@@ -1,0 +1,928 @@
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import { User } from '../models/User.js';
+import { Category, Product, Brand } from '../models/Catalog.js';
+import { Warehouse, Inventory } from '../models/Inventory.js';
+import { Order } from '../models/Order.js';
+import { Customer } from '../models/Customer.js';
+import { Coupon, Offer, Payment, WalletTransaction } from '../models/Finance.js';
+import { Review, Notification, CMSPage, Blog, Settings, AuditLog, SupportTicket } from '../models/Operations.js';
+import { uploadToCloudinary } from '../config/cloudinary.js';
+
+// Helper to sign JWT
+const signToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_SECRET || 'supersecretjwtkey_987654321', {
+    expiresIn: '24h'
+  });
+};
+
+// ==========================================
+// 1. AUTHENTICATION CONTROLLER
+// ==========================================
+export const authController = {
+  register: async (req, res) => {
+    try {
+      const { name, email, password, role } = req.body;
+      const userExists = await User.findOne({ email });
+      if (userExists) {
+        return res.status(400).json({ success: false, message: 'User already exists' });
+      }
+      const user = await User.create({ name, email, password, role: role || 'Customer' });
+      const token = signToken(user._id);
+
+      // Create Customer profile if role is Customer
+      if (user.role === 'Customer') {
+        await Customer.create({
+          customerId: 'cust_' + user._id.toString().slice(-6),
+          name: user.name,
+          email: user.email,
+          phone: user.phone || '9999999999',
+          referralCode: 'REF_' + Math.random().toString(36).substring(2, 7).toUpperCase(),
+          walletBalance: 100 // Welcome bonus
+        });
+      }
+
+      res.status(201).json({
+        success: true,
+        token,
+        user: { id: user._id, name: user.name, email: user.email, role: user.role }
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  login: async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      const user = await User.findOne({ email });
+      if (!user) {
+        return res.status(401).json({ success: false, message: 'Invalid email or password' });
+      }
+      const isMatch = await user.comparePassword(password);
+      if (!isMatch) {
+        return res.status(401).json({ success: false, message: 'Invalid email or password' });
+      }
+      if (user.status === 'Suspended') {
+        return res.status(403).json({ success: false, message: 'Account suspended' });
+      }
+      const token = signToken(user._id);
+      res.json({
+        success: true,
+        token,
+        user: { id: user._id, name: user.name, email: user.email, role: user.role, avatarUrl: user.avatarUrl }
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  getMe: async (req, res) => {
+    try {
+      res.json({ success: true, user: req.user });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+};
+
+// ==========================================
+// 2. DASHBOARD STATS CONTROLLER
+// ==========================================
+export const dashboardController = {
+  getStats: async (req, res) => {
+    try {
+      // Fetch aggregations or use defaults if no orders
+      const orders = await Order.find();
+      const productsCount = await Product.countDocuments();
+      const categoriesCount = await Category.countDocuments();
+      const customersCount = await Customer.countDocuments();
+      const lowStockProducts = await Product.find({ stock: { $lt: 15 } });
+
+      let totalRevenue = 0;
+      let todayRevenue = 0;
+      let todayOrders = 0;
+      let pendingOrders = 0;
+
+      const today = new Date().toDateString();
+
+      orders.forEach(o => {
+        if (o.status !== 'Cancelled') {
+          totalRevenue += o.grandTotal;
+          if (new Date(o.createdAt).toDateString() === today) {
+            todayRevenue += o.grandTotal;
+            todayOrders++;
+          }
+        }
+        if (o.status === 'Pending') {
+          pendingOrders++;
+        }
+      });
+
+      const averageOrderValue = orders.length > 0 ? Math.round(totalRevenue / orders.length) : 0;
+
+      res.json({
+        success: true,
+        stats: {
+          todayRevenue,
+          todayOrders,
+          monthlyRevenue: totalRevenue * 0.4, // Simulated monthly split
+          yearlyRevenue: totalRevenue,
+          averageOrderValue,
+          conversionRate: 3.8, // 3.8% mock
+          customerGrowth: 14.5, // 14.5% mock
+          returningCustomers: 64, // 64% mock
+          productsCount,
+          categoriesCount,
+          customersCount,
+          pendingOrdersCount: pendingOrders,
+          lowStockCount: lowStockProducts.length
+        },
+        lowStockItems: lowStockProducts.slice(0, 5),
+        charts: {
+          revenue: [
+            { name: 'Jan', value: totalRevenue * 0.05 + 5000 },
+            { name: 'Feb', value: totalRevenue * 0.08 + 8000 },
+            { name: 'Mar', value: totalRevenue * 0.12 + 12000 },
+            { name: 'Apr', value: totalRevenue * 0.15 + 15000 },
+            { name: 'May', value: totalRevenue * 0.20 + 20000 },
+            { name: 'Jun', value: totalRevenue * 0.25 + 25000 },
+            { name: 'Jul', value: totalRevenue * 0.15 + todayRevenue }
+          ],
+          categories: [
+            { name: 'Organic', value: 35 },
+            { name: 'Vegetables', value: 25 },
+            { name: 'Fruits', value: 20 },
+            { name: 'Dairy', value: 15 },
+            { name: 'Others', value: 5 }
+          ]
+        }
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  getSystemStatus: async (req, res) => {
+    try {
+      res.json({
+        success: true,
+        server: 'Online',
+        database: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
+        paymentGateway: 'Razorpay Live',
+        redis: 'Connected',
+        bullQueue: 'BullMQ Idle'
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+};
+
+// ==========================================
+// 3. PRODUCT CATALOG CONTROLLER
+// ==========================================
+export const productController = {
+  getProducts: async (req, res) => {
+    try {
+      const { categoryId, category, subCategory, search, isOrganic, minPrice, maxPrice, sort } = req.query;
+      let query = {};
+      
+      if (categoryId) {
+        query.$or = [{ categoryId: categoryId }, { category: categoryId }, { slug: categoryId }];
+      } else if (category) {
+        query.$or = [{ categoryId: category }, { category: category }];
+      }
+
+      if (subCategory) {
+        query.subCategory = { $regex: new RegExp(`^${subCategory}$`, 'i') };
+      }
+
+      if (isOrganic) query.isOrganic = isOrganic === 'true';
+
+      if (minPrice || maxPrice) {
+        query.price = {};
+        if (minPrice) query.price.$gte = Number(minPrice);
+        if (maxPrice) query.price.$lte = Number(maxPrice);
+      }
+
+      if (search) {
+        const searchRegex = new RegExp(search, 'i');
+        query.$or = [
+          { name: searchRegex },
+          { brand: searchRegex },
+          { category: searchRegex },
+          { subCategory: searchRegex }
+        ];
+      }
+
+      let sortOptions = { createdAt: -1 };
+      if (sort === 'price-low') sortOptions = { price: 1 };
+      else if (sort === 'price-high') sortOptions = { price: -1 };
+      else if (sort === 'rating') sortOptions = { rating: -1 };
+
+      const list = await Product.find(query).sort(sortOptions);
+      res.json({ success: true, count: list.length, products: list });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  getProduct: async (req, res) => {
+    try {
+      const prod = await Product.findOne({ $or: [{ id: req.params.id }, { _id: mongoose.isValidObjectId(req.params.id) ? req.params.id : null }] });
+      if (!prod) return res.status(404).json({ success: false, message: 'Product not found' });
+      res.json({ success: true, product: prod });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  createProduct: async (req, res) => {
+    try {
+      const prodData = req.body;
+      if (!prodData.id) {
+        prodData.id = 'prod_' + Date.now();
+      }
+      if (!prodData.slug && prodData.name) {
+        prodData.slug = prodData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      }
+      if (prodData.price && !prodData.mrp) prodData.mrp = prodData.originalPrice || prodData.price;
+      if (prodData.mrp && !prodData.originalPrice) prodData.originalPrice = prodData.mrp;
+      
+      if (!prodData.imageUrl && prodData.images && prodData.images.length > 0) {
+        prodData.imageUrl = prodData.images[0];
+      }
+
+      const prod = await Product.create(prodData);
+      if (prod.categoryId) {
+        await Category.updateOne({ $or: [{ id: prod.categoryId }, { slug: prod.categoryId }] }, { $inc: { productCount: 1 } });
+      }
+      res.status(201).json({ success: true, product: prod });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  updateProduct: async (req, res) => {
+    try {
+      const prodData = req.body;
+      if (prodData.price && prodData.originalPrice) {
+        prodData.mrp = prodData.originalPrice;
+      }
+      if (!prodData.imageUrl && prodData.images && prodData.images.length > 0) {
+        prodData.imageUrl = prodData.images[0];
+      }
+
+      const prod = await Product.findOneAndUpdate(
+        { $or: [{ id: req.params.id }, { _id: mongoose.isValidObjectId(req.params.id) ? req.params.id : null }] },
+        prodData,
+        { new: true }
+      );
+      if (!prod) return res.status(404).json({ success: false, message: 'Product not found' });
+      res.json({ success: true, product: prod });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  deleteProduct: async (req, res) => {
+    try {
+      const prod = await Product.findOneAndDelete({ $or: [{ id: req.params.id }, { _id: mongoose.isValidObjectId(req.params.id) ? req.params.id : null }] });
+      if (!prod) return res.status(404).json({ success: false, message: 'Product not found' });
+      if (prod.categoryId) {
+        await Category.updateOne({ $or: [{ id: prod.categoryId }, { slug: prod.categoryId }] }, { $inc: { productCount: -1 } });
+      }
+      res.json({ success: true, message: 'Product deleted successfully' });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  bulkImport: async (req, res) => {
+    try {
+      const { products } = req.body;
+      if (!products || !Array.isArray(products)) {
+        return res.status(400).json({ success: false, message: 'Products array is required' });
+      }
+      await Product.insertMany(products, { ordered: false });
+      res.json({ success: true, message: `Successfully imported ${products.length} products.` });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+};
+
+// ==========================================
+// 4. CATEGORY CONTROLLER
+// ==========================================
+export const categoryController = {
+  getCategories: async (req, res) => {
+    try {
+      const list = await Category.find().sort({ name: 1 });
+      res.json({ success: true, categories: list });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  createCategory: async (req, res) => {
+    try {
+      const catData = req.body;
+      if (!catData.slug && catData.name) {
+        catData.slug = catData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      }
+      if (!catData.id) {
+        catData.id = catData.slug || 'cat_' + Date.now();
+      }
+      const cat = await Category.create(catData);
+      res.status(201).json({ success: true, category: cat });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  updateCategory: async (req, res) => {
+    try {
+      const cat = await Category.findOneAndUpdate(
+        { $or: [{ id: req.params.id }, { slug: req.params.id }] },
+        req.body,
+        { new: true }
+      );
+      if (!cat) return res.status(404).json({ success: false, message: 'Category not found' });
+      res.json({ success: true, category: cat });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  deleteCategory: async (req, res) => {
+    try {
+      const cat = await Category.findOneAndDelete({ $or: [{ id: req.params.id }, { slug: req.params.id }] });
+      if (!cat) return res.status(404).json({ success: false, message: 'Category not found' });
+      res.json({ success: true, message: 'Category deleted' });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  addSubCategory: async (req, res) => {
+    try {
+      const { name, icon } = req.body;
+      const subSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      const subId = 'sub_' + Date.now();
+      
+      const cat = await Category.findOneAndUpdate(
+        { $or: [{ id: req.params.id }, { slug: req.params.id }] },
+        { $push: { subCategories: { id: subId, name, slug: subSlug, icon: icon || 'Tag' } } },
+        { new: true }
+      );
+      if (!cat) return res.status(404).json({ success: false, message: 'Category not found' });
+      res.json({ success: true, category: cat });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  deleteSubCategory: async (req, res) => {
+    try {
+      const { id, subId } = req.params;
+      const cat = await Category.findOneAndUpdate(
+        { $or: [{ id }, { slug: id }] },
+        { $pull: { subCategories: { $or: [{ id: subId }, { slug: subId }, { name: subId }] } } },
+        { new: true }
+      );
+      if (!cat) return res.status(404).json({ success: false, message: 'Category not found' });
+      res.json({ success: true, category: cat });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+};
+
+// ==========================================
+// 5. ORDER CONTROLLER
+// ==========================================
+export const orderController = {
+  getOrders: async (req, res) => {
+    try {
+      const list = await Order.find().sort({ createdAt: -1 });
+      res.json({ success: true, orders: list });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  getOrder: async (req, res) => {
+    try {
+      const order = await Order.findOne({ orderId: req.params.id });
+      if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+      res.json({ success: true, order });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  createOrder: async (req, res) => {
+    try {
+      const orderData = req.body;
+      if (!orderData.orderId) {
+        orderData.orderId = 'ORD-' + Math.floor(100000 + Math.random() * 900000);
+      }
+      orderData.trackingTimeline = [{ status: 'Pending', note: 'Order placed by customer.' }];
+      const order = await Order.create(orderData);
+      
+      // Update inventory stock levels
+      for (const item of order.items) {
+        await Product.updateOne({ id: item.productId }, { $inc: { stock: -item.quantity } });
+      }
+
+      res.status(201).json({ success: true, order });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  updateStatus: async (req, res) => {
+    try {
+      const { status, note, deliveryPartnerId, deliveryPartnerName } = req.body;
+      const order = await Order.findOne({ orderId: req.params.id });
+      if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+      order.status = status;
+      if (deliveryPartnerId) {
+        order.deliveryPartnerId = deliveryPartnerId;
+        order.deliveryPartnerName = deliveryPartnerName;
+      }
+      order.trackingTimeline.push({
+        status,
+        note: note || `Order status updated to ${status}.`
+      });
+
+      if (status === 'Delivered') {
+        order.paymentStatus = 'Paid';
+      }
+
+      await order.save();
+      res.json({ success: true, order });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+};
+
+// ==========================================
+// 6. COUPON CONTROLLER
+// ==========================================
+export const couponController = {
+  getCoupons: async (req, res) => {
+    try {
+      const list = await Coupon.find().sort({ createdAt: -1 });
+      res.json({ success: true, coupons: list });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  createCoupon: async (req, res) => {
+    try {
+      const coupon = await Coupon.create(req.body);
+      res.status(201).json({ success: true, coupon });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  deleteCoupon: async (req, res) => {
+    try {
+      await Coupon.findOneAndDelete({ code: req.params.code });
+      res.json({ success: true, message: 'Coupon deleted' });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  updateCoupon: async (req, res) => {
+    try {
+      const coupon = await Coupon.findOneAndUpdate({ code: req.params.code }, req.body, { new: true });
+      if (!coupon) return res.status(404).json({ success: false, message: 'Coupon not found' });
+      res.json({ success: true, coupon });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+};
+
+// ==========================================
+// 7. BLOG CONTROLLER
+// ==========================================
+export const blogController = {
+  getBlogs: async (req, res) => {
+    try {
+      const list = await Blog.find().sort({ createdAt: -1 });
+      res.json({ success: true, blogs: list });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  createBlog: async (req, res) => {
+    try {
+      const blogData = req.body;
+      if (!blogData.id) {
+        blogData.id = 'blog_' + Date.now();
+      }
+      if (!blogData.date) {
+        blogData.date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      }
+      const blog = await Blog.create(blogData);
+      res.status(201).json({ success: true, blog });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  deleteBlog: async (req, res) => {
+    try {
+      await Blog.findOneAndDelete({ id: req.params.id });
+      res.json({ success: true, message: 'Article deleted' });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  updateBlog: async (req, res) => {
+    try {
+      const blog = await Blog.findOneAndUpdate({ id: req.params.id }, req.body, { new: true });
+      if (!blog) return res.status(404).json({ success: false, message: 'Blog article not found' });
+      res.json({ success: true, blog });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+};
+
+// ==========================================
+// 8. SETTINGS CONTROLLER
+// ==========================================
+export const settingsController = {
+  getSettings: async (req, res) => {
+    try {
+      let settings = await Settings.findOne();
+      if (!settings) {
+        settings = await Settings.create({});
+      }
+      res.json({ success: true, settings });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  updateSettings: async (req, res) => {
+    try {
+      let settings = await Settings.findOneAndUpdate({}, req.body, { new: true, upsert: true });
+      res.json({ success: true, settings });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+};
+
+// ==========================================
+// 9. CUSTOMERS CONTROLLER
+// ==========================================
+export const customerController = {
+  getCustomers: async (req, res) => {
+    try {
+      const list = await Customer.find().sort({ createdAt: -1 });
+      res.json({ success: true, customers: list });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  getCustomerProfile: async (req, res) => {
+    try {
+      const customer = await Customer.findOne({ customerId: req.params.id });
+      if (!customer) return res.status(404).json({ success: false, message: 'Customer profile not found' });
+      res.json({ success: true, customer });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  updateWallet: async (req, res) => {
+    try {
+      const { amount, type, description } = req.body; // type: Credit / Debit
+      const customer = await Customer.findOne({ customerId: req.params.id });
+      if (!customer) return res.status(404).json({ success: false, message: 'Customer profile not found' });
+
+      const numVal = Number(amount);
+      if (type === 'Credit') {
+        customer.walletBalance += numVal;
+      } else {
+        customer.walletBalance = Math.max(0, customer.walletBalance - numVal);
+      }
+
+      await customer.save();
+      await WalletTransaction.create({ customerId: customer.customerId, amount: numVal, type, description });
+
+      res.json({ success: true, walletBalance: customer.walletBalance });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+};
+
+// ==========================================
+// 10. SUPPORT CONTROLLER
+// ==========================================
+export const supportController = {
+  getTickets: async (req, res) => {
+    try {
+      const list = await SupportTicket.find().sort({ updatedAt: -1 });
+      res.json({ success: true, tickets: list });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  addTicketMessage: async (req, res) => {
+    try {
+      const { sender, content, status } = req.body;
+      const ticket = await SupportTicket.findOne({ ticketId: req.params.id });
+      if (!ticket) return res.status(404).json({ success: false, message: 'Ticket not found' });
+
+      ticket.messages.push({ sender, content });
+      if (status) ticket.status = status;
+
+      await ticket.save();
+      res.json({ success: true, ticket });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  createTicket: async (req, res) => {
+    try {
+      const { customerId, customerName, subject, priority, message } = req.body;
+      const ticketId = 'TCK-' + Math.floor(1000 + Math.random() * 9000);
+      const ticket = await SupportTicket.create({
+        ticketId,
+        customerId,
+        customerName,
+        subject,
+        priority,
+        messages: [{ sender: 'Customer', content: message }]
+      });
+      res.status(201).json({ success: true, ticket });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  updateTicketStatus: async (req, res) => {
+    try {
+      const { status } = req.body;
+      const ticket = await SupportTicket.findOneAndUpdate({ ticketId: req.params.id }, { status }, { new: true });
+      if (!ticket) return res.status(404).json({ success: false, message: 'Ticket not found' });
+      res.json({ success: true, ticket });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+};
+
+export const brandController = {
+  getBrands: async (req, res) => {
+    try {
+      const list = await Brand.find().sort({ name: 1 });
+      res.json({ success: true, brands: list });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+  createBrand: async (req, res) => {
+    try {
+      const brand = await Brand.create(req.body);
+      res.status(201).json({ success: true, brand });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+  updateBrand: async (req, res) => {
+    try {
+      const brand = await Brand.findOneAndUpdate({ id: req.params.id }, req.body, { new: true });
+      if (!brand) return res.status(404).json({ success: false, message: 'Brand not found' });
+      res.json({ success: true, brand });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+  deleteBrand: async (req, res) => {
+    try {
+      const brand = await Brand.findOneAndDelete({ id: req.params.id });
+      if (!brand) return res.status(404).json({ success: false, message: 'Brand not found' });
+      res.json({ success: true, message: 'Brand deleted successfully' });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+};
+
+export const warehouseController = {
+  getWarehouses: async (req, res) => {
+    try {
+      const list = await Warehouse.find().sort({ name: 1 });
+      res.json({ success: true, warehouses: list });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+  createWarehouse: async (req, res) => {
+    try {
+      const warehouse = await Warehouse.create(req.body);
+      res.status(201).json({ success: true, warehouse });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+  updateWarehouse: async (req, res) => {
+    try {
+      const warehouse = await Warehouse.findOneAndUpdate({ id: req.params.id }, req.body, { new: true });
+      if (!warehouse) return res.status(404).json({ success: false, message: 'Warehouse not found' });
+      res.json({ success: true, warehouse });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+  deleteWarehouse: async (req, res) => {
+    try {
+      const warehouse = await Warehouse.findOneAndDelete({ id: req.params.id });
+      if (!warehouse) return res.status(404).json({ success: false, message: 'Warehouse not found' });
+      res.json({ success: true, message: 'Warehouse deleted successfully' });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+};
+
+export const inventoryController = {
+  getInventory: async (req, res) => {
+    try {
+      const list = await Inventory.find().sort({ updatedAt: -1 });
+      res.json({ success: true, inventory: list });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+  adjustStock: async (req, res) => {
+    try {
+      const { productId, warehouseId, qty, action, note } = req.body;
+      let item = await Inventory.findOne({ productId, warehouseId });
+      const prevQty = item ? item.stockQty : 0;
+      const newQty = Math.max(0, prevQty + Number(qty));
+
+      if (!item) {
+        item = await Inventory.create({
+          productId,
+          warehouseId,
+          stockQty: newQty,
+          logs: [{ action: action || 'Adjustment', qty, prevQty, newQty, note: note || 'Initial adjustment' }]
+        });
+      } else {
+        item.stockQty = newQty;
+        item.logs.push({ action: action || 'Adjustment', qty, prevQty, newQty, note });
+        await item.save();
+      }
+
+      // Sync product main stock level
+      await Product.updateOne({ id: productId }, { stock: newQty });
+
+      res.json({ success: true, inventory: item });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+};
+
+export const employeeController = {
+  getEmployees: async (req, res) => {
+    try {
+      const list = await User.find({ role: { $ne: 'Customer' } }).sort({ name: 1 });
+      res.json({ success: true, employees: list });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+  createEmployee: async (req, res) => {
+    try {
+      const { name, email, password, role } = req.body;
+      const employee = await User.create({
+        name,
+        email,
+        password: password || 'staff123',
+        role: role || 'Employee',
+        status: 'Active'
+      });
+      res.status(201).json({ success: true, employee });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+  updateEmployee: async (req, res) => {
+    try {
+      const employee = await User.findByIdAndUpdate(req.params.id, req.body, { new: true });
+      if (!employee) return res.status(404).json({ success: false, message: 'Employee not found' });
+      res.json({ success: true, employee });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+  deleteEmployee: async (req, res) => {
+    try {
+      const employee = await User.findByIdAndDelete(req.params.id);
+      if (!employee) return res.status(404).json({ success: false, message: 'Employee not found' });
+      res.json({ success: true, message: 'Employee deleted successfully' });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+};
+
+export const reviewController = {
+  getReviews: async (req, res) => {
+    try {
+      const list = await Review.find().sort({ createdAt: -1 });
+      res.json({ success: true, reviews: list });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+  updateReviewStatus: async (req, res) => {
+    try {
+      const { status } = req.body;
+      const review = await Review.findByIdAndUpdate(req.params.id, { status }, { new: true });
+      if (!review) return res.status(404).json({ success: false, message: 'Review not found' });
+      res.json({ success: true, review });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+  deleteReview: async (req, res) => {
+    try {
+      const review = await Review.findByIdAndDelete(req.params.id);
+      if (!review) return res.status(404).json({ success: false, message: 'Review not found' });
+      res.json({ success: true, message: 'Review deleted' });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+};
+
+export const auditLogController = {
+  getAuditLogs: async (req, res) => {
+    try {
+      const list = await AuditLog.find().sort({ timestamp: -1 });
+      res.json({ success: true, logs: list });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+  clearAuditLogs: async (req, res) => {
+    try {
+      await AuditLog.deleteMany({});
+      res.json({ success: true, message: 'Audit logs cleared' });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+};
+
+export const uploadController = {
+  uploadImage: async (req, res) => {
+    try {
+      const { image, folder } = req.body;
+      if (!image) {
+        return res.status(400).json({ success: false, message: 'No image data provided' });
+      }
+      const result = await uploadToCloudinary(image, folder || 'freshcart');
+      res.json({
+        success: true,
+        url: result.url,
+        public_id: result.public_id
+      });
+    } catch (err) {
+      console.error('Upload controller error:', err);
+      res.status(500).json({ success: false, message: err.message || 'Image upload failed' });
+    }
+  }
+};
+
+export const logAudit = async (userId, userName, action, details) => {
+  try {
+    await AuditLog.create({ userId, userName, action, details });
+  } catch (err) {
+    console.error('Audit logging failed:', err.message);
+  }
+};

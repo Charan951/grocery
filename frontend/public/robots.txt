@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+
+# Exclude Admin panel from crawl logs
+Disallow: /admin
+
+Sitemap: https://freshcart.com/sitemap.xml
