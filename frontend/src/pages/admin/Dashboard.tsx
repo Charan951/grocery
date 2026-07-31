@@ -8,7 +8,8 @@ import {
 import { useCMS } from '../../context/CMSContext';
 
 export const Dashboard: React.FC = () => {
-  const { products } = useCMS();
+  const { products, activeHub, warehouses } = useCMS();
+  const activeWarehouse = warehouses.find(w => w.id === activeHub);
   const [stats, setStats] = useState({
     todayRevenue: 0,
     todayOrders: 0,
@@ -118,7 +119,7 @@ export const Dashboard: React.FC = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-extrabold text-text-primary">Welcome, Rohan Murthy</h1>
-          <p className="text-xs text-text-secondary font-medium">Enterprise administrator • South Bengaluru Zone</p>
+          <p className="text-xs text-text-secondary font-medium">Enterprise administrator • Central Management</p>
         </div>
         <button 
           onClick={handleRefreshStats}

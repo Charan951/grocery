@@ -144,28 +144,13 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ onQuickView }) =
         }}
       />
 
-      <div className="container mx-auto px-4 md:px-6 max-w-[1200px] py-6 pb-20">
+      <div className="container mx-auto px-4 md:px-6 max-w-[1200px] py-4 pb-12">
         
-        {/* Breadcrumbs Navigation */}
-        <div className="flex items-center gap-1.5 text-[11px] font-bold text-text-tertiary mb-6">
-          <Link to="/" className="hover:text-emerald-600 transition-colors">Home</Link>
-          <span>›</span>
-          <Link to={`/products?category=${product.categoryId}`} className="hover:text-emerald-600 transition-colors">{categoryName}</Link>
-          {product.subCategory && (
-            <>
-              <span>›</span>
-              <span className="text-text-secondary">{product.subCategory}</span>
-            </>
-          )}
-          <span>›</span>
-          <span className="text-text-primary font-black">{product.name}</span>
-        </div>
-
         {/* 2-Column Zepto Layout Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_480px] gap-8 items-start mb-16">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_480px] gap-8 items-start mb-12 pt-2">
           
-          {/* LEFT COLUMN: Vertical Gallery & Add To Cart Button */}
-          <div className="flex flex-col gap-5 sticky top-20">
+          {/* LEFT COLUMN: Vertical Gallery & Add To Cart Button (100% Frozen flush under constant sticky header) */}
+          <div className="flex flex-col gap-4 lg:sticky lg:top-[168px] self-start z-10">
             
             <div className="flex gap-4 items-start">
               {/* Vertical Thumbnail Strip */}
@@ -184,7 +169,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ onQuickView }) =
               </div>
 
               {/* Main Product Image Container */}
-              <div className="bg-surface border border-divider/70 rounded-2xl p-6 flex-1 aspect-square max-h-[460px] flex items-center justify-center overflow-hidden shadow-xs relative">
+              <div className="bg-surface border border-divider/70 rounded-2xl p-6 flex-1 aspect-square max-h-[380px] flex items-center justify-center overflow-hidden shadow-xs relative">
                 <img src={galleryImages[activeThumb]} alt={product.name} className="max-h-full max-w-full object-contain" />
               </div>
             </div>
@@ -192,7 +177,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ onQuickView }) =
             {/* Bright Magenta/Pink Add to Cart Button Full Width */}
             <motion.button 
               onClick={handleAddToCart}
-              className="w-full bg-[#ff0060] hover:bg-[#e00054] text-white font-black py-4 px-6 rounded-2xl text-base flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
+              className="w-full bg-[#ff0060] hover:bg-[#e00054] text-white font-black py-3.5 px-6 rounded-2xl text-base flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
               whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.99 }}
             >
@@ -202,8 +187,23 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ onQuickView }) =
 
           </div>
 
-          {/* RIGHT COLUMN: Stacked Cards (Zepto Style) */}
-          <div className="flex flex-col gap-5">
+          {/* RIGHT COLUMN: Independent Scrollable Details Panel (Image stays frozen while right side scrolls) */}
+          <div className="flex flex-col gap-5 lg:max-h-[calc(100vh-180px)] lg:overflow-y-auto lg:pr-2 scrollbar-none">
+            
+            {/* Breadcrumbs Navigation */}
+            <div className="flex items-center gap-1.5 text-[11px] font-bold text-text-tertiary">
+              <Link to="/" className="hover:text-emerald-600 transition-colors">Home</Link>
+              <span>›</span>
+              <Link to={`/products?category=${product.categoryId}`} className="hover:text-emerald-600 transition-colors">{categoryName}</Link>
+              {product.subCategory && (
+                <>
+                  <span>›</span>
+                  <span className="text-text-secondary">{product.subCategory}</span>
+                </>
+              )}
+              <span>›</span>
+              <span className="text-text-primary font-black">{product.name}</span>
+            </div>
             
             {/* CARD 1: Title, Quantity, Price Tag & Delivery Policy */}
             <div className="bg-surface border border-divider/70 rounded-2xl p-6 shadow-xs flex flex-col gap-4">

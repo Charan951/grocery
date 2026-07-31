@@ -3,15 +3,16 @@ import {
   FolderTree, Award, Boxes, Warehouse, Users, Truck, UserCheck, Ticket, 
   Tag, Megaphone, Layers, DollarSign, FileText, LineChart, Star, LifeBuoy, 
   Bell, Settings, ShieldAlert, Plus, Trash2, Edit2, Search, ArrowRight, 
-  Send, UserMinus, Shield, Key, Download, CheckSquare, Sparkles, RefreshCw
+  Send, UserMinus, Shield, Key, Download, CheckSquare, Sparkles, RefreshCw,
+  ArrowUp, ArrowDown, X
 } from 'lucide-react';
-import { useCMS } from '../../context/CMSContext';
+import { useCMS, getCategoryImage } from '../../context/CMSContext';
 
 // ==========================================
 // 1. CATEGORIES MODULE
 // ==========================================
 export const CategoriesModule: React.FC = () => {
-  const { categories, addCategory, deleteCategory, uploadImage } = useCMS();
+  const { categories, addCategory, updateCategory, deleteCategory, moveCategory, uploadImage } = useCMS();
   const [showAdd, setShowAdd] = useState(false);
   const [editingCategory, setEditingCategory] = useState<any | null>(null);
   const [cName, setCName] = useState('');
@@ -28,7 +29,7 @@ export const CategoriesModule: React.FC = () => {
     setEditingCategory(null);
     setCName('');
     setCColor('#4CAF50');
-    setCIcon('Leaf');
+    setCIcon('https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=200&auto=format&fit=crop');
     setShowAdd(true);
   };
 
@@ -36,7 +37,7 @@ export const CategoriesModule: React.FC = () => {
     setEditingCategory(cat);
     setCName(cat.name);
     setCColor(cat.color || '#4CAF50');
-    setCIcon(cat.icon || 'Leaf');
+    setCIcon(cat.icon || 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=200&auto=format&fit=crop');
     setShowAdd(true);
   };
 
@@ -50,8 +51,9 @@ export const CategoriesModule: React.FC = () => {
         icon: cIcon,
         color: cColor
       };
+      updateCategory(editingCategory.id, updatedData);
       try {
-        const res = await fetch(`${API_URL}/categories/${editingCategory.id}`, {
+        await fetch(`${API_URL}/categories/${editingCategory.id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -59,17 +61,10 @@ export const CategoriesModule: React.FC = () => {
           },
           body: JSON.stringify(updatedData)
         });
-        const data = await res.json();
-        if (data.success) {
-          // Update in context/state (local fallback handled)
-          alert('Category updated successfully on backend!');
-          window.location.reload(); // Refresh to sync
-        } else {
-          alert('Failed to update category: ' + (data.message || 'Unknown error'));
-        }
       } catch (err) {
-        alert('Offline update: Failed to contact backend');
+        console.warn('Backend update skipped, saved locally');
       }
+      alert('Category updated successfully!');
     } else {
       // Add Mode
       const catId = 'cat_' + cName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '');
@@ -95,7 +90,8 @@ export const CategoriesModule: React.FC = () => {
           addCategory(data.category || catData);
           alert(`Category '${cName}' created successfully on backend!`);
         } else {
-          alert('Failed to save category on backend: ' + (data.message || 'Unknown error'));
+          addCategory(catData);
+          alert(`Category '${cName}' saved locally!`);
         }
       } catch (err) {
         addCategory(catData);
@@ -121,7 +117,8 @@ export const CategoriesModule: React.FC = () => {
         deleteCategory(id);
         alert('Category deleted successfully on backend!');
       } else {
-        alert('Failed to delete category on backend: ' + (data.message || 'Unknown error'));
+        deleteCategory(id);
+        alert('Category deleted locally!');
       }
     } catch (err) {
       deleteCategory(id);
@@ -136,221 +133,194 @@ export const CategoriesModule: React.FC = () => {
           <h2 className="font-extrabold text-sm text-text-primary">Categories Directory</h2>
           <p className="text-[10px] text-text-secondary font-medium">Manage product departments and hierarchy</p>
         </div>
-        <button onClick={handleOpenAdd} className="flex items-center gap-1 bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[10px] hover:bg-secondary cursor-pointer">
-          <Plus size={12} /> Add Category
+        <button onClick={handleOpenAdd} className="flex items-center gap-1 bg-primary text-white font-bold py-2 px-5 rounded-full text-xs hover:bg-secondary transition-colors cursor-pointer shadow-md">
+          <Plus size={14} /> Add Category
         </button>
       </div>
 
+      {/* Pop-up Modal Window for Add / Edit Category */}
       {showAdd && (
-        <div className="bg-background p-4 rounded-2xl border border-divider flex flex-col gap-3">
-          <h3 className="font-bold text-xs">{editingCategory ? 'Edit Department' : 'Add Department'}</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <input type="text" placeholder="Department Name (e.g. Dairy, Bread & Eggs)" value={cName} onChange={(e) => setCName(e.target.value)} className="sm:col-span-2 px-3 py-1.5 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary" />
-            <input type="color" value={cColor} onChange={(e) => setCColor(e.target.value)} className="w-full h-8 border border-divider rounded-xl cursor-pointer bg-surface" />
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold text-text-secondary">Category Icon / Image (Cloudinary or URL)</label>
-            <div className="flex gap-2 items-center">
-              <input type="text" placeholder="https://res.cloudinary.com/..." value={cIcon} onChange={(e) => setCIcon(e.target.value)} className="flex-1 px-3 py-1.5 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary" />
-              <label className="bg-emerald-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-xl cursor-pointer hover:bg-emerald-700 transition-colors flex items-center gap-1 flex-shrink-0">
-                <span>Upload</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onloadend = async () => {
-                        try {
-                          const uploadedUrl = await uploadImage(reader.result as string, 'freshcart/categories');
-                          setCIcon(uploadedUrl);
-                          alert('✅ Category image uploaded to Cloudinary!');
-                        } catch (err: any) {
-                          alert('❌ Upload Error: ' + err.message);
-                        }
-                      };
-                      reader.readAsDataURL(file);
-                    }
-                  }}
-                />
-              </label>
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <button onClick={handleAddCategory} className="bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[10px] cursor-pointer">Save Department</button>
-            <button onClick={() => { setShowAdd(false); setEditingCategory(null); }} className="bg-surface text-text-secondary border border-divider font-bold py-1.5 px-4 rounded-full text-[10px] cursor-pointer">Cancel</button>
-          </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {categories.map(c => (
-          <div key={c.id} className="p-4 rounded-2xl border border-divider bg-background/50 flex flex-col gap-2 relative group">
-            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+        <div 
+          className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowAdd(false);
+              setEditingCategory(null);
+            }
+          }}
+        >
+          <div className="bg-surface border border-divider p-6 rounded-3xl shadow-2xl w-[520px] max-w-[92vw] flex-shrink-0 flex flex-col gap-4 relative animate-in fade-in zoom-in duration-200 my-auto">
+            <div className="flex justify-between items-center pb-3 border-b border-divider">
+              <h3 className="font-extrabold text-base text-text-primary">
+                {editingCategory ? 'Edit Department' : 'Add Department'}
+              </h3>
               <button 
-                onClick={() => handleOpenEdit(c)}
-                className="p-1.5 rounded-lg bg-surface border border-divider text-text-secondary hover:text-primary hover:bg-primary/10 cursor-pointer"
-                title="Edit Category"
+                onClick={() => { setShowAdd(false); setEditingCategory(null); }}
+                className="p-1.5 rounded-full hover:bg-background text-text-secondary hover:text-text-primary cursor-pointer transition-colors"
               >
-                <Edit2 size={11} />
-              </button>
-              <button 
-                onClick={() => handleDeleteCategory(c.id)}
-                className="p-1.5 rounded-lg bg-surface border border-divider text-text-secondary hover:text-error hover:bg-error/10 cursor-pointer"
-                title="Delete Category"
-              >
-                <Trash2 size={11} />
+                <X size={18} />
               </button>
             </div>
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white" style={{ backgroundColor: c.color || '#4CAF50' }}>
-              <FolderTree size={16} />
-            </div>
-            <div>
-              <div className="font-extrabold text-xs text-text-primary">{c.name}</div>
-              <div className="text-[9px] text-text-secondary font-bold uppercase">{c.productCount || 0} Products</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
 
-export const BrandsModule: React.FC = () => {
-  const [brands, setBrands] = useState<any[]>([]);
-  const [showAdd, setShowAdd] = useState(false);
-  const [name, setName] = useState('');
-  const [logo, setLogo] = useState('✨');
-
-  const API_URL = 'http://localhost:5000/api';
-  const getAuthHeader = (): Record<string, string> => {
-    const token = localStorage.getItem('admin_token');
-    return token ? { 'Authorization': `Bearer ${token}` } : {};
-  };
-
-  const fetchBrands = async () => {
-    try {
-      const res = await fetch(`${API_URL}/brands`);
-      const data = await res.json();
-      if (data.success && data.brands) {
-        setBrands(data.brands);
-      }
-    } catch (e) {
-      console.warn('Failed to fetch brands');
-    }
-  };
-
-  useEffect(() => {
-    fetchBrands();
-  }, []);
-
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) return;
-
-    const brandData = {
-      id: 'brand_' + name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, ''),
-      name: name.trim(),
-      logoUrl: logo
-    };
-
-    try {
-      const res = await fetch(`${API_URL}/brands`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...getAuthHeader()
-        },
-        body: JSON.stringify(brandData)
-      });
-      const data = await res.json();
-      if (data.success) {
-        setBrands(prev => [data.brand, ...prev]);
-        alert('Brand added successfully on backend!');
-      } else {
-        alert('Failed to save brand: ' + (data.message || 'Unknown error'));
-      }
-    } catch (err) {
-      alert('Failed to create brand.');
-    }
-
-    setName('');
-    setShowAdd(false);
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this brand?')) return;
-
-    try {
-      const res = await fetch(`${API_URL}/brands/${id}`, {
-        method: 'DELETE',
-        headers: getAuthHeader()
-      });
-      const data = await res.json();
-      if (data.success) {
-        setBrands(prev => prev.filter(b => b.id !== id));
-        alert('Brand deleted successfully!');
-      } else {
-        alert('Failed to delete brand: ' + (data.message || 'Unknown error'));
-      }
-    } catch (err) {
-      alert('Failed to delete brand.');
-    }
-  };
-
-  return (
-    <div className="bg-surface border border-divider p-6 rounded-[28px] shadow-card flex flex-col gap-6">
-      <div className="flex justify-between items-center pb-3 border-b border-divider">
-        <div>
-          <h2 className="font-extrabold text-sm text-text-primary">Brands & Manufacturers</h2>
-          <p className="text-[10px] text-text-secondary font-medium">Coordinate partners, brand logos, and listings count</p>
-        </div>
-        <button onClick={() => setShowAdd(true)} className="flex items-center gap-1 bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[10px] hover:bg-secondary cursor-pointer">
-          <Plus size={12} /> Add Brand
-        </button>
-      </div>
-
-      {showAdd && (
-        <form onSubmit={handleAdd} className="bg-background p-4 rounded-2xl border border-divider flex flex-col gap-3">
-          <h3 className="font-bold text-xs">Add Partner Brand</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <input type="text" placeholder="e.g. Organic Valley" value={name} onChange={(e) => setName(e.target.value)} className="px-3 py-1.5 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary" required />
-            <input type="text" placeholder="Emoji logo (e.g. 🥦)" value={logo} onChange={(e) => setLogo(e.target.value)} className="px-3 py-1.5 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary" required />
-          </div>
-          <div className="flex gap-2">
-            <button type="submit" className="bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[10px] cursor-pointer">Save</button>
-            <button type="button" onClick={() => setShowAdd(false)} className="bg-surface text-text-secondary border border-divider font-bold py-1.5 px-4 rounded-full text-[10px] cursor-pointer">Cancel</button>
-          </div>
-        </form>
-      )}
-
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {brands.map(b => (
-          <div key={b.id} className="p-4 rounded-2xl border border-divider bg-background flex items-center justify-between shadow-sm relative group">
-            <div className="flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-surface border border-divider flex items-center justify-center text-lg">{b.logoUrl || '✨'}</div>
+            <div className="flex flex-col gap-4">
               <div>
-                <div className="font-extrabold text-xs text-text-primary">{b.name}</div>
-                <div className="text-[9px] text-text-secondary font-semibold">Active partner</div>
+                <label className="text-[11px] font-bold text-text-secondary uppercase mb-1.5 block">Department Name</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Dairy, Bread & Eggs" 
+                  value={cName} 
+                  onChange={(e) => setCName(e.target.value)} 
+                  className="w-full px-4 py-2.5 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary font-semibold" 
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-[11px] font-bold text-text-secondary uppercase">Category Icon / Image (Cloudinary or URL)</label>
+                <div className="flex gap-2 items-center">
+                  <input 
+                    type="text" 
+                    placeholder="https://res.cloudinary.com/..." 
+                    value={cIcon} 
+                    onChange={(e) => setCIcon(e.target.value)} 
+                    className="flex-1 px-4 py-2.5 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary" 
+                  />
+                  <label className="bg-emerald-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl cursor-pointer hover:bg-emerald-700 transition-colors flex items-center gap-1 flex-shrink-0">
+                    <span>Upload</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = async () => {
+                            try {
+                              const uploadedUrl = await uploadImage(reader.result as string, 'freshcart/categories');
+                              setCIcon(uploadedUrl);
+                              alert('✅ Category image uploaded to Cloudinary!');
+                            } catch (err: any) {
+                              alert('❌ Upload Error: ' + err.message);
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+
+                {/* Big Live Image Preview (100x148px 25:37) */}
+                {cIcon && (cIcon.startsWith('http') || cIcon.startsWith('data:') || cIcon.startsWith('/')) && (
+                  <div className="mt-2 flex items-center justify-between p-4 bg-background rounded-2xl border border-divider">
+                    <span className="text-[11px] font-bold text-text-secondary uppercase">Big Preview (100 × 148 px):</span>
+                    <div className="w-[100px] h-[148px] min-w-[100px] min-h-[148px] rounded-2xl border border-divider overflow-hidden bg-surface p-1 shadow-md flex items-center justify-center">
+                      <img 
+                        src={cIcon} 
+                        alt="Category Preview" 
+                        className="w-full h-full object-contain rounded-xl" 
+                        style={{ aspectRatio: '25/37' }}
+                        onError={(e) => { (e.target as any).src = 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=200&auto=format&fit=crop'; }} 
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-            <button 
-              onClick={() => handleDelete(b.id)}
-              className="p-1.5 rounded-lg bg-surface border border-divider text-text-secondary hover:text-error hover:bg-error/10 opacity-0 group-hover:opacity-100 transition-all cursor-pointer absolute top-2 right-2"
-              title="Delete Brand"
-            >
-              <Trash2 size={11} />
-            </button>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-divider mt-2">
+              <button 
+                onClick={() => { setShowAdd(false); setEditingCategory(null); }} 
+                className="bg-surface text-text-secondary border border-divider font-bold py-2.5 px-6 rounded-full text-xs hover:bg-background transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleAddCategory} 
+                className="bg-primary text-white font-bold py-2.5 px-6 rounded-full text-xs hover:bg-secondary transition-colors cursor-pointer shadow-md"
+              >
+                Save Department
+              </button>
+            </div>
           </div>
-        ))}
+        </div>
+      )}
+
+      <div className="flex flex-col gap-3.5">
+        {categories.map((c, index) => {
+          const imgSrc = getCategoryImage(c);
+          return (
+            <div key={c.id} className="p-4 rounded-2xl border border-divider bg-background/50 flex items-center justify-between hover:border-primary/50 hover:shadow-md transition-all group">
+              <div className="flex items-center gap-4">
+                {/* Order Number Badge */}
+                <div className="w-9 h-9 rounded-xl bg-surface border border-divider text-xs font-black text-primary flex items-center justify-center flex-shrink-0 shadow-sm" title={`Category Position #${index + 1}`}>
+                  #{index + 1}
+                </div>
+
+                {/* Big Category Thumbnail (100x148px Aspect 25:37) */}
+                <div className="w-[80px] h-[118px] rounded-2xl border border-divider overflow-hidden bg-surface flex items-center justify-center p-1.5 flex-shrink-0 shadow-sm">
+                  <img 
+                    src={imgSrc} 
+                    alt={c.name} 
+                    className="w-full h-full object-contain rounded-xl" 
+                    style={{ aspectRatio: '25/37' }} 
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&auto=format&fit=crop';
+                    }}
+                  />
+                </div>
+                <div>
+                  <div className="font-extrabold text-base text-text-primary">{c.name}</div>
+                  <div className="text-[11px] text-text-secondary font-bold uppercase mt-0.5">{c.productCount || 0} Products</div>
+                  <div className="inline-block mt-1 px-2.5 py-0.5 rounded-full bg-primary/10 text-[10px] font-bold text-primary">Order Position #{index + 1}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Reorder Buttons (Move Up / Move Down) */}
+                <div className="flex items-center bg-surface border border-divider rounded-xl p-0.5 mr-1">
+                  <button 
+                    disabled={index === 0}
+                    onClick={() => moveCategory(c.id, 'up')}
+                    className="p-1 rounded-lg text-text-secondary hover:text-primary disabled:opacity-30 disabled:hover:text-text-secondary cursor-pointer transition-colors"
+                    title="Move Up"
+                  >
+                    <ArrowUp size={14} />
+                  </button>
+                  <button 
+                    disabled={index === categories.length - 1}
+                    onClick={() => moveCategory(c.id, 'down')}
+                    className="p-1 rounded-lg text-text-secondary hover:text-primary disabled:opacity-30 disabled:hover:text-text-secondary cursor-pointer transition-colors"
+                    title="Move Down"
+                  >
+                    <ArrowDown size={14} />
+                  </button>
+                </div>
+                <button 
+                  onClick={() => handleOpenEdit(c)}
+                  className="px-3 py-1.5 rounded-xl bg-surface border border-divider text-xs font-bold text-text-secondary hover:text-primary hover:bg-primary/10 transition-colors flex items-center gap-1 cursor-pointer"
+                  title="Edit Category"
+                >
+                  <Edit2 size={13} />
+                  <span>Edit</span>
+                </button>
+                <button 
+                  onClick={() => handleDeleteCategory(c.id)}
+                  className="px-3 py-1.5 rounded-xl bg-surface border border-divider text-xs font-bold text-text-secondary hover:text-error hover:bg-error/10 transition-colors flex items-center gap-1 cursor-pointer"
+                  title="Delete Category"
+                >
+                  <Trash2 size={13} />
+                  <span>Delete</span>
+                </button>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 };
+
+
 
 // ==========================================
 // 3. INVENTORY MODULE
@@ -409,14 +379,13 @@ export const InventoryModule: React.FC = () => {
     }
   };
 
-  // Filter products by current active hub
-  const hubProducts = products.filter(p => !p.warehouseId || p.warehouseId === activeHub);
+  const hubProducts = products;
 
   return (
     <div className="bg-surface border border-divider p-6 rounded-[28px] shadow-card flex flex-col gap-6">
       <div className="pb-3 border-b border-divider">
         <h2 className="font-extrabold text-sm text-text-primary">Stock Controller</h2>
-        <p className="text-[10px] text-text-secondary font-medium">Monitor batch codes, expire tracking, and stock levels for active hub</p>
+        <p className="text-[10px] text-text-secondary font-medium">Monitor batch codes, expire tracking, and stock levels across inventory</p>
       </div>
 
       <div className="overflow-x-auto">

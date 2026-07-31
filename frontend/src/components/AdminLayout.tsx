@@ -21,7 +21,6 @@ const sidebarItems: SidebarItem[] = [
   { name: 'Orders', path: '/admin/orders', icon: ShoppingBag },
   { name: 'Products', path: '/admin/products', icon: Package },
   { name: 'Categories', path: '/admin/categories', icon: FolderTree },
-  { name: 'Brands', path: '/admin/brands', icon: Award },
   { name: 'Inventory', path: '/admin/inventory', icon: Boxes },
   { name: 'Warehouses', path: '/admin/warehouses', icon: Warehouse },
   { name: 'Customers', path: '/admin/customers', icon: Users },
@@ -53,7 +52,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, onLogout }) 
   const [collapsed, setCollapsed] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Sample notifications
@@ -62,11 +60,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, onLogout }) 
     { id: 2, title: 'New Order Received', body: 'Order ORD-74912 has been placed.', type: 'info', time: '30m ago' },
     { id: 3, title: 'Server Status Check', body: 'Daily automated backup completed successfully.', type: 'success', time: '1h ago' }
   ];
-
-  const toggleTheme = () => {
-    setIsDarkMode(!isDarkMode);
-    document.body.classList.toggle('dark-theme');
-  };
 
   const handleLogout = () => {
     if (window.confirm('Are you sure you want to log out of the admin panel?')) {
@@ -108,30 +101,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, onLogout }) 
           </button>
         </div>
 
-        {/* WORKSPACE SWITCHER */}
-        <div className="p-3 border-b border-divider">
-          {!collapsed ? (
-            <div className="flex flex-col gap-1">
-              <label className="text-[9px] font-bold tracking-wider text-text-secondary uppercase">Active Hub</label>
-              <select 
-                value={activeHub} 
-                onChange={(e) => setActiveHub(e.target.value)}
-                className="w-full px-2 py-1.5 border border-divider rounded-lg text-xs font-semibold bg-background focus:outline-none focus:border-primary text-text-primary"
-              >
-                {warehouses.map((w) => (
-                  <option key={w.id} value={w.id}>{w.name}</option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <div 
-              className="text-center font-bold text-[18px] py-1 cursor-pointer" 
-              title={warehouses.find(w => w.id === activeHub)?.name || activeHub}
-            >
-              {activeHub.includes('bengaluru') ? '🌳' : activeHub.includes('mumbai') ? '🏙️' : '🕌'}
-            </div>
-          )}
-        </div>
+
 
         {/* SIDEBAR SCROLLABLE LINK LIST */}
         <nav className="flex-1 overflow-y-auto p-3 flex flex-col gap-1 custom-scrollbar">
@@ -194,15 +164,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, onLogout }) 
                 className="w-full pl-9 pr-4 py-2 border border-divider rounded-full text-xs bg-background focus:outline-none focus:border-primary text-text-primary font-medium"
               />
             </div>
-
-            {/* Dark Mode toggle */}
-            <button 
-              onClick={toggleTheme}
-              className="p-2 rounded-full border border-divider text-text-secondary hover:text-text-primary bg-surface cursor-pointer shadow-sm"
-              title="Toggle Theme"
-            >
-              {isDarkMode ? <Sun size={15} /> : <Moon size={15} />}
-            </button>
 
             {/* Notification center */}
             <div className="relative">

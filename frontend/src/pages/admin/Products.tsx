@@ -52,7 +52,7 @@ export const Products: React.FC = () => {
     try {
       const res = await fetch(`${API_URL}/products`);
       const data = await res.json();
-      if (data.success && data.products) {
+      if (data.success && Array.isArray(data.products) && data.products.length > 0 && !data.offlineMode) {
         setProductsList(data.products);
       }
     } catch (e) {}
@@ -147,6 +147,7 @@ export const Products: React.FC = () => {
       categoryId: category,
       category: currentCategoryObj?.name || category,
       subCategory: subCategory,
+      warehouseId: activeHub,
       price,
       mrp,
       originalPrice: mrp,
@@ -239,10 +240,9 @@ export const Products: React.FC = () => {
   };
 
   const filteredProducts = productsList.filter(p => {
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.brand.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || (p.brand || '').toLowerCase().includes(search.toLowerCase());
     const matchCat = selectedCategory === 'all' || p.categoryId === selectedCategory;
-    const matchHub = !p.warehouseId || p.warehouseId === activeHub;
-    return matchSearch && matchCat && matchHub;
+    return matchSearch && matchCat;
   });
 
   return (

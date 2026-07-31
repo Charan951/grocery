@@ -34,8 +34,12 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(mongoSanitize());
 
 // Connect database and seed initial configurations
-connectDB().then(() => {
-  seedDatabase();
+connectDB().then((conn) => {
+  if (conn) {
+    seedDatabase();
+  } else {
+    console.log('ℹ️ Server proceeding without active DB connection.');
+  }
 });
 
 // Root check endpoint

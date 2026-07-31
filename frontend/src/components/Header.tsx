@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useCartWishlist } from '../context/CartWishlistContext';
 import { useCMS } from '../context/CMSContext';
+import { LocationModal } from './LocationModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, Heart, ShoppingBag, MapPin, Menu, X, 
-  ChevronDown, Leaf, Sun, Moon, Settings, Percent 
+  ChevronDown, Leaf, Settings, Percent 
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -15,7 +16,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) => {
   const { cartCount, wishlist } = useCartWishlist();
-  const { categories, products, coupons } = useCMS();
+  const { categories, products, coupons, userLocation, updateUserLocation } = useCMS();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -25,17 +26,12 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchResults, setSearchResults] = useState<typeof products>([]);
   
-  const [selectedCity, setSelectedCity] = useState('Bengaluru');
-  const [showCityDropdown, setShowCityDropdown] = useState(false);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [showCategoriesDropdown, setShowCategoriesDropdown] = useState(false);
   
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [darkMode, setDarkMode] = useState(() => {
-    return localStorage.getItem('freshcart_dark_mode') === 'true';
-  });
 
   const searchRef = useRef<HTMLDivElement>(null);
-  const cityRef = useRef<HTMLDivElement>(null);
 
   // Scroll listener for sticky collapse
   useEffect(() => {
@@ -56,34 +52,28 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
         setShowSearchResults(false);
       }
-      if (cityRef.current && !cityRef.current.contains(e.target as Node)) {
-        setShowCityDropdown(false);
-      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Apply dark mode theme
+  // Real-time search filter with debouncing
   useEffect(() => {
-    if (darkMode) {
-      document.body.classList.add('dark-theme');
-    } else {
-      document.body.classList.remove('dark-theme');
-    }
-    localStorage.setItem('freshcart_dark_mode', String(darkMode));
-  }, [darkMode]);
+    const q = searchQuery.trim().toLowerCase();
+    if (q.length > 0) {
+      const timer = setTimeout(() => {
+        const filtered = products.filter(
+          (p) =>
+            p.name.toLowerCase().includes(q) ||
+            p.brand.toLowerCase().includes(q) ||
+            (p.subCategory && p.subCategory.toLowerCase().includes(q)) ||
+            (p.description && p.description.toLowerCase().includes(q))
+        );
+        setSearchResults(filtered);
+        setShowSearchResults(true);
+      }, 150);
 
-  // Search filter
-  useEffect(() => {
-    if (searchQuery.trim().length > 1) {
-      const filtered = products.filter(
-        (p) =>
-          p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          p.brand.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setSearchResults(filtered);
-      setShowSearchResults(true);
+      return () => clearTimeout(timer);
     } else {
       setSearchResults([]);
       setShowSearchResults(false);
@@ -107,15 +97,15 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
   const activeAnnouncement = coupons.length > 0 ? coupons[0] : null;
 
   return (
-    <div className="sticky top-0 z-[1000] w-full transition-all duration-300">
-      {/* Announcement Bar */}
+    <div className="sticky top-0 z-[1000] w-full bg-surface shadow-xs border-b border-divider">
+      {/* Top Announcement Bar */}
       <AnimatePresence>
         {announcementVisible && activeAnnouncement && (
           <motion.div 
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="bg-primary-gradient text-white text-center py-2 px-4 text-sm font-medium flex justify-center items-center relative z-[1001] font-display"
+            className="bg-primary-gradient text-white text-center py-2 px-4 text-xs md:text-sm font-semibold flex justify-center items-center relative z-[1001] font-display border-b border-white/10"
           >
             <span className="flex items-center gap-2">
               <Percent size={14} />
@@ -131,8 +121,8 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
         )}
       </AnimatePresence>
 
-      {/* Main Zepto Style Header */}
-      <header className={`flex items-center justify-between h-16 px-4 md:px-8 gap-4 border-b border-divider bg-surface ${scrolled ? 'shadow-card' : ''}`}>
+      {/* Main Zepto Style Header Bar (Fixed & Stationary) */}
+      <header className="flex items-center justify-between h-20 px-4 md:px-8 gap-4 bg-surface">
         {/* Left: Brand Logo & Location */}
         <div className="flex items-center gap-6">
           <button 
@@ -140,65 +130,43 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
             onClick={() => setMobileMenuOpen(true)}
             aria-label="Open menu"
           >
-            <Menu size={22} />
+            <Menu size={24} />
           </button>
           
-          {/* FreshCart Brand Logo */}
-          <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center group-hover:scale-105 transition-transform duration-200">
-              <Leaf className="w-5 h-5 text-emerald-600 fill-emerald-500/20" />
-            </div>
-            <span className="text-xl font-black tracking-tight text-emerald-600 font-display">FreshCart</span>
+          {/* FreshCart Brand Logo or Name (either logo image or clean name text) */}
+          <Link to="/" className="flex items-center group">
+            <span className="text-[40px] md:text-[44px] font-bold tracking-tight text-emerald-600 font-display leading-none group-hover:opacity-90 transition-opacity">
+              FreshCart
+            </span>
           </Link>
 
-          {/* Delivery location selector */}
-          <div className="hidden sm:flex flex-col text-xs leading-tight cursor-pointer relative" ref={cityRef} onClick={() => setShowCityDropdown(!showCityDropdown)}>
-            <span className="font-extrabold text-emerald-600 flex items-center gap-1">
+          {/* Delivery location selector: "Delivery in minutes*" (24px, 600 weight) & "Select Location" (14px, 500 weight) */}
+          <button 
+            onClick={() => setIsLocationModalOpen(true)}
+            className="hidden sm:flex flex-col text-left cursor-pointer hover:opacity-90 transition-opacity"
+          >
+            <span className="font-semibold text-[24px] text-emerald-600 flex items-center gap-1.5 leading-none">
               ⚡ Delivery in 10 mins*
             </span>
-            <div className="flex items-center gap-0.5 text-text-secondary font-bold text-[11px] hover:text-text-primary">
-              <span>{selectedCity}</span>
-              <ChevronDown size={12} />
+            <div className="flex items-center gap-1 text-text-secondary font-medium text-[14px] hover:text-emerald-700 mt-0.5">
+              <MapPin size={14} className="text-emerald-600 flex-shrink-0" />
+              <span className="max-w-[160px] truncate">{userLocation?.area || userLocation?.city || 'Select Location'}</span>
+              <ChevronDown size={14} />
             </div>
-
-            <AnimatePresence>
-              {showCityDropdown && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  className="absolute top-[calc(100%+8px)] left-0 bg-surface border border-divider rounded-xl shadow-premium p-2 w-[200px] flex flex-col gap-1 z-[1003]"
-                >
-                  <div className="text-[10px] text-text-secondary px-3 py-1 font-black uppercase tracking-wider">SELECT LOCATION</div>
-                  {['Bengaluru', 'Mumbai', 'Delhi NCR', 'Hyderabad', 'Chennai'].map((city) => (
-                    <button 
-                      key={city}
-                      className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-bold transition-colors hover:bg-emerald-500/10 hover:text-emerald-600"
-                      onClick={() => {
-                        setSelectedCity(city);
-                        setShowCityDropdown(false);
-                      }}
-                    >
-                      {city}
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          </button>
         </div>
 
-        {/* Center: Wide Search Input */}
+        {/* Center: Wide Search Input (Placeholder & Input: 16px, 400 weight) */}
         <div className="flex-1 max-w-[620px] relative" ref={searchRef}>
-          <form onSubmit={handleSearchSubmit} className="flex items-center w-full px-4 py-2 bg-background border border-divider rounded-full transition-all focus-within:border-[#7000ff] focus-within:bg-surface">
-            <Search size={16} className="text-text-tertiary mr-2 flex-shrink-0" />
+          <form onSubmit={handleSearchSubmit} className="flex items-center w-full px-5 py-3 bg-background border border-divider rounded-full transition-all focus-within:border-[#7000ff] focus-within:bg-surface shadow-2xs">
+            <Search size={18} className="text-text-tertiary mr-3 flex-shrink-0" />
             <input
               type="text"
-              placeholder='Search for "kurkure", "sweet potato", "milk"...'
+              placeholder='Search for "chocolate box", "kurkure", "milk"...'
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => searchQuery.length > 1 && setShowSearchResults(true)}
-              className="w-full text-xs font-semibold bg-transparent border-none outline-none text-text-primary placeholder:text-text-tertiary"
+              className="w-full text-[16px] font-normal bg-transparent border-none outline-none text-text-primary placeholder:text-text-tertiary placeholder:text-[16px] placeholder:font-normal"
             />
           </form>
 
@@ -219,11 +187,11 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
                   >
                     <img src={product.imageUrl || (product.images && product.images[0]) || ''} alt={product.name} className="w-10 h-10 object-contain rounded-md" />
                     <div className="flex-1 flex flex-col">
-                      <span className="text-xs font-bold text-text-primary">{product.name}</span>
-                      <span className="text-[10px] text-text-secondary">{product.brand}</span>
+                      <span className="text-sm font-bold text-text-primary">{product.name}</span>
+                      <span className="text-xs text-text-secondary">{product.brand}</span>
                     </div>
                     <div className="text-right">
-                      <div className="text-xs font-black text-text-primary">₹{product.price}</div>
+                      <div className="text-sm font-black text-text-primary">₹{product.price}</div>
                     </div>
                   </div>
                 ))}
@@ -232,75 +200,83 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
           </AnimatePresence>
         </div>
 
-        {/* Right Actions: Login, Cart & Admin */}
-        <div className="flex items-center gap-4 text-xs font-extrabold text-text-primary">
+        {/* Right Actions: Login / Cart (14px, 500 weight) */}
+        <div className="flex items-center gap-6 font-medium text-[14px] text-text-primary">
           {/* Login Button */}
           <button 
             onClick={() => navigate('/admin')}
-            className="flex flex-col items-center gap-0.5 hover:text-[#7000ff] transition-colors cursor-pointer"
+            className="flex flex-col items-center gap-1 hover:text-[#7000ff] transition-colors cursor-pointer"
           >
-            <div className="w-7 h-7 rounded-full border border-divider flex items-center justify-center bg-background">
-              <span className="text-xs">👤</span>
+            <div className="w-8 h-8 rounded-full border border-divider flex items-center justify-center bg-background">
+              <span className="text-sm">👤</span>
             </div>
-            <span className="text-[11px]">Login</span>
+            <span className="font-medium text-[14px]">Login</span>
           </button>
 
           {/* Cart Button */}
           <button 
             onClick={onCartOpen}
-            className="flex flex-col items-center gap-0.5 hover:text-[#7000ff] transition-colors relative cursor-pointer"
+            className="flex flex-col items-center gap-1 hover:text-[#7000ff] transition-colors relative cursor-pointer"
           >
-            <div className="w-7 h-7 rounded-full border border-divider flex items-center justify-center bg-background relative">
-              <ShoppingBag size={16} />
+            <div className="w-8 h-8 rounded-full border border-divider flex items-center justify-center bg-background relative">
+              <ShoppingBag size={18} />
               {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-[#7000ff] text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 bg-[#7000ff] text-white text-[10px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center">
                   {cartCount}
                 </span>
               )}
             </div>
-            <span className="text-[11px]">Cart</span>
-          </button>
-
-          {/* Dark Mode */}
-          <button 
-            onClick={() => setDarkMode(!darkMode)}
-            className="p-2 rounded-full border border-divider hover:bg-background transition-colors text-text-secondary"
-            title="Toggle theme"
-          >
-            {darkMode ? <Sun size={15} /> : <Moon size={15} />}
+            <span className="font-medium text-[14px]">Cart</span>
           </button>
         </div>
       </header>
 
-      {/* Zepto Row 2: Top Category Tabs Bar */}
-      <nav className="border-b border-divider bg-surface px-4 md:px-8 py-2 overflow-x-auto scrollbar-none">
-        <div className="flex items-center gap-6 min-w-max text-xs font-bold text-text-secondary">
-          <Link to="/" className="flex items-center gap-1 text-[#7000ff] border-b-2 border-[#7000ff] pb-1 font-extrabold">
-            <span>🛍️ All</span>
+      {/* Location Selector Modal */}
+      <LocationModal
+        isOpen={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+        currentLocation={userLocation}
+        onSelectLocation={updateUserLocation}
+      />
+
+      {/* Zepto Row 2: Top Navigation Tabs Bar */}
+      <nav className="border-b border-divider bg-surface px-4 md:px-8 py-3.5 overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-8 md:gap-10 min-w-max text-[18px] md:text-[20px] font-bold text-text-secondary">
+          <Link to="/" className="flex items-center gap-2 text-[#7000ff] border-b-2 border-[#7000ff] pb-1 font-extrabold">
+            <span className="text-xl md:text-2xl">🛍️</span>
+            <span>All</span>
           </Link>
-          <Link to="/products?category=tea-coffee-health-drinks" className="flex items-center gap-1 hover:text-[#7000ff] transition-colors pb-1">
-            <span>☕ Cafe</span>
+          <Link to="/products?category=tea-coffee-health-drinks" className="flex items-center gap-2 hover:text-[#7000ff] transition-colors pb-1">
+            <span className="text-xl md:text-2xl">☕</span>
+            <span>Cafe</span>
           </Link>
-          <Link to="/products?category=fruits-vegetables" className="flex items-center gap-1 hover:text-[#7000ff] transition-colors pb-1">
-            <span>🏠 Home</span>
+          <Link to="/products?category=fruits-vegetables" className="flex items-center gap-2 hover:text-[#7000ff] transition-colors pb-1">
+            <span className="text-xl md:text-2xl">🏠</span>
+            <span>Home</span>
           </Link>
-          <Link to="/products?category=chocolates-indian-sweets" className="flex items-center gap-1 hover:text-[#7000ff] transition-colors pb-1">
-            <span>🧸 Toys</span>
+          <Link to="/products?category=chocolates-indian-sweets" className="flex items-center gap-2 hover:text-[#7000ff] transition-colors pb-1">
+            <span className="text-xl md:text-2xl">🧸</span>
+            <span>Toys</span>
           </Link>
-          <Link to="/products?category=fruits-vegetables" className="flex items-center gap-1 hover:text-[#7000ff] transition-colors pb-1">
-            <span>🍎 Fresh</span>
+          <Link to="/products?category=fruits-vegetables" className="flex items-center gap-2 hover:text-[#7000ff] transition-colors pb-1">
+            <span className="text-xl md:text-2xl">🍎</span>
+            <span>Fresh</span>
           </Link>
-          <Link to="/products?category=breakfast-cereals-spreads-sauces" className="flex items-center gap-1 hover:text-[#7000ff] transition-colors pb-1">
-            <span>🎧 Electronics</span>
+          <Link to="/products?category=breakfast-cereals-spreads-sauces" className="flex items-center gap-2 hover:text-[#7000ff] transition-colors pb-1">
+            <span className="text-xl md:text-2xl">🎧</span>
+            <span>Electronics</span>
           </Link>
-          <Link to="/products?category=atta-rice-oil-dals" className="flex items-center gap-1 hover:text-[#7000ff] transition-colors pb-1">
-            <span>📱 Mobiles</span>
+          <Link to="/products?category=atta-rice-oil-dals" className="flex items-center gap-2 hover:text-[#7000ff] transition-colors pb-1">
+            <span className="text-xl md:text-2xl">📱</span>
+            <span>Mobiles</span>
           </Link>
-          <Link to="/products?category=ice-creams-kulfi-frozen-desserts" className="flex items-center gap-1 hover:text-[#7000ff] transition-colors pb-1">
-            <span>💄 Beauty</span>
+          <Link to="/products?category=ice-creams-kulfi-frozen-desserts" className="flex items-center gap-2 hover:text-[#7000ff] transition-colors pb-1">
+            <span className="text-xl md:text-2xl">💄</span>
+            <span>Beauty</span>
           </Link>
-          <Link to="/products?category=dairy-bread-eggs" className="flex items-center gap-1 hover:text-[#7000ff] transition-colors pb-1">
-            <span>👗 Fashion</span>
+          <Link to="/products?category=dairy-bread-eggs" className="flex items-center gap-2 hover:text-[#7000ff] transition-colors pb-1">
+            <span className="text-xl md:text-2xl">👗</span>
+            <span>Fashion</span>
           </Link>
         </div>
       </nav>

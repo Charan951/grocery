@@ -25,7 +25,7 @@ import { Dashboard } from './pages/admin/Dashboard';
 import { Orders } from './pages/admin/Orders';
 import { Products as AdminProducts } from './pages/admin/Products';
 import { 
-  CategoriesModule, BrandsModule, InventoryModule, WarehousesModule, CustomersModule, 
+  CategoriesModule, InventoryModule, WarehousesModule, CustomersModule, 
   DeliveryModule, EmployeesModule, CouponsModule, CMSModule, FinanceModule, 
   ReportsModule, AnalyticsModule, ReviewsModule, SupportModule, AuditLogsModule, SettingsModule 
 } from './pages/admin/Modules';
@@ -84,7 +84,6 @@ const AppContent: React.FC = () => {
           <Route path="/admin/orders" element={<AdminLayout onLogout={handleLogout}><Orders /></AdminLayout>} />
           <Route path="/admin/products" element={<AdminLayout onLogout={handleLogout}><AdminProducts /></AdminLayout>} />
           <Route path="/admin/categories" element={<AdminLayout onLogout={handleLogout}><CategoriesModule /></AdminLayout>} />
-          <Route path="/admin/brands" element={<AdminLayout onLogout={handleLogout}><BrandsModule /></AdminLayout>} />
           <Route path="/admin/inventory" element={<AdminLayout onLogout={handleLogout}><InventoryModule /></AdminLayout>} />
           <Route path="/admin/warehouses" element={<AdminLayout onLogout={handleLogout}><WarehousesModule /></AdminLayout>} />
           <Route path="/admin/customers" element={<AdminLayout onLogout={handleLogout}><CustomersModule /></AdminLayout>} />

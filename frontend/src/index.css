@@ -60,25 +60,6 @@
   --max-width: 1280px;
 }
 
-.dark-theme {
-  --background: #121214;
-  --surface: #1C1C1E;
-  --glass: rgba(28, 28, 30, 0.6);
-  --card: rgba(28, 28, 30, 0.95);
-  --divider: #2C2C2E;
-
-  --text-primary: #F2F2F7;
-  --text-secondary: #AEB2B8;
-  --text-tertiary: #48484A;
-
-  --shadow: rgba(0, 0, 0, 0.24);
-  --shadow-hover: rgba(0, 0, 0, 0.32);
-  --shadow-premium: 0 20px 40px -15px rgba(0, 0, 0, 0.35), 0 15px 25px -10px rgba(0, 0, 0, 0.25);
-  --shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.2);
-
-  --glass-gradient: linear-gradient(135deg, rgba(28, 28, 30, 0.7), rgba(28, 28, 30, 0.3));
-}
-
 @theme {
   --color-primary: var(--primary);
   --color-secondary: var(--secondary);

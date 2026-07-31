@@ -30,12 +30,11 @@ export const Footer: React.FC = () => {
 
   return (
     <footer className="w-full bg-surface text-text-primary border-t border-divider py-12 md:py-16 transition-all duration-300">
-      <div className="container mx-auto px-4 md:px-6 max-w-[1280px]">
+      <div className="w-full px-4 md:px-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1.2fr_1.5fr] gap-8 mb-12">
           {/* Brand Column */}
           <div className="flex flex-col gap-4">
-            <Link to="/" className="flex items-center gap-2 text-2xl font-extrabold text-primary font-display">
-              <Leaf fill="currentColor" size={26} />
+            <Link to="/" className="flex items-center text-3xl font-extrabold font-display">
               <span className="text-text-primary">Fresh<span className="text-primary">Cart</span></span>
             </Link>
             <p className="text-sm text-text-secondary leading-relaxed">

@@ -83,6 +83,9 @@ export interface Banner {
   tag: string;
   gradient: string[];
   imageUrl?: string;
+  buttonText?: string;
+  linkUrl?: string;
+  positionIndex?: number;
   active: boolean;
 }
 
@@ -190,14 +193,32 @@ export interface CMSState {
 interface CMSContextProps extends CMSState {
   activeHub: string;
   setActiveHub: (hub: string) => void;
+  homeSelectedSubCategories: string[];
+  updateHomeSubCategories: (subCats: string[]) => void;
+  toggleHomeSubCategory: (subCatName: string) => void;
+  userLocation: {
+    address: string;
+    area: string;
+    city: string;
+    pincode: string;
+    lat: number;
+    lng: number;
+    flatNo?: string;
+    landmark?: string;
+  };
+  updateUserLocation: (loc: any) => void;
+  addBanner: (banner: Banner) => void;
   updateBanner: (id: string, updated: Partial<Banner>) => void;
+  deleteBanner: (id: string) => void;
   updateProduct: (id: string, updated: Partial<Product>) => void;
   addProduct: (product: Product) => void;
   deleteProduct: (id: string) => void;
   updateCategory: (id: string, updated: Partial<Category>) => void;
   addCategory: (category: Category) => void;
   deleteCategory: (id: string) => void;
+  moveCategory: (id: string, direction: 'up' | 'down') => void;
   addSubCategory: (categoryId: string, subCategoryName: string) => void;
+  updateSubCategory: (categoryId: string, subCategoryNameOrId: string, updatedName: string) => void;
   deleteSubCategory: (categoryId: string, subCategoryNameOrId: string) => void;
   updateCoupon: (code: string, updated: Partial<Coupon>) => void;
   addCoupon: (coupon: Coupon) => void;
@@ -228,29 +249,60 @@ const CMSContext = createContext<CMSContextProps | undefined>(undefined);
 const defaultBanners: Banner[] = [
   {
     id: 'banner_1',
-    title: 'Weekend Freshness',
-    subtitle: 'Up to 30% OFF on Organic Vegetables',
+    title: 'Weekend Organic Freshness',
+    subtitle: 'Up to 30% OFF on Fresh Greens & Organic Vegetables',
     tag: 'FLASH SALE',
-    gradient: ['#4CAF50', '#81C784'],
+    gradient: ['#10B981', '#059669'],
+    imageUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&auto=format&fit=crop',
+    buttonText: 'Shop Organic',
+    linkUrl: '/products?category=cat_organic',
+    positionIndex: 1,
     active: true,
   },
   {
     id: 'banner_2',
-    title: 'VIP Super Savings',
-    subtitle: 'Free Delivery and double reward points on every order',
-    tag: 'MEMBERSHIP',
-    gradient: ['#1C1C1E', '#3A3A3C'],
+    title: 'Farm Fresh Milk & Dairy Basket',
+    subtitle: 'Free Express 15-min delivery on all daily breakfast orders',
+    tag: 'EXPRESS DELIVERY',
+    gradient: ['#3B82F6', '#1D4ED8'],
+    imageUrl: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=800&auto=format&fit=crop',
+    buttonText: 'Order Dairy',
+    linkUrl: '/products?category=cat_dairy',
+    positionIndex: 2,
     active: true,
   },
   {
     id: 'banner_3',
-    title: 'Farm to Kitchen',
-    subtitle: 'Harvested fresh at 4 AM and delivered to you by 7 AM',
-    tag: 'OUR PROMISE',
-    gradient: ['#FF9500', '#FFB800'],
+    title: 'Exotic Seasonal Fruits',
+    subtitle: 'Handpicked organic Hass avocados, berries and fresh Gala apples',
+    tag: 'FARM DIRECT',
+    gradient: ['#F59E0B', '#D97706'],
+    imageUrl: 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=800&auto=format&fit=crop',
+    buttonText: 'Explore Fruits',
+    linkUrl: '/products?category=cat_fruits',
+    positionIndex: 3,
     active: true,
   },
 ];
+
+export const getCategoryImage = (cat: any) => {
+  if (cat?.icon && (cat.icon.startsWith('http://') || cat.icon.startsWith('https://') || cat.icon.startsWith('data:') || cat.icon.startsWith('/'))) {
+    return cat.icon;
+  }
+  if (cat?.imageUrl && (cat.imageUrl.startsWith('http://') || cat.imageUrl.startsWith('https://') || cat.imageUrl.startsWith('data:') || cat.imageUrl.startsWith('/'))) {
+    return cat.imageUrl;
+  }
+  const nameLower = (cat?.name || '').toLowerCase();
+  if (nameLower.includes('fruit') || nameLower.includes('veg')) return 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=300&auto=format&fit=crop';
+  if (nameLower.includes('dairy') || nameLower.includes('milk') || nameLower.includes('egg')) return 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=300&auto=format&fit=crop';
+  if (nameLower.includes('atta') || nameLower.includes('rice') || nameLower.includes('dal') || nameLower.includes('oil')) return 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=300&auto=format&fit=crop';
+  if (nameLower.includes('meat') || nameLower.includes('fish') || nameLower.includes('seafood')) return 'https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=300&auto=format&fit=crop';
+  if (nameLower.includes('snack') || nameLower.includes('biscuit') || nameLower.includes('cookie') || nameLower.includes('sweet') || nameLower.includes('chocolate')) return 'https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?w=300&auto=format&fit=crop';
+  if (nameLower.includes('drink') || nameLower.includes('beverage') || nameLower.includes('tea') || nameLower.includes('coffee')) return 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=300&auto=format&fit=crop';
+  if (nameLower.includes('bakery') || nameLower.includes('bread') || nameLower.includes('cereal') || nameLower.includes('sauce') || nameLower.includes('breakfast')) return 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=300&auto=format&fit=crop';
+  if (nameLower.includes('ice') || nameLower.includes('kulfi') || nameLower.includes('frozen') || nameLower.includes('dessert')) return 'https://images.unsplash.com/photo-1570197788417-0e82375c9371?w=300&auto=format&fit=crop';
+  return 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&auto=format&fit=crop';
+};
 
 const defaultCategories: Category[] = [
   { id: 'cat_organic', name: 'Organic', icon: 'Leaf', color: '#34C759', productCount: 12 },
@@ -644,34 +696,99 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     const syncWithBackend = async () => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1500);
+
       try {
-        const pRes = await fetch('http://localhost:5000/api/products');
-        const pData = await pRes.json();
-        const cRes = await fetch('http://localhost:5000/api/categories');
-        const cData = await cRes.json();
-        const cpRes = await fetch('http://localhost:5000/api/coupons');
-        const cpData = await cpRes.json();
-        const bRes = await fetch('http://localhost:5000/api/blogs');
-        const bData = await bRes.json();
-        const wRes = await fetch('http://localhost:5000/api/warehouses');
-        const wData = await wRes.json();
+        const fetchJson = async (url: string) => {
+          const res = await fetch(url, { signal: controller.signal });
+          return res.ok ? await res.json() : null;
+        };
+
+        const [pData, cData, cpData, bData, wData] = await Promise.all([
+          fetchJson('http://localhost:5000/api/products').catch(() => null),
+          fetchJson('http://localhost:5000/api/categories').catch(() => null),
+          fetchJson('http://localhost:5000/api/coupons').catch(() => null),
+          fetchJson('http://localhost:5000/api/blogs').catch(() => null),
+          fetchJson('http://localhost:5000/api/warehouses').catch(() => null),
+        ]);
+
+        clearTimeout(timeoutId);
 
         setState((prev) => ({
           ...prev,
-          products: pData.success ? pData.products : prev.products,
-          categories: cData.success ? cData.categories : prev.categories,
-          coupons: cpData.success ? cpData.coupons : prev.coupons,
-          blogs: bData.success ? bData.blogs : prev.blogs,
-          warehouses: wData.success ? wData.warehouses : prev.warehouses,
+          products: pData?.success && pData.products?.length ? pData.products : prev.products,
+          categories: cData?.success && cData.categories?.length ? cData.categories : prev.categories,
+          coupons: cpData?.success && cpData.coupons?.length ? cpData.coupons : prev.coupons,
+          blogs: bData?.success && bData.blogs?.length ? bData.blogs : prev.blogs,
+          warehouses: wData?.success && wData.warehouses?.length ? wData.warehouses : prev.warehouses,
         }));
         console.log('✅ FreshCart context synchronized with live MERN server database.');
       } catch (err) {
-        console.warn('⚠️ FreshCart MERN server not connected. Falling back to local offline mock state.');
+        console.warn('⚠️ FreshCart MERN server not connected or timed out. Using local offline state.');
+      } finally {
+        clearTimeout(timeoutId);
       }
     };
     syncWithBackend();
   }, []);
 
+
+  const [userLocation, setUserLocationState] = useState(() => {
+    const saved = localStorage.getItem('freshcart_delivery_location');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return {
+      address: 'Indiranagar 100ft Road, Bengaluru, KA 560038',
+      area: 'Indiranagar',
+      city: 'Bengaluru',
+      pincode: '560038',
+      lat: 12.9716,
+      lng: 77.5946
+    };
+  });
+
+  const updateUserLocation = (loc: any) => {
+    setUserLocationState(loc);
+    localStorage.setItem('freshcart_delivery_location', JSON.stringify(loc));
+  };
+
+  const [homeSelectedSubCategories, setHomeSelectedSubCategories] = useState<string[]>(() => {
+    const saved = localStorage.getItem('freshcart_home_subcategories');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return [];
+  });
+
+  const updateHomeSubCategories = (subCats: string[]) => {
+    setHomeSelectedSubCategories(subCats);
+    localStorage.setItem('freshcart_home_subcategories', JSON.stringify(subCats));
+  };
+
+  const toggleHomeSubCategory = (subCatName: string) => {
+    setHomeSelectedSubCategories((prev) => {
+      const exists = prev.includes(subCatName);
+      const next = exists ? prev.filter((s) => s !== subCatName) : [...prev, subCatName];
+      localStorage.setItem('freshcart_home_subcategories', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const addBanner = (banner: Banner) => {
+    setState((prev) => ({
+      ...prev,
+      banners: [...prev.banners, banner],
+    }));
+  };
+
+  const deleteBanner = (id: string) => {
+    setState((prev) => ({
+      ...prev,
+      banners: prev.banners.filter((b) => b.id !== id),
+    }));
+  };
 
   const updateBanner = (id: string, updated: Partial<Banner>) => {
     setState((prev) => ({
@@ -704,7 +821,10 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateCategory = (id: string, updated: Partial<Category>) => {
     setState((prev) => ({
       ...prev,
-      categories: prev.categories.map((c) => (c.id === id ? { ...c, ...updated } : c)),
+      categories: prev.categories.map((c) => {
+        const isMatch = c.id === id || c.slug === id || (c as any)._id === id || (c.name && c.name.toLowerCase() === id.toLowerCase());
+        return isMatch ? { ...c, ...updated } : c;
+      }),
     }));
   };
 
@@ -718,8 +838,28 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteCategory = (id: string) => {
     setState((prev) => ({
       ...prev,
-      categories: prev.categories.filter((c) => c.id !== id && c.slug !== id),
+      categories: prev.categories.filter((c) => c.id !== id && c.slug !== id && (c as any)._id !== id && (c.name && c.name.toLowerCase() !== id.toLowerCase())),
     }));
+  };
+
+  const moveCategory = (id: string, direction: 'up' | 'down') => {
+    setState((prev) => {
+      const idx = prev.categories.findIndex(
+        (c) => c.id === id || c.slug === id || (c as any)._id === id || (c.name && c.name.toLowerCase() === id.toLowerCase())
+      );
+      if (idx < 0) return prev;
+      const newIdx = direction === 'up' ? idx - 1 : idx + 1;
+      if (newIdx < 0 || newIdx >= prev.categories.length) return prev;
+
+      const newCategories = [...prev.categories];
+      const [moved] = newCategories.splice(idx, 1);
+      newCategories.splice(newIdx, 0, moved);
+
+      return {
+        ...prev,
+        categories: newCategories,
+      };
+    });
   };
 
   const addSubCategory = (categoryId: string, subCategoryName: string) => {
@@ -937,13 +1077,21 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...state,
         activeHub,
         setActiveHub,
+        homeSelectedSubCategories,
+        updateHomeSubCategories,
+        toggleHomeSubCategory,
+        userLocation,
+        updateUserLocation,
+        addBanner,
         updateBanner,
+        deleteBanner,
         updateProduct,
         addProduct,
         deleteProduct,
         updateCategory,
         addCategory,
         deleteCategory,
+        moveCategory,
         addSubCategory,
         deleteSubCategory,
         updateCoupon,

@@ -1,17 +1,32 @@
 import React, { useState } from 'react';
-import { useCMS, Product, Coupon, Blog } from '../context/CMSContext';
+import { useCMS, Product, Coupon, Blog, Banner } from '../context/CMSContext';
 import { SEO } from '../components/SEO';
-import { Trash2, Plus } from 'lucide-react';
+import { Trash2, Plus, Edit2, CheckSquare, Square, Image, LayoutGrid } from 'lucide-react';
 
 export const AdminCMS: React.FC = () => {
   const { 
     banners, categories, products, coupons, blogs, seoSettings,
+    homeSelectedSubCategories, updateHomeSubCategories, toggleHomeSubCategory,
     updateProduct, addProduct, deleteProduct,
-    updateBanner, addCoupon, deleteCoupon,
+    addBanner, updateBanner, deleteBanner,
+    addCoupon, deleteCoupon,
     addBlog, deleteBlog, updateSEOSettings, resetToDefaults 
   } = useCMS();
 
-  const [activeTab, setActiveTab] = useState<'banners' | 'products' | 'coupons' | 'blogs' | 'seo'>('products');
+  const [activeTab, setActiveTab] = useState<'banners' | 'products' | 'coupons' | 'blogs' | 'seo' | 'home_subcats'>('products');
+
+  // Banner Add/Edit Form States
+  const [showBannerForm, setShowBannerForm] = useState(false);
+  const [editingBannerId, setEditingBannerId] = useState<string | null>(null);
+  const [bannerTitle, setBannerTitle] = useState('');
+  const [bannerSubtitle, setBannerSubtitle] = useState('');
+  const [bannerTag, setBannerTag] = useState('FLASH SALE');
+  const [bannerBtnText, setBannerBtnText] = useState('Shop Deals');
+  const [bannerLinkUrl, setBannerLinkUrl] = useState('/products');
+  const [bannerImageUrl, setBannerImageUrl] = useState('https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&auto=format&fit=crop');
+  const [bannerPosition, setBannerPosition] = useState(1);
+  const [bannerGrad1, setBannerGrad1] = useState('#10B981');
+  const [bannerGrad2, setBannerGrad2] = useState('#059669');
 
   // Product Add Form States
   const [showProductForm, setShowProductForm] = useState(false);
@@ -49,6 +64,62 @@ export const AdminCMS: React.FC = () => {
   const [seoTitle, setSeoTitle] = useState(seoSettings.home?.title || '');
   const [seoDesc, setSeoDesc] = useState(seoSettings.home?.description || '');
   const [seoKeys, setSeoKeys] = useState(seoSettings.home?.keywords || '');
+
+  const handleEditBanner = (b: Banner) => {
+    setEditingBannerId(b.id);
+    setBannerTitle(b.title);
+    setBannerSubtitle(b.subtitle);
+    setBannerTag(b.tag || 'FLASH SALE');
+    setBannerBtnText(b.buttonText || 'Shop Deals');
+    setBannerLinkUrl(b.linkUrl || '/products');
+    setBannerImageUrl(b.imageUrl || '');
+    setBannerPosition(b.positionIndex || 1);
+    setBannerGrad1(b.gradient?.[0] || '#10B981');
+    setBannerGrad2(b.gradient?.[1] || '#059669');
+    setShowBannerForm(true);
+  };
+
+  const handleBannerSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bannerTitle.trim() || !bannerSubtitle.trim()) {
+      alert('Please provide banner title and subtitle.');
+      return;
+    }
+
+    if (editingBannerId) {
+      updateBanner(editingBannerId, {
+        title: bannerTitle.trim(),
+        subtitle: bannerSubtitle.trim(),
+        tag: bannerTag.trim(),
+        buttonText: bannerBtnText.trim(),
+        linkUrl: bannerLinkUrl.trim(),
+        imageUrl: bannerImageUrl.trim(),
+        positionIndex: bannerPosition,
+        gradient: [bannerGrad1, bannerGrad2]
+      });
+      alert('Banner updated successfully!');
+    } else {
+      const newBanner: Banner = {
+        id: 'banner_' + Date.now(),
+        title: bannerTitle.trim(),
+        subtitle: bannerSubtitle.trim(),
+        tag: bannerTag.trim(),
+        buttonText: bannerBtnText.trim(),
+        linkUrl: bannerLinkUrl.trim(),
+        imageUrl: bannerImageUrl.trim(),
+        positionIndex: bannerPosition,
+        gradient: [bannerGrad1, bannerGrad2],
+        active: true
+      };
+      addBanner(newBanner);
+      alert('New Dynamic Banner created successfully!');
+    }
+
+    setShowBannerForm(false);
+    setEditingBannerId(null);
+    setBannerTitle('');
+    setBannerSubtitle('');
+  };
 
   const handleReset = () => {
     if (window.confirm('⚠️ Are you sure you want to reset all CMS modifications? This will restore original Flutter app mock values.')) {
@@ -190,10 +261,16 @@ export const AdminCMS: React.FC = () => {
               📦 Products Catalog
             </button>
             <button 
+              className={`w-full text-left px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-colors ${activeTab === 'home_subcats' ? 'bg-primary/10 border border-primary/20 text-primary' : 'text-text-primary hover:bg-background'}`}
+              onClick={() => setActiveTab('home_subcats')}
+            >
+              🏷️ Home Sub-Categories
+            </button>
+            <button 
               className={`w-full text-left px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-colors ${activeTab === 'banners' ? 'bg-primary/10 border border-primary/20 text-primary' : 'text-text-primary hover:bg-background'}`}
               onClick={() => setActiveTab('banners')}
             >
-              🖼️ Home Banners
+              🖼️ Inter-Section Banners
             </button>
             <button 
               className={`w-full text-left px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-colors ${activeTab === 'coupons' ? 'bg-primary/10 border border-primary/20 text-primary' : 'text-text-primary hover:bg-background'}`}
@@ -229,7 +306,8 @@ export const AdminCMS: React.FC = () => {
             <div className="border-b border-divider pb-4">
               <h2 className="text-xl font-extrabold text-text-primary font-display">
                 {activeTab === 'products' && 'Products Management'}
-                {activeTab === 'banners' && 'Hero Banner Carousel'}
+                {activeTab === 'home_subcats' && 'Home Page Sub-Categories Selection'}
+                {activeTab === 'banners' && 'Dynamic Inter-Section Banners (CRUD)'}
                 {activeTab === 'coupons' && 'Offers & Discount Coupons'}
                 {activeTab === 'blogs' && 'Health Articles CMS'}
                 {activeTab === 'seo' && 'Search Optimization Meta Engine'}
@@ -337,47 +415,258 @@ export const AdminCMS: React.FC = () => {
               </div>
             )}
 
-            {/* TAB: BANNERS */}
+            {/* TAB: HOME SUB-CATEGORIES SELECTION */}
+            {activeTab === 'home_subcats' && (
+              <div className="flex flex-col gap-6">
+                <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 text-xs font-medium">
+                  <strong>💡 Admin Home Configuration:</strong> Select which sub-categories appear on the customer Home page. Toggle checkboxes to enable/disable sub-categories in real-time.
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {categories.map((cat) => {
+                    const subCats = cat.subCategories || [];
+                    if (subCats.length === 0) return null;
+
+                    return (
+                      <div key={cat.id} className="p-5 rounded-2xl bg-background border border-divider space-y-3 shadow-xs">
+                        <div className="flex items-center justify-between border-b border-divider/60 pb-2">
+                          <h4 className="font-extrabold text-sm text-text-primary flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: cat.color || '#10B981' }} />
+                            {cat.name}
+                          </h4>
+                          <span className="text-[10px] font-bold text-text-tertiary">{subCats.length} sub-categories</span>
+                        </div>
+
+                        <div className="space-y-2">
+                          {subCats.map((sub, idx) => {
+                            const subName = typeof sub === 'string' ? sub : sub.name;
+                            const isSelected = homeSelectedSubCategories.length === 0 || homeSelectedSubCategories.includes(subName);
+
+                            return (
+                              <label
+                                key={idx}
+                                onClick={() => toggleHomeSubCategory(subName)}
+                                className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer select-none text-xs font-bold ${
+                                  isSelected 
+                                    ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-700' 
+                                    : 'bg-surface border-divider/60 text-text-secondary opacity-60'
+                                }`}
+                              >
+                                <span>{subName}</span>
+                                {isSelected ? (
+                                  <CheckSquare size={16} className="text-emerald-600" />
+                                ) : (
+                                  <Square size={16} className="text-text-tertiary" />
+                                )}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* TAB: BANNERS (DYNAMIC CRUD) */}
             {activeTab === 'banners' && (
-              <div className="overflow-x-auto border border-divider rounded-xl">
-                <table className="w-full text-left border-collapse text-xs md:text-sm">
-                  <thead>
-                    <tr>
-                      <th className="p-3.5 bg-background border-b border-divider font-bold text-text-primary whitespace-nowrap">Title</th>
-                      <th className="p-3.5 bg-background border-b border-divider font-bold text-text-primary whitespace-nowrap">Subtitle</th>
-                      <th className="p-3.5 bg-background border-b border-divider font-bold text-text-primary whitespace-nowrap">Tag</th>
-                      <th className="p-3.5 bg-background border-b border-divider font-bold text-text-primary whitespace-nowrap">Gradient Colors</th>
-                      <th className="p-3.5 bg-background border-b border-divider font-bold text-text-primary whitespace-nowrap">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {banners.map((b) => (
-                      <tr key={b.id} className="hover:bg-background/30 transition-colors">
-                        <td className="p-3.5 border-b border-divider text-text-secondary"><strong>{b.title}</strong></td>
-                        <td className="p-3.5 border-b border-divider text-text-secondary">{b.subtitle}</td>
-                        <td className="p-3.5 border-b border-divider text-text-secondary"><span className="text-[10px] bg-background border border-divider px-2 py-1 rounded font-semibold text-text-secondary">{b.tag}</span></td>
-                        <td className="p-3.5 border-b border-divider text-text-secondary">
-                          <div className="flex gap-1.5">
-                            {b.gradient.map((col) => (
-                              <span key={col} className="w-3.5 h-3.5 rounded-full border border-white shadow-sm" style={{ background: col }} />
-                            ))}
+              <div className="flex flex-col gap-6">
+                <div className="flex justify-between items-center">
+                  <p className="text-xs text-text-secondary font-medium">
+                    Add, edit and rearrange dynamic promo banners displayed between sub-category sections on the home page.
+                  </p>
+                  {!showBannerForm && (
+                    <button 
+                      onClick={() => {
+                        setEditingBannerId(null);
+                        setBannerTitle('');
+                        setBannerSubtitle('');
+                        setShowBannerForm(true);
+                      }} 
+                      className="bg-emerald-600 text-white font-bold py-2.5 px-5 rounded-full text-xs hover:bg-emerald-700 transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
+                    >
+                      <Plus size={16} />
+                      <span>Create New Banner</span>
+                    </button>
+                  )}
+                </div>
+
+                {showBannerForm && (
+                  <form onSubmit={handleBannerSubmit} className="bg-background p-6 rounded-2xl border border-divider flex flex-col gap-4 shadow-sm">
+                    <div className="flex items-center justify-between border-b border-divider pb-3">
+                      <h3 className="font-extrabold text-sm text-text-primary">
+                        {editingBannerId ? '✏️ Edit Inter-Section Banner' : '✨ Add Dynamic Inter-Section Banner'}
+                      </h3>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1.5 sm:col-span-2">
+                        <label className="text-xs font-bold text-text-primary">Banner Title</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. Mid-Month Organic Freshness Sale" 
+                          value={bannerTitle} 
+                          onChange={(e) => setBannerTitle(e.target.value)} 
+                          className="w-full px-3.5 py-2 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-emerald-500 text-text-primary font-semibold" 
+                          required 
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5 sm:col-span-2">
+                        <label className="text-xs font-bold text-text-primary">Subtitle / Description</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. Get flat 30% discount on organic juices and dairy baskets." 
+                          value={bannerSubtitle} 
+                          onChange={(e) => setBannerSubtitle(e.target.value)} 
+                          className="w-full px-3.5 py-2 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-emerald-500 text-text-primary font-medium" 
+                          required 
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-text-primary">Tag / Badge Text</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. FLASH SALE or LIMITED OFFER" 
+                          value={bannerTag} 
+                          onChange={(e) => setBannerTag(e.target.value)} 
+                          className="w-full px-3.5 py-2 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-emerald-500 text-text-primary font-bold" 
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-text-primary">Button Label</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. Shop Now or Explore" 
+                          value={bannerBtnText} 
+                          onChange={(e) => setBannerBtnText(e.target.value)} 
+                          className="w-full px-3.5 py-2 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-emerald-500 text-text-primary font-bold" 
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-text-primary">Target Link / URL</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. /products?category=cat_organic" 
+                          value={bannerLinkUrl} 
+                          onChange={(e) => setBannerLinkUrl(e.target.value)} 
+                          className="w-full px-3.5 py-2 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-emerald-500 text-text-primary font-medium" 
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-text-primary">Position (After Sub-category Section #)</label>
+                        <select
+                          value={bannerPosition}
+                          onChange={(e) => setBannerPosition(parseInt(e.target.value) || 1)}
+                          className="w-full px-3.5 py-2 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-emerald-500 text-text-primary font-bold"
+                        >
+                          {[1, 2, 3, 4, 5, 6, 7, 8].map((pos) => (
+                            <option key={pos} value={pos}>After Sub-category Section #{pos}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5 sm:col-span-2">
+                        <label className="text-xs font-bold text-text-primary">Banner Image URL</label>
+                        <input 
+                          type="text" 
+                          placeholder="https://images.unsplash.com/..." 
+                          value={bannerImageUrl} 
+                          onChange={(e) => setBannerImageUrl(e.target.value)} 
+                          className="w-full px-3.5 py-2 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-emerald-500 text-text-primary font-medium" 
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-text-primary">Gradient Start Color</label>
+                        <input type="color" value={bannerGrad1} onChange={(e) => setBannerGrad1(e.target.value)} className="w-full h-9 p-1 border border-divider rounded-xl bg-surface cursor-pointer" />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-text-primary">Gradient End Color</label>
+                        <input type="color" value={bannerGrad2} onChange={(e) => setBannerGrad2(e.target.value)} className="w-full h-9 p-1 border border-divider rounded-xl bg-surface cursor-pointer" />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 mt-4">
+                      <button type="submit" className="bg-emerald-600 text-white font-extrabold py-2.5 px-6 rounded-xl text-xs hover:bg-emerald-700 transition-colors cursor-pointer shadow-sm">
+                        {editingBannerId ? 'Update Banner' : 'Save Banner'}
+                      </button>
+                      <button type="button" onClick={() => setShowBannerForm(false)} className="bg-background text-text-secondary border border-divider font-bold py-2.5 px-6 rounded-xl text-xs hover:bg-surface transition-colors cursor-pointer">
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* Banner cards listing */}
+                <div className="grid grid-cols-1 gap-4">
+                  {banners.map((b) => (
+                    <div 
+                      key={b.id} 
+                      className="p-5 rounded-2xl border border-divider bg-background shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
+                      style={{
+                        background: b.gradient ? `linear-gradient(135deg, ${b.gradient[0]}15, ${b.gradient[1] || b.gradient[0]}25)` : undefined
+                      }}
+                    >
+                      <div className="flex items-start gap-4 flex-1">
+                        {b.imageUrl && (
+                          <img src={b.imageUrl} alt={b.title} className="w-20 h-20 rounded-xl object-cover border border-divider/60 flex-shrink-0" />
+                        )}
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
+                              {b.tag || 'BANNER'}
+                            </span>
+                            <span className="text-[10px] font-bold text-text-tertiary px-2 py-0.5 rounded-full bg-surface border border-divider">
+                              Placement: After Section #{b.positionIndex || 1}
+                            </span>
                           </div>
-                        </td>
-                        <td className="p-3.5 border-b border-divider text-text-secondary">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input 
-                              type="checkbox" 
-                              checked={b.active} 
-                              onChange={(e) => updateBanner(b.id, { active: e.target.checked })}
-                              className="w-4 h-4 rounded border-divider text-primary focus:ring-primary"
-                            />
-                            <span className="text-xs text-text-secondary">{b.active ? 'Active' : 'Disabled'}</span>
-                          </label>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                          <h4 className="text-sm font-extrabold text-text-primary mt-1.5">{b.title}</h4>
+                          <p className="text-xs text-text-secondary mt-0.5">{b.subtitle}</p>
+                          {b.linkUrl && (
+                            <p className="text-[11px] text-emerald-600 font-bold mt-1">Target: {b.linkUrl}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 self-end md:self-center">
+                        <label className="flex items-center gap-2 cursor-pointer bg-surface px-3 py-1.5 rounded-xl border border-divider shadow-2xs">
+                          <input 
+                            type="checkbox" 
+                            checked={b.active} 
+                            onChange={(e) => updateBanner(b.id, { active: e.target.checked })}
+                            className="w-4 h-4 rounded border-divider text-emerald-600 focus:ring-emerald-500"
+                          />
+                          <span className="text-xs font-bold text-text-primary">{b.active ? 'Active' : 'Disabled'}</span>
+                        </label>
+
+                        <button 
+                          onClick={() => handleEditBanner(b)} 
+                          className="p-2 rounded-xl border border-divider text-text-secondary hover:text-emerald-600 hover:bg-emerald-500/10 transition-colors" 
+                          title="Edit banner"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+
+                        <button 
+                          onClick={() => {
+                            if (window.confirm(`Delete banner "${b.title}"?`)) deleteBanner(b.id);
+                          }} 
+                          className="p-2 rounded-xl border border-divider text-text-secondary hover:text-error hover:bg-error/10 transition-colors" 
+                          title="Delete banner"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 

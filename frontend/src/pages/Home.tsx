@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useCMS } from '../context/CMSContext';
+import { useCMS, getCategoryImage } from '../context/CMSContext';
 import { ProductCard } from '../components/ProductCard';
 import { SEO } from '../components/SEO';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -15,7 +15,9 @@ interface HomeProps {
 }
 
 export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
-  const { categories, products, testimonials, faqs, blogs, seoSettings } = useCMS();
+  const { banners, categories, products, testimonials, faqs, blogs, seoSettings, homeSelectedSubCategories } = useCMS();
+
+  const activeBanners = banners.filter(b => b.active);
 
   // Countdown timer for Flash Sale (Midnight tonight)
   const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
@@ -82,20 +84,6 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
     'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=500&auto=format&fit=crop',
   ];
 
-  const zeptoCategories = [
-    { name: 'Fruits & Vegetables', slug: 'fruits-vegetables', image: 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=300&auto=format&fit=crop' },
-    { name: 'Dairy, Bread & Eggs', slug: 'dairy-bread-eggs', image: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=300&auto=format&fit=crop' },
-    { name: 'Atta, Rice, Oil & Dals', slug: 'atta-rice-oil-dals', image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=300&auto=format&fit=crop' },
-    { name: 'Meat, Fish & Eggs', slug: 'fruits-vegetables', image: 'https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=300&auto=format&fit=crop' },
-    { name: 'Masala & Dry Fruits', slug: 'atta-rice-oil-dals', image: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=300&auto=format&fit=crop' },
-    { name: 'Breakfast & Sauces', slug: 'breakfast-cereals-spreads-sauces', image: 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=300&auto=format&fit=crop' },
-    { name: 'Packaged Food', slug: 'breakfast-cereals-spreads-sauces', image: 'https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=300&auto=format&fit=crop' },
-    { name: 'Zepto Cafe', slug: 'tea-coffee-health-drinks', image: 'https://images.unsplash.com/photo-1517256064527-09c73fc73e38?w=300&auto=format&fit=crop' },
-    { name: 'Tea, Coffee & More', slug: 'tea-coffee-health-drinks', image: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=300&auto=format&fit=crop' },
-    { name: 'Ice Creams & More', slug: 'ice-creams-kulfi-frozen-desserts', image: 'https://images.unsplash.com/photo-1570197788417-0e82375c9371?w=300&auto=format&fit=crop' },
-    { name: 'Frozen Food', slug: 'ice-creams-kulfi-frozen-desserts', image: 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=300&auto=format&fit=crop' },
-  ];
-
   return (
     <div className="w-full page-wrapper bg-background">
       <SEO 
@@ -105,32 +93,40 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
         schema={faqSchema}
       />
 
-      <div className="container mx-auto px-4 md:px-6 max-w-[1360px] pt-3 pb-6">
+      <div className="w-full px-4 md:px-8 pt-3 pb-6">
 
-        {/* 1. Zepto Top Category Cards Scroll Row */}
+        {/* 1. Top Category Cards Scroll Row (One by one in single line) */}
         <section className="mb-6 relative group">
           <div 
             id="category-scroll-container" 
-            className="flex items-center gap-3.5 overflow-x-auto pb-4 pt-1 scrollbar-none scroll-smooth"
+            className="flex items-center gap-4 overflow-x-auto pb-4 pt-1 scrollbar-none scroll-smooth flex-nowrap"
           >
-            {zeptoCategories.map((cat, idx) => (
-              <Link 
-                key={idx} 
-                to={`/products?category=${cat.slug}`}
-                className="flex flex-col items-center gap-2 p-2 rounded-2xl bg-surface border border-divider/60 hover:border-[#7000ff]/40 hover:shadow-md transition-all duration-200 group/card w-24 sm:w-28 text-center flex-shrink-0"
-              >
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden bg-background p-1.5 group-hover/card:scale-105 transition-transform duration-200 border border-divider">
-                  <img 
-                    src={cat.image} 
-                    alt={cat.name} 
-                    className="w-full h-full object-cover rounded-xl"
-                  />
-                </div>
-                <span className="text-[11px] font-black text-text-primary group-hover/card:text-[#7000ff] transition-colors line-clamp-2 leading-tight">
-                  {cat.name}
-                </span>
-              </Link>
-            ))}
+            {categories.map((cat) => {
+              const catSlug = cat.slug || cat.id;
+              const imgSrc = getCategoryImage(cat);
+              return (
+                <Link 
+                  key={cat.id} 
+                  to={`/products?category=${catSlug}`}
+                  className="flex flex-col items-center gap-2 p-2 rounded-2xl bg-surface border border-divider/60 hover:border-[#7000ff]/40 hover:shadow-md transition-all duration-200 group/card w-[110px] sm:w-[125px] text-center flex-shrink-0"
+                >
+                  <div className="w-[100px] h-[148px] min-w-[100px] min-h-[148px] rounded-2xl overflow-hidden bg-background p-1 group-hover/card:scale-105 transition-transform duration-200 border border-divider flex items-center justify-center">
+                    <img 
+                      src={imgSrc} 
+                      alt={cat.name} 
+                      className="w-full h-full object-contain rounded-xl"
+                      style={{ aspectRatio: '25/37' }}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&auto=format&fit=crop';
+                      }}
+                    />
+                  </div>
+                  <span className="text-[13px] font-medium text-text-primary group-hover/card:text-[#7000ff] transition-colors line-clamp-2 leading-snug">
+                    {cat.name}
+                  </span>
+                </Link>
+              );
+            })}
           </div>
 
           {/* Right Scroll Nav Button */}
@@ -139,74 +135,130 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
               const el = document.getElementById('category-scroll-container');
               if (el) el.scrollBy({ left: 300, behavior: 'smooth' });
             }}
-            className="hidden sm:flex absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black text-white items-center justify-center shadow-lg hover:bg-neutral-800 transition-transform active:scale-95 cursor-pointer z-10"
+            className="hidden sm:flex absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black text-white items-center justify-center shadow-lg hover:bg-neutral-800 transition-transform active:scale-95 cursor-pointer z-10"
             title="Scroll Right"
           >
-            <span className="text-xs font-bold">›</span>
+            <span className="text-sm font-bold">›</span>
           </button>
         </section>
 
-        {/* 2. All Categories A-to-Z Subcategory Cards & Product Shelves */}
-        {categories.map((category) => {
+        {/* 2. All Categories Subcategory Sections & Dynamic Inter-Section Banners */}
+        {categories.map((category, catIndex) => {
           const catSlug = category.slug || category.id;
           const categoryProducts = products.filter(
             p => p.categoryId === catSlug || p.category === category.name || p.categoryId === category.id
           );
-          const subCats = category.subCategories || [];
+          
+          const rawSubCats = category.subCategories || [];
+          const subCats = rawSubCats.filter((sub) => {
+            const subName = typeof sub === 'string' ? sub : sub.name;
+            return homeSelectedSubCategories.length === 0 || homeSelectedSubCategories.includes(subName);
+          });
+
+          const matchingBanner = activeBanners.find(b => (b.positionIndex || 1) === (catIndex + 1));
 
           return (
-            <section key={category.id} className="mb-12 border-b border-divider/40 pb-10 last:border-b-0">
-              {/* Category Title Header */}
-              <div className="flex justify-between items-end mb-4">
-                <div>
-                  <h2 className="text-xl md:text-2xl font-black text-text-primary tracking-tight font-display flex items-center gap-2">
-                    <span className="w-2.5 h-6 rounded-full bg-emerald-600 inline-block" />
-                    {category.name}
-                  </h2>
-                  <p className="text-xs text-text-tertiary font-bold mt-0.5 ml-4">
-                    {categoryProducts.length} items • Delivery in 10 mins
-                  </p>
+            <React.Fragment key={category.id}>
+              <section className="mb-12 border-b border-divider/40 pb-10 last:border-b-0">
+                {/* Category Title Header */}
+                <div className="flex justify-between items-end mb-4">
+                  <div>
+                    <h2 className="text-2xl md:text-3xl font-black text-text-primary tracking-tight font-display flex items-center gap-2">
+                      <span className="w-2.5 h-6 rounded-full bg-emerald-600 inline-block" />
+                      {category.name}
+                    </h2>
+                    <p className="text-xs text-text-tertiary font-bold mt-0.5 ml-4">
+                      {categoryProducts.length} items • Delivery in 10 mins
+                    </p>
+                  </div>
+                  <Link 
+                    to={`/products?category=${catSlug}`}
+                    className="text-xs font-black text-emerald-600 bg-emerald-500/10 hover:bg-emerald-500/20 px-3.5 py-1.5 rounded-full flex items-center gap-1 transition-colors"
+                  >
+                    <span>See All</span>
+                    <ArrowRight size={14} />
+                  </Link>
                 </div>
-                <Link 
-                  to={`/products?category=${catSlug}`}
-                  className="text-xs font-black text-emerald-600 bg-emerald-500/10 hover:bg-emerald-500/20 px-3.5 py-1.5 rounded-full flex items-center gap-1 transition-colors"
+
+                {/* Subcategories Horizontal Chips (Subcategory Names: 14px, 500 weight) */}
+                {subCats.length > 0 && (
+                  <div className="flex items-center gap-2.5 overflow-x-auto pb-3 mb-5 scrollbar-none">
+                    {subCats.map((sub, idx) => {
+                      const subName = typeof sub === 'string' ? sub : sub.name;
+                      return (
+                        <Link
+                          key={idx}
+                          to={`/products?category=${catSlug}&subCategory=${encodeURIComponent(subName)}`}
+                          className="px-4 py-2 rounded-xl bg-surface border border-divider/70 hover:border-emerald-500/50 hover:bg-emerald-500/10 text-text-secondary hover:text-emerald-700 text-[14px] font-medium transition-all flex-shrink-0 shadow-xs"
+                        >
+                          {subName}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Category Product Grid */}
+                {categoryProducts.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-5">
+                    {categoryProducts.slice(0, 5).map((product) => (
+                      <ProductCard key={product.id} product={product} onQuickView={onQuickView} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-6 bg-surface border border-divider rounded-2xl text-center text-xs text-text-tertiary font-bold">
+                    Fresh stock arriving shortly in 10 minutes.
+                  </div>
+                )}
+              </section>
+
+              {/* Dynamic Inter-Section Banner rendering */}
+              {matchingBanner && (
+                <div 
+                  className="relative overflow-hidden rounded-3xl p-8 md:p-12 mb-12 shadow-xl flex flex-col lg:flex-row items-center justify-between gap-6 text-white group"
+                  style={{ 
+                    background: `linear-gradient(135deg, ${matchingBanner.gradient?.[0] || '#10B981'}, ${matchingBanner.gradient?.[1] || '#059669'})` 
+                  }}
                 >
-                  <span>See All</span>
-                  <ArrowRight size={14} />
-                </Link>
-              </div>
+                  <div className="flex flex-col gap-3 max-w-[650px] text-center lg:text-left items-center lg:items-start z-10">
+                    {matchingBanner.tag && (
+                      <span className="bg-white/20 backdrop-blur-md text-white text-[12px] font-bold px-3.5 py-1 rounded-full w-fit uppercase tracking-widest border border-white/30">
+                        {matchingBanner.tag}
+                      </span>
+                    )}
+                    
+                    {/* Banner Heading: 22-24px, Bold (700) */}
+                    <h3 className="text-[24px] md:text-[24px] font-bold text-white font-display leading-tight">
+                      {matchingBanner.title}
+                    </h3>
 
-              {/* Subcategories Horizontal Chips / Cards Bar */}
-              {subCats.length > 0 && (
-                <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-5 scrollbar-none">
-                  {subCats.map((sub, idx) => {
-                    const subName = typeof sub === 'string' ? sub : sub.name;
-                    return (
-                      <Link
-                        key={idx}
-                        to={`/products?category=${catSlug}&subCategory=${encodeURIComponent(subName)}`}
-                        className="px-3.5 py-1.5 rounded-xl bg-surface border border-divider/70 hover:border-emerald-500/50 hover:bg-emerald-500/10 text-text-secondary hover:text-emerald-700 text-xs font-extrabold transition-all flex-shrink-0 shadow-xs"
-                      >
-                        {subName}
-                      </Link>
-                    );
-                  })}
+                    {/* Banner Offer: 52-60px, ExtraBold (800) */}
+                    <div className="text-[52px] md:text-[60px] font-extrabold text-white font-display leading-none tracking-tight">
+                      ₹0 FEES
+                    </div>
+
+                    {/* Secondary Banner Text: 28-32px, Bold (700) */}
+                    <p className="text-[28px] md:text-[30px] font-bold text-white/90 font-display leading-tight">
+                      {matchingBanner.subtitle || 'EVERYDAY LOW PRICES'}
+                    </p>
+                    
+                    <Link 
+                      to={matchingBanner.linkUrl || '/products'} 
+                      className="mt-3 bg-white text-emerald-950 font-extrabold px-7 py-3 rounded-full text-sm hover:bg-emerald-50 hover:shadow-lg transition-all flex items-center gap-2 group-hover:scale-105"
+                    >
+                      <span>{matchingBanner.buttonText || 'Shop Deals'}</span>
+                      <ArrowRight size={16} />
+                    </Link>
+                  </div>
+
+                  {matchingBanner.imageUrl && (
+                    <div className="w-full lg:w-80 h-48 rounded-2xl overflow-hidden shadow-lg border border-white/20 z-10 flex-shrink-0">
+                      <img src={matchingBanner.imageUrl} alt={matchingBanner.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    </div>
+                  )}
                 </div>
               )}
-
-              {/* Category Product Grid */}
-              {categoryProducts.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-5">
-                  {categoryProducts.slice(0, 5).map((product) => (
-                    <ProductCard key={product.id} product={product} onQuickView={onQuickView} />
-                  ))}
-                </div>
-              ) : (
-                <div className="p-6 bg-surface border border-divider rounded-2xl text-center text-xs text-text-tertiary font-bold">
-                  Fresh stock arriving shortly in 10 minutes.
-                </div>
-              )}
-            </section>
+            </React.Fragment>
           );
         })}
 
@@ -233,11 +285,11 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
         )}
 
         {/* 4. Flash Sale Banner with Countdown */}
-        <section className="relative overflow-hidden rounded-2xl p-6 md:p-12 mb-12 md:mb-16 flex flex-col lg:flex-row items-center justify-between gap-6 bg-gradient-to-r from-red-600 via-orange-500 to-amber-500 text-white shadow-premium">
+        <section className="relative overflow-hidden rounded-3xl p-8 md:p-12 mb-12 md:mb-16 flex flex-col lg:flex-row items-center justify-between gap-6 bg-gradient-to-r from-red-600 via-orange-500 to-amber-500 text-white shadow-premium">
           <div className="flex flex-col gap-3 max-w-[600px] text-center lg:text-left items-center lg:items-start">
-            <span className="bg-white/20 text-white text-[10px] font-bold px-2.5 py-1 rounded-full w-fit uppercase tracking-widest">LIMITED TIMER RUNNING</span>
-            <h2 className="text-2xl md:text-4xl font-extrabold text-white font-display">Mid-Month Flash Sale!</h2>
-            <p className="text-sm opacity-90">Get flat 30% discount on organic juices and dairy baskets. Free delivery included.</p>
+            <span className="bg-white/20 text-white text-[12px] font-bold px-3.5 py-1 rounded-full w-fit uppercase tracking-widest border border-white/30">LIMITED TIMER RUNNING</span>
+            <h2 className="text-[24px] md:text-[24px] font-bold text-white font-display">Mid-Month Flash Sale!</h2>
+            <p className="text-[16px] font-normal opacity-95">Get flat 30% discount on organic juices and dairy baskets. Free delivery included.</p>
             
             <div className="flex gap-4 mt-2">
               <div className="flex flex-col items-center justify-center w-16 h-16 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl">
@@ -257,6 +309,33 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
 
           <Link to="/offers" className="bg-white text-text-primary px-8 py-3.5 rounded-full font-bold text-sm md:text-base whitespace-nowrap shadow-md hover:bg-background transition-colors active:scale-95">
             Claim Offers
+          </Link>
+        </section>
+
+        {/* 4b. Zepto Paan Corner Showcase (Paan Corner Heading: 44-48px ExtraBold, Description: 22-24px Medium) */}
+        <section className="relative overflow-hidden rounded-3xl p-8 md:p-12 mb-12 md:mb-16 bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 text-white shadow-2xl border border-emerald-500/30 flex flex-col md:flex-row items-center justify-between gap-8 group">
+          <div className="flex flex-col gap-3 max-w-[680px]">
+            <span className="bg-emerald-500/20 text-emerald-400 text-[12px] font-extrabold px-4 py-1.5 rounded-full w-fit uppercase tracking-widest border border-emerald-500/40">
+              🍃 SPECIALITY STORE
+            </span>
+            
+            {/* Paan Corner Heading: 44-48px, Inter ExtraBold (800) */}
+            <h2 className="text-[44px] md:text-[46px] font-extrabold text-white font-display leading-tight tracking-tight">
+              Paan Corner & Refreshments
+            </h2>
+
+            {/* Paan Corner Description: 22-24px, Inter Medium (500) */}
+            <p className="text-[22px] md:text-[24px] font-medium text-emerald-100/90 leading-snug">
+              Authentic Meetha Paan, Mouth Fresheners, Digestive Mouth Sprays & Premium Hookah Essentials Delivered in 10 Mins.
+            </p>
+          </div>
+
+          <Link 
+            to="/products?category=chocolates-indian-sweets"
+            className="px-8 py-4 rounded-full bg-emerald-500 hover:bg-emerald-400 text-emerald-950 text-[16px] font-extrabold flex items-center gap-2.5 transition-all shadow-lg group-hover:scale-105 flex-shrink-0"
+          >
+            <span>Explore Paan Corner</span>
+            <ArrowRight size={18} />
           </Link>
         </section>
 
