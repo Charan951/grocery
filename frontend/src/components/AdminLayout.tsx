@@ -22,16 +22,11 @@ const sidebarItems: SidebarItem[] = [
   { name: 'Products', path: '/admin/products', icon: Package },
   { name: 'Categories', path: '/admin/categories', icon: FolderTree },
   { name: 'Inventory', path: '/admin/inventory', icon: Boxes },
-  { name: 'Warehouses', path: '/admin/warehouses', icon: Warehouse },
   { name: 'Customers', path: '/admin/customers', icon: Users },
   { name: 'Delivery Partners', path: '/admin/delivery', icon: Truck },
   { name: 'Employees', path: '/admin/employees', icon: UserCheck },
-  { name: 'Coupons', path: '/admin/coupons', icon: Ticket },
-  { name: 'Offers', path: '/admin/offers', icon: Tag },
-  { name: 'Marketing', path: '/admin/marketing', icon: Megaphone },
   { name: 'CMS Pages', path: '/admin/cms', icon: Layers },
   { name: 'Finance', path: '/admin/finance', icon: DollarSign },
-  { name: 'Reports', path: '/admin/reports', icon: FileText },
   { name: 'Analytics', path: '/admin/analytics', icon: LineChart },
   { name: 'Reviews', path: '/admin/reviews', icon: Star },
   { name: 'Support', path: '/admin/support', icon: LifeBuoy },
@@ -46,7 +41,6 @@ interface AdminLayoutProps {
 }
 
 export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, onLogout }) => {
-  const { activeHub, setActiveHub, warehouses } = useCMS();
   const location = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);

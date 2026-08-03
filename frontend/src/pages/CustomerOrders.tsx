@@ -1,0 +1,672 @@
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { SEO } from '../components/SEO';
+import { useCartWishlist } from '../context/CartWishlistContext';
+import { useCMS } from '../context/CMSContext';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { 
+  Package, 
+  Clock, 
+  CheckCircle2, 
+  ChevronRight, 
+  ArrowLeft, 
+  MapPin, 
+  RotateCcw, 
+  Download, 
+  Zap,
+  ShoppingBag,
+  MessageSquare,
+  Copy,
+  Check,
+  FileText
+} from 'lucide-react';
+
+interface OrderItem {
+  id: string;
+  name: string;
+  weightSpec: string;
+  price: number;
+  mrp: number;
+  qty: number;
+  image: string;
+}
+
+interface MockOrder {
+  id: string;
+  orderNumber: string;
+  date: string;
+  time: string;
+  status: 'In Transit' | 'Delivered' | 'Cancelled';
+  estimatedDelivery?: string;
+  orderPlacedAt: string;
+  orderArrivedAt?: string;
+  items: OrderItem[];
+  itemTotal: number;
+  itemTotalMrp: number;
+  deliveryFee: number;
+  handlingFee: number;
+  totalAmount: number;
+  deliveryAddress: string;
+  paymentMethod: string;
+}
+
+const initialCustomerOrders: MockOrder[] = [
+  {
+    id: 'PNNHJHTYP81116',
+    orderNumber: 'PNNHJHTYP81116',
+    date: '19 May 2026',
+    time: '09:20 PM',
+    status: 'Delivered',
+    orderPlacedAt: '19 May 2026, 9:20 PM',
+    orderArrivedAt: '19 May 2026, 9:49 PM',
+    itemTotal: 182,
+    itemTotalMrp: 286,
+    deliveryFee: 0,
+    handlingFee: 0,
+    totalAmount: 182,
+    paymentMethod: 'UPI (GPay)',
+    deliveryAddress: '501,sai asha residency,, 15/21/150/116, New Balaji Nagar, APHB Colony, Kukatpally, Hyderabad, Telangana 500072, India',
+    items: [
+      {
+        id: 'p101',
+        name: 'Yoga Bar Chocolate Chunk Multigrain Energy Bar, With Millets, Chocolate, Almonds, High Dietary Fibre',
+        weightSpec: '1 pc (35 g)',
+        price: 33,
+        mrp: 45,
+        qty: 4,
+        image: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=200&auto=format&fit=crop',
+      },
+      {
+        id: 'p102',
+        name: 'Yoga Bar Breakfast Protein Bar Apricot Fig, 6g Protein, Fiber Rich , Omega - 3, Millets, Almonds',
+        weightSpec: '1 pc (45 g)',
+        price: 25,
+        mrp: 53,
+        qty: 2,
+        image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=200&auto=format&fit=crop',
+      },
+    ],
+  },
+  {
+    id: 'FC-984210',
+    orderNumber: 'FC-984210',
+    date: 'Today',
+    time: '10:15 AM',
+    status: 'In Transit',
+    estimatedDelivery: '8 minutes',
+    orderPlacedAt: 'Today, 10:15 AM',
+    itemTotal: 349,
+    itemTotalMrp: 410,
+    deliveryFee: 0,
+    handlingFee: 0,
+    totalAmount: 349,
+    paymentMethod: 'UPI (GPay)',
+    deliveryAddress: 'Flat 402, Balaji Heights, KPHB Phase 3, Hyderabad, Telangana 500072, India',
+    items: [
+      {
+        id: 'p1',
+        name: 'Fresh Organic Bananas (6 pcs)',
+        weightSpec: '6 pcs (approx. 800g)',
+        price: 49,
+        mrp: 60,
+        qty: 1,
+        image: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=200&auto=format&fit=crop',
+      },
+      {
+        id: 'p2',
+        name: 'Amul Taaza Toned Milk (1 Litre)',
+        weightSpec: '1 Litre',
+        price: 72,
+        mrp: 76,
+        qty: 2,
+        image: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=200&auto=format&fit=crop',
+      },
+      {
+        id: 'p3',
+        name: 'Whole Wheat Bread (400g)',
+        weightSpec: '1 pack (400g)',
+        price: 45,
+        mrp: 50,
+        qty: 1,
+        image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=200&auto=format&fit=crop',
+      },
+      {
+        id: 'p4',
+        name: 'Fresh Alphonso Mangoes (1kg)',
+        weightSpec: '1 kg',
+        price: 111,
+        mrp: 148,
+        qty: 1,
+        image: 'https://images.unsplash.com/photo-1553279768-865429fa0078?w=200&auto=format&fit=crop',
+      },
+    ],
+  },
+  {
+    id: 'FC-973142',
+    orderNumber: 'FC-973142',
+    date: '31 Jul 2026',
+    time: '08:40 PM',
+    status: 'Delivered',
+    orderPlacedAt: '31 Jul 2026, 8:40 PM',
+    orderArrivedAt: '31 Jul 2026, 8:52 PM',
+    itemTotal: 685,
+    itemTotalMrp: 790,
+    deliveryFee: 0,
+    handlingFee: 0,
+    totalAmount: 685,
+    paymentMethod: 'Credit Card',
+    deliveryAddress: 'Flat 402, Balaji Heights, KPHB Phase 3, Hyderabad, Telangana 500072, India',
+    items: [
+      {
+        id: 'p5',
+        name: 'Daawat Rozana Basmati Rice (5kg)',
+        weightSpec: '5 kg',
+        price: 480,
+        mrp: 550,
+        qty: 1,
+        image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=200&auto=format&fit=crop',
+      },
+      {
+        id: 'p6',
+        name: 'Fortune Sunlite Sunflower Oil (1L)',
+        weightSpec: '1 Litre',
+        price: 155,
+        mrp: 180,
+        qty: 1,
+        image: 'https://images.unsplash.com/photo-1597481499750-3e6b22637e12?w=200&auto=format&fit=crop',
+      },
+      {
+        id: 'p7',
+        name: 'Tata Salt Vaccum Evaporated (1kg)',
+        weightSpec: '1 kg',
+        price: 50,
+        mrp: 60,
+        qty: 1,
+        image: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=200&auto=format&fit=crop',
+      },
+    ],
+  },
+];
+
+export const CustomerOrders: React.FC = () => {
+  const customerUser = (() => {
+    const cached = localStorage.getItem('customer_user');
+    return cached ? JSON.parse(cached) : null;
+  })();
+  const userPhoneKey = customerUser?.phone ? customerUser.phone.replace(/\D/g, '') : 'default';
+
+  const [filter, setFilter] = useState<'All' | 'In Transit' | 'Delivered' | 'Cancelled'>('All');
+  const [orders, setOrders] = useState<MockOrder[]>(() => {
+    const cached = localStorage.getItem(`customer_orders_${userPhoneKey}`);
+    if (cached) return JSON.parse(cached);
+    return [];
+  });
+  const [selectedOrder, setSelectedOrder] = useState<MockOrder | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const { addToCart } = useCartWishlist();
+  const { products } = useCMS();
+  const navigate = useNavigate();
+
+  React.useEffect(() => {
+    if (customerUser?.phone) {
+      const cleanPhone = customerUser.phone.replace(/\D/g, '').slice(-10);
+      fetch(`/api/orders/customer/${cleanPhone}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.success && data.orders && data.orders.length > 0) {
+            setOrders(data.orders);
+            localStorage.setItem(`customer_orders_${userPhoneKey}`, JSON.stringify(data.orders));
+          }
+        })
+        .catch(() => null);
+    }
+  }, [userPhoneKey]);
+
+  const filteredOrders = orders.filter(
+    (o) => filter === 'All' || o.status === filter
+  );
+
+  const handleCopyOrderId = (id: string) => {
+    navigator.clipboard.writeText(id);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleReorder = (order: MockOrder) => {
+    order.items.forEach((item) => {
+      const existingProduct = products.find((p) => p.id === item.id);
+      if (existingProduct) {
+        addToCart(existingProduct, item.qty);
+      } else {
+        addToCart(
+          {
+            id: item.id,
+            name: item.name,
+            price: item.price,
+            mrp: item.mrp || item.price + 20,
+            netQuantity: item.weightSpec || '1 pack',
+            category: 'Grocery',
+            categoryId: 'c1',
+            subCategory: 'General',
+            brand: 'FreshCart',
+            stock: 50,
+            rating: 4.8,
+            reviewsCount: 12,
+            description: item.name,
+            imageUrl: item.image,
+          },
+          item.qty
+        );
+      }
+    });
+    alert('All items added back to your cart!');
+  };
+
+  // IF AN ORDER IS SELECTED: RENDER EXACT ORDER DETAILS PAGE MATCHING SCREENSHOT
+  if (selectedOrder) {
+    const totalUnitsCount = selectedOrder.items.reduce((sum, item) => sum + item.qty, 0);
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -20 }}
+        className="min-h-screen bg-white text-gray-900 pb-16 font-sans"
+      >
+        <SEO 
+          title={`Order #${selectedOrder.orderNumber} | FreshCart`}
+          description={`Order details for order #${selectedOrder.orderNumber}`}
+        />
+
+        {/* Top Sticky Header */}
+        <header className="bg-white border-b border-gray-200 py-3.5 px-4 md:px-12 flex items-center justify-between sticky top-0 z-40 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSelectedOrder(null)}
+              className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 transition-colors cursor-pointer"
+              aria-label="Back"
+            >
+              <ArrowLeft size={18} />
+            </button>
+            <div className="flex flex-col">
+              <h1 className="text-base md:text-lg font-black text-gray-900 font-display leading-tight">
+                Order #{selectedOrder.orderNumber}
+              </h1>
+              <span className="text-xs text-gray-500 font-semibold">
+                {selectedOrder.items.length} {selectedOrder.items.length === 1 ? 'item' : 'items'}
+              </span>
+            </div>
+          </div>
+
+          <button
+            onClick={() => navigate('/help')}
+            className="border border-rose-200 text-rose-600 hover:bg-rose-50 px-4 py-1.5 rounded-full text-xs font-extrabold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+          >
+            <MessageSquare size={14} className="text-rose-500" />
+            <span>Get Help</span>
+          </button>
+        </header>
+
+        {/* Status Banner */}
+        <div className="px-4 md:px-12 py-5 bg-white border-b border-gray-100">
+          {selectedOrder.status === 'Delivered' ? (
+            <div className="bg-emerald-50 border border-emerald-200/80 text-emerald-900 p-4 rounded-2xl flex items-center gap-3 font-extrabold text-lg shadow-2xs">
+              <div className="w-8 h-8 rounded-xl bg-[#00E676]/20 text-[#00E676] flex items-center justify-center shrink-0">
+                <CheckCircle2 size={24} className="text-emerald-600" />
+              </div>
+              <span className="font-display tracking-tight text-emerald-950">Delivered</span>
+            </div>
+          ) : selectedOrder.status === 'In Transit' ? (
+            <div className="bg-emerald-50 border border-emerald-200/80 text-emerald-900 p-4 rounded-2xl flex items-center gap-3 font-extrabold text-lg shadow-2xs animate-pulse">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0">
+                <Zap size={20} className="fill-white" />
+              </div>
+              <span className="font-display tracking-tight text-emerald-950">
+                Arriving in {selectedOrder.estimatedDelivery || '8 minutes'}
+              </span>
+            </div>
+          ) : (
+            <div className="bg-rose-50 border border-rose-200 text-rose-800 p-4 rounded-2xl flex items-center gap-3 font-extrabold text-lg">
+              <span>Cancelled</span>
+            </div>
+          )}
+        </div>
+
+        {/* Items Section */}
+        <div className="px-4 md:px-12 py-6 border-b border-gray-100">
+          <h2 className="text-sm font-extrabold text-gray-900 mb-4">
+            {selectedOrder.items.length} {selectedOrder.items.length === 1 ? 'item' : 'items'} in order
+          </h2>
+
+          <div className="flex flex-col gap-5">
+            {selectedOrder.items.map((item, idx) => (
+              <div key={item.id || `ord_item_${idx}`} className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="w-14 h-14 rounded-xl bg-gray-50 border border-gray-200/80 p-1 shrink-0 flex items-center justify-center">
+                    <img 
+                      src={item.image} 
+                      alt={item.name} 
+                      className="w-full h-full object-contain" 
+                    />
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <h3 className="text-xs sm:text-sm font-bold text-gray-900 leading-snug line-clamp-2">
+                      {item.name}
+                    </h3>
+                    <span className="text-[11px] font-semibold text-gray-500 mt-0.5">
+                      {item.weightSpec} • {item.qty} {item.qty === 1 ? 'unit' : 'units'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-right shrink-0">
+                  <span className="text-xs sm:text-sm font-black text-gray-900 block font-display">
+                    ₹{item.price * item.qty}
+                  </span>
+                  {item.mrp && item.mrp > item.price && (
+                    <span className="text-[11px] text-gray-400 line-through font-medium block">
+                      ₹{item.mrp * item.qty}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Bill Summary Section */}
+        <div className="px-4 md:px-12 py-6 border-b border-gray-100 bg-gray-50/50">
+          <div className="flex items-center gap-2 mb-4">
+            <FileText size={18} className="text-gray-700" />
+            <h2 className="text-base font-extrabold text-gray-900 font-display">
+              Bill Summary
+            </h2>
+          </div>
+
+          <div className="flex flex-col gap-2.5 text-xs md:text-sm">
+            <div className="flex items-center justify-between text-gray-600 font-medium">
+              <span>Item Total</span>
+              <div className="flex items-center gap-2">
+                <span className="line-through text-gray-400">₹{selectedOrder.itemTotalMrp}</span>
+                <span className="font-bold text-gray-900">₹{selectedOrder.itemTotal}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between text-gray-600 font-medium">
+              <span>Delivery Fee</span>
+              <div className="flex items-center gap-2">
+                <span className="line-through text-gray-400">₹30</span>
+                <span className="font-extrabold text-[#2E7D32]">FREE</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between text-gray-600 font-medium">
+              <span>Handling Fee</span>
+              <div className="flex items-center gap-2">
+                <span className="line-through text-gray-400">₹10</span>
+                <span className="font-extrabold text-[#2E7D32]">FREE</span>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-200 my-2" />
+
+            <div className="flex items-center justify-between font-black text-sm md:text-base text-gray-900">
+              <span className="font-display">Total Bill</span>
+              <div className="flex items-center gap-2">
+                <span className="line-through text-xs font-normal text-gray-400">₹{selectedOrder.itemTotalMrp + 40}</span>
+                <span className="text-base font-black text-gray-900 font-display">₹{selectedOrder.totalAmount}</span>
+              </div>
+            </div>
+
+            {/* Download Invoice Button */}
+            <div className="pt-3 flex justify-end">
+              <button
+                type="button"
+                onClick={() => alert(`Downloading Invoice for Order #${selectedOrder.orderNumber}...`)}
+                className="bg-[#F3E8FF] hover:bg-[#E9D5FF] text-[#8E24AA] font-extrabold text-xs px-5 py-2.5 rounded-xl transition-colors cursor-pointer shadow-2xs"
+              >
+                Download Invoice / Credit Note
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Order Details Section */}
+        <div className="px-4 md:px-12 py-6 flex flex-col gap-4 text-xs md:text-sm">
+          <h2 className="text-base font-extrabold text-gray-900 font-display">
+            Order Details
+          </h2>
+
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-gray-500 font-semibold">Order ID</span>
+            <div className="flex items-center gap-2 font-bold text-gray-900">
+              <span>#{selectedOrder.orderNumber}</span>
+              <button
+                type="button"
+                onClick={() => handleCopyOrderId(selectedOrder.orderNumber)}
+                className="text-gray-400 hover:text-gray-700 cursor-pointer p-0.5"
+                title="Copy Order ID"
+              >
+                {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-gray-500 font-semibold">Delivery Address</span>
+            <p className="text-xs md:text-sm font-medium text-gray-800 leading-relaxed max-w-2xl">
+              {selectedOrder.deliveryAddress}
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-gray-500 font-semibold">Order Placed at</span>
+            <span className="font-semibold text-gray-900">{selectedOrder.orderPlacedAt}</span>
+          </div>
+
+          {selectedOrder.orderArrivedAt && (
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-gray-500 font-semibold">Order Arrived at</span>
+              <span className="font-semibold text-gray-900">{selectedOrder.orderArrivedAt}</span>
+            </div>
+          )}
+        </div>
+
+      </motion.div>
+    );
+  }
+
+  // DEFAULT VIEW: LIST OF ALL ORDERS
+  return (
+    <div className="w-full min-h-screen bg-gray-50/70 pb-16 font-sans">
+      <SEO 
+        title="Your Orders | FreshCart 10-Minute Delivery"
+        description="Track active orders, view past grocery purchase invoices, and repeat orders in 1-click."
+      />
+
+      {/* Top Banner Header */}
+      <header className="w-full bg-white border-b border-gray-200 py-4 px-6 md:px-12 sticky top-0 z-40 shadow-2xs">
+        <div className="w-full max-w-[900px] mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link 
+              to="/" 
+              className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 transition-colors"
+              aria-label="Back"
+            >
+              <ArrowLeft size={18} />
+            </Link>
+            <div>
+              <h1 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight font-display">
+                Your Orders
+              </h1>
+              <p className="text-xs text-gray-500 font-semibold">
+                Track live 10-minute deliveries & view past purchases
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => navigate('/products')}
+            className="hidden sm:flex items-center gap-2 bg-[#00A86B] hover:bg-[#00915c] text-white font-extrabold text-xs px-4 py-2.5 rounded-xl transition-colors shadow-2xs cursor-pointer"
+          >
+            <ShoppingBag size={14} />
+            <span>Shop More</span>
+          </button>
+        </div>
+
+        {/* Category Filter Tabs */}
+        <div className="w-full max-w-[900px] mx-auto flex items-center gap-2 overflow-x-auto pt-3 scrollbar-none">
+          {(['All', 'In Transit', 'Delivered', 'Cancelled'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setFilter(tab)}
+              className={`px-4 py-1.5 rounded-full text-xs font-extrabold transition-all cursor-pointer shrink-0 ${
+                filter === tab
+                  ? 'bg-gray-900 text-white shadow-2xs'
+                  : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+              }`}
+            >
+              {tab === 'All' ? 'All Orders' : tab}
+            </button>
+          ))}
+        </div>
+      </header>
+
+      {/* Main Content Body */}
+      <div className="w-full max-w-[900px] mx-auto px-4 md:px-8 py-6">
+        {filteredOrders.length === 0 ? (
+          <div className="w-full bg-white rounded-3xl p-8 sm:p-12 text-center border border-gray-200/80 shadow-2xs flex flex-col items-center justify-center gap-4 my-6">
+            <div className="w-16 h-16 rounded-full bg-emerald-50 text-[#00A86B] flex items-center justify-center shrink-0 shadow-2xs">
+              <Package size={32} />
+            </div>
+            <h3 className="text-xl sm:text-2xl font-black text-gray-900 font-display">
+              No orders found
+            </h3>
+            <p className="text-xs sm:text-sm md:text-base text-gray-500 font-semibold text-center w-full max-w-2xl mx-auto leading-normal px-2">
+              You haven't placed any orders in this category yet. Explore 30,000+ products delivered in 10 minutes!
+            </p>
+            <Link 
+              to="/products" 
+              className="mt-2 inline-flex items-center justify-center gap-2 bg-[#00A86B] hover:bg-[#00915c] text-white font-black text-xs sm:text-sm px-8 py-3.5 rounded-xl transition-all shadow-md hover:shadow-lg cursor-pointer shrink-0"
+            >
+              <ShoppingBag size={16} />
+              <span>Start Shopping</span>
+            </Link>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-5">
+            {filteredOrders.map((order, idx) => (
+              <motion.div
+                key={order.id || order.orderNumber || `order_${idx}`}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                onClick={() => setSelectedOrder(order)}
+                className="bg-white rounded-2xl border border-gray-200/90 p-4 sm:p-6 shadow-2xs flex flex-col gap-4 transition-all hover:border-gray-300 cursor-pointer group"
+              >
+                {/* Card Header (Order ID + Status Badge + Date) */}
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-black text-gray-900 font-display group-hover:text-[#4CAF50] transition-colors">
+                      {order.orderNumber}
+                    </span>
+                    <span className="text-xs text-gray-400 font-semibold">•</span>
+                    <span className="text-xs text-gray-500 font-semibold flex items-center gap-1">
+                      <Clock size={13} className="text-gray-400" />
+                      {order.date}, {order.time}
+                    </span>
+                  </div>
+
+                  {/* Status Badge */}
+                  {order.status === 'In Transit' ? (
+                    <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-1 rounded-full text-xs font-black flex items-center gap-1.5 animate-pulse">
+                      <Zap size={14} className="fill-emerald-600 text-emerald-600" />
+                      <span>Arriving in {order.estimatedDelivery}</span>
+                    </div>
+                  ) : order.status === 'Delivered' ? (
+                    <div className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-extrabold flex items-center gap-1.5">
+                      <CheckCircle2 size={14} className="text-emerald-600" />
+                      <span>Delivered</span>
+                    </div>
+                  ) : (
+                    <div className="bg-rose-50 text-rose-600 px-3 py-1 rounded-full text-xs font-extrabold">
+                      Cancelled
+                    </div>
+                  )}
+                </div>
+
+                {/* Items Thumbnails Row */}
+                <div className="flex items-center justify-between gap-4 overflow-x-auto py-1 scrollbar-none">
+                  <div className="flex items-center gap-3 shrink-0">
+                    {order.items.map((item, idx) => (
+                      <div key={idx} className="relative group shrink-0">
+                        <div className="w-14 h-14 rounded-xl bg-gray-50 border border-gray-200/70 p-1.5 flex items-center justify-center">
+                          <img 
+                            src={item.image} 
+                            alt={item.name} 
+                            className="w-full h-full object-contain" 
+                          />
+                        </div>
+                        {item.qty > 1 && (
+                          <span className="absolute -top-1.5 -right-1.5 bg-gray-900 text-white text-[10px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center shadow-xs">
+                            x{item.qty}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="text-right shrink-0 flex items-center gap-2">
+                    <div>
+                      <span className="text-xs text-gray-500 font-semibold block">Total Amount</span>
+                      <span className="text-lg font-black text-gray-900 font-display">
+                        ₹{order.totalAmount}
+                      </span>
+                    </div>
+                    <ChevronRight size={18} className="text-gray-400 group-hover:text-gray-800 transition-colors" />
+                  </div>
+                </div>
+
+                {/* Delivery Address & Payment Summary */}
+                <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-600 flex flex-wrap items-center justify-between gap-2 border border-gray-100">
+                  <div className="flex items-center gap-1.5 truncate max-w-md">
+                    <MapPin size={14} className="text-gray-400 shrink-0" />
+                    <span className="truncate font-medium">{order.deliveryAddress}</span>
+                  </div>
+                  <span className="font-bold text-gray-700 shrink-0">
+                    Paid via {order.paymentMethod}
+                  </span>
+                </div>
+
+                {/* Action Buttons Row */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-gray-100">
+                  <div className="text-xs text-gray-500 font-medium">
+                    {order.items.length} {order.items.length === 1 ? 'item' : 'items'}
+                  </div>
+
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => alert(`Downloading Invoice for ${order.orderNumber}...`)}
+                      className="flex items-center gap-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 font-extrabold text-xs px-3.5 py-2 rounded-xl transition-colors cursor-pointer"
+                    >
+                      <Download size={13} />
+                      <span>Invoice</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleReorder(order)}
+                      className="flex items-center gap-1.5 bg-gray-900 hover:bg-black text-white font-extrabold text-xs px-4 py-2 rounded-xl transition-colors cursor-pointer shadow-2xs"
+                    >
+                      <RotateCcw size={13} />
+                      <span>Repeat Order</span>
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

@@ -1,17 +1,20 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:freshcart/core/di/injection.dart';
+import 'package:freshcart/core/services/api_service.dart';
+import 'package:freshcart/core/services/socket_service.dart';
 import 'package:freshcart/features/cart/data/models/cart_item_model.dart';
 import 'package:freshcart/features/orders/data/models/order_model.dart';
 
 class OrdersNotifier extends StateNotifier<List<OrderModel>> {
-  Timer? _trackingTimer;
+  final ApiService _api;
+  final SocketService _socket;
 
-  OrdersNotifier() : super([]) {
+  OrdersNotifier(this._api, this._socket) : super([]) {
     _loadPastOrders();
   }
 
   void _loadPastOrders() {
-    // Start with empty or mock history
     state = [
       OrderModel(
         id: 'FC-82931',
@@ -40,7 +43,7 @@ class OrdersNotifier extends StateNotifier<List<OrderModel>> {
     }
   }
 
-  String placeOrder({
+  Future<String> placeOrder({
     required List<CartItemModel> items,
     required double subtotal,
     required double deliveryFee,
@@ -49,7 +52,7 @@ class OrdersNotifier extends StateNotifier<List<OrderModel>> {
     required double tax,
     required double total,
     required String address,
-  }) {
+  }) async {
     final orderId = 'FC-${10000 + state.length * 17}';
     final newOrder = OrderModel(
       id: orderId,
@@ -67,51 +70,29 @@ class OrdersNotifier extends StateNotifier<List<OrderModel>> {
     );
 
     state = [newOrder, ...state];
-    _startLiveTracking(orderId);
+
+    // Submit to REST API
+    final orderPayload = {
+      'id': orderId,
+      'subtotal': subtotal,
+      'deliveryFee': deliveryFee,
+      'platformFee': platformFee,
+      'discount': discount,
+      'tax': tax,
+      'total': total,
+      'deliveryAddress': address,
+      'status': 'Processing',
+    };
+
+    await _api.createOrder(orderPayload);
+
+    // Join Socket room for real-time tracking updates
+    _socket.joinOrderRoom(orderId);
+
     return orderId;
-  }
-
-  void _startLiveTracking(String orderId) {
-    _trackingTimer?.cancel();
-    
-    // Simulate order progress status transitions
-    int seconds = 0;
-    _trackingTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
-      seconds += 15;
-      
-      final currentOrders = List<OrderModel>.from(state);
-      final index = currentOrders.indexWhere((o) => o.id == orderId);
-      if (index < 0) {
-        timer.cancel();
-        return;
-      }
-      
-      final order = currentOrders[index];
-      OrderModel updatedOrder;
-
-      if (seconds == 15) {
-        updatedOrder = order.copyWith(status: OrderStatus.processing, eta: '10 Mins');
-      } else if (seconds == 30) {
-        updatedOrder = order.copyWith(status: OrderStatus.dispatched, eta: '5 Mins');
-      } else if (seconds == 45) {
-        updatedOrder = order.copyWith(status: OrderStatus.delivered, eta: 'Delivered');
-        timer.cancel();
-      } else {
-        updatedOrder = order;
-      }
-
-      currentOrders[index] = updatedOrder;
-      state = currentOrders;
-    });
-  }
-
-  @override
-  void dispose() {
-    _trackingTimer?.cancel();
-    super.dispose();
   }
 }
 
 final ordersProvider = StateNotifierProvider<OrdersNotifier, List<OrderModel>>((ref) {
-  return OrdersNotifier();
+  return OrdersNotifier(getIt<ApiService>(), getIt<SocketService>());
 });

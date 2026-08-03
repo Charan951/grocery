@@ -47,7 +47,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       }
     }
 
-    final orderId = ref.read(ordersProvider.notifier).placeOrder(
+    final orderId = await ref.read(ordersProvider.notifier).placeOrder(
           items: cartState.items,
           subtotal: cartState.subtotal,
           deliveryFee: cartState.deliveryFee,

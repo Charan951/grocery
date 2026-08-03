@@ -28,24 +28,24 @@ class ProductCard extends StatelessWidget {
       onTap: onTap,
       child: GlassCard(
         width: width,
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Image area with discount overflow
+            // Image area with discount badge
             Stack(
               clipBehavior: Clip.none,
               children: [
                 Container(
-                  height: 120,
+                  height: 100,
                   width: double.infinity,
                   decoration: BoxDecoration(
                     color: isDark ? Colors.white.withOpacity(0.03) : Colors.black.withOpacity(0.02),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(16),
                     child: Hero(
                       tag: 'product_image_${product.id}',
                       child: product.imageUrl.startsWith('http')
@@ -53,13 +53,13 @@ class ProductCard extends StatelessWidget {
                               product.imageUrl,
                               fit: BoxFit.cover,
                               width: double.infinity,
-                              height: 120,
+                              height: 100,
                               loadingBuilder: (context, child, loadingProgress) {
                                 if (loadingProgress == null) return child;
                                 return const Center(
                                   child: SizedBox(
-                                    width: 24,
-                                    height: 24,
+                                    width: 20,
+                                    height: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
                                       color: AppColors.primary,
@@ -69,18 +69,18 @@ class ProductCard extends StatelessWidget {
                               },
                               errorBuilder: (context, error, stackTrace) {
                                 return Center(
-                                    child: Icon(
-                                      _getProductIcon(product.imageUrl),
-                                      size: 48,
-                                      color: product.isOrganic ? AppColors.primary : AppColors.accent,
-                                    ),
-                                  );
+                                  child: Icon(
+                                    _getProductIcon(product.imageUrl),
+                                    size: 40,
+                                    color: product.isOrganic ? AppColors.primary : AppColors.accent,
+                                  ),
+                                );
                               },
                             )
                           : Center(
                               child: Icon(
                                 _getProductIcon(product.imageUrl),
-                                size: 64,
+                                size: 48,
                                 color: product.isOrganic ? AppColors.primary : AppColors.accent,
                               ),
                             ),
@@ -114,58 +114,66 @@ class ProductCard extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(height: 12),
-            
+            const SizedBox(height: 6),
+
             // Brand & Rating
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  product.brand.toUpperCase(),
-                  style: AppTypography.labelSmall(
-                    isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                  ).copyWith(letterSpacing: 0.8),
+                Expanded(
+                  child: Text(
+                    product.brand.toUpperCase(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.labelSmall(
+                      isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                    ).copyWith(letterSpacing: 0.6, fontSize: 9),
+                  ),
                 ),
                 RatingWidget(rating: product.rating),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
 
             // Title
             SizedBox(
-              height: 40,
+              height: 34,
               child: Text(
                 product.name,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: AppTypography.title(
                   isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                ).copyWith(fontSize: 14, height: 1.25),
+                ).copyWith(fontSize: 12, height: 1.2),
               ),
             ),
             const SizedBox(height: 2),
-            
-            // Weight selector label
+
+            // Weight label
             Text(
               product.defaultWeight,
-              style: AppTypography.bodySmall(
-                isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+              style: TextStyle(
+                fontSize: 10,
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
 
-            // Pricing and Add Button
+            // Pricing & Add Button
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     if (product.hasDiscount)
                       Text(
                         '₹${product.mrp.toStringAsFixed(0)}',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 10,
                           color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
                           decoration: TextDecoration.lineThrough,
                         ),
@@ -174,14 +182,14 @@ class ProductCard extends StatelessWidget {
                       '₹${product.price.toStringAsFixed(0)}',
                       style: AppTypography.h3(
                         isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                      ).copyWith(fontSize: 16),
+                      ).copyWith(fontSize: 14, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
                 GestureDetector(
                   onTap: onAdd,
                   child: Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(6),
                     decoration: const BoxDecoration(
                       gradient: AppColors.primaryGradient,
                       shape: BoxShape.circle,
@@ -189,7 +197,7 @@ class ProductCard extends StatelessWidget {
                     child: const Icon(
                       Icons.add_rounded,
                       color: Colors.white,
-                      size: 20,
+                      size: 18,
                     ),
                   ),
                 ),
@@ -227,7 +235,7 @@ class ProductCard extends StatelessWidget {
       case 'soda':
         return Icons.local_drink_rounded;
       case 'snacks':
-      case 'chips':
+      case 'cookie':
         return Icons.cookie_rounded;
       case 'wallet':
         return Icons.wallet_rounded;

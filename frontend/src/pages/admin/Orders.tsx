@@ -39,7 +39,6 @@ interface Order {
 import { useCMS } from '../../context/CMSContext';
 
 export const Orders: React.FC = () => {
-  const { activeHub, warehouses } = useCMS();
   const [orders, setOrders] = useState<Order[]>([]);
   const [activeTab, setActiveTab] = useState<string>('All');
   
@@ -223,14 +222,8 @@ export const Orders: React.FC = () => {
 
   const tabs = ['All', 'Pending', 'Accepted', 'Packed', 'Ready', 'Assigned', 'Out For Delivery', 'Delivered', 'Cancelled'];
 
-  const activeWarehouseObj = warehouses.find(w => w.id === activeHub);
-  const activePincodes = activeWarehouseObj ? activeWarehouseObj.pincodes : [];
-
   const filteredOrders = orders.filter(o => {
-    const matchStatus = activeTab === 'All' || o.status === activeTab;
-    const matchHub = activePincodes.length === 0 || 
-                     (o.deliveryAddress?.pincode && activePincodes.includes(o.deliveryAddress.pincode));
-    return matchStatus && matchHub;
+    return activeTab === 'All' || o.status === activeTab;
   });
 
   return (

@@ -1,226 +1,145 @@
 import React from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { SEO } from '../components/SEO';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
-export const Legal: React.FC = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const currentTab = searchParams.get('tab') || 'privacy';
+interface LegalProps {
+  defaultTab?: 'privacy' | 'terms' | 'refund' | 'shipping';
+}
 
-  const handleTabChange = (tabId: string) => {
-    setSearchParams({ tab: tabId });
-  };
+export const Legal: React.FC<LegalProps> = ({ defaultTab }) => {
+  const [searchParams] = useSearchParams();
+  const currentTab = defaultTab || searchParams.get('tab') || 'terms';
 
-  const tabsConfig = [
-    { id: 'privacy', label: 'Privacy Policy' },
-    { id: 'terms', label: 'Terms of Service' },
-    { id: 'refund', label: 'Refund Policy' },
-    { id: 'shipping', label: 'Shipping Policy' },
-    { id: 'cookie', label: 'Cookie Policy' }
-  ];
+  const isTerms = currentTab === 'terms';
+  const isPrivacy = currentTab === 'privacy';
 
   return (
-    <div className="page-wrapper">
+    <motion.div 
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: 'easeOut' }}
+      className="min-h-screen bg-white text-gray-900 flex flex-col font-sans"
+    >
       <SEO 
-        title={`${tabsConfig.find(t => t.id === currentTab)?.label || 'Legal Policies'} | FreshCart`}
-        description="Read FreshCart privacy guidelines, customer terms of service, shipping timelines, and refund frameworks."
+        title={`${isTerms ? 'FreshCart Terms of Use' : isPrivacy ? 'Privacy Notice' : 'Legal Policy'} | FreshCart`}
+        description="Official legal policies, customer terms of service, and privacy guidelines for FreshCart Marketplace Private Limited."
       />
 
-      <div className="container mx-auto px-4 md:px-6 max-w-[1000px] py-8 pb-16">
-        
-        {/* Mobile Dropdown Menu Selector */}
-        <select 
-          value={currentTab}
-          onChange={(e) => handleTabChange(e.target.value)}
-          className="block md:hidden w-full px-3 py-2 border border-divider rounded-md text-xs bg-surface mb-6 focus:outline-none focus:border-primary text-text-primary font-medium"
-        >
-          {tabsConfig.map(t => (
-            <option key={t.id} value={t.id}>{t.label}</option>
-          ))}
-        </select>
+      {/* Clean White Standalone Header with Brand Logo Only */}
+      <header className="bg-white py-4 px-6 md:px-16 flex items-center justify-between border-b border-gray-200 sticky top-0 z-50 shadow-2xs">
+        <Link to="/" className="flex items-center gap-2">
+          <span className="text-[30px] md:text-[36px] font-extrabold tracking-tight text-gray-900 font-display leading-none">
+            fresh<span className="text-[#4CAF50]">cart</span>
+          </span>
+        </Link>
+      </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-[250px_1fr] gap-8">
-          
-          {/* Left Column: Sidebar Tab list */}
-          <aside className="hidden md:flex flex-col gap-2">
-            {tabsConfig.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => handleTabChange(tab.id)}
-                className={`w-full text-left px-4 py-2.5 rounded-lg text-xs font-semibold bg-surface border border-divider hover:border-primary transition-all duration-200 ${
-                  currentTab === tab.id ? 'bg-primary/10 border-primary text-primary' : 'text-text-primary'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </aside>
-
-          {/* Right Column: Content viewport */}
-          <main>
-            <AnimatePresence mode="wait">
-              {currentTab === 'privacy' && (
-                <motion.div
-                  key="privacy"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="bg-surface border border-divider rounded-2xl p-6 md:p-8 shadow-card"
-                >
-                  <h1 className="text-2xl font-extrabold text-text-primary mb-1">Privacy Policy</h1>
-                  <p className="text-[10px] text-text-secondary font-medium mb-6">Last updated: July 12, 2026</p>
-                  
-                  <div className="flex flex-col gap-6">
-                    <div>
-                      <h3 className="text-base font-bold text-text-primary mb-1.5">1. Data Collection</h3>
-                      <p className="text-xs md:text-sm text-text-secondary leading-relaxed">
-                        We collect name, contact details, GPS delivery coordinates, and wallet transaction logs necessary to route riders and audit produce quality.
-                      </p>
-                    </div>
-                    
-                    <div>
-                      <h3 className="text-base font-bold text-text-primary mb-1.5">2. Location Services</h3>
-                      <p className="text-xs md:text-sm text-text-secondary leading-relaxed">
-                        Our mobile app and store locators query background GPS coordinates to provide active local category catalogs and track dispatch timings.
-                      </p>
-                    </div>
-
-                    <div>
-                      <h3 className="text-base font-bold text-text-primary mb-1.5">3. Security Compliance</h3>
-                      <p className="text-xs md:text-sm text-text-secondary leading-relaxed">
-                        All payments are managed using PCI-DSS compliant secure gateways. FreshCart does not store credit/debit card numbers in our state servers.
-                      </p>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {currentTab === 'terms' && (
-                <motion.div
-                  key="terms"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="bg-surface border border-divider rounded-2xl p-6 md:p-8 shadow-card"
-                >
-                  <h1 className="text-2xl font-extrabold text-text-primary mb-1">Terms of Service</h1>
-                  <p className="text-[10px] text-text-secondary font-medium mb-6">Last updated: July 12, 2026</p>
-                  
-                  <div className="flex flex-col gap-6">
-                    <div>
-                      <h3 className="text-base font-bold text-text-primary mb-1.5">1. Services Framework</h3>
-                      <p className="text-xs md:text-sm text-text-secondary leading-relaxed">
-                        FreshCart provides hyperlocal grocery delivery slots from Indiranagar, HSR, and Whitefield dark store hubs. By placing orders, you agree to dispatch timelines.
-                      </p>
-                    </div>
-                    
-                    <div>
-                      <h3 className="text-base font-bold text-text-primary mb-1.5">2. Fair Usage Policy</h3>
-                      <p className="text-xs md:text-sm text-text-secondary leading-relaxed">
-                        We block accounts abusing coupon codes or making false return claims. Sitemaps and code details are copyrighted.
-                      </p>
-                    </div>
-
-                    <div>
-                      <h3 className="text-base font-bold text-text-primary mb-1.5">3. Pricing & Billing</h3>
-                      <p className="text-xs md:text-sm text-text-secondary leading-relaxed">
-                        MRP and discounts are mapped dynamically based on farm cooperative wholesale fluctuations. Prices shown at checkouts are final.
-                      </p>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {currentTab === 'refund' && (
-                <motion.div
-                  key="refund"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="bg-surface border border-divider rounded-2xl p-6 md:p-8 shadow-card"
-                >
-                  <h1 className="text-2xl font-extrabold text-text-primary mb-1">Refund & Returns Policy</h1>
-                  <p className="text-[10px] text-text-secondary font-medium mb-6">Last updated: July 12, 2026</p>
-                  
-                  <div className="flex flex-col gap-6">
-                    <div>
-                      <h3 className="text-base font-bold text-text-primary mb-1.5">1. No-Questions return</h3>
-                      <p className="text-xs md:text-sm text-text-secondary leading-relaxed">
-                        We offer a 24-hour return policy for all fresh vegetables, fruits, and dairy products. If you are not satisfied with quality, hand the item back to the rider or raise a support ticket.
-                      </p>
-                    </div>
-                    
-                    <div>
-                      <h3 className="text-base font-bold text-text-primary mb-1.5">2. Wallet Cashbacks</h3>
-                      <p className="text-xs md:text-sm text-text-secondary leading-relaxed">
-                        Approved refunds are credited to your FreshCart wallet instantly or returned to your original bank account within 3-5 working days.
-                      </p>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {currentTab === 'shipping' && (
-                <motion.div
-                  key="shipping"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="bg-surface border border-divider rounded-2xl p-6 md:p-8 shadow-card"
-                >
-                  <h1 className="text-2xl font-extrabold text-text-primary mb-1">Shipping & Delivery Policy</h1>
-                  <p className="text-[10px] text-text-secondary font-medium mb-6">Last updated: July 12, 2026</p>
-                  
-                  <div className="flex flex-col gap-6">
-                    <div>
-                      <h3 className="text-base font-bold text-text-primary mb-1.5">1. Express Timelines</h3>
-                      <p className="text-xs md:text-sm text-text-secondary leading-relaxed">
-                        Standard deliveries are routed under 30 minutes in active zones. High traffic or rains may extend slots up to 45 minutes, communicated via SMS logs.
-                      </p>
-                    </div>
-                    
-                    <div>
-                      <h3 className="text-base font-bold text-text-primary mb-1.5">2. Free Delivery thresholds</h3>
-                      <p className="text-xs md:text-sm text-text-secondary leading-relaxed">
-                        Free delivery applies to all baskets above ₹199. Standard order handling charges below ₹199 is ₹29.
-                      </p>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {currentTab === 'cookie' && (
-                <motion.div
-                  key="cookie"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="bg-surface border border-divider rounded-2xl p-6 md:p-8 shadow-card"
-                >
-                  <h1 className="text-2xl font-extrabold text-text-primary mb-1">Cookie Preferences</h1>
-                  <p className="text-[10px] text-text-secondary font-medium mb-6">Last updated: July 12, 2026</p>
-                  
-                  <div className="flex flex-col gap-6">
-                    <div>
-                      <h3 className="text-base font-bold text-text-primary mb-1.5">1. Technical Cookies</h3>
-                      <p className="text-xs md:text-sm text-text-secondary leading-relaxed">
-                        We utilize cookies to cache your delivery postcodes, dark store sessions, and active shopping cart items in the browser.
-                      </p>
-                    </div>
-                    
-                    <div>
-                      <h3 className="text-base font-bold text-text-primary mb-1.5">2. Analytics Tracking</h3>
-                      <p className="text-xs md:text-sm text-text-secondary leading-relaxed">
-                        Anonymized analytics cookies track sitemap clicks and page loading times to optimize our performance grids.
-                      </p>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </main>
-        </div>
+      {/* Centered Page Title Banner */}
+      <div className="bg-gray-50 py-8 px-6 text-center border-b border-gray-200">
+        <h1 className="text-2xl md:text-3xl font-black text-gray-900 underline underline-offset-8 font-display">
+          {isTerms ? 'FreshCart Terms of Use' : isPrivacy ? 'Privacy Notice' : 'FreshCart Policies'}
+        </h1>
       </div>
-    </div>
+
+      {/* Main Document Body */}
+      <main className="flex-1 w-full max-w-[900px] mx-auto px-6 md:px-12 py-8 text-gray-800 text-sm md:text-base leading-relaxed flex flex-col gap-6">
+        
+        {/* Version & Date Metadata */}
+        <div className="flex flex-col gap-1 border-b border-gray-200 pb-4">
+          <span className="text-sm md:text-base font-extrabold text-gray-900">
+            {isTerms ? 'Version 1.4' : 'Version 1.1'}
+          </span>
+          <span className="text-xs md:text-sm font-bold text-gray-600">
+            {isTerms ? 'Last updated: 1 st November 2025' : 'Last updated: 17th June 2025'}
+          </span>
+        </div>
+
+        {/* Legal Preamble */}
+        <p className="text-xs md:text-sm text-gray-600 leading-relaxed">
+          This document is an electronic record and published in accordance with the provisions of the Information Technology Act, 2000 and the rules thereunder and the Information Technology (Intermediary Guidelines and Digital Media Ethics Code) Rules, 2021 and generated by a computer system and does not require any physical or digital signatures.
+        </p>
+
+        {/* Terms Content Section */}
+        {isTerms && (
+          <div className="flex flex-col gap-6">
+            <div>
+              <h2 className="text-base md:text-lg font-extrabold text-gray-900 mb-2">1. Terms of Use</h2>
+              <p className="text-xs md:text-sm text-gray-700 leading-relaxed mb-3">
+                1.1. The websites <strong className="text-gray-900">www.freshcart.com</strong>, <strong className="text-gray-900">www.freshcartnow.com</strong> ("Website") and mobile application 'FreshCart' (<strong className="text-gray-900">App</strong>) (Website and App collectively referred to as the "<strong className="text-gray-900">Platform</strong>") is owned, operated and managed by FreshCart Marketplace Private Limited, a private limited company incorporated in accordance with the provisions of the Indian Companies Act, 2013 having its registered office situated at First Floor, 773, Sarjapur Main Road, Bengaluru, Karnataka-560103.
+              </p>
+              <p className="text-xs md:text-sm text-gray-700 leading-relaxed">
+                1.2. These terms of use ("Terms") govern your use of the Platform, and for the purpose of these Terms, FreshCart Marketplace Private Limited including its subsidiaries, its holding company, its affiliates may wherever context so require, be also referred to as, "FreshCart", "We", "Us", or "Our".
+              </p>
+            </div>
+
+            <div>
+              <h2 className="text-base md:text-lg font-extrabold text-gray-900 mb-2">2. Services & 10-Minute Delivery Commitment</h2>
+              <p className="text-xs md:text-sm text-gray-700 leading-relaxed mb-3">
+                2.1. FreshCart enables quick-commerce delivery of groceries, fresh fruits, vegetables, dairy, household items, and personal care products directly to your designated address via localized dark stores.
+              </p>
+              <p className="text-xs md:text-sm text-gray-700 leading-relaxed">
+                2.2. Displayed delivery estimates (e.g. 10 minutes) are target timeframes subject to active rider availability, traffic regulations, bad weather conditions, and accurate delivery location details provided by the user.
+              </p>
+            </div>
+
+            <div>
+              <h2 className="text-base md:text-lg font-extrabold text-gray-900 mb-2">3. User Account & Security</h2>
+              <p className="text-xs md:text-sm text-gray-700 leading-relaxed mb-3">
+                3.1. You are responsible for maintaining the confidentiality of your mobile number and OTP authentication credentials. All actions originating from your registered account shall be deemed to be authorized by you.
+              </p>
+              <p className="text-xs md:text-sm text-gray-700 leading-relaxed">
+                3.2. FreshCart reserves the right to suspend or terminate accounts engaging in fraudulent orders, abusive behavior toward delivery partners, or violation of applicable laws.
+              </p>
+            </div>
+
+            <div>
+              <h2 className="text-base md:text-lg font-extrabold text-gray-900 mb-2">4. Pricing, Payments & Invoicing</h2>
+              <p className="text-xs md:text-sm text-gray-700 leading-relaxed">
+                4.1. Prices displayed on the Platform are inclusive of applicable taxes unless stated otherwise. The final bill amount generated upon checkout is payable via UPI, credit/debit card, net banking, or cash on delivery.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Privacy Content Section */}
+        {!isTerms && (
+          <div className="flex flex-col gap-6">
+            <div>
+              <h2 className="text-base md:text-lg font-extrabold text-gray-900 mb-2">1. Privacy Notice Overview</h2>
+              <p className="text-xs md:text-sm text-gray-700 leading-relaxed mb-3">
+                1.1. This Notice applies to FreshCart Marketplace Private Limited (hereinafter referred to as "FreshCart" or "the Company"), a company incorporated under the Companies Act, 2013 and having its registered office at First Floor, 773, Sarjapur Main Road, Bengaluru, Karnataka-560103. The Company is the owner of websites <strong className="text-gray-900">www.freshcart.com</strong>, <strong className="text-gray-900">www.freshcartnow.com</strong> and mobile application 'FreshCart' (collectively, the "<strong className="text-gray-900">Platform</strong>").
+              </p>
+              <p className="text-xs md:text-sm text-gray-700 leading-relaxed">
+                1.2. This privacy notice (Privacy Notice) describes the policies and procedures applicable to the collection, use, storage, disclosure and protection of Your information shared with Us while You use the Platform, and for the purpose of this Privacy Notice "We", "Us", or "Our" refers to FreshCart Marketplace Private Limited and its subsidiaries. We value the trust You place in Us. That is why, We maintain reasonable security standards for securing the transactions and Your information.
+              </p>
+            </div>
+
+            <div>
+              <h2 className="text-base md:text-lg font-extrabold text-gray-900 mb-2">2. Information We Collect</h2>
+              <p className="text-xs md:text-sm text-gray-700 leading-relaxed mb-3">
+                2.1. <strong className="text-gray-900">Personal Information:</strong> We collect your mobile number, delivery address, contact name, and order preferences to fulfill grocery deliveries.
+              </p>
+              <p className="text-xs md:text-sm text-gray-700 leading-relaxed">
+                2.2. <strong className="text-gray-900">Location Data:</strong> With your permission, we query real-time GPS coordinates to display nearby available product catalogs and enable real-time dispatch tracking.
+              </p>
+            </div>
+
+            <div>
+              <h2 className="text-base md:text-lg font-extrabold text-gray-900 mb-2">3. Data Protection & Security</h2>
+              <p className="text-xs md:text-sm text-gray-700 leading-relaxed">
+                3.1. All online payments are processed through PCI-DSS certified payment gateways. FreshCart does not store credit or debit card numbers on our servers. Your data is protected using industry-standard encryption protocols.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Legal Footer Note */}
+        <div className="mt-8 border-t border-gray-200 pt-6 text-center text-xs text-gray-500">
+          © {new Date().getFullYear()} FreshCart Marketplace Private Limited. All rights reserved.
+        </div>
+
+      </main>
+    </motion.div>
   );
 };

@@ -2,49 +2,44 @@ import mongoose from 'mongoose';
 
 // Order Schema
 const orderSchema = new mongoose.Schema({
-  orderId: { type: String, required: true, unique: true, index: true }, // e.g. ORD-98745
+  orderId: { type: String, required: true, unique: true, index: true }, // e.g. FC-984210 or PNNHJHTYP81116
   customerId: { type: String, required: true, index: true },
-  customerName: { type: String, required: true },
-  customerPhone: { type: String, required: true },
+  customerName: { type: String, default: 'Customer' },
+  customerPhone: { type: String, required: true, index: true },
   items: [{
-    productId: { type: String, required: true },
+    id: { type: String },
+    productId: { type: String },
     name: { type: String, required: true },
-    quantity: { type: Number, required: true },
+    weightSpec: { type: String, default: '1 pc' },
+    quantity: { type: Number, required: true, default: 1 },
+    qty: { type: Number, default: 1 },
     price: { type: Number, required: true },
-    weight: { type: String, required: true }
+    mrp: { type: Number },
+    image: { type: String }
   }],
-  subTotal: { type: Number, required: true },
+  subTotal: { type: Number, default: 0 },
+  itemTotal: { type: Number, required: true },
+  itemTotalMrp: { type: Number, default: 0 },
   discount: { type: Number, default: 0 },
-  deliveryCharges: { type: Number, default: 0 },
-  grandTotal: { type: Number, required: true },
-  paymentStatus: { type: String, enum: ['Pending', 'Paid', 'Failed', 'Refunded'], default: 'Pending' },
-  paymentMethod: { type: String, enum: ['COD', 'UPI', 'Card', 'Wallet'], default: 'COD' },
+  deliveryFee: { type: Number, default: 0 },
+  handlingFee: { type: Number, default: 0 },
+  totalAmount: { type: Number, required: true },
+  paymentStatus: { type: String, enum: ['Pending', 'Paid', 'Failed', 'Refunded'], default: 'Paid' },
+  paymentMethod: { type: String, default: 'UPI (GPay)' },
   status: { 
     type: String, 
     enum: [
-      'Pending', 'Accepted', 'Packed', 'Ready', 
+      'Pending', 'In Transit', 'Accepted', 'Packed', 'Ready', 
       'Assigned', 'Out For Delivery', 'Delivered', 
-      'Cancelled', 'Returned', 'Refunded', 'Exchange'
+      'Cancelled', 'Returned', 'Refunded'
     ], 
-    default: 'Pending',
+    default: 'In Transit',
     index: true
   },
-  deliveryPartnerId: { type: String },
-  deliveryPartnerName: { type: String },
-  deliveryAddress: {
-    type: { type: String }, // Home, Office
-    street: { type: String },
-    city: { type: String },
-    pincode: { type: String },
-    lat: { type: Number },
-    lng: { type: Number }
-  },
-  trackingTimeline: [{
-    status: { type: String },
-    note: { type: String },
-    timestamp: { type: Date, default: Date.now }
-  }],
-  estimatedDeliveryTime: { type: String, default: '15-20 mins' }
+  deliveryAddress: { type: String, required: true },
+  orderPlacedAt: { type: String, default: () => new Date().toLocaleString() },
+  orderArrivedAt: { type: String },
+  estimatedDelivery: { type: String, default: '8 minutes' }
 }, { timestamps: true });
 
 export const Order = mongoose.model('Order', orderSchema);

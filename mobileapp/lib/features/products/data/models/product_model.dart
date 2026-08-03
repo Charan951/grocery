@@ -3,6 +3,7 @@ class ProductModel {
   final String name;
   final String brand;
   final String categoryId;
+  final String? subCategory;
   final double rating;
   final int reviewsCount;
   final double price;
@@ -14,7 +15,7 @@ class ProductModel {
   final Map<String, String> nutritionFacts;
   final List<String> ingredients;
   final bool isOrganic;
-  final String imageUrl; // Keyword or mock image asset path
+  final String imageUrl;
   final bool isBestSeller;
   final bool isFreshPick;
 
@@ -23,6 +24,7 @@ class ProductModel {
     required this.name,
     required this.brand,
     required this.categoryId,
+    this.subCategory,
     required this.rating,
     required this.reviewsCount,
     required this.price,
@@ -48,6 +50,7 @@ class ProductModel {
       name: json['name'] as String,
       brand: json['brand'] as String,
       categoryId: json['categoryId'] as String,
+      subCategory: json['subCategory'] as String?,
       rating: (json['rating'] as num).toDouble(),
       reviewsCount: json['reviewsCount'] as int,
       price: (json['price'] as num).toDouble(),
@@ -71,6 +74,7 @@ class ProductModel {
       'name': name,
       'brand': brand,
       'categoryId': categoryId,
+      'subCategory': subCategory,
       'rating': rating,
       'reviewsCount': reviewsCount,
       'price': price,
@@ -92,12 +96,14 @@ class ProductModel {
     double? price,
     double? mrp,
     String? defaultWeight,
+    String? subCategory,
   }) {
     return ProductModel(
       id: id,
       name: name,
       brand: brand,
       categoryId: categoryId,
+      subCategory: subCategory ?? this.subCategory,
       rating: rating,
       reviewsCount: reviewsCount,
       price: price ?? this.price,

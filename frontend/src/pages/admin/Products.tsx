@@ -6,7 +6,7 @@ import {
 import { useCMS, Product } from '../../context/CMSContext';
 
 export const Products: React.FC = () => {
-  const { products: contextProducts, categories, addProduct: contextAdd, deleteProduct: contextDelete, updateProduct: contextUpdate, activeHub, uploadImage } = useCMS();
+  const { products: contextProducts, categories, addProduct: contextAdd, deleteProduct: contextDelete, updateProduct: contextUpdate, uploadImage } = useCMS();
   const [productsList, setProductsList] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -147,7 +147,6 @@ export const Products: React.FC = () => {
       categoryId: category,
       category: currentCategoryObj?.name || category,
       subCategory: subCategory,
-      warehouseId: activeHub,
       price,
       mrp,
       originalPrice: mrp,

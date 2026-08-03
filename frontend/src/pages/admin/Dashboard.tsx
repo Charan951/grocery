@@ -8,8 +8,7 @@ import {
 import { useCMS } from '../../context/CMSContext';
 
 export const Dashboard: React.FC = () => {
-  const { products, activeHub, warehouses } = useCMS();
-  const activeWarehouse = warehouses.find(w => w.id === activeHub);
+  const { products } = useCMS();
   const [stats, setStats] = useState({
     todayRevenue: 0,
     todayOrders: 0,

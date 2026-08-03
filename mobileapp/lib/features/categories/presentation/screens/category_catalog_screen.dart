@@ -23,7 +23,22 @@ class CategoryCatalogScreen extends ConsumerStatefulWidget {
 
 class _CategoryCatalogScreenState extends ConsumerState<CategoryCatalogScreen> {
   bool _organicOnly = false;
+  String _selectedSubCategory = 'All';
   String _sortBy = 'popular'; // popular, price_low, price_high
+
+  // Subcategory Tabs mapping for categories
+  final Map<String, List<String>> _categorySubMap = {
+    'fruits-vegetables': ['All', 'Fresh Vegetables', 'Fresh Fruits', 'Exotics & Premium', 'Organics & Hydroponics', 'Mangoes & Melons'],
+    'cat_veg': ['All', 'Fresh Vegetables', 'Exotics & Premium', 'Organics & Hydroponics'],
+    'cat_fruits': ['All', 'Fresh Fruits', 'Exotics & Premium', 'Mangoes & Melons'],
+    'dairy-bread-eggs': ['All', 'Milk', 'Breads & Buns', 'Eggs', 'Curd & Probiotic Drinks', 'Paneer & Cream'],
+    'cat_dairy': ['All', 'Milk', 'Curd & Probiotic Drinks', 'Paneer & Cream', 'Butter', 'Cheese'],
+    'cat_bakery': ['All', 'Breads & Buns', 'Fresh Bakery', 'Indian Breads'],
+    'atta-rice-oil-dals': ['All', 'Atta', 'Rice', 'Edible Oils', 'Dals & Pulses', 'Ghee'],
+    'meats-fish-eggs': ['All', 'Chicken', 'Mutton', 'Fish & Seafood', 'Eggs & Poultry'],
+    'masala-dry-fruits-more': ['All', 'Whole Spices', 'Powdered Spices', 'Almonds & Cashews', 'Raisins & Walnuts'],
+    'packaged-food': ['All', 'Chips & Namkeen', 'Noodles & Pasta', 'Biscuits & Cookies'],
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -40,80 +55,38 @@ class _CategoryCatalogScreenState extends ConsumerState<CategoryCatalogScreen> {
       category = standardCategory;
     } else {
       final String name = widget.categoryId;
-      String iconStr = 'custom';
-      Color color = const Color(0xFF2E7D32);
-      
-      if (name.toLowerCase().contains('fresh')) {
-        iconStr = 'organic';
-        color = const Color(0xFF4CAF50);
-      } else if (name.toLowerCase().contains('grocery')) {
-        iconStr = 'dairy';
-        color = const Color(0xFF007AFF);
-      } else if (name.toLowerCase().contains('electronics') || name.toLowerCase().contains('earbud')) {
-        iconStr = 'frozen';
-        color = const Color(0xFF8E8E93);
-      } else if (name.toLowerCase().contains('monsoon') || name.toLowerCase().contains('umbrella')) {
-        iconStr = 'beverages';
-        color = const Color(0xFFAF52DE);
-      } else if (name.toLowerCase().contains('kitchen') || name.toLowerCase().contains('crockery')) {
-        iconStr = 'bakery';
-        color = const Color(0xFFFF9500);
-      } else if (name.toLowerCase().contains('cleaning') || name.toLowerCase().contains('home')) {
-        iconStr = 'dairy';
-        color = const Color(0xFF5AC8FA);
-      } else if (name.toLowerCase().contains('makeup') || name.toLowerCase().contains('fragrance')) {
-        iconStr = 'snacks';
-        color = const Color(0xFFFF2D55);
-      } else if (name.toLowerCase().contains('skin') || name.toLowerCase().contains('hair')) {
-        iconStr = 'organic';
-        color = const Color(0xFF34C759);
-      }
-
       category = CategoryModel(
         id: widget.categoryId,
         name: name,
-        icon: iconStr,
-        color: color,
+        icon: 'custom',
+        color: const Color(0xFF00A86B),
         productCount: 0,
       );
     }
 
+    final availableSubCategories = _categorySubMap[widget.categoryId] ?? ['All', 'Popular Items', 'Fresh Picks', 'Organics'];
+
     var filteredProducts = MockDataService.products.where((p) {
       final catId = widget.categoryId.toLowerCase();
+      bool matchCategory = (p.categoryId == widget.categoryId);
       
-      if (p.categoryId == widget.categoryId) return true;
-      
-      if (catId.contains('fresh')) {
-        return p.categoryId == 'cat_organic' || p.categoryId == 'cat_veg' || p.categoryId == 'cat_fruits';
+      if (!matchCategory) {
+        if (catId.contains('fresh') || catId.contains('veg') || catId.contains('fruit')) {
+          matchCategory = p.categoryId == 'cat_organic' || p.categoryId == 'cat_veg' || p.categoryId == 'cat_fruits';
+        } else if (catId.contains('grocery') || catId.contains('dairy') || catId.contains('bakery')) {
+          matchCategory = p.categoryId == 'cat_dairy' || p.categoryId == 'cat_bakery' || p.categoryId == 'cat_snacks' || p.categoryId == 'cat_drinks';
+        }
       }
-      
-      if (catId.contains('grocery')) {
-        return p.categoryId == 'cat_dairy' || p.categoryId == 'cat_bakery' || p.categoryId == 'cat_snacks' || p.categoryId == 'cat_drinks';
+
+      if (!matchCategory) return false;
+
+      if (_selectedSubCategory != 'All') {
+        final pSub = (p.subCategory ?? '').toLowerCase();
+        final selSub = _selectedSubCategory.toLowerCase();
+        return pSub.contains(selSub) || selSub.contains(pSub) || p.name.toLowerCase().contains(selSub);
       }
-      
-      if (catId.contains('kitchen') || catId.contains('crockery')) {
-        return p.categoryId == 'cat_bakery' || p.categoryId == 'cat_organic';
-      }
-      if (catId.contains('cleaning') || catId.contains('home')) {
-        return p.categoryId == 'cat_dairy';
-      }
-      if (catId.contains('makeup') || catId.contains('fragrance') || catId.contains('skin') || catId.contains('hair')) {
-        return p.categoryId == 'cat_organic';
-      }
-      if (catId.contains('after hours') || catId.contains('kickoff') || catId.contains('munchies') || catId.contains('snack')) {
-        return p.categoryId == 'cat_snacks';
-      }
-      if (catId.contains('beverage') || catId.contains('mixer') || catId.contains('drink')) {
-        return p.categoryId == 'cat_drinks';
-      }
-      if (catId.contains('instant') || catId.contains('bakery')) {
-        return p.categoryId == 'cat_bakery' || p.categoryId == 'cat_snacks';
-      }
-      if (catId.contains('meat') || catId.contains('seafood')) {
-        return p.categoryId == 'cat_meat';
-      }
-      
-      return false;
+
+      return true;
     }).toList();
 
     if (_organicOnly) {
@@ -129,7 +102,7 @@ class _CategoryCatalogScreenState extends ConsumerState<CategoryCatalogScreen> {
     final cartNotifier = ref.read(cartProvider.notifier);
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
+      backgroundColor: isDark ? AppColors.backgroundDark : const Color(0xFFF9FAFB),
       appBar: AppBar(
         title: Text(category.name),
         centerTitle: true,
@@ -141,12 +114,39 @@ class _CategoryCatalogScreenState extends ConsumerState<CategoryCatalogScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Filter Pills Bar
+            // 1. Subcategory Horizontal Tabs Bar (Matching Web Frontend Products.tsx)
+            Container(
+              height: 48,
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: availableSubCategories.length,
+                itemBuilder: (context, index) {
+                  final sub = availableSubCategories[index];
+                  final isSelected = _selectedSubCategory == sub;
+
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: ChoiceChip(
+                      label: Text(sub, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87))),
+                      selected: isSelected,
+                      selectedColor: const Color(0xFF00A86B),
+                      backgroundColor: isDark ? Colors.white10 : Colors.grey.shade100,
+                      onSelected: (_) => setState(() => _selectedSubCategory = sub),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            // 2. Filter & Sorting Controls
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Row(
                 children: [
-                  // Organic filter
                   GestureDetector(
                     onTap: () {
                       setState(() {
@@ -154,12 +154,10 @@ class _CategoryCatalogScreenState extends ConsumerState<CategoryCatalogScreen> {
                       });
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                       decoration: BoxDecoration(
-                        color: _organicOnly
-                            ? AppColors.primary
-                            : (isDark ? Colors.white10 : Colors.white),
-                        borderRadius: BorderRadius.circular(20),
+                        color: _organicOnly ? const Color(0xFF00A86B) : (isDark ? Colors.white10 : Colors.white),
+                        borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: _organicOnly ? Colors.transparent : (isDark ? Colors.white24 : AppColors.divider),
                         ),
@@ -168,35 +166,36 @@ class _CategoryCatalogScreenState extends ConsumerState<CategoryCatalogScreen> {
                         children: [
                           Icon(
                             Icons.eco_rounded,
-                            size: 16,
-                            color: _organicOnly ? Colors.white : AppColors.primary,
+                            size: 14,
+                            color: _organicOnly ? Colors.white : const Color(0xFF00A86B),
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 4),
                           Text(
                             'Organic Only',
-                            style: AppTypography.labelMedium(
-                              _organicOnly ? Colors.white : (isDark ? Colors.white : AppColors.textPrimary),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: _organicOnly ? Colors.white : (isDark ? Colors.white : AppColors.textPrimary),
                             ),
                           ),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  
-                  // Sort dropdown
+                  const SizedBox(width: 10),
+
                   Expanded(
                     child: GlassCard(
-                      borderRadius: 20,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      borderRadius: 16,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
                       color: isDark ? Colors.white12 : Colors.white,
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
                           value: _sortBy,
-                          icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
                           style: TextStyle(
                             color: isDark ? Colors.white : AppColors.textPrimary,
-                            fontSize: 13,
+                            fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),
                           onChanged: (String? newValue) {
@@ -219,12 +218,12 @@ class _CategoryCatalogScreenState extends ConsumerState<CategoryCatalogScreen> {
               ),
             ),
 
-            // Products Grid
+            // 3. Products 2-Column Grid
             Expanded(
               child: filteredProducts.isEmpty
                   ? Center(
                       child: Text(
-                        'No products found in this category.',
+                        'No products found for "$_selectedSubCategory"',
                         style: AppTypography.bodyMedium(
                           isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
                         ),
@@ -232,11 +231,11 @@ class _CategoryCatalogScreenState extends ConsumerState<CategoryCatalogScreen> {
                     )
                   : GridView.builder(
                       physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
                       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2,
-                        crossAxisSpacing: 14,
-                        mainAxisSpacing: 14,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
                         childAspectRatio: 0.64,
                       ),
                       itemCount: filteredProducts.length,
@@ -252,6 +251,7 @@ class _CategoryCatalogScreenState extends ConsumerState<CategoryCatalogScreen> {
                                 content: Text('Added ${prod.name} to Cart'),
                                 duration: const Duration(seconds: 1),
                                 behavior: SnackBarBehavior.floating,
+                                backgroundColor: const Color(0xFF00A86B),
                               ),
                             );
                           },

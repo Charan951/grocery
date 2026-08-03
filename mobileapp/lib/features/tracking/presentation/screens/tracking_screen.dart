@@ -7,6 +7,7 @@ import 'package:freshcart/core/widgets/glass_card.dart';
 import 'package:freshcart/core/widgets/buttons.dart';
 import 'package:freshcart/features/orders/data/models/order_model.dart';
 import 'package:freshcart/features/orders/presentation/controllers/orders_controller.dart';
+import 'package:freshcart/features/tracking/presentation/controllers/tracking_controller.dart';
 
 class TrackingScreen extends ConsumerWidget {
   final String orderId;
@@ -21,6 +22,7 @@ class TrackingScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
+    final trackingState = ref.watch(trackingProvider(orderId));
     final orders = ref.watch(ordersProvider);
     final order = orders.firstWhere(
       (o) => o.id == orderId,
@@ -30,19 +32,17 @@ class TrackingScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
       appBar: AppBar(
-        title: Text('Track Order: $orderId'),
+        title: Text('Live Socket Track: $orderId'),
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-          onPressed: () {
-            context.go('/');
-          },
+          onPressed: () => context.go('/'),
         ),
       ),
       body: SafeArea(
         child: Column(
           children: [
-            // Map Area (Mock Visualizer)
+            // Map Area (Socket Visualizer)
             Expanded(
               flex: 4,
               child: Container(
@@ -60,7 +60,6 @@ class TrackingScreen extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(32),
                   child: Stack(
                     children: [
-                      // Map custom painter
                       CustomPaint(
                         painter: TrackingMapPainter(
                           isDark: isDark,
@@ -68,8 +67,6 @@ class TrackingScreen extends ConsumerWidget {
                         ),
                         child: Container(),
                       ),
-                      
-                      // Floating ETA Card
                       Positioned(
                         top: 20,
                         left: 20,
@@ -84,14 +81,14 @@ class TrackingScreen extends ConsumerWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Estimated Arrival',
+                                    'Live Socket ETA',
                                     style: AppTypography.bodySmall(
                                       isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    order.eta == 'Delivered' ? 'Delivered' : 'Arriving in ${order.eta}',
+                                    '${trackingState.etaMinutes} Mins Delivery',
                                     style: AppTypography.h2(
                                       isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
                                     ).copyWith(fontSize: 18),
@@ -130,8 +127,6 @@ class TrackingScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 12),
-                      
-                      // Driver Info Card
                       GlassCard(
                         padding: const EdgeInsets.all(16),
                         child: Row(
@@ -147,7 +142,7 @@ class TrackingScreen extends ConsumerWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Ramesh Kumar',
+                                    trackingState.riderName,
                                     style: AppTypography.labelLarge(
                                       isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
                                     ),
@@ -158,7 +153,7 @@ class TrackingScreen extends ConsumerWidget {
                                       const Icon(Icons.star_rounded, color: AppColors.warning, size: 14),
                                       const SizedBox(width: 4),
                                       Text(
-                                        '4.9 (1.2k deliveries)',
+                                        '4.9 • ${trackingState.riderPhone}',
                                         style: AppTypography.bodySmall(
                                           isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
                                         ),
@@ -168,12 +163,14 @@ class TrackingScreen extends ConsumerWidget {
                                 ],
                               ),
                             ),
-                            // Action buttons
                             Row(
                               children: [
                                 _buildRoundButton(Icons.call_rounded, isDark),
                                 const SizedBox(width: 8),
-                                _buildRoundButton(Icons.chat_bubble_rounded, isDark),
+                                GestureDetector(
+                                  onTap: () => context.push('/support'),
+                                  child: _buildRoundButton(Icons.chat_bubble_rounded, isDark),
+                                ),
                               ],
                             ),
                           ],
@@ -181,18 +178,17 @@ class TrackingScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 24),
 
-                      // Status Timeline
                       Text(
-                        'Delivery Timeline',
+                        'Live Order Timeline',
                         style: AppTypography.title(
                           isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 16),
-                      _buildTimelineItem('Order Placed', 'We have received your order.', order.status, OrderStatus.placed, isDark, isFirst: true),
-                      _buildTimelineItem('Grocery Packing', 'Your fresh items are being carefully packed at our dark store.', order.status, OrderStatus.processing, isDark),
-                      _buildTimelineItem('Out for Delivery', 'Our delivery partner is on the way to your door.', order.status, OrderStatus.dispatched, isDark),
-                      _buildTimelineItem('Delivered', 'Order successfully received.', order.status, OrderStatus.delivered, isDark, isLast: true),
+                      _buildTimelineItem('Order Placed', 'Order placed & assigned to Dark Store.', order.status, OrderStatus.placed, isDark, isFirst: true),
+                      _buildTimelineItem('Grocery Packing', 'Fresh items packed in insulated bag.', order.status, OrderStatus.processing, isDark),
+                      _buildTimelineItem('Out for Delivery', 'Rider is on the way (Socket Connected).', order.status, OrderStatus.dispatched, isDark),
+                      _buildTimelineItem('Delivered', 'Order successfully handed over.', order.status, OrderStatus.delivered, isDark, isLast: true),
 
                       const SizedBox(height: 24),
                       PrimaryButton(
@@ -249,7 +245,6 @@ class TrackingScreen extends ConsumerWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Timeline indicator
           Column(
             children: [
               Container(
@@ -286,8 +281,6 @@ class TrackingScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(width: 16),
-          
-          // Details
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -334,17 +327,14 @@ class TrackingMapPainter extends CustomPainter {
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
 
-    // Draw simple grid map roads
     canvas.drawLine(const Offset(30, 0), Offset(30, size.height), linePaint);
     canvas.drawLine(Offset(size.width - 40, 0), Offset(size.width - 40, size.height), linePaint);
     canvas.drawLine(const Offset(0, 100), Offset(size.width, 100), linePaint);
     canvas.drawLine(Offset(0, size.height - 80), Offset(size.width, size.height - 80), linePaint);
 
-    // Dark store coordinate (A) & Delivery Destination coordinate (B)
     final startPt = Offset(50, size.height - 120);
     final endPt = Offset(size.width - 80, 80);
 
-    // Route line path
     final routePaint = Paint()
       ..color = AppColors.primary.withOpacity(0.3)
       ..strokeWidth = 4.0
@@ -353,29 +343,26 @@ class TrackingMapPainter extends CustomPainter {
 
     final path = Path();
     path.moveTo(startPt.dx, startPt.dy);
-    // Draw L-shaped path
     path.lineTo(startPt.dx, endPt.dy);
     path.lineTo(endPt.dx, endPt.dy);
     canvas.drawPath(path, routePaint);
 
-    // Draw active completed path
     final activeRoutePaint = Paint()
       ..color = AppColors.primary
       ..strokeWidth = 4.0
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
 
-    double progress = 0.05; // Placed
+    double progress = 0.05;
     if (status == OrderStatus.processing) progress = 0.3;
     if (status == OrderStatus.dispatched) progress = 0.65;
     if (status == OrderStatus.delivered) progress = 1.0;
 
-    // Calculate rider position coordinate on path
-    Offset riderPos;
     final totalX = endPt.dx - startPt.dx;
     final totalY = startPt.dy - endPt.dy;
     final cornerProgress = totalY / (totalX + totalY);
 
+    Offset riderPos;
     if (progress <= cornerProgress) {
       final subProg = progress / cornerProgress;
       riderPos = Offset(startPt.dx, startPt.dy - (totalY * subProg));
@@ -394,7 +381,6 @@ class TrackingMapPainter extends CustomPainter {
     }
     canvas.drawPath(activePath, activeRoutePaint);
 
-    // Pin points A (Dark Store) and B (Home)
     final storePaint = Paint()
       ..color = isDark ? Colors.white30 : Colors.black26
       ..style = PaintingStyle.fill;
@@ -405,21 +391,19 @@ class TrackingMapPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
     canvas.drawCircle(startPt, 5, storePoint);
 
-    // Pin Home
     canvas.drawCircle(endPt, 12, storePaint);
     final homePoint = Paint()
       ..color = AppColors.primary
       ..style = PaintingStyle.fill;
     canvas.drawCircle(endPt, 8, homePoint);
 
-    // Rider Icon circle marker
     final riderBg = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.fill;
     final shadowPaint = Paint()
       ..color = Colors.black.withOpacity(0.15)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
-    
+
     canvas.drawCircle(riderPos + const Offset(0, 3), 14, shadowPaint);
     canvas.drawCircle(riderPos, 14, riderBg);
 

@@ -5,8 +5,6 @@ import { Coupon, Offer } from '../models/Finance.js';
 import { Blog, Settings } from '../models/Operations.js';
 import { Customer } from '../models/Customer.js';
 
-import { Warehouse } from '../models/Inventory.js';
-
 export const seedDatabase = async () => {
   try {
     // 1. Seed Users for all roles
@@ -58,18 +56,6 @@ export const seedDatabase = async () => {
     if (settingsCount === 0) {
       await Settings.create({});
       console.log('seeded default application settings.');
-    }
-
-    // 3. Seed Warehouses (Hubs)
-    const warehouseCount = await Warehouse.countDocuments();
-    if (warehouseCount === 0) {
-      const defaultWarehouses = [
-        { id: 'wh_bengaluru', name: '🌳 Bengaluru Hub', address: '12, 100 Feet Rd, Indiranagar, Bengaluru, KA 560038', phone: '+91 80 4910 2000', capacity: 15000, zone: 'Bengaluru Zone', pincodes: ['560038', '560102', '560103'] },
-        { id: 'wh_mumbai', name: '🏙️ Mumbai Hub', address: 'A-2, Link Road, Bandra West, Mumbai, MH 400050', phone: '+91 22 4910 3000', capacity: 20000, zone: 'Mumbai Zone', pincodes: ['400001', '400011', '400050'] },
-        { id: 'wh_delhi', name: '🕌 Delhi NCR Hub', address: '45, Barakhamba Rd, Connaught Place, New Delhi, DL 110001', phone: '+91 11 4910 4000', capacity: 18000, zone: 'Delhi NCR Zone', pincodes: ['110001', '110011', '110020'] }
-      ];
-      await Warehouse.insertMany(defaultWarehouses);
-      console.log('✅ Seeded 3 default warehouses/hubs.');
     }
 
     // 4. Seed Categories & Subcategories

@@ -3,10 +3,12 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useCartWishlist } from '../context/CartWishlistContext';
 import { useCMS } from '../context/CMSContext';
 import { LocationModal } from './LocationModal';
+import { CustomerAuthModal } from './CustomerAuthModal';
+import { CustomerProfileDrawer } from './CustomerProfileDrawer';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, Heart, ShoppingBag, MapPin, Menu, X, 
-  ChevronDown, Leaf, Settings, Percent 
+  ChevronDown, Leaf, Settings, Percent, User, Zap, LogOut, Shield
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -27,11 +29,35 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
   const [searchResults, setSearchResults] = useState<typeof products>([]);
   
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [isCustomerAuthOpen, setIsCustomerAuthOpen] = useState(false);
+  const [isCustomerProfileOpen, setIsCustomerProfileOpen] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showCategoriesDropdown, setShowCategoriesDropdown] = useState(false);
   
+  const [customerUser, setCustomerUser] = useState<any>(() => {
+    const cached = localStorage.getItem('customer_user');
+    return cached ? JSON.parse(cached) : null;
+  });
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const searchRef = useRef<HTMLDivElement>(null);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  const handleProfileClick = () => {
+    if (customerUser) {
+      setIsCustomerProfileOpen(true);
+    } else {
+      setIsCustomerAuthOpen(true);
+    }
+  };
+
+  const handleCustomerLogout = () => {
+    setCustomerUser(null);
+    localStorage.removeItem('customer_user');
+    setIsCustomerProfileOpen(false);
+    setShowProfileMenu(false);
+  };
 
   // Scroll listener for sticky collapse
   useEffect(() => {
@@ -97,76 +123,136 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
   const activeAnnouncement = coupons.length > 0 ? coupons[0] : null;
 
   return (
-    <div className="sticky top-0 z-[1000] w-full bg-surface shadow-xs border-b border-divider">
-      {/* Top Announcement Bar */}
-      <AnimatePresence>
-        {announcementVisible && activeAnnouncement && (
-          <motion.div 
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="bg-primary-gradient text-white text-center py-2 px-4 text-xs md:text-sm font-semibold flex justify-center items-center relative z-[1001] font-display border-b border-white/10"
-          >
-            <span className="flex items-center gap-2">
-              <Percent size={14} />
-              Use coupon <strong>{activeAnnouncement.code}</strong> for {activeAnnouncement.discount}! ({activeAnnouncement.description})
-            </span>
-            <button 
-              className="absolute right-4 bg-none border-none text-white cursor-pointer flex items-center opacity-80 hover:opacity-100 transition-opacity duration-200" 
-              onClick={() => setAnnouncementVisible(false)}
-            >
-              <X size={16} />
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Main Zepto Style Header Bar (Fixed & Stationary) */}
-      <header className="flex items-center justify-between h-20 px-4 md:px-8 gap-4 bg-surface">
-        {/* Left: Brand Logo & Location */}
-        <div className="flex items-center gap-6">
-          <button 
-            className="block lg:hidden text-text-secondary hover:text-primary transition-colors" 
-            onClick={() => setMobileMenuOpen(true)}
-            aria-label="Open menu"
-          >
-            <Menu size={24} />
-          </button>
-          
-          {/* FreshCart Brand Logo or Name (either logo image or clean name text) */}
-          <Link to="/" className="flex items-center group">
-            <span className="text-[40px] md:text-[44px] font-bold tracking-tight text-emerald-600 font-display leading-none group-hover:opacity-90 transition-opacity">
+    <>
+      {/* Top Header Row: Brand, Location, Login (Scrolls naturally) */}
+      <header className="flex items-center justify-between w-full px-4 md:px-8 py-2.5 bg-[#EBE0FF] border-b border-[#D8C2FF]/60">
+        {/* Delivery Time & Location Selector (Zepto Style) */}
+        <div className="flex items-center gap-3 md:gap-6">
+          <Link to="/" className="hidden sm:flex items-center group shrink-0">
+            <span className="text-[28px] sm:text-[36px] md:text-[40px] font-extrabold tracking-tight text-emerald-600 font-display leading-none group-hover:opacity-90 transition-opacity">
               FreshCart
             </span>
           </Link>
 
-          {/* Delivery location selector: "Delivery in minutes*" (24px, 600 weight) & "Select Location" (14px, 500 weight) */}
-          <button 
-            onClick={() => setIsLocationModalOpen(true)}
-            className="hidden sm:flex flex-col text-left cursor-pointer hover:opacity-90 transition-opacity"
+          {/* Delivery Time & Location Selector */}
+          <div 
+            onClick={() => navigate('/account/addresses')}
+            className="flex flex-col cursor-pointer select-none group"
           >
-            <span className="font-semibold text-[24px] text-emerald-600 flex items-center gap-1.5 leading-none">
-              ⚡ Delivery in 10 mins*
-            </span>
-            <div className="flex items-center gap-1 text-text-secondary font-medium text-[14px] hover:text-emerald-700 mt-0.5">
-              <MapPin size={14} className="text-emerald-600 flex-shrink-0" />
-              <span className="max-w-[160px] truncate">{userLocation?.area || userLocation?.city || 'Select Location'}</span>
-              <ChevronDown size={14} />
+            <div className="flex items-center gap-1 text-black font-extrabold text-xs sm:text-sm tracking-tight leading-tight">
+              <Zap size={15} className="text-amber-500 fill-amber-400 shrink-0" />
+              <span className="text-black font-black">10 minutes</span>
+            </div>
+            <div className="flex items-center gap-0.5 text-[11px] sm:text-xs font-semibold text-slate-800 group-hover:text-black transition-colors">
+              <span className="truncate max-w-[200px] sm:max-w-[340px]">
+                {(() => {
+                  const customerUser = (() => {
+                    const cached = localStorage.getItem('customer_user');
+                    return cached ? JSON.parse(cached) : null;
+                  })();
+                  const userPhoneKey = customerUser?.phone ? customerUser.phone.replace(/\D/g, '') : '';
+                  const saved = userPhoneKey ? localStorage.getItem(`saved_addresses_${userPhoneKey}`) : null;
+                  const addrs = saved ? JSON.parse(saved) : [];
+
+                  if (!customerUser || addrs.length === 0) {
+                    return '📍 Add Address';
+                  }
+
+                  if (typeof userLocation === 'object' && userLocation !== null) {
+                    const parts = [];
+                    if (userLocation.label) parts.push(userLocation.label);
+                    if (userLocation.houseNo) parts.push(userLocation.houseNo);
+                    parts.push(userLocation.area || userLocation.address || 'KPHB Colony');
+                    return parts.join(' - ');
+                  }
+
+                  return 'KPHB Colony - Balaji Nagar, KPHB ...';
+                })()}
+              </span>
+              <ChevronDown size={14} className="text-slate-800 shrink-0" />
+            </div>
+          </div>
+        </div>
+
+        {/* Top Right Actions */}
+        <div className="flex items-center gap-3 sm:gap-5 font-medium text-[14px] text-text-primary">
+          {/* Circular Profile/Login Button */}
+          <div className="relative">
+            <button 
+              onClick={handleProfileClick}
+              className="w-8.5 h-8.5 rounded-full border border-black/80 flex items-center justify-center text-black hover:bg-black/10 transition-colors cursor-pointer shrink-0"
+              title={customerUser ? `Logged in as ${customerUser.phone}` : "Customer Login"}
+            >
+              <User size={18} className="text-black" />
+            </button>
+
+            {/* Customer Profile Dropdown */}
+            <AnimatePresence>
+              {showProfileMenu && customerUser && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  className="absolute right-0 top-[calc(100%+8px)] w-56 bg-white border border-divider rounded-2xl shadow-premium p-3 z-[1002] flex flex-col gap-1 text-xs"
+                >
+                  <div className="px-3 py-2 border-b border-divider flex flex-col">
+                    <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider">Logged In Customer</span>
+                    <span className="text-xs font-extrabold text-text-primary truncate mt-0.5">{customerUser.phone}</span>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      navigate('/admin');
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 font-bold text-text-primary hover:bg-background rounded-xl transition-colors text-left cursor-pointer"
+                  >
+                    <Shield size={14} className="text-primary shrink-0" />
+                    <span>Admin Control Console</span>
+                  </button>
+
+                  <button
+                    onClick={handleCustomerLogout}
+                    className="flex items-center gap-2 px-3 py-2 font-bold text-rose-600 hover:bg-rose-50 rounded-xl transition-colors text-left cursor-pointer"
+                  >
+                    <LogOut size={14} className="shrink-0" />
+                    <span>Log Out</span>
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Cart Button (Desktop / Tablet only) */}
+          <button 
+            onClick={onCartOpen}
+            className="hidden sm:flex flex-col items-center gap-1 hover:text-[#7000ff] transition-colors relative cursor-pointer"
+          >
+            <div className="w-8 h-8 rounded-full border border-black/80 flex items-center justify-center bg-transparent relative">
+              <ShoppingBag size={18} className="text-black" />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-[#7000ff] text-white text-[10px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center">
+                  {cartCount}
+                </span>
+              )}
             </div>
           </button>
         </div>
+      </header>
 
-        {/* Center: Wide Search Input (Placeholder & Input: 16px, 400 weight) */}
-        <div className="flex-1 max-w-[620px] relative" ref={searchRef}>
-          <form onSubmit={handleSearchSubmit} className="flex items-center w-full px-5 py-3 bg-background border border-divider rounded-full transition-all focus-within:border-[#7000ff] focus-within:bg-surface shadow-2xs">
-            <Search size={18} className="text-text-tertiary mr-3 flex-shrink-0" />
+      {/* Sticky Search Bar & Category Navigation Tabs */}
+      <div className="sticky top-0 z-[1000] w-full bg-[#EBE0FF] shadow-xs border-b border-[#D8C2FF]/60">
+        {/* Search Input Bar */}
+        <div className="w-full px-4 md:px-8 py-2 sm:py-2.5 bg-[#EBE0FF] relative" ref={searchRef}>
+          <form onSubmit={handleSearchSubmit} className="flex items-center w-full px-4 sm:px-5 py-2 sm:py-2.5 bg-white border border-[#D8C2FF] rounded-full transition-all focus-within:border-[#7000ff] focus-within:bg-white shadow-2xs">
+            <Search size={18} className="text-text-tertiary mr-2.5 flex-shrink-0" />
             <input
               type="text"
               placeholder='Search for "chocolate box", "kurkure", "milk"...'
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => searchQuery.length > 1 && setShowSearchResults(true)}
-              className="w-full text-[16px] font-normal bg-transparent border-none outline-none text-text-primary placeholder:text-text-tertiary placeholder:text-[16px] placeholder:font-normal"
+              className="w-full text-xs sm:text-[16px] font-normal bg-transparent border-none outline-none text-text-primary placeholder:text-text-tertiary"
             />
           </form>
 
@@ -177,12 +263,12 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 15 }}
-                className="absolute top-[calc(100%+8px)] left-0 right-0 bg-surface border border-divider rounded-xl shadow-premium overflow-hidden max-h-[380px] overflow-y-auto z-[1002] flex flex-col"
+                className="absolute top-[calc(100%+8px)] left-0 right-0 bg-white border border-[#D8C2FF] rounded-xl shadow-premium overflow-hidden max-h-[380px] overflow-y-auto z-[1002] flex flex-col"
               >
                 {searchResults.map((product) => (
                   <div 
                     key={product.id} 
-                    className="flex items-center gap-3 p-3 border-b border-divider cursor-pointer hover:bg-background transition-colors last:border-b-0"
+                    className="flex items-center gap-3 p-3 border-b border-divider cursor-pointer hover:bg-[#EBE0FF]/50 transition-colors last:border-b-0"
                     onClick={() => handleSearchResultClick(product.id)}
                   >
                     <img src={product.imageUrl || (product.images && product.images[0]) || ''} alt={product.name} className="w-10 h-10 object-contain rounded-md" />
@@ -200,86 +286,56 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
           </AnimatePresence>
         </div>
 
-        {/* Right Actions: Login / Cart (14px, 500 weight) */}
-        <div className="flex items-center gap-6 font-medium text-[14px] text-text-primary">
-          {/* Login Button */}
-          <button 
-            onClick={() => navigate('/admin')}
-            className="flex flex-col items-center gap-1 hover:text-[#7000ff] transition-colors cursor-pointer"
-          >
-            <div className="w-8 h-8 rounded-full border border-divider flex items-center justify-center bg-background">
-              <span className="text-sm">👤</span>
-            </div>
-            <span className="font-medium text-[14px]">Login</span>
-          </button>
+        {/* Location Selector Modal */}
+        <LocationModal
+          isOpen={isLocationModalOpen}
+          onClose={() => setIsLocationModalOpen(false)}
+          currentLocation={userLocation}
+          onSelectLocation={(loc: any) => updateUserLocation(loc)}
+        />
 
-          {/* Cart Button */}
-          <button 
-            onClick={onCartOpen}
-            className="flex flex-col items-center gap-1 hover:text-[#7000ff] transition-colors relative cursor-pointer"
-          >
-            <div className="w-8 h-8 rounded-full border border-divider flex items-center justify-center bg-background relative">
-              <ShoppingBag size={18} />
-              {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-[#7000ff] text-white text-[10px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center">
-                  {cartCount}
-                </span>
-              )}
-            </div>
-            <span className="font-medium text-[14px]">Cart</span>
-          </button>
-        </div>
-      </header>
-
-      {/* Location Selector Modal */}
-      <LocationModal
-        isOpen={isLocationModalOpen}
-        onClose={() => setIsLocationModalOpen(false)}
-        currentLocation={userLocation}
-        onSelectLocation={updateUserLocation}
-      />
-
-      {/* Zepto Row 2: Top Navigation Tabs Bar */}
-      <nav className="border-b border-divider bg-surface px-4 md:px-8 py-3.5 overflow-x-auto scrollbar-none">
-        <div className="flex items-center gap-8 md:gap-10 min-w-max text-[18px] md:text-[20px] font-bold text-text-secondary">
-          <Link to="/" className="flex items-center gap-2 text-[#7000ff] border-b-2 border-[#7000ff] pb-1 font-extrabold">
-            <span className="text-xl md:text-2xl">🛍️</span>
-            <span>All</span>
-          </Link>
-          <Link to="/products?category=tea-coffee-health-drinks" className="flex items-center gap-2 hover:text-[#7000ff] transition-colors pb-1">
-            <span className="text-xl md:text-2xl">☕</span>
-            <span>Cafe</span>
-          </Link>
-          <Link to="/products?category=fruits-vegetables" className="flex items-center gap-2 hover:text-[#7000ff] transition-colors pb-1">
-            <span className="text-xl md:text-2xl">🏠</span>
-            <span>Home</span>
-          </Link>
-          <Link to="/products?category=chocolates-indian-sweets" className="flex items-center gap-2 hover:text-[#7000ff] transition-colors pb-1">
-            <span className="text-xl md:text-2xl">🧸</span>
-            <span>Toys</span>
-          </Link>
-          <Link to="/products?category=fruits-vegetables" className="flex items-center gap-2 hover:text-[#7000ff] transition-colors pb-1">
-            <span className="text-xl md:text-2xl">🍎</span>
-            <span>Fresh</span>
-          </Link>
-          <Link to="/products?category=breakfast-cereals-spreads-sauces" className="flex items-center gap-2 hover:text-[#7000ff] transition-colors pb-1">
-            <span className="text-xl md:text-2xl">🎧</span>
-            <span>Electronics</span>
-          </Link>
-          <Link to="/products?category=atta-rice-oil-dals" className="flex items-center gap-2 hover:text-[#7000ff] transition-colors pb-1">
-            <span className="text-xl md:text-2xl">📱</span>
-            <span>Mobiles</span>
-          </Link>
-          <Link to="/products?category=ice-creams-kulfi-frozen-desserts" className="flex items-center gap-2 hover:text-[#7000ff] transition-colors pb-1">
-            <span className="text-xl md:text-2xl">💄</span>
-            <span>Beauty</span>
-          </Link>
-          <Link to="/products?category=dairy-bread-eggs" className="flex items-center gap-2 hover:text-[#7000ff] transition-colors pb-1">
-            <span className="text-xl md:text-2xl">👗</span>
-            <span>Fashion</span>
-          </Link>
-        </div>
-      </nav>
+        {/* Zepto Row 2: Top Navigation Tabs Bar with Emojis above Text Name */}
+        <nav className="border-b border-[#D8C2FF]/60 bg-[#EBE0FF] px-3 md:px-8 py-2 overflow-x-auto scrollbar-none">
+          <div className="flex items-center gap-6 md:gap-10 min-w-max text-xs md:text-sm font-bold text-text-secondary">
+            <Link to="/" className="flex flex-col items-center gap-0.5 text-[#7000ff] font-extrabold pb-1 border-b-2 border-[#7000ff]">
+              <span className="text-xl md:text-2xl">🛍️</span>
+              <span className="text-[11px] md:text-xs">All</span>
+            </Link>
+            <Link to="/products?category=tea-coffee-health-drinks" className="flex flex-col items-center gap-0.5 hover:text-[#7000ff] transition-colors pb-1">
+              <span className="text-xl md:text-2xl">☕</span>
+              <span className="text-[11px] md:text-xs">Cafe</span>
+            </Link>
+            <Link to="/products?category=fruits-vegetables" className="flex flex-col items-center gap-0.5 hover:text-[#7000ff] transition-colors pb-1">
+              <span className="text-xl md:text-2xl">🏠</span>
+              <span className="text-[11px] md:text-xs">Home</span>
+            </Link>
+            <Link to="/products?category=chocolates-indian-sweets" className="flex flex-col items-center gap-0.5 hover:text-[#7000ff] transition-colors pb-1">
+              <span className="text-xl md:text-2xl">🧸</span>
+              <span className="text-[11px] md:text-xs">Toys</span>
+            </Link>
+            <Link to="/products?category=fruits-vegetables" className="flex flex-col items-center gap-0.5 hover:text-[#7000ff] transition-colors pb-1">
+              <span className="text-xl md:text-2xl">🍎</span>
+              <span className="text-[11px] md:text-xs">Fresh</span>
+            </Link>
+            <Link to="/products?category=breakfast-cereals-spreads-sauces" className="flex flex-col items-center gap-0.5 hover:text-[#7000ff] transition-colors pb-1">
+              <span className="text-xl md:text-2xl">🎧</span>
+              <span className="text-[11px] md:text-xs">Electronics</span>
+            </Link>
+            <Link to="/products?category=atta-rice-oil-dals" className="flex flex-col items-center gap-0.5 hover:text-[#7000ff] transition-colors pb-1">
+              <span className="text-xl md:text-2xl">📱</span>
+              <span className="text-[11px] md:text-xs">Mobiles</span>
+            </Link>
+            <Link to="/products?category=ice-creams-kulfi-frozen-desserts" className="flex flex-col items-center gap-0.5 hover:text-[#7000ff] transition-colors pb-1">
+              <span className="text-xl md:text-2xl">💄</span>
+              <span className="text-[11px] md:text-xs">Beauty</span>
+            </Link>
+            <Link to="/products?category=dairy-bread-eggs" className="flex flex-col items-center gap-0.5 hover:text-[#7000ff] transition-colors pb-1">
+              <span className="text-xl md:text-2xl">👗</span>
+              <span className="text-[11px] md:text-xs">Fashion</span>
+            </Link>
+          </div>
+        </nav>
+      </div>
 
       {/* Mobile Menu Drawer Overlay */}
       <AnimatePresence>
@@ -343,6 +399,26 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
           </>
         )}
       </AnimatePresence>
-    </div>
+
+      {/* Customer Auth Drawer Modal */}
+      <CustomerAuthModal
+        isOpen={isCustomerAuthOpen}
+        onClose={() => setIsCustomerAuthOpen(false)}
+        onLoginSuccess={(user) => {
+          setCustomerUser(user);
+          setIsCustomerAuthOpen(false);
+          setIsCustomerProfileOpen(true);
+        }}
+      />
+
+      {/* Customer Profile Drawer (Logged In View) */}
+      <CustomerProfileDrawer
+        isOpen={isCustomerProfileOpen}
+        onClose={() => setIsCustomerProfileOpen(false)}
+        customerUser={customerUser}
+        onLogout={handleCustomerLogout}
+        onOpenLocationModal={() => setIsLocationModalOpen(true)}
+      />
+    </>
   );
 };

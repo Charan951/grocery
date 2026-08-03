@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -13,8 +15,13 @@ void main() async {
   // Set up dependency injection containers (Hive initialization inside setupInjection)
   await setupInjection();
 
+  // Determine host URL dynamically (Android Emulator loopback 10.0.2.2 vs localhost)
+  final String hostUrl = (!kIsWeb && Platform.isAndroid)
+      ? "http://10.0.2.2:5000/api"
+      : "http://localhost:5000/api";
+
   // Sync background catalog with live Express server API (using non-blocking async call)
-  MockDataService.syncWithServer("http://localhost:5000/api");
+  MockDataService.syncWithServer(hostUrl);
 
   runApp(
     const ProviderScope(
@@ -22,7 +29,6 @@ void main() async {
     ),
   );
 }
-
 
 class FreshCartApp extends ConsumerWidget {
   const FreshCartApp({super.key});
@@ -32,7 +38,7 @@ class FreshCartApp extends ConsumerWidget {
     final isDarkMode = ref.watch(themeProvider);
 
     return ScreenUtilInit(
-      designSize: const Size(390, 844), // Standard iOS device baseline size
+      designSize: const Size(390, 844),
       minTextAdapt: true,
       splitScreenMode: true,
       builder: (context, child) {

@@ -1,21 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
 import 'package:freshcart/core/widgets/glass_card.dart';
+import 'package:freshcart/features/profile/presentation/controllers/support_controller.dart';
 
-class SupportScreen extends StatefulWidget {
+class SupportScreen extends ConsumerStatefulWidget {
   const SupportScreen({super.key});
 
   @override
-  State<SupportScreen> createState() => _SupportScreenState();
+  ConsumerState<SupportScreen> createState() => _SupportScreenState();
 }
 
-class _SupportScreenState extends State<SupportScreen> {
+class _SupportScreenState extends ConsumerState<SupportScreen> {
   final TextEditingController _msgController = TextEditingController();
-  final List<Map<String, dynamic>> _messages = [
-    {'text': 'Hello, welcome to FreshCart Customer Support. How can we help you today?', 'isUser': false},
-  ];
 
   @override
   void dispose() {
@@ -27,32 +26,20 @@ class _SupportScreenState extends State<SupportScreen> {
     final text = _msgController.text.trim();
     if (text.isEmpty) return;
 
-    setState(() {
-      _messages.add({'text': text, 'isUser': true});
-      _msgController.clear();
-    });
-
-    // Simulate Agent reply
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      if (!mounted) return;
-      setState(() {
-        _messages.add({
-          'text': 'Thank you for reaching out. An agent is reviewing your message and will respond shortly.',
-          'isUser': false
-        });
-      });
-    });
+    ref.read(supportProvider.notifier).sendMessage(text);
+    _msgController.clear();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final messages = ref.watch(supportProvider);
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
       appBar: AppBar(
-        title: const Text('Live Support Chat'),
+        title: const Text('Live Socket Support Chat'),
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
@@ -62,15 +49,14 @@ class _SupportScreenState extends State<SupportScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Chat bubble listing
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.all(20),
                 physics: const BouncingScrollPhysics(),
-                itemCount: _messages.length,
+                itemCount: messages.length,
                 itemBuilder: (context, index) {
-                  final msg = _messages[index];
-                  final isUser = msg['isUser'] as bool;
+                  final msg = messages[index];
+                  final isUser = msg.isUser;
 
                   return Align(
                     alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -84,11 +70,24 @@ class _SupportScreenState extends State<SupportScreen> {
                             ? AppColors.primary
                             : (isDark ? Colors.white.withOpacity(0.04) : Colors.white),
                         borderColor: isUser ? Colors.transparent : (isDark ? Colors.white10 : Colors.black12),
-                        child: Text(
-                          msg['text'] as String,
-                          style: AppTypography.bodyMedium(
-                            isUser ? Colors.white : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimary),
-                          ),
+                        child: Column(
+                          crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              msg.text,
+                              style: AppTypography.bodyMedium(
+                                isUser ? Colors.white : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimary),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${msg.time.hour}:${msg.time.minute.toString().padLeft(2, '0')}',
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: isUser ? Colors.white70 : Colors.grey,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -97,7 +96,6 @@ class _SupportScreenState extends State<SupportScreen> {
               ),
             ),
             
-            // Bottom input bar
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Row(
@@ -108,9 +106,10 @@ class _SupportScreenState extends State<SupportScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: TextField(
                         controller: _msgController,
+                        onSubmitted: (_) => _onSend(),
                         style: TextStyle(color: isDark ? Colors.white : AppColors.textPrimary),
                         decoration: InputDecoration(
-                          hintText: 'Type your message...',
+                          hintText: 'Type your message to agent...',
                           hintStyle: TextStyle(color: isDark ? Colors.white30 : Colors.black38),
                           border: InputBorder.none,
                         ),

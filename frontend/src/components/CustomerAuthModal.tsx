@@ -1,0 +1,309 @@
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowLeft, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+
+interface CustomerAuthModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onLoginSuccess: (customer: { phone: string; name?: string }) => void;
+}
+
+// 4 Rows of Real Product Images for Animated Moving Marquee Background (Top Half)
+const row1 = [
+  { id: 'r1_1', name: 'Bananas', img: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=200&auto=format&fit=crop' },
+  { id: 'r1_2', name: 'Pampers', img: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?w=200&auto=format&fit=crop' },
+  { id: 'r1_3', name: 'Toor Dal', img: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=200&auto=format&fit=crop' },
+  { id: 'r1_4', name: 'Red Apples', img: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=200&auto=format&fit=crop' },
+  { id: 'r1_5', name: 'Fresh Milk', img: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=200&auto=format&fit=crop' },
+];
+
+const row2 = [
+  { id: 'r2_1', name: 'Oats Cereal', img: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=200&auto=format&fit=crop' },
+  { id: 'r2_2', name: 'Basmati Rice', img: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=200&auto=format&fit=crop' },
+  { id: 'r2_3', name: 'Strawberries', img: 'https://images.unsplash.com/photo-1464965911861-746a04b4bca6?w=200&auto=format&fit=crop' },
+  { id: 'r2_4', name: 'Ice Cream Tub', img: 'https://images.unsplash.com/photo-1570197788417-0e82375c9371?w=200&auto=format&fit=crop' },
+  { id: 'r2_5', name: 'Yellow Butter', img: 'https://images.unsplash.com/photo-1589985270826-4b7bb135bc9d?w=200&auto=format&fit=crop' },
+];
+
+const row3 = [
+  { id: 'r3_1', name: 'Heinz Ketchup', img: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=200&auto=format&fit=crop' },
+  { id: 'r3_2', name: 'Fresh Broccoli', img: 'https://images.unsplash.com/photo-1459411552884-841db9b3cc2a?w=200&auto=format&fit=crop' },
+  { id: 'r3_3', name: 'Nescafe Coffee', img: 'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=200&auto=format&fit=crop' },
+  { id: 'r3_4', name: 'Wooden Utensils', img: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=200&auto=format&fit=crop' },
+  { id: 'r3_5', name: 'Avocados', img: 'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=200&auto=format&fit=crop' },
+];
+
+const row4 = [
+  { id: 'r4_1', name: 'Fortune Cooking Oil', img: 'https://images.unsplash.com/photo-1597481499750-3e6b22637e12?w=200&auto=format&fit=crop' },
+  { id: 'r4_2', name: 'Tata Premium Tea', img: 'https://images.unsplash.com/photo-1597481499750-3e6b22637e12?w=200&auto=format&fit=crop' },
+  { id: 'r4_3', name: 'Coca Cola Can', img: 'https://images.unsplash.com/photo-1554866585-cd94860890b7?w=200&auto=format&fit=crop' },
+  { id: 'r4_4', name: 'Organic Spices', img: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=200&auto=format&fit=crop' },
+  { id: 'r4_5', name: 'Fresh Oranges', img: 'https://images.unsplash.com/photo-1611080626919-7cf5a9dbab5b?w=200&auto=format&fit=crop' },
+];
+
+export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
+  isOpen,
+  onClose,
+  onLoginSuccess,
+}) => {
+  const [phone, setPhone] = useState('');
+  const [otp, setOtp] = useState('');
+  const [step, setStep] = useState<'phone' | 'otp' | 'success'>('phone');
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+
+  const handlePhoneSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (phone.length !== 10) {
+      setError('Please enter a valid 10-digit mobile number');
+      return;
+    }
+    setError('');
+    setStep('otp');
+  };
+
+  const handleOtpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (otp.length < 4) {
+      setError('Please enter 4-digit OTP (Default: 1234)');
+      return;
+    }
+    setError('');
+    setStep('success');
+
+    const formattedPhone = `+91 ${phone}`;
+    let customerData: any = {
+      phone: formattedPhone,
+      name: `Customer (${phone.slice(-4)})`,
+      customerId: `cust_${phone}`,
+      email: '',
+      walletBalance: 0,
+    };
+
+    try {
+      const res = await fetch('/api/customers/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: formattedPhone }),
+      });
+      const data = await res.json().catch(() => null);
+      if (data && data.success && data.customer) {
+        customerData = data.customer;
+      }
+    } catch (err) {
+      console.warn('Backend API offline, using local unique customer record');
+    }
+
+    setTimeout(() => {
+      localStorage.setItem('customer_user', JSON.stringify(customerData));
+      onLoginSuccess(customerData);
+      resetState();
+      onClose();
+    }, 1000);
+  };
+
+  const resetState = () => {
+    setPhone('');
+    setOtp('');
+    setStep('phone');
+    setError('');
+  };
+
+  const handleModalClose = () => {
+    resetState();
+    onClose();
+  };
+
+  // Pure GPU Hardware-Accelerated 60 FPS continuous infinite marquee row
+  const renderMarqueeRow = (items: typeof row1, reverse = false) => (
+    <div className="flex overflow-hidden w-full select-none">
+      <div className={reverse ? "animate-marquee-right" : "animate-marquee-left"}>
+        {[...items, ...items, ...items, ...items, ...items, ...items].map((item, idx) => (
+          <div
+            key={`${item.id}_${idx}`}
+            className="w-18 h-18 sm:w-22 sm:h-22 rounded-3xl bg-[#E0F7FA]/90 flex items-center justify-center p-2.5 shadow-2xs shrink-0 mr-3"
+          >
+            <img
+              src={item.img}
+              alt={item.name}
+              className="w-full h-full object-contain drop-shadow-xs"
+              loading="eager"
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={handleModalClose}
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[2000]"
+          />
+
+          {/* Customer Auth Drawer Panel */}
+          <motion.div
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 26, stiffness: 220 }}
+            className="fixed top-0 right-0 bottom-0 w-full sm:w-[440px] max-w-full bg-white text-gray-900 z-[2001] shadow-2xl flex flex-col h-full overflow-hidden"
+          >
+            {/* TOP HALF: 4-Row Moving Product Cards Marquee Background */}
+            <div className="h-[46%] w-full bg-[#E0F7FA]/30 relative overflow-hidden flex flex-col justify-around py-2 border-b border-gray-100 shrink-0">
+              {/* Floating Top Left Circular Back Button */}
+              <button
+                onClick={handleModalClose}
+                className="absolute top-4 left-4 z-[20] w-9 h-9 rounded-full bg-white shadow-md flex items-center justify-center text-gray-800 hover:bg-gray-50 cursor-pointer transition-transform hover:scale-105"
+                aria-label="Back"
+              >
+                <ArrowLeft size={18} />
+              </button>
+
+              {/* 4 Moving Marquee Rows (Pure GPU 60FPS Right to Left) */}
+              <div className="flex flex-col gap-2 justify-around h-full py-1">
+                {renderMarqueeRow(row1, false)}
+                {renderMarqueeRow(row2, true)}
+                {renderMarqueeRow(row3, false)}
+                {renderMarqueeRow(row4, true)}
+              </div>
+            </div>
+
+            {/* BOTTOM HALF: White Section with Brand Icon Badge, Headline, Input & Continue Button */}
+            <div className="h-[54%] w-full bg-white px-6 sm:px-8 py-4 flex flex-col items-center justify-center gap-4 text-center overflow-y-auto shrink-0 z-[10]">
+              {step === 'success' ? (
+                <div className="my-auto flex flex-col items-center justify-center text-center gap-3">
+                  <motion.div
+                    initial={{ scale: 0.5, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="w-16 h-16 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg"
+                  >
+                    <CheckCircle2 size={36} />
+                  </motion.div>
+                  <h3 className="text-2xl font-extrabold text-gray-900">Login Successful!</h3>
+                  <p className="text-sm text-gray-600 font-medium">Welcome back to FreshCart</p>
+                </div>
+              ) : (
+                <>
+                  {/* Brand App Icon Badge & Headline */}
+                  <div className="flex flex-col items-center text-center shrink-0 mt-2">
+                    {/* Brand Green App Icon Badge */}
+                    <div className="w-20 h-16 rounded-2xl bg-[#4CAF50] border border-emerald-600 shadow-md flex items-center justify-center p-2 text-center mb-2">
+                      <span className="text-lg font-black tracking-tight text-white font-display leading-none">
+                        fresh<span className="text-[#A5D6A7]">cart</span>
+                      </span>
+                    </div>
+
+                    <h2 className="text-2xl sm:text-[25px] font-black text-gray-900 tracking-tight leading-tight">
+                      India's 10 minute app
+                    </h2>
+                    <p className="text-xs sm:text-sm font-semibold text-gray-500 mt-1">
+                      Log in or Sign up
+                    </p>
+                  </div>
+
+                  {/* Error Notification */}
+                  {error && (
+                    <div className="w-[310px] sm:w-[350px] max-w-full bg-rose-50 border border-rose-200 text-rose-700 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shrink-0">
+                      <ShieldAlert size={16} className="shrink-0 text-rose-500" />
+                      <span>{error}</span>
+                    </div>
+                  )}
+
+                  {/* Form Step 1: Mobile Input */}
+                  {step === 'phone' && (
+                    <form onSubmit={handlePhoneSubmit} className="w-[310px] sm:w-[350px] max-w-full flex flex-col gap-3 shrink-0">
+                      <div className="w-full border border-gray-300 focus-within:border-[#4CAF50] focus-within:ring-2 focus-within:ring-[#4CAF50]/20 rounded-xl px-4 py-3.5 flex items-center gap-3 transition-all bg-white shadow-2xs">
+                        <span className="text-sm font-extrabold text-gray-900 shrink-0">+91</span>
+                        <div className="h-4 w-[1px] bg-gray-300 shrink-0" />
+                        <input
+                          type="tel"
+                          maxLength={10}
+                          placeholder="Enter mobile number"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                          className="w-full min-w-0 bg-transparent border-none outline-none text-gray-900 font-bold placeholder:text-gray-400 placeholder:font-normal text-sm tracking-wide"
+                          autoFocus
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={phone.length !== 10}
+                        className="w-full block bg-[#9E9E9E] disabled:bg-[#9E9E9E] disabled:opacity-90 disabled:cursor-not-allowed text-white font-extrabold py-3.5 rounded-xl text-sm transition-all shadow-2xs cursor-pointer enabled:bg-[#4CAF50] enabled:hover:bg-[#43A047]"
+                      >
+                        Continue
+                      </button>
+                    </form>
+                  )}
+
+                  {/* Form Step 2: OTP Verification */}
+                  {step === 'otp' && (
+                    <form onSubmit={handleOtpSubmit} className="w-[310px] sm:w-[350px] max-w-full flex flex-col gap-3 shrink-0">
+                      <p className="text-xs text-gray-600 font-medium text-center">
+                        OTP sent to <strong className="text-gray-900">+91 {phone}</strong>
+                      </p>
+
+                      <div className="w-full border border-gray-300 focus-within:border-[#4CAF50] focus-within:ring-2 focus-within:ring-[#4CAF50]/20 rounded-xl px-4 py-3.5 flex items-center gap-3 transition-colors bg-white shadow-2xs">
+                        <input
+                          type="text"
+                          maxLength={4}
+                          placeholder="Enter 4-digit OTP (Default: 1234)"
+                          value={otp}
+                          onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                          className="w-full min-w-0 bg-transparent border-none outline-none text-gray-900 font-bold placeholder:text-gray-400 placeholder:font-normal text-center text-sm tracking-widest"
+                          autoFocus
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full block bg-[#4CAF50] hover:bg-[#43A047] text-white font-extrabold py-3.5 rounded-xl text-sm transition-all shadow-xs cursor-pointer"
+                      >
+                        Verify & Login
+                      </button>
+                    </form>
+                  )}
+
+                  {/* Terms Footer */}
+                  <div className="text-[11px] text-gray-500 font-medium text-center shrink-0">
+                    By continuing, you agree to our{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleModalClose();
+                        navigate('/s/terms-of-service');
+                      }}
+                      className="underline text-gray-700 font-semibold hover:text-[#4CAF50] cursor-pointer inline bg-transparent border-none p-0"
+                    >
+                      Terms of service
+                    </button>{' '}
+                    &{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleModalClose();
+                        navigate('/s/privacy-policy');
+                      }}
+                      className="underline text-gray-700 font-semibold hover:text-[#4CAF50] cursor-pointer inline bg-transparent border-none p-0"
+                    >
+                      Privacy policy
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+};

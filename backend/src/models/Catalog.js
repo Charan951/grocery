@@ -5,7 +5,12 @@ const subCategorySchema = new mongoose.Schema({
   id: { type: String },
   name: { type: String, required: true },
   slug: { type: String },
-  icon: { type: String }
+  icon: { type: String },
+  image: { type: String },
+  showOnHome: { type: Boolean, default: true },
+  displayOrder: { type: Number, default: 0 },
+  promoImage: { type: String, default: '' },
+  promoLink: { type: String, default: '' }
 });
 
 // Category Schema
@@ -16,6 +21,7 @@ const categorySchema = new mongoose.Schema({
   icon: { type: String, default: 'Leaf' },
   color: { type: String, default: '#4CAF50' },
   subCategories: [subCategorySchema],
+  displayOrder: { type: Number, default: 0 },
   productCount: { type: Number, default: 0 }
 }, { timestamps: true });
 
@@ -77,7 +83,46 @@ const productSchema = new mongoose.Schema({
   warehouseId: { type: String, default: 'wh_main' }
 }, { timestamps: true });
 
+// Special Subcategory Group Schema
+const specialGroupItemSchema = new mongoose.Schema({
+  id: { type: String },
+  name: { type: String, required: true },
+  categoryId: { type: String },
+  subCategoryName: { type: String },
+  image: { type: String, default: '' },
+  link: { type: String, default: '' },
+  isFeatured: { type: Boolean, default: false },
+  displayOrder: { type: Number, default: 0 }
+});
+
+const specialGroupSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true, index: true },
+  title: { type: String, required: true },
+  slug: { type: String },
+  displayOrder: { type: Number, default: 0 },
+  insertAfterSubCategoryIndex: { type: Number, default: 0 },
+  active: { type: Boolean, default: true },
+  items: [specialGroupItemSchema]
+}, { timestamps: true });
+
+const bannerSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true, index: true },
+  title: { type: String, required: true },
+  subtitle: { type: String },
+  tag: { type: String },
+  gradient: [{ type: String }],
+  imageUrl: { type: String, required: true },
+  buttonText: { type: String },
+  linkUrl: { type: String },
+  positionIndex: { type: Number, default: 1 },
+  subCategoryName: { type: String },
+  active: { type: Boolean, default: true }
+}, { timestamps: true });
+
 export const Category = mongoose.model('Category', categorySchema);
 export const Brand = mongoose.model('Brand', brandSchema);
 export const Product = mongoose.model('Product', productSchema);
+export const SpecialGroup = mongoose.model('SpecialGroup', specialGroupSchema);
+export const Banner = mongoose.model('Banner', bannerSchema);
+
 

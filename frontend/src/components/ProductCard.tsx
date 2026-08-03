@@ -67,97 +67,83 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
   return (
     <motion.div 
       layout
-      className="bg-surface border border-divider/60 rounded-xl p-3.5 relative flex flex-col h-full transition-all duration-300 shadow-sm hover:shadow-md hover:border-primary/40 group overflow-hidden"
+      className="bg-surface border border-divider/60 rounded-2xl p-2.5 sm:p-3 relative flex flex-col h-full transition-all duration-300 shadow-2xs hover:shadow-md hover:border-primary/40 group overflow-hidden"
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.3 }}
     >
-      {/* Top Badges */}
-      <div className="relative w-full aspect-square overflow-hidden rounded-lg bg-background mb-3 flex items-center justify-center">
-        {discountLabel && (
-          <span className="absolute top-2 left-2 bg-pink-600 text-white text-[10px] font-black px-2 py-0.5 rounded z-10 shadow-sm uppercase tracking-wider">
-            {discountLabel}
-          </span>
-        )}
-
-        <button 
-          className="absolute top-2 right-2 w-8 h-8 rounded-full bg-surface/90 backdrop-blur flex items-center justify-center text-text-secondary z-10 shadow-sm transition-all duration-200 hover:bg-surface hover:text-primary hover:scale-110"
-          onClick={handleWishlistToggle}
-          aria-label="Toggle wishlist"
-        >
-          <Heart size={16} fill={favorited ? 'var(--primary)' : 'none'} color={favorited ? 'var(--primary)' : 'currentColor'} />
-        </button>
-
-        <Link to={`/product/${product.id}`} className="w-full h-full">
-          <img src={displayImage} alt={product.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+      {/* Top Image Container (Zepto Style soft background box) */}
+      <div className="relative w-full aspect-square rounded-2xl bg-neutral-100/60 dark:bg-neutral-800/40 mb-1.5 flex items-center justify-center p-1 group/img overflow-hidden">
+        {/* Product Image */}
+        <Link to={`/product/${product.id}`} className="w-full h-full flex items-center justify-center">
+          <img src={displayImage} alt={product.name} className="w-[90%] h-[90%] object-contain transition-transform duration-300 group-hover/img:scale-105" loading="lazy" />
         </Link>
 
-        {/* Delivery Time Badge */}
-        <div className="absolute bottom-2 left-2 bg-emerald-950/80 text-emerald-300 backdrop-blur-md text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 z-10">
-          <Zap size={10} className="fill-emerald-400 text-emerald-400" />
-          <span>10 MINS</span>
-        </div>
-
-        <button 
-          className="absolute bottom-2 right-2 bg-text-primary text-white text-xs font-semibold px-3 py-1.5 rounded-full opacity-0 z-10 transition-all duration-300 shadow-md group-hover:opacity-100 hidden sm:block"
-          onClick={handleQuickViewClick}
-        >
-          View
-        </button>
-      </div>
-
-      {/* Info Details */}
-      <div className="flex flex-col flex-1">
-        <span className="text-[11px] font-bold text-text-tertiary mb-0.5">{netWeight}</span>
-        <Link to={`/product/${product.id}`}>
-          <h3 className="text-xs sm:text-sm font-bold text-text-primary leading-snug mb-2 line-clamp-2 h-9 group-hover:text-primary transition-colors">
-            {product.name}
-          </h3>
-        </Link>
-
-        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-warning mb-3">
-          <div className="flex items-center gap-0.5 bg-amber-500/10 text-amber-600 px-1.5 py-0.5 rounded text-[10px] font-bold">
-            <Star size={10} className="fill-amber-500 text-amber-500" />
-            <span>{product.rating || 4.8}</span>
-          </div>
-          <span className="text-text-tertiary text-[10px]">({product.reviewsCount || 45})</span>
-        </div>
-
-        {/* Footer: Price and Dynamic Add CTA */}
-        <div className="flex items-center justify-between mt-auto pt-2 border-t border-divider/40">
-          <div className="flex flex-col">
-            <span className="text-sm sm:text-base font-extrabold text-text-primary">
-              ₹{product.price}
-            </span>
-            {originalPrice > product.price && (
-              <span className="text-[11px] line-through text-text-tertiary">
-                ₹{originalPrice}
-              </span>
-            )}
-          </div>
-
+        {/* Floating Add CTA inside Image Box (Bottom Right Corner) */}
+        <div className="absolute bottom-2 right-2 z-20">
           {cartQty > 0 ? (
-            <div className="flex items-center bg-primary text-white rounded-lg shadow-sm font-bold text-xs overflow-hidden">
-              <button onClick={handleDecrement} className="p-1.5 hover:bg-primary-hover transition-colors">
-                <Minus size={14} />
+            <div className="flex items-center bg-pink-600 text-white rounded-xl shadow-md font-bold text-[10px] sm:text-xs overflow-hidden">
+              <button onClick={handleDecrement} className="p-1 sm:p-1.5 hover:bg-pink-700 transition-colors">
+                <Minus size={12} />
               </button>
-              <span className="px-2 font-black text-xs">{cartQty}</span>
-              <button onClick={handleIncrement} className="p-1.5 hover:bg-primary-hover transition-colors">
-                <Plus size={14} />
+              <span className="px-1.5 sm:px-2 font-black text-[10px] sm:text-xs">{cartQty}</span>
+              <button onClick={handleIncrement} className="p-1 sm:p-1.5 hover:bg-pink-700 transition-colors">
+                <Plus size={12} />
               </button>
             </div>
           ) : (
             <motion.button 
               onClick={handleAddToCart}
-              className="flex items-center gap-1 bg-emerald-500/10 text-emerald-600 border border-emerald-500/30 px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition-all duration-200 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 shadow-sm"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-white border-2 border-pink-500 text-pink-600 flex items-center justify-center shadow-md font-extrabold hover:bg-pink-600 hover:text-white transition-all duration-200 cursor-pointer"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              title="Add to Cart"
             >
-              <Plus size={14} />
-              <span>ADD</span>
+              <Plus size={16} strokeWidth={3} />
             </motion.button>
           )}
+        </div>
+      </div>
+
+      {/* Info Details below Image Box */}
+      <div className="flex flex-col flex-1">
+        {/* Price Row: Green solid badge + MRP */}
+        <div className="flex items-center gap-1.5 flex-wrap mb-1">
+          <span className="bg-emerald-600 text-white text-xs sm:text-sm font-extrabold px-2 py-0.5 rounded-lg inline-block shadow-2xs">
+            ₹{product.price}
+          </span>
+          {originalPrice > product.price && (
+            <span className="text-[10px] sm:text-xs line-through text-text-tertiary font-medium">
+              ₹{originalPrice}
+            </span>
+          )}
+        </div>
+
+        {/* Discount Tag below price */}
+        {discountLabel && (
+          <span className="text-emerald-600 font-extrabold text-[10px] block mb-1">
+            {discountLabel}
+          </span>
+        )}
+
+        {/* Product Title */}
+        <Link to={`/product/${product.id}`}>
+          <h3 className="text-xs sm:text-[13px] font-bold text-text-primary leading-snug mb-1 line-clamp-2 h-7 sm:h-8 group-hover:text-primary transition-colors">
+            {product.name}
+          </h3>
+        </Link>
+
+        {/* Net Quantity / Weight */}
+        <span className="text-[10px] sm:text-[11px] font-semibold text-text-tertiary mb-1.5">{netWeight}</span>
+
+        {/* Rating Badge at Bottom */}
+        <div className="flex items-center gap-1 text-[10px] font-semibold text-emerald-700 mt-auto pt-1">
+          <div className="flex items-center gap-0.5 bg-emerald-500/10 text-emerald-600 px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] font-bold">
+            <Star size={9} className="fill-emerald-500 text-emerald-500" />
+            <span>{product.rating || 4.8}</span>
+          </div>
+          <span className="text-text-tertiary text-[9px] sm:text-[10px]">({product.reviewsCount || 45})</span>
         </div>
       </div>
     </motion.div>

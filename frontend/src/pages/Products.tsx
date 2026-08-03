@@ -202,22 +202,42 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView }) => {
     }
 
     if (selectedCategory) {
-      result = result.filter((p) => 
-        p.categoryId === selectedCategory || 
-        p.category === selectedCategory || 
-        (currentCategoryObj && (p.categoryId === currentCategoryObj.id || p.category === currentCategoryObj.name))
-      );
+      const catTarget = selectedCategory.toLowerCase().trim();
+      const curId = (currentCategoryObj?.id || '').toLowerCase().trim();
+      const curSlug = (currentCategoryObj?.slug || '').toLowerCase().trim();
+      const curName = (currentCategoryObj?.name || '').toLowerCase().trim();
+
+      result = result.filter((p) => {
+        const pCatId = (p.categoryId || '').toLowerCase().trim();
+        const pCat = (p.category || '').toLowerCase().trim();
+
+        if (pCatId === catTarget || pCat === catTarget || (curId && pCatId === curId) || (curSlug && pCatId === curSlug) || (curName && pCat === curName)) return true;
+        if (catTarget === 'fruits-vegetables' && (pCatId.includes('fruit') || pCatId.includes('veg') || pCat.includes('fruit') || pCat.includes('veg'))) return true;
+        if (catTarget === 'dairy-bread-eggs' && (pCatId.includes('dairy') || pCat.includes('dairy') || pCat.includes('bread') || pCat.includes('egg'))) return true;
+        if (catTarget === 'atta-rice-oil-dals' && (pCatId.includes('atta') || pCat.includes('rice') || pCat.includes('oil') || pCat.includes('dal'))) return true;
+        if (catTarget.includes(pCatId) || pCatId.includes(catTarget) || catTarget.includes(pCat) || pCat.includes(catTarget)) return true;
+
+        return false;
+      });
     }
 
     if (selectedSubCategory) {
-      const subTarget = selectedSubCategory.toLowerCase();
-      const subFiltered = result.filter((p) => {
+      const subTarget = selectedSubCategory.toLowerCase().trim();
+      const subMatches = result.filter((p) => {
         if (!p.subCategory) return false;
-        const pSub = p.subCategory.toLowerCase();
+        const pSub = p.subCategory.toLowerCase().trim();
         return pSub === subTarget || pSub.includes(subTarget) || subTarget.includes(pSub);
       });
-      if (subFiltered.length > 0) {
-        result = subFiltered;
+
+      if (subMatches.length > 0) {
+        result = subMatches;
+      } else {
+        // Fallback search in name or description if subcategory is dynamic
+        result = result.filter((p) => 
+          p.name.toLowerCase().includes(subTarget) || 
+          (p.subCategory && p.subCategory.toLowerCase().includes(subTarget)) ||
+          (p.description && p.description.toLowerCase().includes(subTarget))
+        );
       }
     }
 
@@ -404,11 +424,11 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView }) => {
               ) : (
                 <motion.div 
                   layout
-                  className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6"
+                  className="grid grid-cols-4 gap-2 sm:gap-3 md:gap-4"
                 >
                   <AnimatePresence mode="popLayout">
-                    {paginatedProducts.map((product) => (
-                      <ProductCard key={product.id} product={product} onQuickView={onQuickView} />
+                    {paginatedProducts.map((product, idx) => (
+                      <ProductCard key={product.id || `prod_${idx}`} product={product} onQuickView={onQuickView} />
                     ))}
                   </AnimatePresence>
                 </motion.div>

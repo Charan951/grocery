@@ -118,13 +118,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> sendOtp(String phone) async {
     state = state.copyWith(isLoading: true, error: null);
-    await Future.delayed(const Duration(milliseconds: 1500)); // Mock network
+    await Future.delayed(const Duration(milliseconds: 500));
     state = state.copyWith(isLoading: false);
+  }
+
+  Future<bool> loginWithDemo() async {
+    state = state.copyWith(isLoading: true, error: null);
+    await Future.delayed(const Duration(milliseconds: 500));
+    state = state.copyWith(isLoading: false, isAuthenticated: true);
+    return true;
   }
 
   Future<bool> verifyOtp(String phone, String code) async {
     state = state.copyWith(isLoading: true, error: null);
-    await Future.delayed(const Duration(milliseconds: 1500)); // Mock validation
+    await Future.delayed(const Duration(milliseconds: 500));
     
     final mockUser = UserProfile(
       name: 'John Doe',
@@ -150,7 +157,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   void selectAddress(String addressId) {
     if (state.user == null) return;
-    final address = state.user!.addresses.firstWhere((a) => a['id'] == addressId);
+    final address = state.user!.addresses.firstWhere((a) => a['id'] == addressId, orElse: () => state.user!.addresses.first);
     state = state.copyWith(
       user: state.user!.copyWith(selectedAddress: address),
     );

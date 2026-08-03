@@ -13,12 +13,14 @@ import {
   customerController,
   supportController,
   brandController,
-  warehouseController,
   inventoryController,
   employeeController,
   reviewController,
   auditLogController,
-  uploadController
+  uploadController,
+  specialGroupController,
+  bannerController,
+  paymentController
 } from '../controllers/apiController.js';
 
 const router = express.Router();
@@ -38,9 +40,12 @@ router.use((req, res, next) => {
     if (req.method === 'GET') {
       if (req.path === '/products') return res.json({ success: true, offlineMode: true, products: [] });
       if (req.path === '/categories') return res.json({ success: true, offlineMode: true, categories: [] });
+      if (req.path.startsWith('/special-groups')) return res.json({ success: true, offlineMode: true, groups: [] });
+      if (req.path.startsWith('/banners')) return res.json({ success: true, offlineMode: true, banners: [] });
+      if (req.path.startsWith('/customers')) return res.json({ success: true, offlineMode: true, customer: { name: 'Customer', email: '' } });
+      if (req.path.startsWith('/orders')) return res.json({ success: true, offlineMode: true, orders: [] });
       if (req.path === '/coupons') return res.json({ success: true, offlineMode: true, coupons: [] });
       if (req.path === '/blogs') return res.json({ success: true, offlineMode: true, blogs: [] });
-      if (req.path === '/warehouses') return res.json({ success: true, offlineMode: true, warehouses: [] });
       if (req.path === '/dashboard/status') {
         return res.json({
           success: true,
@@ -49,6 +54,18 @@ router.use((req, res, next) => {
           paymentGateway: 'Razorpay Live',
           redis: 'Connected'
         });
+      }
+    }
+    if (req.method === 'PUT' || req.method === 'POST' || req.method === 'DELETE') {
+      if (
+        req.path.startsWith('/special-groups') || 
+        req.path.startsWith('/banners') || 
+        req.path.startsWith('/categories') || 
+        req.path.startsWith('/products') ||
+        req.path.startsWith('/customers') ||
+        req.path.startsWith('/orders')
+      ) {
+        return res.json({ success: true, offlineMode: true, message: 'Saved successfully', customer: req.body });
       }
     }
   }
@@ -91,13 +108,27 @@ router.post('/categories', protect, authorize('Admin', 'Manager'), categoryContr
 router.put('/categories/:id', protect, authorize('Admin', 'Manager'), categoryController.updateCategory);
 router.delete('/categories/:id', protect, authorize('Admin'), categoryController.deleteCategory);
 router.post('/categories/:id/subcategories', protect, authorize('Admin', 'Manager'), categoryController.addSubCategory);
+router.put('/categories/:id/subcategories/:subId', protect, authorize('Admin', 'Manager'), categoryController.updateSubCategory);
 router.delete('/categories/:id/subcategories/:subId', protect, authorize('Admin', 'Manager'), categoryController.deleteSubCategory);
+
+// Special Group routes
+router.get('/special-groups', specialGroupController.getSpecialGroups);
+router.post('/special-groups', specialGroupController.createSpecialGroup);
+router.put('/special-groups/:id', specialGroupController.updateSpecialGroup);
+router.delete('/special-groups/:id', specialGroupController.deleteSpecialGroup);
+
+// Banner routes
+router.get('/banners', bannerController.getBanners);
+router.post('/banners', bannerController.createBanner);
+router.put('/banners/:id', bannerController.updateBanner);
+router.delete('/banners/:id', bannerController.deleteBanner);
 
 // ==========================================
 // 5. ORDER ROUTES
 // ==========================================
-router.get('/orders', protect, orderController.getOrders);
-router.get('/orders/:id', protect, orderController.getOrder);
+router.get('/orders', orderController.getOrders);
+router.get('/orders/customer/:phone', orderController.getCustomerOrders);
+router.get('/orders/:id', orderController.getOrder);
 router.post('/orders', orderController.createOrder); // Open for client app placements
 router.put('/orders/:id/status', protect, authorize('Admin', 'Manager', 'Delivery'), orderController.updateStatus);
 
@@ -127,7 +158,12 @@ router.put('/settings', protect, authorize('Admin'), settingsController.updateSe
 // 9. CUSTOMER ROUTES
 // ==========================================
 router.get('/customers', protect, customerController.getCustomers);
-router.get('/customers/:id', protect, customerController.getCustomerProfile);
+router.post('/customers/auth', customerController.authCustomer);
+router.get('/customers/:id', customerController.getCustomerProfile);
+router.put('/customers/:id/profile', customerController.updateProfile);
+router.post('/customers/:id/addresses', customerController.addAddress);
+router.delete('/customers/:id/addresses/:addressId', customerController.deleteAddress);
+router.delete('/customers/:id', customerController.deleteAccount);
 router.put('/customers/:id/wallet', protect, customerController.updateWallet);
 
 // ==========================================
@@ -145,14 +181,6 @@ router.get('/brands', brandController.getBrands);
 router.post('/brands', protect, authorize('Admin', 'Manager'), brandController.createBrand);
 router.put('/brands/:id', protect, authorize('Admin', 'Manager'), brandController.updateBrand);
 router.delete('/brands/:id', protect, authorize('Admin'), brandController.deleteBrand);
-
-// ==========================================
-// 12. WAREHOUSE ROUTES
-// ==========================================
-router.get('/warehouses', warehouseController.getWarehouses);
-router.post('/warehouses', protect, authorize('Admin', 'Manager'), warehouseController.createWarehouse);
-router.put('/warehouses/:id', protect, authorize('Admin', 'Manager'), warehouseController.updateWarehouse);
-router.delete('/warehouses/:id', protect, authorize('Admin'), warehouseController.deleteWarehouse);
 
 // ==========================================
 // 13. INVENTORY ROUTES
@@ -180,5 +208,11 @@ router.delete('/reviews/:id', protect, authorize('Admin'), reviewController.dele
 // ==========================================
 router.get('/audit-logs', protect, authorize('Admin'), auditLogController.getAuditLogs);
 router.delete('/audit-logs', protect, authorize('Admin'), auditLogController.clearAuditLogs);
+
+// ==========================================
+// 17. PAYMENT ROUTES (RAZORPAY)
+// ==========================================
+router.post('/payment/create-order', paymentController.createRazorpayOrder);
+router.post('/payment/verify', paymentController.verifyPayment);
 
 export default router;

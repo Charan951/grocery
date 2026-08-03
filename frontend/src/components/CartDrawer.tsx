@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { useCartWishlist } from '../context/CartWishlistContext';
 import { useCMS } from '../context/CMSContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ShoppingBag, Plus, Minus, Trash2, Tag } from 'lucide-react';
-import confetti from 'canvas-confetti';
+import { X, ShoppingBag, Plus, Minus, Trash2, Tag, MapPin, AlertCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { CheckoutModal } from './CheckoutModal';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -54,19 +55,38 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const discount = calculateDiscount();
   const total = Math.max(cartSubtotal - discount, 0);
 
-  const handleCheckout = () => {
-    confetti({
-      particleCount: 150,
-      spread: 70,
-      origin: { y: 0.6 },
-    });
+  const navigate = useNavigate();
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [addressError, setAddressError] = useState('');
 
-    alert(
-      `🎉 Order Placed Successfully!\nTotal Amount: ₹${total}\n\nOur delivery rider is heading to the Indiranagar fulfillment center. Your order will be delivered in 15-30 minutes!`
-    );
-    clearCart();
-    handleRemoveCoupon();
-    onClose();
+  const customerUser = (() => {
+    const cached = localStorage.getItem('customer_user');
+    return cached ? JSON.parse(cached) : null;
+  })();
+  const userPhoneKey = customerUser?.phone ? customerUser.phone.replace(/\D/g, '') : 'default';
+
+  const savedAddresses = (() => {
+    const cached = localStorage.getItem(`saved_addresses_${userPhoneKey}`);
+    if (cached) return JSON.parse(cached);
+    if (customerUser?.addresses && customerUser.addresses.length > 0) return customerUser.addresses;
+    return [];
+  })();
+
+  const activeAddress = savedAddresses.length > 0 ? savedAddresses[0] : null;
+
+  const handleCheckout = () => {
+    setAddressError('');
+
+    if (!savedAddresses || savedAddresses.length === 0) {
+      setAddressError('Please select or add a delivery address before proceeding to checkout.');
+      setTimeout(() => {
+        onClose();
+        navigate('/account/addresses');
+      }, 1400);
+      return;
+    }
+
+    setIsCheckoutOpen(true);
   };
 
   return (
@@ -106,10 +126,10 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                   <button onClick={onClose} className="bg-primary text-white font-bold py-2.5 px-6 rounded-full text-sm transition-all hover:bg-secondary active:scale-[0.98]">Start Shopping</button>
                 </div>
               ) : (
-                cart.map((item) => (
+                cart.map((item, idx) => (
                   <motion.div 
                     layout
-                    key={`${item.product.id}-${item.selectedWeight}`}
+                    key={`${item.product.id || 'item'}-${item.selectedWeight || 'w'}-${idx}`}
                     className="flex gap-4 p-3 border border-divider rounded-xl bg-background relative overflow-hidden transition-all hover:shadow-card"
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -211,7 +231,14 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                   <span>₹{total}</span>
                 </div>
 
-                <button onClick={handleCheckout} className="w-full bg-primary text-white font-bold py-3 rounded-full text-sm mt-2 transition-all hover:bg-secondary active:scale-[0.98] flex items-center justify-center">
+                {addressError && (
+                  <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold p-3 rounded-xl flex items-center gap-2">
+                    <AlertCircle size={16} className="shrink-0 text-rose-600" />
+                    <span>{addressError}</span>
+                  </div>
+                )}
+
+                <button onClick={handleCheckout} className="w-full bg-[#00A86B] hover:bg-[#00915c] text-white font-extrabold py-3.5 rounded-2xl text-sm mt-2 transition-all shadow-md active:scale-[0.98] flex items-center justify-center cursor-pointer">
                   <span>Proceed to Checkout - ₹{total}</span>
                 </button>
               </div>
@@ -219,6 +246,18 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
           </motion.div>
         </>
       )}
+
+      {/* Zepto-Style Checkout Modal matching image copy 20.png */}
+      <CheckoutModal
+        isOpen={isCheckoutOpen}
+        onClose={() => setIsCheckoutOpen(false)}
+        selectedAddress={activeAddress}
+        onOpenAddressSelector={() => {
+          setIsCheckoutOpen(false);
+          onClose();
+          navigate('/account/addresses');
+        }}
+      />
     </AnimatePresence>
   );
 };

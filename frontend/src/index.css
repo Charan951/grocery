@@ -159,3 +159,37 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   flex-direction: column;
 }
+
+/* GPU Hardware Accelerated Infinite Marquee Scroll */
+@keyframes continuous-marquee-left {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@keyframes continuous-marquee-right {
+  0% {
+    transform: translate3d(-50%, 0, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.animate-marquee-left {
+  display: flex;
+  width: max-content;
+  will-change: transform;
+  animation: continuous-marquee-left 25s linear infinite;
+}
+
+.animate-marquee-right {
+  display: flex;
+  width: max-content;
+  will-change: transform;
+  animation: continuous-marquee-right 20s linear infinite;
+}
+
