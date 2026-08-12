@@ -1,3 +1,9 @@
 /image copy 2.png
 /image copy.png
 /image.png
+
+# Environment files
+.env
+.env.local
+.env.*.local
+*.env
