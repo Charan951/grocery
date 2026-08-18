@@ -64,56 +64,55 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, onLogout }) 
 
 
   return (
-    <div className="min-h-screen bg-background flex text-text-primary">
-      {/* SIDEBAR */}
-      <aside 
-        className={`bg-surface border-r border-divider flex flex-col transition-all duration-300 z-30 sticky top-0 h-screen ${collapsed ? 'w-[72px]' : 'w-[260px]'}`}
+    <div className="min-h-screen bg-admin-paper flex font-admin-body text-admin-text">
+      {/* SIDEBAR — control tower */}
+      <aside
+        className={`bg-admin-ink flex flex-col transition-all duration-300 z-30 sticky top-0 h-screen ${collapsed ? 'w-[72px]' : 'w-[248px]'}`}
       >
         {/* LOGO AREA */}
-        <div className="h-[80px] flex items-center justify-between px-4 border-b border-divider">
+        <div className="h-[72px] flex items-center justify-between px-4 border-b border-admin-ink-line">
           {!collapsed && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className="flex items-center gap-2.5"
             >
-              <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center text-white font-extrabold text-sm">F</div>
+              <div className="w-7 h-7 rounded bg-admin-green flex items-center justify-center text-white font-admin-display font-bold text-xs">F</div>
               <div>
-                <div className="font-extrabold text-xs tracking-wider text-text-primary">FRESHCART</div>
-                <div className="text-[10px] font-bold text-primary tracking-widest uppercase">Admin Panel</div>
+                <div className="font-admin-display font-bold text-[11px] tracking-wide text-white leading-none">FRESHCART</div>
+                <div className="font-admin-mono text-[9px] font-medium text-white/40 tracking-[0.12em] uppercase mt-1">Ops Console</div>
               </div>
             </motion.div>
           )}
           {collapsed && (
-            <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center text-white font-extrabold text-sm mx-auto">F</div>
+            <div className="w-7 h-7 rounded bg-admin-green flex items-center justify-center text-white font-admin-display font-bold text-xs mx-auto">F</div>
           )}
-          <button 
+          <button
             onClick={() => setCollapsed(!collapsed)}
-            className="p-1.5 rounded-lg border border-divider text-text-secondary hover:text-text-primary bg-background hover:bg-surface cursor-pointer hidden md:block"
+            className="p-1.5 rounded text-white/40 hover:text-white bg-white/5 hover:bg-white/10 cursor-pointer hidden md:block transition-colors"
           >
             {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
           </button>
         </div>
 
-
-
         {/* SIDEBAR SCROLLABLE LINK LIST */}
-        <nav className="flex-1 overflow-y-auto p-3 flex flex-col gap-1 custom-scrollbar">
+        <nav className="flex-1 overflow-y-auto p-2.5 flex flex-col gap-0.5 no-scrollbar">
           {sidebarItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path || (item.path !== '/admin' && location.pathname.startsWith(item.path));
             return (
-              <Link 
-                key={item.name} 
+              <Link
+                key={item.name}
                 to={item.path}
-                className={`flex items-center gap-3.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                  isActive 
-                    ? 'bg-primary/10 border border-primary/20 text-primary shadow-sm' 
-                    : 'text-text-primary hover:bg-background/80 hover:text-text-primary'
+                className={`relative flex items-center gap-3 px-3 py-2.5 rounded-md text-[12px] font-medium transition-all ${
+                  isActive
+                    ? 'bg-admin-ink-soft text-white'
+                    : 'text-white/55 hover:bg-white/5 hover:text-white/90'
                 }`}
                 title={collapsed ? item.name : undefined}
               >
-                <Icon size={18} className={isActive ? 'text-primary' : 'text-text-secondary'} />
+                {isActive && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r bg-admin-green" />}
+                <Icon size={16} className={isActive ? 'text-admin-green' : 'text-white/40'} />
                 {!collapsed && <span>{item.name}</span>}
               </Link>
             );
@@ -121,12 +120,12 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, onLogout }) 
         </nav>
 
         {/* LOGOUT */}
-        <div className="p-3 border-t border-divider">
-          <button 
+        <div className="p-2.5 border-t border-admin-ink-line">
+          <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-error border border-error/20 bg-error/5 hover:bg-error/10 cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-md text-[11px] font-semibold text-admin-red bg-admin-red/10 hover:bg-admin-red/15 cursor-pointer transition-colors"
           >
-            <LogOut size={16} />
+            <LogOut size={14} />
             {!collapsed && <span>Sign Out</span>}
           </button>
         </div>
@@ -135,64 +134,65 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, onLogout }) 
       {/* MAIN CONTAINER */}
       <div className="flex-1 flex flex-col overflow-x-hidden min-h-screen">
         {/* HEADER */}
-        <header className="h-[80px] sticky top-0 z-20 glass-effect border-b border-divider flex items-center justify-between px-6">
+        <header className="h-[72px] sticky top-0 z-20 bg-admin-paper/95 backdrop-blur-sm border-b border-admin-ledger-line flex items-center justify-between px-6">
           {/* Breadcrumbs / Page Title */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-text-secondary">Enterprise</span>
-            <span className="text-text-tertiary">/</span>
-            <span className="text-xs font-bold text-text-primary">
+          <div className="flex items-center gap-2 font-admin-mono">
+            <span className="text-[11px] font-medium text-admin-text-faint uppercase tracking-wide">Enterprise</span>
+            <span className="text-admin-text-faint">/</span>
+            <span className="text-[11px] font-semibold text-admin-text uppercase tracking-wide">
               {sidebarItems.find(item => item.path === location.pathname)?.name || 'Control Panel'}
             </span>
           </div>
 
           {/* Search / Tool Bar */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             {/* Global Search Bar */}
-            <div className="relative max-w-[280px] hidden sm:block">
-              <Search className="absolute left-3 top-2.5 text-text-secondary" size={15} />
-              <input 
-                type="text" 
-                placeholder="Global command search..."
+            <div className="relative max-w-[260px] hidden sm:block">
+              <Search className="absolute left-3 top-2.5 text-admin-text-faint" size={14} />
+              <input
+                type="text"
+                placeholder="Search orders, SKUs, customers…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 border border-divider rounded-full text-xs bg-background focus:outline-none focus:border-primary text-text-primary font-medium"
+                className="w-full pl-9 pr-4 py-2 border border-admin-ledger-line rounded-md text-[12px] bg-admin-surface focus:outline-none focus:border-admin-green text-admin-text font-admin-body font-medium placeholder:text-admin-text-faint"
               />
             </div>
 
             {/* Notification center */}
             <div className="relative">
-              <button 
+              <button
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
-                className="p-2 rounded-full border border-divider text-text-secondary hover:text-text-primary bg-surface cursor-pointer shadow-sm relative"
+                className="p-2 rounded-md border border-admin-ledger-line text-admin-text-muted hover:text-admin-text bg-admin-surface cursor-pointer relative transition-colors"
               >
                 <Bell size={15} />
-                <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-error border border-white" />
+                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-admin-red" />
               </button>
-              
+
               <AnimatePresence>
                 {notificationsOpen && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setNotificationsOpen(false)} />
-                    <motion.div 
-                      initial={{ opacity: 0, y: 15 }}
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 15 }}
-                      className="absolute right-0 mt-2.5 w-[320px] bg-surface border border-divider rounded-2xl p-4 shadow-premium z-50 flex flex-col gap-3"
+                      exit={{ opacity: 0, y: 10 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-0 mt-2.5 w-[320px] bg-admin-surface border border-admin-ledger-line rounded-lg p-3.5 shadow-lg z-50 flex flex-col gap-2.5"
                     >
-                      <div className="flex items-center justify-between border-b border-divider pb-2">
-                        <span className="font-bold text-xs">Alert Notifications</span>
-                        <span className="text-[10px] text-primary font-bold cursor-pointer hover:underline">Mark all read</span>
+                      <div className="flex items-center justify-between border-b border-admin-ledger-line pb-2">
+                        <span className="font-admin-display font-semibold text-[12px] text-admin-text">Alerts</span>
+                        <span className="font-admin-mono text-[10px] text-admin-green font-semibold cursor-pointer hover:underline uppercase tracking-wide">Mark all read</span>
                       </div>
-                      <div className="flex flex-col gap-2.5 max-h-[250px] overflow-y-auto">
+                      <div className="flex flex-col gap-2 max-h-[250px] overflow-y-auto no-scrollbar">
                         {notifications.map(n => (
-                          <div key={n.id} className="p-2.5 rounded-xl bg-background border border-divider flex items-start gap-2.5 text-[11px] leading-relaxed">
-                            {n.type === 'warning' && <AlertTriangle className="text-warning mt-0.5" size={14} />}
-                            {n.type === 'success' && <CheckCircle2 className="text-success mt-0.5" size={14} />}
-                            {n.type === 'info' && <Info className="text-primary mt-0.5" size={14} />}
+                          <div key={n.id} className="p-2.5 rounded-md bg-admin-paper border border-admin-ledger-line flex items-start gap-2.5 text-[11px] leading-relaxed">
+                            {n.type === 'warning' && <AlertTriangle className="text-admin-amber mt-0.5 shrink-0" size={14} />}
+                            {n.type === 'success' && <CheckCircle2 className="text-admin-green mt-0.5 shrink-0" size={14} />}
+                            {n.type === 'info' && <Info className="text-admin-blue mt-0.5 shrink-0" size={14} />}
                             <div className="flex-1">
-                              <div className="font-bold text-text-primary">{n.title}</div>
-                              <div className="text-text-secondary font-medium">{n.body}</div>
-                              <div className="text-[9px] text-text-tertiary font-semibold mt-1">{n.time}</div>
+                              <div className="font-semibold text-admin-text">{n.title}</div>
+                              <div className="text-admin-text-muted font-medium">{n.body}</div>
+                              <div className="font-admin-mono text-[9px] text-admin-text-faint font-medium mt-1 uppercase tracking-wide">{n.time}</div>
                             </div>
                           </div>
                         ))}
@@ -205,9 +205,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, onLogout }) 
 
             {/* Profile Avatar Trigger */}
             <div className="relative">
-              <button 
+              <button
                 onClick={() => setProfileOpen(!profileOpen)}
-                className="w-9 h-9 rounded-full border border-divider overflow-hidden cursor-pointer shadow-sm"
+                className="w-8 h-8 rounded-md border border-admin-ledger-line overflow-hidden cursor-pointer"
               >
                 <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop" alt="avatar" />
               </button>
@@ -216,27 +216,28 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, onLogout }) 
                 {profileOpen && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setProfileOpen(false)} />
-                    <motion.div 
-                      initial={{ opacity: 0, y: 15 }}
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 15 }}
-                      className="absolute right-0 mt-2.5 w-[200px] bg-surface border border-divider rounded-2xl p-2 shadow-premium z-50"
+                      exit={{ opacity: 0, y: 10 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-0 mt-2.5 w-[200px] bg-admin-surface border border-admin-ledger-line rounded-lg p-1.5 shadow-lg z-50"
                     >
-                      <div className="px-3.5 py-2.5 border-b border-divider">
-                        <div className="font-bold text-xs text-text-primary">Rohan Murthy</div>
-                        <div className="text-[10px] text-text-secondary">admin@freshcart.com</div>
+                      <div className="px-3 py-2.5 border-b border-admin-ledger-line">
+                        <div className="font-semibold text-[12px] text-admin-text">Rohan Murthy</div>
+                        <div className="font-admin-mono text-[10px] text-admin-text-muted">admin@freshcart.com</div>
                       </div>
                       <div className="p-1 flex flex-col gap-0.5">
-                        <Link 
-                          to="/admin/settings" 
-                          onClick={() => setProfileOpen(false)} 
-                          className="px-3.5 py-2 rounded-lg text-xs font-semibold text-text-secondary hover:text-text-primary hover:bg-background flex items-center gap-2.5"
+                        <Link
+                          to="/admin/settings"
+                          onClick={() => setProfileOpen(false)}
+                          className="px-3 py-2 rounded-md text-[12px] font-medium text-admin-text-muted hover:text-admin-text hover:bg-admin-paper flex items-center gap-2.5"
                         >
                           <Settings size={14} /> Settings
                         </Link>
-                        <button 
-                          onClick={() => { setProfileOpen(false); handleLogout(); }} 
-                          className="w-full text-left px-3.5 py-2 rounded-lg text-xs font-bold text-error hover:bg-error/5 flex items-center gap-2.5 cursor-pointer"
+                        <button
+                          onClick={() => { setProfileOpen(false); handleLogout(); }}
+                          className="w-full text-left px-3 py-2 rounded-md text-[12px] font-semibold text-admin-red hover:bg-admin-red/5 flex items-center gap-2.5 cursor-pointer"
                         >
                           <LogOut size={14} /> Sign Out
                         </button>

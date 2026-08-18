@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useCartWishlist } from '../context/CartWishlistContext';
-import { useCMS } from '../context/CMSContext';
+import { useCMS, getCategoryImage, hexToRgba, hexToTintOnWhite } from '../context/CMSContext';
 import { LocationModal } from './LocationModal';
 import { CustomerAuthModal } from './CustomerAuthModal';
 import { CustomerProfileDrawer } from './CustomerProfileDrawer';
@@ -22,8 +22,18 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Entire app bar (top header, search bar, category nav) tints to the active
+  // category's own colour; defaults to violet when "All" / home is active.
+  const activeCategory = useMemo(
+    () => categories.find(cat => location.search.includes(`category=${cat.slug || cat.id}`)),
+    [categories, location.search]
+  );
+  const isHomeActive = location.pathname === '/' && !activeCategory;
+  const navAccent = activeCategory ? (activeCategory.color || '#4CAF50') : '#7000ff';
+  const appBarBg = isHomeActive || !activeCategory ? '#EBE0FF' : hexToTintOnWhite(navAccent, 0.16);
+  const appBarBorder = isHomeActive || !activeCategory ? 'rgba(216,194,255,0.6)' : hexToRgba(navAccent, 0.35);
+
   const [announcementVisible, setAnnouncementVisible] = useState(true);
-  const [scrolled, setScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchResults, setSearchResults] = useState<typeof products>([]);
@@ -43,6 +53,23 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
 
   const searchRef = useRef<HTMLDivElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+  const appBarRef = useRef<HTMLDivElement>(null);
+
+  // The top bar (logo/location + search) and the category nav are stacked
+  // inside ONE sticky container (top-0) — no cross-element offset math needed,
+  // so there's no timing gap on route navigation. Just measure the combined
+  // height so other pages can offset their own sticky elements correctly.
+  useEffect(() => {
+    const el = appBarRef.current;
+    if (!el) return;
+    const updateHeight = () => {
+      document.documentElement.style.setProperty('--sticky-header-h', `${el.offsetHeight}px`);
+    };
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const handleProfileClick = () => {
     if (customerUser) {
@@ -58,19 +85,6 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
     setIsCustomerProfileOpen(false);
     setShowProfileMenu(false);
   };
-
-  // Scroll listener for sticky collapse
-  useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 50) {
-        setScrolled(true);
-      } else {
-        setScrolled(false);
-      }
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
 
   // Click outside listener for dropdowns
   useEffect(() => {
@@ -124,8 +138,15 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
 
   return (
     <>
-      {/* Top Header Row: Brand, Location, Login (Scrolls naturally) */}
-      <header className="flex items-center justify-between w-full px-4 md:px-8 py-2.5 bg-[#EBE0FF] border-b border-[#D8C2FF]/60">
+      {/* Top Header Row + Search Bar + Category Nav: fixed to the viewport top
+          (not sticky) so it is never subject to flow/stacking edge cases.
+          Page content gets an explicit padding-top matching this bar's real
+          height (see App.tsx), so there is never a flow-reservation guess. */}
+      <div ref={appBarRef} className="fixed top-0 left-0 right-0 z-[1000] w-full">
+      <header
+        style={{ backgroundColor: appBarBg, borderBottomColor: appBarBorder }}
+        className="flex items-center justify-between w-full px-4 md:px-8 py-2.5 border-b transition-colors duration-300"
+      >
         {/* Delivery Time & Location Selector (Zepto Style) */}
         <div className="flex items-center gap-3 md:gap-6">
           <Link to="/" className="hidden sm:flex items-center group shrink-0">
@@ -240,10 +261,8 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
         </div>
       </header>
 
-      {/* Sticky Search Bar & Category Navigation Tabs */}
-      <div className="sticky top-0 z-[1000] w-full bg-[#EBE0FF] shadow-xs border-b border-[#D8C2FF]/60">
         {/* Search Input Bar */}
-        <div className="w-full px-4 md:px-8 py-2 sm:py-2.5 bg-[#EBE0FF] relative" ref={searchRef}>
+        <div style={{ backgroundColor: appBarBg, borderBottomColor: appBarBorder }} className="w-full px-4 md:px-8 py-2 sm:py-2.5 relative border-b shadow-xs transition-colors duration-300" ref={searchRef}>
           <form onSubmit={handleSearchSubmit} className="flex items-center w-full px-4 sm:px-5 py-2 sm:py-2.5 bg-white border border-[#D8C2FF] rounded-full transition-all focus-within:border-[#7000ff] focus-within:bg-white shadow-2xs">
             <Search size={18} className="text-text-tertiary mr-2.5 flex-shrink-0" />
             <input
@@ -286,56 +305,69 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
           </AnimatePresence>
         </div>
 
-        {/* Location Selector Modal */}
-        <LocationModal
-          isOpen={isLocationModalOpen}
-          onClose={() => setIsLocationModalOpen(false)}
-          currentLocation={userLocation}
-          onSelectLocation={(loc: any) => updateUserLocation(loc)}
-        />
-
-        {/* Zepto Row 2: Top Navigation Tabs Bar with Emojis above Text Name */}
-        <nav className="border-b border-[#D8C2FF]/60 bg-[#EBE0FF] px-3 md:px-8 py-2 overflow-x-auto scrollbar-none">
-          <div className="flex items-center gap-6 md:gap-10 min-w-max text-xs md:text-sm font-bold text-text-secondary">
-            <Link to="/" className="flex flex-col items-center gap-0.5 text-[#7000ff] font-extrabold pb-1 border-b-2 border-[#7000ff]">
-              <span className="text-xl md:text-2xl">🛍️</span>
-              <span className="text-[11px] md:text-xs">All</span>
+        {/* Category Nav Tabs — driven by admin-managed categories, not hardcoded. */}
+        <nav
+          style={{ backgroundColor: appBarBg, borderBottomColor: appBarBorder }}
+          className="border-b px-3 md:px-8 py-2.5 overflow-x-auto scrollbar-none transition-colors duration-300"
+        >
+          <div className="flex items-start gap-2 md:gap-3 min-w-max">
+            <Link
+              to="/"
+              className="flex flex-col items-center gap-1.5 group"
+            >
+              <div className={`w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center transition-all ${
+                location.pathname === '/'
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'bg-white/70 text-text-secondary group-hover:bg-white group-hover:text-primary'
+              }`}>
+                <ShoppingBag size={22} />
+              </div>
+              <span className={`text-xs font-semibold transition-colors ${
+                location.pathname === '/' ? 'text-primary' : 'text-text-secondary group-hover:text-primary'
+              }`}>All</span>
             </Link>
-            <Link to="/products?category=tea-coffee-health-drinks" className="flex flex-col items-center gap-0.5 hover:text-[#7000ff] transition-colors pb-1">
-              <span className="text-xl md:text-2xl">☕</span>
-              <span className="text-[11px] md:text-xs">Cafe</span>
-            </Link>
-            <Link to="/products?category=fruits-vegetables" className="flex flex-col items-center gap-0.5 hover:text-[#7000ff] transition-colors pb-1">
-              <span className="text-xl md:text-2xl">🏠</span>
-              <span className="text-[11px] md:text-xs">Home</span>
-            </Link>
-            <Link to="/products?category=chocolates-indian-sweets" className="flex flex-col items-center gap-0.5 hover:text-[#7000ff] transition-colors pb-1">
-              <span className="text-xl md:text-2xl">🧸</span>
-              <span className="text-[11px] md:text-xs">Toys</span>
-            </Link>
-            <Link to="/products?category=fruits-vegetables" className="flex flex-col items-center gap-0.5 hover:text-[#7000ff] transition-colors pb-1">
-              <span className="text-xl md:text-2xl">🍎</span>
-              <span className="text-[11px] md:text-xs">Fresh</span>
-            </Link>
-            <Link to="/products?category=breakfast-cereals-spreads-sauces" className="flex flex-col items-center gap-0.5 hover:text-[#7000ff] transition-colors pb-1">
-              <span className="text-xl md:text-2xl">🎧</span>
-              <span className="text-[11px] md:text-xs">Electronics</span>
-            </Link>
-            <Link to="/products?category=atta-rice-oil-dals" className="flex flex-col items-center gap-0.5 hover:text-[#7000ff] transition-colors pb-1">
-              <span className="text-xl md:text-2xl">📱</span>
-              <span className="text-[11px] md:text-xs">Mobiles</span>
-            </Link>
-            <Link to="/products?category=ice-creams-kulfi-frozen-desserts" className="flex flex-col items-center gap-0.5 hover:text-[#7000ff] transition-colors pb-1">
-              <span className="text-xl md:text-2xl">💄</span>
-              <span className="text-[11px] md:text-xs">Beauty</span>
-            </Link>
-            <Link to="/products?category=dairy-bread-eggs" className="flex flex-col items-center gap-0.5 hover:text-[#7000ff] transition-colors pb-1">
-              <span className="text-xl md:text-2xl">👗</span>
-              <span className="text-[11px] md:text-xs">Fashion</span>
-            </Link>
+            {categories.map((cat) => {
+              const catSlug = cat.slug || cat.id;
+              const isActive = location.search.includes(`category=${catSlug}`);
+              const label = cat.displayName?.trim() || cat.name;
+              const catColor = cat.color || '#4CAF50';
+              return (
+                <Link
+                  key={cat.id}
+                  to={`/products?category=${catSlug}`}
+                  className="flex flex-col items-center gap-1.5 group shrink-0"
+                >
+                  <div
+                    style={{
+                      backgroundColor: isActive ? catColor : hexToRgba(catColor, 0.22),
+                      boxShadow: isActive ? `0 0 0 3px ${appBarBg}, 0 0 0 5px ${catColor}` : undefined,
+                    }}
+                    className={`w-14 h-14 md:w-16 md:h-16 rounded-full overflow-hidden transition-all duration-200 ${
+                      isActive ? '' : 'group-hover:ring-2 group-hover:ring-primary/30 group-hover:ring-offset-2'
+                    }`}
+                  >
+                    <img src={getCategoryImage(cat)} alt={label} className="w-full h-full object-cover" />
+                  </div>
+                  <span
+                    style={{ color: isActive ? catColor : undefined }}
+                    className={`text-xs font-semibold w-16 md:w-[72px] text-center leading-tight line-clamp-2 transition-colors ${
+                      isActive ? '' : 'text-text-secondary group-hover:text-primary'
+                    }`}
+                  >{label}</span>
+                </Link>
+              );
+            })}
           </div>
         </nav>
       </div>
+
+      {/* Location Selector Modal */}
+      <LocationModal
+        isOpen={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+        currentLocation={userLocation}
+        onSelectLocation={(loc: any) => updateUserLocation(loc)}
+      />
 
       {/* Mobile Menu Drawer Overlay */}
       <AnimatePresence>

@@ -18,6 +18,7 @@ const categorySchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true, index: true }, // e.g. fruits-vegetables
   slug: { type: String, required: true, index: true },
   name: { type: String, required: true },
+  displayName: { type: String, default: '' }, // customer-facing label shown on Home page & app bar; falls back to `name` when empty
   icon: { type: String, default: 'Leaf' },
   color: { type: String, default: '#4CAF50' },
   subCategories: [subCategorySchema],

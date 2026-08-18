@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 :root {
@@ -58,6 +58,30 @@
   /* Layout */
   --header-height: 80px;
   --max-width: 1280px;
+
+  /* ---- Admin Console (Operations / Ledger) Design System ---- */
+  /* Recolored to the FreshCart logo palette: primary/secondary/accent greens + emerald wordmark */
+  --admin-ink: #0F2A1B;          /* control-tower sidebar — deep forest green (tinted from --primary) */
+  --admin-ink-soft: #17402A;     /* sidebar hover/active surface */
+  --admin-ink-line: #234F35;     /* hairline on dark ink */
+  --admin-paper: #F5F5F0;        /* main canvas, warm paper */
+  --admin-surface: #FFFFFF;      /* cards/tables */
+  --admin-ledger-line: #E4E1D5;  /* hairline divider on paper, warm gray */
+  --admin-text: #171B16;         /* ink text on paper */
+  --admin-text-muted: #6E6C5F;   /* warm muted gray */
+  --admin-text-faint: #A6A392;
+  --admin-signal-green: #059669; /* logo wordmark emerald — operational / fresh / positive */
+  --admin-signal-green-soft: #E3F3EC;
+  --admin-tag-amber: #B8860A;    /* derived from --warning, muted for paper legibility */
+  --admin-tag-amber-soft: #FBF0D9;
+  --admin-signal-red: #C0392B;   /* derived from --error, muted for paper legibility */
+  --admin-signal-red-soft: #FBE4E1;
+  --admin-signal-blue: #4CAF50;  /* informational — mapped to brand --primary (no blue in logo palette) */
+  --admin-signal-blue-soft: #E7F5E8;
+
+  --font-admin-display: 'Space Grotesk', var(--font-sans);
+  --font-admin-body: 'IBM Plex Sans', var(--font-sans);
+  --font-admin-mono: 'IBM Plex Mono', ui-monospace, monospace;
 }
 
 @theme {
@@ -91,6 +115,28 @@
   --radius-md: var(--radius-md);
   --radius-lg: var(--radius-lg);
   --radius-xl: var(--radius-xl);
+
+  /* Admin console tokens */
+  --color-admin-ink: var(--admin-ink);
+  --color-admin-ink-soft: var(--admin-ink-soft);
+  --color-admin-ink-line: var(--admin-ink-line);
+  --color-admin-paper: var(--admin-paper);
+  --color-admin-surface: var(--admin-surface);
+  --color-admin-ledger-line: var(--admin-ledger-line);
+  --color-admin-text: var(--admin-text);
+  --color-admin-text-muted: var(--admin-text-muted);
+  --color-admin-text-faint: var(--admin-text-faint);
+  --color-admin-green: var(--admin-signal-green);
+  --color-admin-green-soft: var(--admin-signal-green-soft);
+  --color-admin-amber: var(--admin-tag-amber);
+  --color-admin-amber-soft: var(--admin-tag-amber-soft);
+  --color-admin-red: var(--admin-signal-red);
+  --color-admin-red-soft: var(--admin-signal-red-soft);
+  --color-admin-blue: var(--admin-signal-blue);
+  --color-admin-blue-soft: var(--admin-signal-blue-soft);
+  --font-admin-display: var(--font-admin-display);
+  --font-admin-body: var(--font-admin-body);
+  --font-admin-mono: var(--font-admin-mono);
 }
 
 /* Global resets and helper classes */
@@ -127,6 +173,52 @@ h1, h2, h3, h4, h5, h6 {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-secondary);
+}
+
+/* ---- Admin Shelf Tag (signature status chip, punched-hole produce-label motif) ---- */
+.shelf-tag {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem 0.25rem 1.125rem;
+  border-radius: 4px;
+  font-family: var(--font-admin-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.shelf-tag::before {
+  content: '';
+  position: absolute;
+  left: 0.4375rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.55;
+}
+
+.shelf-tag-green { background: var(--admin-signal-green-soft); color: var(--admin-signal-green); }
+.shelf-tag-amber { background: var(--admin-tag-amber-soft); color: var(--admin-tag-amber); }
+.shelf-tag-red { background: var(--admin-signal-red-soft); color: var(--admin-signal-red); }
+.shelf-tag-blue { background: var(--admin-signal-blue-soft); color: var(--admin-signal-blue); }
+.shelf-tag-neutral { background: var(--admin-ledger-line); color: var(--admin-text-muted); }
+
+/* Hide scrollbar while keeping scroll functionality */
+.no-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome/Safari/Edge */
 }
 
 /* Glassmorphism Utility */

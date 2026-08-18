@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Plus, Search, Edit2, Trash2, ArrowUpDown, Download, Upload, 
+import {
+  Plus, Search, Edit2, Trash2, ArrowUpDown, Download, Upload,
   X, Check, AlertTriangle, Eye, HelpCircle
 } from 'lucide-react';
 import { useCMS, Product } from '../../context/CMSContext';
+import { PageHeader } from '../../components/admin/PageHeader';
+import { ShelfTag } from '../../components/admin/ShelfTag';
 
 export const Products: React.FC = () => {
   const { products: contextProducts, categories, addProduct: contextAdd, deleteProduct: contextDelete, updateProduct: contextUpdate, uploadImage } = useCMS();
@@ -37,7 +39,7 @@ export const Products: React.FC = () => {
   const { addSubCategory: contextAddSubCategory } = useCMS();
 
   // REST API connection helper
-  const API_URL = 'http://localhost:5000/api';
+  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -246,53 +248,51 @@ export const Products: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Header Controls */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-xl font-extrabold text-text-primary">Products Catalog</h1>
-          <p className="text-xs text-text-secondary font-medium">Manage stock levels, variants, catalog info, and pricing.</p>
-        </div>
-        <div className="flex flex-wrap gap-2.5">
-          <button 
-            onClick={handleBulkExport}
-            className="flex items-center gap-2 px-4 py-2 border border-divider rounded-full text-xs font-bold bg-surface hover:bg-background hover:text-primary transition-all cursor-pointer shadow-sm"
-          >
-            <Download size={14} />
-            <span>Export JSON</span>
-          </button>
-          <button 
-            onClick={() => setImportOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 border border-divider rounded-full text-xs font-bold bg-surface hover:bg-background hover:text-primary transition-all cursor-pointer shadow-sm"
-          >
-            <Upload size={14} />
-            <span>Bulk Import</span>
-          </button>
-          <button 
-            onClick={handleOpenAdd}
-            className="flex items-center gap-2 px-5 py-2 rounded-full text-xs font-bold bg-primary text-white hover:bg-secondary transition-all cursor-pointer shadow-sm"
-          >
-            <Plus size={14} />
-            <span>Add Product</span>
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Products Catalog"
+        actions={
+          <>
+            <button
+              onClick={handleBulkExport}
+              className="flex items-center gap-2 px-3.5 py-2 border border-admin-ledger-line rounded-md text-[11px] font-semibold bg-admin-surface hover:bg-admin-paper text-admin-text-muted hover:text-admin-text transition-all cursor-pointer font-admin-mono uppercase tracking-wide"
+            >
+              <Download size={13} />
+              <span>Export</span>
+            </button>
+            <button
+              onClick={() => setImportOpen(true)}
+              className="flex items-center gap-2 px-3.5 py-2 border border-admin-ledger-line rounded-md text-[11px] font-semibold bg-admin-surface hover:bg-admin-paper text-admin-text-muted hover:text-admin-text transition-all cursor-pointer font-admin-mono uppercase tracking-wide"
+            >
+              <Upload size={13} />
+              <span>Import</span>
+            </button>
+            <button
+              onClick={handleOpenAdd}
+              className="flex items-center gap-2 px-4 py-2 rounded-md text-[11px] font-semibold bg-admin-ink text-white hover:bg-admin-ink-soft transition-all cursor-pointer font-admin-mono uppercase tracking-wide"
+            >
+              <Plus size={13} />
+              <span>Add Product</span>
+            </button>
+          </>
+        }
+      />
 
       {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row gap-3 bg-surface p-4 rounded-2xl border border-divider shadow-sm">
+      <div className="flex flex-col sm:flex-row gap-3 bg-admin-surface p-3 rounded-lg border border-admin-ledger-line">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-2.5 text-text-secondary" size={15} />
-          <input 
-            type="text" 
-            placeholder="Search by name, brand, or SKU..."
+          <Search className="absolute left-3 top-2.5 text-admin-text-faint" size={15} />
+          <input
+            type="text"
+            placeholder="Search by name, brand, or SKU…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary font-medium"
+            className="w-full pl-9 pr-4 py-2 border border-admin-ledger-line rounded-md text-xs bg-admin-paper focus:outline-none focus:border-admin-green text-admin-text font-medium placeholder:text-admin-text-faint"
           />
         </div>
         <select
           value={selectedCategory}
           onChange={(e) => setSelectedCategory(e.target.value)}
-          className="px-4 py-2 border border-divider rounded-xl text-xs font-semibold bg-background focus:outline-none focus:border-primary text-text-primary"
+          className="px-4 py-2 border border-admin-ledger-line rounded-md text-xs font-semibold bg-admin-paper focus:outline-none focus:border-admin-green text-admin-text"
         >
           <option value="all">All Categories</option>
           {categories.map(c => (
@@ -301,19 +301,19 @@ export const Products: React.FC = () => {
         </select>
       </div>
 
-      {/* Product Table Grid */}
-      <div className="bg-surface border border-divider rounded-[28px] overflow-hidden shadow-card">
+      {/* Product Ledger Table */}
+      <div className="bg-admin-surface border border-admin-ledger-line rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs md:text-sm">
+          <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr>
-                <th className="p-4 bg-background border-b border-divider font-bold text-text-primary whitespace-nowrap">Image</th>
-                <th className="p-4 bg-background border-b border-divider font-bold text-text-primary whitespace-nowrap">Product Info</th>
-                <th className="p-4 bg-background border-b border-divider font-bold text-text-primary whitespace-nowrap">Category</th>
-                <th className="p-4 bg-background border-b border-divider font-bold text-text-primary whitespace-nowrap">Price / MRP</th>
-                <th className="p-4 bg-background border-b border-divider font-bold text-text-primary whitespace-nowrap">Stock Level</th>
-                <th className="p-4 bg-background border-b border-divider font-bold text-text-primary whitespace-nowrap">Type</th>
-                <th className="p-4 bg-background border-b border-divider font-bold text-text-primary whitespace-nowrap text-right">Actions</th>
+              <tr className="font-admin-mono">
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide whitespace-nowrap">Image</th>
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide whitespace-nowrap">Product</th>
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide whitespace-nowrap">Category</th>
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide whitespace-nowrap">Price / MRP</th>
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide whitespace-nowrap">Stock</th>
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide whitespace-nowrap">Type</th>
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide whitespace-nowrap text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -323,51 +323,44 @@ export const Products: React.FC = () => {
                 const isLowStock = stockQty < 15;
                 const weightText = p.netQuantity || p.defaultWeight || (p.weightOptions && p.weightOptions[0]) || '500 g';
                 return (
-                  <tr key={p.id} className="hover:bg-background/20 transition-all border-b border-divider">
-                    <td className="p-4">
-                      <img src={p.imageUrl || (p.images && p.images[0]) || ''} alt={p.name} className="w-12 h-12 object-contain rounded-xl bg-background border border-divider p-1" />
+                  <tr key={p.id} className="hover:bg-admin-paper/70 transition-colors border-b border-admin-ledger-line last:border-b-0">
+                    <td className="p-3.5">
+                      <img src={p.imageUrl || (p.images && p.images[0]) || ''} alt={p.name} className="w-11 h-11 object-cover rounded-md bg-admin-paper border border-admin-ledger-line" />
                     </td>
-                    <td className="p-4">
-                      <div className="font-extrabold text-text-primary">{p.name}</div>
-                      <div className="text-[10px] text-text-secondary font-bold uppercase">{p.brand} • {weightText}</div>
+                    <td className="p-3.5">
+                      <div className="font-semibold text-admin-text">{p.name}</div>
+                      <div className="font-admin-mono text-[10px] text-admin-text-faint font-medium uppercase mt-0.5">{p.brand} • {weightText}</div>
                     </td>
-                    <td className="p-4 text-text-secondary font-semibold">
-                      <span className="px-2.5 py-1 rounded-full text-[10px] bg-background border border-divider">
-                        {catObj?.name || p.categoryId}
-                      </span>
+                    <td className="p-3.5">
+                      <ShelfTag tone="neutral">{catObj?.name || p.categoryId}</ShelfTag>
                     </td>
-                    <td className="p-4">
-                      <div className="font-bold text-text-primary">₹{p.price}</div>
+                    <td className="p-3.5">
+                      <div className="font-admin-mono font-semibold text-admin-text tabular-nums">₹{p.price}</div>
                       {(p.originalPrice || p.mrp) > p.price && (
-                        <div className="text-[10px] text-text-secondary line-through">₹{p.originalPrice || p.mrp}</div>
+                        <div className="font-admin-mono text-[10px] text-admin-text-faint line-through tabular-nums">₹{p.originalPrice || p.mrp}</div>
                       )}
                     </td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-1.5">
-                        <span className={`w-2.5 h-2.5 rounded-full ${isLowStock ? 'bg-error animate-pulse' : 'bg-success'}`} />
-                        <span className="font-bold text-text-primary">{stockQty} units</span>
-                      </div>
+                    <td className="p-3.5">
+                      <ShelfTag tone={isLowStock ? 'red' : 'green'}>{stockQty} units</ShelfTag>
                     </td>
-                    <td className="p-4">
-                      <span className={`px-2.5 py-0.5 rounded text-[10px] font-bold ${p.isOrganic ? 'text-success bg-success/10' : 'text-text-secondary bg-background border border-divider'}`}>
-                        {p.isOrganic ? '🟢 Certified Organic' : 'Standard'}
-                      </span>
+                    <td className="p-3.5">
+                      <ShelfTag tone={p.isOrganic ? 'green' : 'neutral'}>{p.isOrganic ? 'Certified organic' : 'Standard'}</ShelfTag>
                     </td>
-                    <td className="p-4 text-right">
-                      <div className="flex justify-end gap-1.5">
-                        <button 
+                    <td className="p-3.5 text-right">
+                      <div className="flex justify-end gap-1">
+                        <button
                           onClick={() => handleOpenEdit(p)}
-                          className="p-2 rounded-xl text-text-secondary hover:text-primary hover:bg-primary/10 transition-all cursor-pointer" 
+                          className="p-2 rounded-md text-admin-text-muted hover:text-admin-green hover:bg-admin-green-soft transition-all cursor-pointer"
                           title="Edit Product"
                         >
-                          <Edit2 size={15} />
+                          <Edit2 size={14} />
                         </button>
-                        <button 
+                        <button
                           onClick={() => handleDelete(p.id)}
-                          className="p-2 rounded-xl text-text-secondary hover:text-error hover:bg-error/10 transition-all cursor-pointer" 
+                          className="p-2 rounded-md text-admin-text-muted hover:text-admin-red hover:bg-admin-red-soft transition-all cursor-pointer"
                           title="Delete Product"
                         >
-                          <Trash2 size={15} />
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     </td>
@@ -376,7 +369,7 @@ export const Products: React.FC = () => {
               })}
               {filteredProducts.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-text-secondary font-semibold">
+                  <td colSpan={7} className="p-8 text-center text-admin-text-faint font-medium">
                     No products found matching filters.
                   </td>
                 </tr>

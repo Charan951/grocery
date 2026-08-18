@@ -27,7 +27,7 @@ export const Legal: React.FC<LegalProps> = ({ defaultTab }) => {
       />
 
       {/* Clean White Standalone Header with Brand Logo Only */}
-      <header className="bg-white py-4 px-6 md:px-16 flex items-center justify-between border-b border-gray-200 sticky top-0 z-50 shadow-2xs">
+      <header className="bg-white py-4 px-6 md:px-16 flex items-center justify-between border-b border-gray-200 sticky top-0 z-40 shadow-2xs">
         <Link to="/" className="flex items-center gap-2">
           <span className="text-[30px] md:text-[36px] font-extrabold tracking-tight text-gray-900 font-display leading-none">
             fresh<span className="text-[#4CAF50]">cart</span>

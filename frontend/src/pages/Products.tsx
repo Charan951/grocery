@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
-import { useCMS, Product } from '../context/CMSContext';
+import { useSearchParams } from 'react-router-dom';
+import { useCMS, getCategoryImage, Product } from '../context/CMSContext';
 import { ProductCard } from '../components/ProductCard';
 import { SEO } from '../components/SEO';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,9 +8,10 @@ import { ArrowUpDown, ChevronRight, RefreshCw, X } from 'lucide-react';
 
 interface ProductsProps {
   onQuickView: (product: Product) => void;
+  onListViewChange?: (inListView: boolean) => void;
 }
 
-export const Products: React.FC<ProductsProps> = ({ onQuickView }) => {
+export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChange }) => {
   const { products, categories, seoSettings } = useCMS();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -23,6 +24,11 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView }) => {
   // Filter States
   const [selectedCategory, setSelectedCategory] = useState<string>('fruits-vegetables');
   const [selectedSubCategory, setSelectedSubCategory] = useState<string>('');
+  // Whether the sidebar + product-list layout is showing (vs. the subcategory
+  // cards landing page). Kept separate from selectedSubCategory so picking
+  // "All" in the sidebar can show every product in the category without
+  // kicking the user back out to the cards view.
+  const [inCategoryView, setInCategoryView] = useState<boolean>(false);
   const [onlyOrganic, setOnlyOrganic] = useState(false);
   const [sortBy, setSortBy] = useState('default');
 
@@ -34,8 +40,8 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView }) => {
   const categoryMetaData: Record<string, { description: string; bannerImg: string; icon: string }> = {
     'fruits-vegetables': {
       description: 'Fresh fruits and vegetables sourced daily from farms across India. From everyday onions and tomatoes to seasonal mangoes and hard-to-find avocados — get them delivered in minutes.',
-      bannerImg: 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=600&auto=format&fit=crop',
-      icon: 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=150&auto=format&fit=crop'
+      bannerImg: 'https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=600&auto=format&fit=crop',
+      icon: 'https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=150&auto=format&fit=crop'
     },
     'dairy-bread-eggs': {
       description: 'Farm-fresh milk, artisan breads, farm eggs, paneer, and rich cream delivered cold to your doorstep within 10 minutes.',
@@ -158,14 +164,27 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView }) => {
     }
     if (urlSubCategory) {
       setSelectedSubCategory(urlSubCategory);
+      setInCategoryView(true);
     } else {
       setSelectedSubCategory('');
+      setInCategoryView(false);
     }
   }, [urlCategory, urlSubCategory, categories]);
 
   useEffect(() => {
     setOnlyOrganic(urlOrganic);
   }, [urlOrganic]);
+
+  // Let the app shell know when the sidebar + product-list layout is active,
+  // so it can hide the app bar / category nav for that view.
+  useEffect(() => {
+    onListViewChange?.(inCategoryView);
+  }, [inCategoryView, onListViewChange]);
+
+  useEffect(() => {
+    return () => onListViewChange?.(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Active Category Object
   const currentCategoryObj = useMemo(() => {
@@ -280,7 +299,7 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView }) => {
   };
 
   return (
-    <div className="page-wrapper min-h-screen bg-background">
+    <div className="page-wrapper min-h-screen bg-background relative z-0">
       <SEO 
         title={seo.title}
         description={seo.description}
@@ -289,57 +308,54 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView }) => {
 
       <div className="container mx-auto px-4 md:px-6 max-w-[1360px] pt-4 pb-16">
         
-        {/* Top Navigation & Breadcrumb Bar */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2 text-[11px] font-bold text-text-tertiary">
-            <Link to="/" className="hover:text-emerald-600 transition-colors">Home</Link>
-            <span>›</span>
-            <span 
-              onClick={() => setSelectedSubCategory('')} 
-              className={`cursor-pointer hover:text-emerald-600 ${!selectedSubCategory ? 'text-text-primary font-black' : ''}`}
-            >
-              {currentCategoryObj?.name || 'Catalog'}
-            </span>
-            {selectedSubCategory && (
-              <>
-                <span>›</span>
-                <span className="text-emerald-600 font-black">{selectedSubCategory}</span>
-              </>
-            )}
-          </div>
-
-          {selectedSubCategory && (
-            <button 
-              onClick={() => setSelectedSubCategory('')}
-              className="text-xs font-black text-emerald-600 hover:text-emerald-700 flex items-center gap-1 transition-colors"
+        {/* CONDITION 1: Sidebar + product-list view (either a specific subcategory
+            or "All" within the current category). Mobile-first: a narrow icon rail
+            sits beside the product grid at every viewport, widening into a labeled
+            sidebar at lg+. */}
+        {inCategoryView ? (
+          <>
+            <button
+              onClick={() => { setSelectedSubCategory(''); setInCategoryView(false); }}
+              className="mb-3 text-[11px] sm:text-xs font-black text-emerald-600 hover:text-emerald-700 flex items-center gap-1 transition-colors"
             >
               ← Back to All {currentCategoryObj?.name} Subcategories
             </button>
-          )}
-        </div>
+            <div className="grid grid-cols-[104px_1fr] sm:grid-cols-[132px_1fr] lg:grid-cols-[300px_1fr] gap-3 sm:gap-4 lg:gap-6 items-start">
 
-        {/* CONDITION 1: Subcategory IS Selected -> Show Subcategory View with Left Subcategory Sidebar */}
-        {selectedSubCategory ? (
-          <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6 items-start">
-            
-            {/* Left Subcategory Sidebar */}
-            <aside className="bg-surface border border-divider/70 rounded-2xl p-4 shadow-xs space-y-4 sticky top-20">
-              <div className="flex items-center justify-between border-b border-divider/60 pb-3">
+            {/* Left Subcategory Rail / Sidebar */}
+            <aside
+              style={{
+                top: '12px',
+                maxHeight: 'calc(100vh - 24px)',
+              }}
+              className="bg-surface border border-divider/70 rounded-2xl p-2 lg:p-3 shadow-xs sticky overflow-y-auto no-scrollbar"
+            >
+              <div className="hidden lg:flex items-center justify-between border-b border-divider/60 px-1 pb-3 mb-2">
                 <h3 className="font-black text-xs text-text-primary tracking-wider uppercase">
-                  Subcategories ({activeSubCategories.length})
+                  Subcategories
                 </h3>
+                <span className="text-[11px] font-bold text-text-tertiary bg-background rounded-full px-2 py-0.5">
+                  {activeSubCategories.length}
+                </span>
               </div>
 
-              <div className="space-y-1 max-h-[75vh] overflow-y-auto pr-1 scrollbar-thin">
+              <div className="flex flex-col gap-1.5 lg:gap-1">
                 <button
                   onClick={() => setSelectedSubCategory('')}
-                  className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all duration-200 ${
+                  className={`relative w-full flex flex-col items-center gap-1.5 lg:flex-row lg:items-center lg:gap-3 p-1.5 lg:pl-2.5 lg:pr-3 lg:py-2 rounded-xl text-center lg:text-left transition-all duration-200 ${
                     selectedSubCategory === ''
-                      ? 'bg-emerald-600 text-white font-extrabold shadow-sm'
-                      : 'hover:bg-background text-text-primary font-bold'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'hover:bg-background text-text-primary'
                   }`}
                 >
-                  <span className="text-xs truncate">All {currentCategoryObj?.name}</span>
+                  <div className={`w-9 h-9 lg:w-10 lg:h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    selectedSubCategory === '' ? 'bg-white/20' : 'bg-emerald-500/10'
+                  }`}>
+                    <span className="text-base lg:text-lg">🛍️</span>
+                  </div>
+                  <span className="text-[10px] lg:text-xs font-black leading-tight line-clamp-2 lg:line-clamp-1">
+                    All {currentCategoryObj?.name}
+                  </span>
                 </button>
 
                 {activeSubCategories.map((sub, idx) => {
@@ -352,27 +368,40 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView }) => {
                     <button
                       key={idx}
                       onClick={() => setSelectedSubCategory(subName)}
-                      className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all duration-200 group ${
-                        isActive 
-                          ? 'bg-emerald-600 text-white font-extrabold shadow-sm' 
-                          : 'hover:bg-background text-text-primary font-bold'
+                      className={`relative w-full flex flex-col items-center gap-1.5 lg:flex-row lg:items-center lg:gap-3 p-1.5 lg:pl-2.5 lg:pr-3 lg:py-2 rounded-xl text-center lg:text-left transition-all duration-200 group ${
+                        isActive
+                          ? 'bg-emerald-600 text-white shadow-sm'
+                          : 'hover:bg-background text-text-primary'
                       }`}
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 border border-divider bg-background">
-                          <img src={subImg} alt={subName} className="w-full h-full object-cover" />
-                        </div>
-                        <span className="text-xs truncate">{subName}</span>
+                      {isActive && (
+                        <span className="hidden lg:block absolute left-0 top-1/2 -translate-y-1/2 w-1 h-7 rounded-r bg-white/70" />
+                      )}
+                      <div className={`w-9 h-9 lg:w-10 lg:h-10 rounded-full overflow-hidden flex-shrink-0 border-2 ${isActive ? 'border-white/70' : 'border-divider group-hover:border-emerald-300'} bg-background transition-colors`}>
+                        <img
+                          src={subImg}
+                          alt={subName}
+                          loading="lazy"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            const fallback = 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=150&auto=format&fit=crop';
+                            if (target.src !== fallback) target.src = fallback;
+                          }}
+                        />
                       </div>
+                      <span className={`text-[10px] lg:text-xs leading-tight line-clamp-2 lg:line-clamp-2 flex-1 min-w-0 ${isActive ? 'font-black' : 'font-bold'}`}>
+                        {subName}
+                      </span>
 
-                      <ChevronRight size={14} className={`flex-shrink-0 opacity-60 ${isActive ? 'text-white' : 'text-text-tertiary'}`} />
+                      <ChevronRight size={14} className={`hidden lg:block flex-shrink-0 opacity-60 ${isActive ? 'text-white' : 'text-text-tertiary'}`} />
                     </button>
                   );
                 })}
               </div>
 
-              <div className="pt-3 border-t border-divider/60 space-y-3">
-                <div className="flex items-center justify-between cursor-pointer">
+              <div className="hidden lg:block mt-2 pt-3 border-t border-divider/60">
+                <label className="flex items-center justify-between px-1 cursor-pointer">
                   <span className="text-xs font-bold text-text-secondary">Organic Only</span>
                   <input
                     type="checkbox"
@@ -380,36 +409,41 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView }) => {
                     onChange={(e) => setOnlyOrganic(e.target.checked)}
                     className="w-4 h-4 rounded border-divider text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                   />
-                </div>
+                </label>
               </div>
             </aside>
 
             {/* Right Main Content Area: Subcategory Header & Products Grid */}
-            <main className="flex flex-col gap-6">
-              
-              <div className="bg-surface border border-divider/70 rounded-2xl p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h1 className="text-2xl font-black text-text-primary tracking-tight font-display">
-                    {selectedSubCategory}
-                  </h1>
-                  <p className="text-xs text-text-tertiary font-bold mt-0.5">
-                    {filteredProducts.length} Products available in 10 mins
-                  </p>
-                </div>
+            <main
+              style={{ maxHeight: 'calc(100vh - 24px)' }}
+              className="flex flex-col gap-3 sm:gap-6 min-w-0 overflow-y-auto no-scrollbar"
+            >
 
-                <div className="flex items-center gap-2 bg-background border border-divider px-3 py-1.5 rounded-xl text-xs">
-                  <ArrowUpDown size={14} className="text-emerald-600" />
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className="bg-transparent font-extrabold text-text-primary outline-none cursor-pointer"
-                  >
-                    <option value="default">Relevance</option>
-                    <option value="price-low">Price: Low to High</option>
-                    <option value="price-high">Price: High to Low</option>
-                    <option value="rating">Popularity</option>
-                    <option value="discount">Max Discount</option>
-                  </select>
+              <div className="bg-surface border border-divider/70 rounded-2xl p-3 sm:p-5 shadow-xs flex flex-col gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+                  <div>
+                    <h1 className="text-lg sm:text-2xl font-black text-text-primary tracking-tight font-display">
+                      {selectedSubCategory || `All ${currentCategoryObj?.name || ''}`}
+                    </h1>
+                    <p className="text-[11px] sm:text-xs text-text-tertiary font-bold mt-0.5">
+                      {filteredProducts.length} Products available in 10 mins
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 bg-background border border-divider px-3 py-1.5 rounded-xl text-xs self-start sm:self-auto">
+                    <ArrowUpDown size={14} className="text-emerald-600" />
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                      className="bg-transparent font-extrabold text-text-primary outline-none cursor-pointer"
+                    >
+                      <option value="default">Relevance</option>
+                      <option value="price-low">Price: Low to High</option>
+                      <option value="price-high">Price: High to Low</option>
+                      <option value="rating">Popularity</option>
+                      <option value="discount">Max Discount</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -422,9 +456,9 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView }) => {
                   <button onClick={handleClearAll} className="text-xs font-bold bg-emerald-600 text-white py-2.5 px-6 rounded-full mt-2 hover:bg-emerald-700 transition-colors">Reset All Filters</button>
                 </div>
               ) : (
-                <motion.div 
+                <motion.div
                   layout
-                  className="grid grid-cols-4 gap-2 sm:gap-3 md:gap-4"
+                  className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4"
                 >
                   <AnimatePresence mode="popLayout">
                     {paginatedProducts.map((product, idx) => (
@@ -436,13 +470,14 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView }) => {
 
             </main>
           </div>
+          </>
         ) : (
           /* CONDITION 2: NO Subcategory Selected -> Show Category Landing Page with 3-Column Cards Grid */
           <main className="flex flex-col gap-6">
             
             {/* Category Hero Card Banner */}
             <div className="bg-[#f4f5f7] border border-divider/60 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
-              <div className="max-w-[580px] z-10">
+              <div className="max-w-[580px] relative z-10">
                 <h1 className="text-3xl md:text-4xl font-black text-text-primary tracking-tight font-display">
                   {currentCategoryObj ? currentCategoryObj.name : 'Category Catalog'}
                 </h1>
@@ -454,11 +489,20 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView }) => {
                 </div>
               </div>
 
-              <div className="w-32 h-32 md:w-44 md:h-44 rounded-2xl overflow-hidden shadow-xs border border-divider bg-surface flex-shrink-0 z-10">
-                <img 
-                  src={activeCategoryMeta.bannerImg} 
-                  alt={currentCategoryObj?.name} 
+              <div className="w-32 h-32 md:w-44 md:h-44 rounded-2xl overflow-hidden shadow-xs border border-divider bg-surface flex-shrink-0 relative z-10">
+                <img
+                  src={activeCategoryMeta.bannerImg}
+                  alt={currentCategoryObj?.name}
                   className="w-full h-full object-cover"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    const iconFallback = currentCategoryObj ? getCategoryImage(currentCategoryObj) : '';
+                    if (iconFallback && target.src !== iconFallback) {
+                      target.src = iconFallback;
+                    } else {
+                      target.src = 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&auto=format&fit=crop';
+                    }
+                  }}
                 />
               </div>
             </div>
@@ -480,7 +524,7 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView }) => {
                     return (
                       <div
                         key={idx}
-                        onClick={() => setSelectedSubCategory(subName)}
+                        onClick={() => { setSelectedSubCategory(subName); setInCategoryView(true); }}
                         className="p-3.5 rounded-2xl border bg-surface border-divider/70 hover:border-emerald-500/50 hover:shadow-xs transition-all duration-200 cursor-pointer flex gap-3 items-start group"
                       >
                         <div className="w-12 h-12 rounded-xl overflow-hidden border border-divider flex-shrink-0 bg-background group-hover:scale-105 transition-transform">

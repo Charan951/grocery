@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  ShoppingBag, Eye, Printer, UserPlus, Clock, ArrowRight, CheckCircle2, 
+import {
+  ShoppingBag, Eye, Printer, UserPlus, Clock, ArrowRight, CheckCircle2,
   XCircle, Truck, FileText, ChevronRight, X, AlertCircle
 } from 'lucide-react';
+import { PageHeader } from '../../components/admin/PageHeader';
+import { ShelfTag } from '../../components/admin/ShelfTag';
 
 interface OrderItem {
   productId: string;
@@ -48,7 +50,7 @@ export const Orders: React.FC = () => {
   const [selectedRider, setSelectedRider] = useState('');
   
   // MERN API Connection
-  const API_URL = 'http://localhost:5000/api';
+  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -226,22 +228,27 @@ export const Orders: React.FC = () => {
     return activeTab === 'All' || o.status === activeTab;
   });
 
+  const statusTone = (status: string): 'green' | 'amber' | 'red' | 'blue' | 'neutral' => {
+    if (status === 'Delivered') return 'green';
+    if (status === 'Cancelled' || status === 'Returned') return 'red';
+    if (status === 'Pending') return 'amber';
+    return 'blue';
+  };
+
   return (
     <div className="flex flex-col gap-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-xl font-extrabold text-text-primary">Order Management</h1>
-        <p className="text-xs text-text-secondary font-medium font-sans">Dispatch orders, update delivery progress timelines, print invoices, and allocate riders.</p>
-      </div>
+      <PageHeader
+        title="Order Management"
+      />
 
       {/* Tabs */}
-      <div className="flex flex-wrap gap-1 bg-surface p-1 rounded-2xl border border-divider shadow-sm max-w-fit">
+      <div className="flex flex-wrap gap-1 bg-admin-surface p-1 rounded-md border border-admin-ledger-line max-w-fit font-admin-mono">
         {tabs.map(tab => (
-          <button 
-            key={tab} 
+          <button
+            key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeTab === tab ? 'bg-primary text-white shadow-sm' : 'text-text-secondary hover:text-text-primary'
+            className={`px-3.5 py-2 rounded text-[10px] font-semibold uppercase tracking-wide transition-all cursor-pointer ${
+              activeTab === tab ? 'bg-admin-ink text-white' : 'text-admin-text-muted hover:text-admin-text'
             }`}
           >
             {tab}
@@ -249,59 +256,53 @@ export const Orders: React.FC = () => {
         ))}
       </div>
 
-      {/* Orders Table */}
-      <div className="bg-surface border border-divider rounded-[28px] overflow-hidden shadow-card">
+      {/* Orders Ledger Table */}
+      <div className="bg-admin-surface border border-admin-ledger-line rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs md:text-sm">
+          <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr>
-                <th className="p-4 bg-background border-b border-divider font-bold text-text-primary">ID</th>
-                <th className="p-4 bg-background border-b border-divider font-bold text-text-primary">Customer</th>
-                <th className="p-4 bg-background border-b border-divider font-bold text-text-primary">Total Items</th>
-                <th className="p-4 bg-background border-b border-divider font-bold text-text-primary">Grand Total</th>
-                <th className="p-4 bg-background border-b border-divider font-bold text-text-primary">Payment</th>
-                <th className="p-4 bg-background border-b border-divider font-bold text-text-primary">Rider</th>
-                <th className="p-4 bg-background border-b border-divider font-bold text-text-primary">Status</th>
-                <th className="p-4 bg-background border-b border-divider font-bold text-text-primary text-right">Actions</th>
+              <tr className="font-admin-mono">
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide">ID</th>
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide">Customer</th>
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide">Items</th>
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide">Total</th>
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide">Payment</th>
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide">Rider</th>
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide">Status</th>
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredOrders.map((o) => {
                 const totalItems = o.items.reduce((sum, item) => sum + item.quantity, 0);
                 return (
-                  <tr key={o.orderId} className="hover:bg-background/20 transition-all border-b border-divider">
-                    <td className="p-4 font-extrabold text-primary">{o.orderId}</td>
-                    <td className="p-4">
-                      <div className="font-extrabold text-text-primary">{o.customerName}</div>
-                      <div className="text-[10px] text-text-secondary font-medium">{o.customerPhone}</div>
+                  <tr key={o.orderId} className="hover:bg-admin-paper/70 transition-colors border-b border-admin-ledger-line last:border-b-0">
+                    <td className="p-3.5 font-admin-mono font-semibold text-admin-text">{o.orderId}</td>
+                    <td className="p-3.5">
+                      <div className="font-semibold text-admin-text">{o.customerName}</div>
+                      <div className="font-admin-mono text-[10px] text-admin-text-faint font-medium">{o.customerPhone}</div>
                     </td>
-                    <td className="p-4 font-semibold text-text-secondary">{totalItems} items</td>
-                    <td className="p-4 font-extrabold text-text-primary">₹{o.grandTotal}</td>
-                    <td className="p-4">
-                      <div className="flex flex-col">
-                        <span className="font-bold text-text-primary">{o.paymentMethod}</span>
-                        <span className={`text-[9px] font-extrabold uppercase ${o.paymentStatus === 'Paid' ? 'text-success' : 'text-warning'}`}>{o.paymentStatus}</span>
+                    <td className="p-3.5 font-medium text-admin-text-muted">{totalItems} items</td>
+                    <td className="p-3.5 font-admin-mono font-semibold text-admin-text tabular-nums">₹{o.grandTotal}</td>
+                    <td className="p-3.5">
+                      <div className="flex flex-col gap-1">
+                        <span className="font-medium text-admin-text">{o.paymentMethod}</span>
+                        <ShelfTag tone={o.paymentStatus === 'Paid' ? 'green' : 'amber'}>{o.paymentStatus}</ShelfTag>
                       </div>
                     </td>
-                    <td className="p-4 text-text-secondary font-semibold">
-                      {o.deliveryPartnerName ? `🚴 ${o.deliveryPartnerName}` : 'Unassigned'}
+                    <td className="p-3.5 text-admin-text-muted font-medium">
+                      {o.deliveryPartnerName || 'Unassigned'}
                     </td>
-                    <td className="p-4">
-                      <span className={`px-2.5 py-1 rounded-full text-[9px] font-extrabold uppercase ${
-                        o.status === 'Delivered' ? 'text-success bg-success/10' :
-                        o.status === 'Cancelled' ? 'text-error bg-error/10' :
-                        o.status === 'Pending' ? 'text-warning bg-warning/10' : 'text-primary bg-primary/10'
-                      }`}>
-                        {o.status}
-                      </span>
+                    <td className="p-3.5">
+                      <ShelfTag tone={statusTone(o.status)}>{o.status}</ShelfTag>
                     </td>
-                    <td className="p-4 text-right">
-                      <button 
+                    <td className="p-3.5 text-right">
+                      <button
                         onClick={() => setSelectedOrder(o)}
-                        className="p-2 rounded-xl text-text-secondary hover:text-primary hover:bg-primary/10 transition-all cursor-pointer inline-flex items-center gap-1.5"
+                        className="px-2.5 py-1.5 rounded text-admin-text-muted hover:text-admin-green hover:bg-admin-green-soft transition-all cursor-pointer inline-flex items-center gap-1.5"
                       >
-                        <Eye size={15} />
-                        <span className="text-[10px] font-bold">Process</span>
+                        <Eye size={14} />
+                        <span className="text-[10px] font-semibold uppercase tracking-wide font-admin-mono">Process</span>
                       </button>
                     </td>
                   </tr>
@@ -309,7 +310,7 @@ export const Orders: React.FC = () => {
               })}
               {filteredOrders.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-text-secondary font-semibold">
+                  <td colSpan={8} className="p-8 text-center text-admin-text-faint font-medium">
                     No orders found matching status tab.
                   </td>
                 </tr>

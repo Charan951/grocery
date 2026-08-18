@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useCMS, getCategoryImage, Product } from '../context/CMSContext';
+import { useCMS, Product } from '../context/CMSContext';
 import { ProductCard } from '../components/ProductCard';
 import { SEO } from '../components/SEO';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -213,60 +213,13 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
 
       <div className="w-full px-4 md:px-8 pt-3 pb-6">
 
-        {/* 1. Top Category Cards Scroll Row (Hidden on mobile) */}
-        <section className="mb-6 relative group hidden md:block">
-          <div 
-            id="category-scroll-container" 
-            className="flex items-center gap-4 overflow-x-auto pb-4 pt-1 scrollbar-none scroll-smooth flex-nowrap"
-          >
-            {categories.map((cat, catIdx) => {
-              const catSlug = cat.slug || cat.id;
-              const imgSrc = getCategoryImage(cat);
-              return (
-                <Link 
-                  key={cat.id || `cat_${catIdx}`} 
-                  to={`/products?category=${catSlug}`}
-                  className="flex flex-col items-center gap-2 p-2 rounded-2xl bg-surface border border-divider/60 hover:border-[#7000ff]/40 hover:shadow-md transition-all duration-200 group/card w-[110px] sm:w-[125px] text-center flex-shrink-0"
-                >
-                  <div className="w-[100px] h-[148px] min-w-[100px] min-h-[148px] rounded-2xl overflow-hidden bg-background p-1 group-hover/card:scale-105 transition-transform duration-200 border border-divider flex items-center justify-center">
-                    <img 
-                      src={imgSrc} 
-                      alt={cat.name} 
-                      className="w-full h-full object-contain rounded-xl"
-                      style={{ aspectRatio: '25/37' }}
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&auto=format&fit=crop';
-                      }}
-                    />
-                  </div>
-                  <span className="text-[13px] font-medium text-text-primary group-hover/card:text-[#7000ff] transition-colors line-clamp-2 leading-snug">
-                    {cat.name}
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-
-          {/* Right Scroll Nav Button */}
-          <button 
-            onClick={() => {
-              const el = document.getElementById('category-scroll-container');
-              if (el) el.scrollBy({ left: 300, behavior: 'smooth' });
-            }}
-            className="hidden sm:flex absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black text-white items-center justify-center shadow-lg hover:bg-neutral-800 transition-transform active:scale-95 cursor-pointer z-10"
-            title="Scroll Right"
-          >
-            <span className="text-sm font-bold">›</span>
-          </button>
-        </section>
-
         {/* Helper component rendering a Special Subcategory Group (Mobile Only - md:hidden) */}
         {specialCategoryGroups && specialCategoryGroups.length > 0 && (
           <div className="md:hidden w-full">
             {specialCategoryGroups
               .filter(g => g.active !== false && g.items && g.items.length > 0 && (!g.insertAfterSubCategoryIndex || g.insertAfterSubCategoryIndex === 0))
               .map((group, grpIdx) => (
-                <div key={group.id || `grp_${grpIdx}`} className="mb-6 bg-surface rounded-3xl border border-divider/60 p-2 sm:p-4 shadow-sm">
+                <div key={group.id || `grp_${grpIdx}`} className="mb-3 bg-surface rounded-3xl border border-divider/60 p-2 sm:p-4 shadow-sm">
                   {group.title && (
                     <h2 className="text-lg font-black text-text-primary tracking-tight font-display px-3 pt-2 pb-1">
                       {group.title}
@@ -293,9 +246,9 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                               fetchPriority="high" 
                               loading="eager" 
                               decoding="async" 
-                              className="relative overflow-hidden rounded-lg w-full h-full object-contain transition-transform group-hover:scale-105" 
-                              src={item.image} 
-                              style={{ color: 'transparent', objectFit: 'contain' }}
+                              className="relative overflow-hidden rounded-lg w-full h-full object-cover transition-transform group-hover:scale-105"
+                              src={item.image}
+                              style={{ color: 'transparent', objectFit: 'cover' }}
                               onError={(e) => {
                                 (e.target as HTMLImageElement).src = 'https://cdn.zeptonow.com/production/tr:w-210,ar-225-333,pr-true,f-auto,q-40/cms/category/474e6e58-1894-4378-86f1-168cc7266d1a.png';
                               }}
@@ -316,9 +269,9 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
         {/* 2. Dynamic Subcategories Home Sections & Dynamic Inter-Section Banners & In-Between Mobile Special Groups */}
         {subCategorySections.map((sec, secIdx) => (
           <React.Fragment key={sec.id}>
-            <section className="mb-5 border-b border-divider/40 pb-3 last:border-b-0">
+            <section className="mb-3 border-b border-divider/40 pb-2 last:border-b-0">
               {/* Subcategory Title Header */}
-              <div className="flex justify-between items-end mb-4">
+              <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-3">
                   {sec.subImg && (
                     <img 
@@ -328,16 +281,11 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                       onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
                     />
                   )}
-                  <div>
-                    <h2 className="text-xl md:text-2xl font-black text-text-primary tracking-tight font-display">
-                      {sec.subName}
-                    </h2>
-                    <p className="text-xs text-text-tertiary font-bold mt-0.5">
-                      {sec.subProducts.length} items
-                    </p>
-                  </div>
+                  <h2 className="text-xl md:text-2xl font-black text-text-primary tracking-tight font-display">
+                    {sec.subName}
+                  </h2>
                 </div>
-                <Link 
+                <Link
                   to={`/products?category=${sec.catSlug}&subCategory=${encodeURIComponent(sec.subName)}`}
                   className="text-xs font-black text-emerald-600 bg-emerald-500/10 hover:bg-emerald-500/20 px-3.5 py-1.5 rounded-full flex items-center gap-1 transition-colors"
                 >
@@ -348,7 +296,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
 
               {/* Special Subcategory Promo Banner (Full 100% Image Visible - Zero Cut-off) */}
               {sec.promoImage && (
-                <div className="mb-5 w-full rounded-2xl md:rounded-3xl overflow-hidden shadow-sm hover:shadow-md border border-divider/60 bg-surface">
+                <div className="mb-3 w-full rounded-2xl md:rounded-3xl overflow-hidden shadow-sm hover:shadow-md border border-divider/60 bg-surface">
                   <Link 
                     to={`/products?category=${sec.catSlug}&subCategory=${encodeURIComponent(sec.subName)}`}
                     className="block w-full cursor-pointer group"
@@ -368,7 +316,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
               {sec.subProducts.length > 0 ? (
                 <div className="flex gap-2.5 sm:gap-3.5 overflow-x-auto scrollbar-none pb-2 flex-nowrap">
                   {sec.subProducts.map((product, pIdx) => (
-                    <div key={product.id || `subp_${pIdx}`} className="w-[130px] sm:w-[155px] md:w-[180px] shrink-0">
+                    <div key={product.id || `subp_${pIdx}`} className="w-[155px] sm:w-[180px] md:w-[205px] shrink-0">
                       <ProductCard product={product} onQuickView={onQuickView} />
                     </div>
                   ))}
@@ -386,7 +334,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                 {specialCategoryGroups
                   .filter(g => g.active !== false && g.items && g.items.length > 0 && g.insertAfterSubCategoryIndex === (secIdx + 1))
                   .map((group) => (
-                    <div key={group.id} className="mb-6 bg-surface rounded-3xl border border-divider/60 p-2 sm:p-4 shadow-sm">
+                    <div key={group.id} className="mb-3 bg-surface rounded-3xl border border-divider/60 p-2 sm:p-4 shadow-sm">
                       {group.title && (
                         <h2 className="text-lg font-black text-text-primary tracking-tight font-display px-3 pt-2 pb-1">
                           {group.title}
@@ -460,7 +408,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
             {specialCategoryGroups
               .filter(g => g.active !== false && g.items && g.items.length > 0 && g.insertAfterSubCategoryIndex !== undefined && g.insertAfterSubCategoryIndex >= 99)
               .map((group) => (
-                <div key={group.id} className="mb-6 bg-surface rounded-3xl border border-divider/60 p-2 sm:p-4 shadow-sm">
+                <div key={group.id} className="mb-3 bg-surface rounded-3xl border border-divider/60 p-2 sm:p-4 shadow-sm">
                   {group.title && (
                     <h2 className="text-lg font-black text-text-primary tracking-tight font-display px-3 pt-2 pb-1">
                       {group.title}
@@ -487,9 +435,9 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                               fetchPriority="high" 
                               loading="eager" 
                               decoding="async" 
-                              className="relative overflow-hidden rounded-lg w-full h-full object-contain transition-transform group-hover:scale-105" 
-                              src={item.image} 
-                              style={{ color: 'transparent', objectFit: 'contain' }}
+                              className="relative overflow-hidden rounded-lg w-full h-full object-cover transition-transform group-hover:scale-105"
+                              src={item.image}
+                              style={{ color: 'transparent', objectFit: 'cover' }}
                               onError={(e) => {
                                 (e.target as HTMLImageElement).src = 'https://cdn.zeptonow.com/production/tr:w-210,ar-225-333,pr-true,f-auto,q-40/cms/category/474e6e58-1894-4378-86f1-168cc7266d1a.png';
                               }}
@@ -523,7 +471,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
 
             <div className="flex gap-2.5 sm:gap-3.5 overflow-x-auto scrollbar-none pb-2 flex-nowrap">
               {freshPicks.map((product, pIdx) => (
-                <div key={product.id || `fp_${pIdx}`} className="w-[130px] sm:w-[155px] md:w-[180px] shrink-0">
+                <div key={product.id || `fp_${pIdx}`} className="w-[155px] sm:w-[180px] md:w-[205px] shrink-0">
                   <ProductCard product={product} onQuickView={onQuickView} />
                 </div>
               ))}
@@ -549,7 +497,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
 
             <div className="flex gap-2.5 sm:gap-3.5 overflow-x-auto scrollbar-none pb-2 flex-nowrap">
               {organicPicks.map((product, pIdx) => (
-                <div key={product.id || `op_${pIdx}`} className="w-[130px] sm:w-[155px] md:w-[180px] shrink-0">
+                <div key={product.id || `op_${pIdx}`} className="w-[155px] sm:w-[180px] md:w-[205px] shrink-0">
                   <ProductCard product={product} onQuickView={onQuickView} />
                 </div>
               ))}
@@ -607,7 +555,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
 
             <div className="flex gap-2.5 sm:gap-3.5 overflow-x-auto scrollbar-none pb-2 flex-nowrap">
               {bestSellers.map((product) => (
-                <div key={product.id} className="w-[130px] sm:w-[155px] md:w-[180px] shrink-0">
+                <div key={product.id} className="w-[155px] sm:w-[180px] md:w-[205px] shrink-0">
                   <ProductCard product={product} onQuickView={onQuickView} />
                 </div>
               ))}

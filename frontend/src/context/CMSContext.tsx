@@ -39,6 +39,7 @@ export interface Category {
   id: string;
   slug?: string;
   name: string;
+  displayName?: string;
   icon: string;
   color: string;
   image?: string;
@@ -373,6 +374,28 @@ const categoryImages: Record<string, string> = {
   'Breakfast & Sauces': 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=200&auto=format&fit=crop',
   'packaged-food': 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=200&auto=format&fit=crop',
   'Packaged Food': 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=200&auto=format&fit=crop',
+};
+
+// Converts a #rrggbb hex color into an rgba() string with the given alpha,
+// used to tint category avatar/card backgrounds with an admin-chosen color.
+export const hexToRgba = (hex: string | undefined, alpha: number): string => {
+  if (!hex || !/^#([0-9a-fA-F]{6})$/.test(hex)) return `rgba(76, 175, 80, ${alpha})`;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+// Same tint as hexToRgba but pre-blended onto white and returned as an
+// opaque rgb() — used for surfaces (like the fixed header) that must stay
+// fully solid so scrolled page content can never show through them.
+export const hexToTintOnWhite = (hex: string | undefined, alpha: number): string => {
+  if (!hex || !/^#([0-9a-fA-F]{6})$/.test(hex)) hex = '#4CAF50';
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const blend = (c: number) => Math.round(c * alpha + 255 * (1 - alpha));
+  return `rgb(${blend(r)}, ${blend(g)}, ${blend(b)})`;
 };
 
 export const getCategoryImage = (category: Category | string): string => {
@@ -848,12 +871,12 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
 
         const [pData, cData, sgData, bannerData, cpData, bData] = await Promise.all([
-          fetchJson('http://localhost:5000/api/products').catch(() => null),
-          fetchJson('http://localhost:5000/api/categories').catch(() => null),
-          fetchJson('http://localhost:5000/api/special-groups').catch(() => null),
-          fetchJson('http://localhost:5000/api/banners').catch(() => null),
-          fetchJson('http://localhost:5000/api/coupons').catch(() => null),
-          fetchJson('http://localhost:5000/api/blogs').catch(() => null),
+          fetchJson('/api/products').catch(() => null),
+          fetchJson('/api/categories').catch(() => null),
+          fetchJson('/api/special-groups').catch(() => null),
+          fetchJson('/api/banners').catch(() => null),
+          fetchJson('/api/coupons').catch(() => null),
+          fetchJson('/api/blogs').catch(() => null),
         ]);
 
         clearTimeout(timeoutId);
@@ -927,7 +950,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       banners: [...prev.banners, banner],
     }));
     try {
-      await fetch('http://localhost:5000/api/banners', {
+      await fetch('/api/banners', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(banner)
@@ -943,7 +966,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       banners: prev.banners.filter((b) => b.id !== id),
     }));
     try {
-      await fetch(`http://localhost:5000/api/banners/${id}`, {
+      await fetch(`/api/banners/${id}`, {
         method: 'DELETE'
       });
     } catch (e) {
@@ -957,7 +980,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       banners: prev.banners.map((b) => (b.id === id ? { ...b, ...updated } : b)),
     }));
     try {
-      await fetch(`http://localhost:5000/api/banners/${id}`, {
+      await fetch(`/api/banners/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updated)
@@ -1032,7 +1055,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Sync updated displayOrder to backend
       updatedCategories.forEach(async (cat) => {
         try {
-          await fetch(`http://localhost:5000/api/categories/${cat.id}`, {
+          await fetch(`/api/categories/${cat.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ displayOrder: cat.displayOrder })
@@ -1150,7 +1173,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const res = await fetch('http://localhost:5000/api/special-groups', {
+      const res = await fetch('/api/special-groups', {
         method: 'POST',
         headers,
         body: JSON.stringify(group)
@@ -1180,7 +1203,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const res = await fetch(`http://localhost:5000/api/special-groups/${id}`, {
+      const res = await fetch(`/api/special-groups/${id}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify(updated)
@@ -1210,7 +1233,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      await fetch(`http://localhost:5000/api/special-groups/${id}`, {
+      await fetch(`/api/special-groups/${id}`, {
         method: 'DELETE',
         headers
       });
@@ -1361,7 +1384,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const uploadImage = async (fileBase64OrUri: string, folder?: string): Promise<string> => {
     try {
-      const response = await fetch('http://localhost:5000/api/upload', {
+      const response = await fetch('/api/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: fileBase64OrUri, folder: folder || 'freshcart' }),

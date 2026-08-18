@@ -57,6 +57,10 @@ const AppContent: React.FC = () => {
   const [wishlistOpen, setWishlistOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [quickViewProduct, setQuickViewProduct] = useState<any>(null);
+  // True while the Products page is showing its sidebar + product-list view
+  // (a subcategory, or "All" within a category) rather than the category
+  // landing page — the app bar / category nav hide for that view.
+  const [productsListView, setProductsListView] = useState(false);
 
   // Admin Session State
   const [adminUser, setAdminUser] = useState<any>(() => {
@@ -80,6 +84,11 @@ const AppContent: React.FC = () => {
 
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith('/admin');
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('no-scrollbar', isAdminRoute);
+    return () => document.documentElement.classList.remove('no-scrollbar');
+  }, [isAdminRoute]);
 
   if (isAdminRoute) {
     if (!adminUser) {
@@ -114,9 +123,10 @@ const AppContent: React.FC = () => {
   }
 
 
-  const isStandalonePage = 
-    location.pathname.startsWith('/s/') || 
-    location.pathname.startsWith('/terms-of-service') || 
+  const isStandalonePage =
+    (location.pathname.startsWith('/products') && productsListView) ||
+    location.pathname.startsWith('/s/') ||
+    location.pathname.startsWith('/terms-of-service') ||
     location.pathname.startsWith('/privacy-policy') || 
     location.pathname === '/legal' ||
     location.pathname.startsWith('/orders') ||
@@ -143,11 +153,14 @@ const AppContent: React.FC = () => {
       )}
 
       {/* Main Pages */}
-      <main className="flex-grow">
+      <main
+        className="flex-grow"
+        style={!isStandalonePage ? { paddingTop: 'var(--sticky-header-h, 320px)' } : undefined}
+      >
         <Routes>
           <Route path="/" element={<Home onQuickView={setQuickViewProduct} />} />
           <Route path="/about" element={<About />} />
-          <Route path="/products" element={<ShopProducts onQuickView={setQuickViewProduct} />} />
+          <Route path="/products" element={<ShopProducts onQuickView={setQuickViewProduct} onListViewChange={setProductsListView} />} />
           <Route path="/product/:id" element={<ProductDetails onQuickView={setQuickViewProduct} />} />
           <Route path="/brands" element={<Brands onQuickView={setQuickViewProduct} />} />
           <Route path="/offers" element={<Offers />} />
@@ -174,8 +187,8 @@ const AppContent: React.FC = () => {
         </Routes>
       </main>
 
-      {/* Footer Layout (Hidden on standalone pages) */}
-      {!isStandalonePage && <Footer />}
+      {/* Footer Layout (Home page only) */}
+      {location.pathname === '/' && <Footer />}
 
       {/* Overlays Drawers & Modals */}
       <WishlistDrawer 

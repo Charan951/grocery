@@ -77,7 +77,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
       <div className="relative w-full aspect-square rounded-2xl bg-neutral-100/60 dark:bg-neutral-800/40 mb-1.5 flex items-center justify-center p-1 group/img overflow-hidden">
         {/* Product Image */}
         <Link to={`/product/${product.id}`} className="w-full h-full flex items-center justify-center">
-          <img src={displayImage} alt={product.name} className="w-[90%] h-[90%] object-contain transition-transform duration-300 group-hover/img:scale-105" loading="lazy" />
+          <img src={displayImage} alt={product.name} className="w-full h-full object-cover transition-transform duration-300 group-hover/img:scale-105" loading="lazy" />
         </Link>
 
         {/* Floating Add CTA inside Image Box (Bottom Right Corner) */}
@@ -129,7 +129,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
 
         {/* Product Title */}
         <Link to={`/product/${product.id}`}>
-          <h3 className="text-xs sm:text-[13px] font-bold text-text-primary leading-snug mb-1 line-clamp-2 h-7 sm:h-8 group-hover:text-primary transition-colors">
+          <h3 className="text-xs sm:text-[13px] font-bold text-text-primary leading-snug mb-1 line-clamp-2 min-h-[2.2em] sm:min-h-[2.4em] group-hover:text-primary transition-colors">
             {product.name}
           </h3>
         </Link>

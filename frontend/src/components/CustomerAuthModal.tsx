@@ -122,12 +122,12 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
         {[...items, ...items, ...items, ...items, ...items, ...items].map((item, idx) => (
           <div
             key={`${item.id}_${idx}`}
-            className="w-18 h-18 sm:w-22 sm:h-22 rounded-3xl bg-[#E0F7FA]/90 flex items-center justify-center p-2.5 shadow-2xs shrink-0 mr-3"
+            className="w-18 h-18 sm:w-22 sm:h-22 rounded-3xl bg-[#E0F7FA]/90 overflow-hidden shadow-2xs shrink-0 mr-3"
           >
             <img
               src={item.img}
               alt={item.name}
-              className="w-full h-full object-contain drop-shadow-xs"
+              className="w-full h-full object-cover"
               loading="eager"
             />
           </div>
@@ -158,7 +158,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
             className="fixed top-0 right-0 bottom-0 w-full sm:w-[440px] max-w-full bg-white text-gray-900 z-[2001] shadow-2xl flex flex-col h-full overflow-hidden"
           >
             {/* TOP HALF: 4-Row Moving Product Cards Marquee Background */}
-            <div className="h-[46%] w-full bg-[#E0F7FA]/30 relative overflow-hidden flex flex-col justify-around py-2 border-b border-gray-100 shrink-0">
+            <div className="h-[46%] w-full bg-gradient-to-b from-[#E0F7FA] to-[#E0F7FA]/40 relative overflow-hidden flex flex-col justify-around py-2 shrink-0">
               {/* Floating Top Left Circular Back Button */}
               <button
                 onClick={handleModalClose}
@@ -175,6 +175,9 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                 {renderMarqueeRow(row3, false)}
                 {renderMarqueeRow(row4, true)}
               </div>
+
+              {/* Fade into the white sheet below so the marquee doesn't hard-cut */}
+              <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-b from-transparent to-white pointer-events-none" />
             </div>
 
             {/* BOTTOM HALF: White Section with Brand Icon Badge, Headline, Input & Continue Button */}
@@ -194,11 +197,11 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
               ) : (
                 <>
                   {/* Brand App Icon Badge & Headline */}
-                  <div className="flex flex-col items-center text-center shrink-0 mt-2">
+                  <div className="flex flex-col items-center text-center shrink-0 mt-1">
                     {/* Brand Green App Icon Badge */}
-                    <div className="w-20 h-16 rounded-2xl bg-[#4CAF50] border border-emerald-600 shadow-md flex items-center justify-center p-2 text-center mb-2">
-                      <span className="text-lg font-black tracking-tight text-white font-display leading-none">
-                        fresh<span className="text-[#A5D6A7]">cart</span>
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#4CAF50] to-[#2E7D32] shadow-lg shadow-emerald-900/10 flex items-center justify-center mb-3">
+                      <span className="text-sm font-black tracking-tight text-white font-display leading-none">
+                        fresh<br /><span className="text-[#A5D6A7]">cart</span>
                       </span>
                     </div>
 

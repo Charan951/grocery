@@ -21,6 +21,7 @@ export const CategoriesModule: React.FC = () => {
   const [showAdd, setShowAdd] = useState(false);
   const [editingCategory, setEditingCategory] = useState<any | null>(null);
   const [cName, setCName] = useState('');
+  const [cDisplayName, setCDisplayName] = useState('');
   const [cColor, setCColor] = useState('#4CAF50');
   const [cIcon, setCIcon] = useState('https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=200&auto=format&fit=crop');
 
@@ -29,7 +30,7 @@ export const CategoriesModule: React.FC = () => {
   const [newSubName, setNewSubName] = useState('');
   const [editingSub, setEditingSub] = useState<{ categoryId: string; subId: string; name: string } | null>(null);
 
-  const API_URL = 'http://localhost:5000/api';
+  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -38,6 +39,7 @@ export const CategoriesModule: React.FC = () => {
   const handleOpenAdd = () => {
     setEditingCategory(null);
     setCName('');
+    setCDisplayName('');
     setCColor('#4CAF50');
     setCIcon('https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=200&auto=format&fit=crop');
     setShowAdd(true);
@@ -46,6 +48,7 @@ export const CategoriesModule: React.FC = () => {
   const handleOpenEdit = (cat: any) => {
     setEditingCategory(cat);
     setCName(cat.name);
+    setCDisplayName(cat.displayName || '');
     setCColor(cat.color || '#4CAF50');
     setCIcon(cat.icon || 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=200&auto=format&fit=crop');
     setShowAdd(true);
@@ -58,6 +61,7 @@ export const CategoriesModule: React.FC = () => {
       // Edit Mode
       const updatedData = {
         name: cName.trim(),
+        displayName: cDisplayName.trim(),
         icon: cIcon,
         color: cColor
       };
@@ -81,6 +85,7 @@ export const CategoriesModule: React.FC = () => {
       const catData = {
         id: catId,
         name: cName.trim(),
+        displayName: cDisplayName.trim(),
         icon: cIcon,
         color: cColor,
         productCount: 0
@@ -229,13 +234,46 @@ export const CategoriesModule: React.FC = () => {
             <div className="flex flex-col gap-4">
               <div>
                 <label className="text-[11px] font-bold text-text-secondary uppercase mb-1.5 block">Department Name</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. Dairy, Bread & Eggs" 
-                  value={cName} 
-                  onChange={(e) => setCName(e.target.value)} 
-                  className="w-full px-4 py-2.5 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary font-semibold" 
+                <input
+                  type="text"
+                  placeholder="e.g. Dairy, Bread & Eggs"
+                  value={cName}
+                  onChange={(e) => setCName(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary font-semibold"
                 />
+                <p className="text-[10px] text-text-tertiary font-medium mt-1">Internal name used across the admin panel and URLs.</p>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-text-secondary uppercase mb-1.5 block">Display Name (shown on Home page & app bar)</label>
+                <input
+                  type="text"
+                  placeholder="Leave blank to use the department name above"
+                  value={cDisplayName}
+                  onChange={(e) => setCDisplayName(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary font-semibold"
+                />
+                <p className="text-[10px] text-text-tertiary font-medium mt-1">A shorter or customer-friendly label customers see on the Home page and top nav bar.</p>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-text-secondary uppercase mb-1.5 block">Background Colour (app bar & home page icon)</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={cColor}
+                    onChange={(e) => setCColor(e.target.value)}
+                    className="w-11 h-11 rounded-xl border border-divider cursor-pointer bg-background p-1"
+                  />
+                  <input
+                    type="text"
+                    value={cColor}
+                    onChange={(e) => setCColor(e.target.value)}
+                    placeholder="#4CAF50"
+                    className="flex-1 px-4 py-2.5 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary font-semibold uppercase"
+                  />
+                </div>
+                <p className="text-[10px] text-text-tertiary font-medium mt-1">Tint shown behind this category's icon in the app bar and Home page rail.</p>
               </div>
 
               <div className="flex flex-col gap-2">
@@ -450,7 +488,7 @@ export const SubCategoriesModule: React.FC = () => {
     if (cat) setSelectedCatFilter(cat);
   }, [searchParams]);
 
-  const API_URL = 'http://localhost:5000/api';
+  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -1344,7 +1382,7 @@ export const InventoryModule: React.FC = () => {
   const [stockFilter, setStockFilter] = useState<'all' | 'low' | 'out'>('all');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const API_URL = 'http://localhost:5000/api';
+  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token') || localStorage.getItem('token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -1733,7 +1771,7 @@ export const CustomersModule: React.FC = () => {
   const [customers, setCustomers] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
 
-  const API_URL = 'http://localhost:5000/api';
+  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -1850,7 +1888,7 @@ export const DeliveryModule: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const API_URL = 'http://localhost:5000/api';
+  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -1987,7 +2025,7 @@ export const EmployeesModule: React.FC = () => {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('Employee');
 
-  const API_URL = 'http://localhost:5000/api';
+  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -2144,7 +2182,7 @@ export const CouponsModule: React.FC = () => {
   const [editingCoupon, setEditingCoupon] = useState<any | null>(null);
   const [showForm, setShowForm] = useState(false);
 
-  const API_URL = 'http://localhost:5000/api';
+  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -2311,7 +2349,7 @@ export const CMSModule: React.FC = () => {
   const [cover, setCover] = useState('https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=500&auto=format&fit=crop');
   const [category, setCategory] = useState('Nutrition');
 
-  const API_URL = 'http://localhost:5000/api';
+  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -2473,7 +2511,7 @@ export const CMSModule: React.FC = () => {
 export const FinanceModule: React.FC = () => {
   const [orders, setOrders] = useState<any[]>([]);
 
-  const API_URL = 'http://localhost:5000/api';
+  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -2584,7 +2622,7 @@ export const AnalyticsModule: React.FC = () => {
 export const ReviewsModule: React.FC = () => {
   const [reviews, setReviews] = useState<any[]>([]);
 
-  const API_URL = 'http://localhost:5000/api';
+  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -2692,7 +2730,7 @@ export const SupportModule: React.FC = () => {
   const [activeTicket, setActiveTicket] = useState<any | null>(null);
   const [replyText, setReplyText] = useState('');
 
-  const API_URL = 'http://localhost:5000/api';
+  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -2855,7 +2893,7 @@ export const SupportModule: React.FC = () => {
 export const AuditLogsModule: React.FC = () => {
   const [logs, setLogs] = useState<any[]>([]);
 
-  const API_URL = 'http://localhost:5000/api';
+  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -2944,7 +2982,7 @@ export const SettingsModule: React.FC = () => {
   const [bEmail, setBEmail] = useState('contact@freshcart.in');
   const [apiKey, setApiKey] = useState('rzp_live_8F0aK912h83Gka');
 
-  const API_URL = 'http://localhost:5000/api';
+  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};

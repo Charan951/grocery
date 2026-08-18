@@ -150,7 +150,10 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ onQuickView }) =
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_480px] gap-8 items-start mb-12 pt-2">
           
           {/* LEFT COLUMN: Vertical Gallery & Add To Cart Button (100% Frozen flush under constant sticky header) */}
-          <div className="flex flex-col gap-4 lg:sticky lg:top-[168px] self-start z-10">
+          <div
+            style={{ top: 'calc(var(--sticky-header-h, 260px) + 12px)' }}
+            className="flex flex-col gap-4 lg:sticky self-start z-10"
+          >
             
             <div className="flex gap-4 items-start">
               {/* Vertical Thumbnail Strip */}

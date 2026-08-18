@@ -2,22 +2,23 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SEO } from '../components/SEO';
 import { Link, useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  MapPin, 
-  Search, 
-  Navigation, 
-  Check, 
-  Home, 
-  Briefcase, 
-  Tag, 
-  Trash2, 
-  Plus, 
-  CheckCircle2, 
-  Edit3, 
+import {
+  ArrowLeft,
+  MapPin,
+  Search,
+  Navigation,
+  Check,
+  Home,
+  Briefcase,
+  Tag,
+  Trash2,
+  Plus,
+  CheckCircle2,
+  Edit3,
   X,
   User,
-  Phone
+  Phone,
+  Info
 } from 'lucide-react';
 import { useCMS } from '../context/CMSContext';
 
@@ -42,6 +43,12 @@ const defaultPopularLocations = [
   { name: 'HSR Layout (Bengaluru)', lat: 12.9121, lng: 77.6446 },
 ];
 
+const labelIcon = (label: 'Home' | 'Work' | 'Other') => {
+  if (label === 'Home') return Home;
+  if (label === 'Work') return Briefcase;
+  return Tag;
+};
+
 export const CustomerAddresses: React.FC = () => {
   const navigate = useNavigate();
   const { userLocation, updateUserLocation } = useCMS();
@@ -52,8 +59,8 @@ export const CustomerAddresses: React.FC = () => {
   })();
   const userPhoneKey = customerUser?.phone ? customerUser.phone.replace(/\D/g, '') : 'default';
 
-  const initialAddressText = typeof userLocation === 'string' 
-    ? userLocation 
+  const initialAddressText = typeof userLocation === 'string'
+    ? userLocation
     : userLocation?.fullAddress || userLocation?.address || '';
 
   // View mode: 'list' (default view showing saved addresses) or 'form' (map & address edit)
@@ -309,28 +316,28 @@ export const CustomerAddresses: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50/70 text-gray-900 font-sans pb-16">
-      <SEO 
+    <div className="min-h-screen bg-background text-text-primary font-sans pb-16">
+      <SEO
         title="Saved Addresses | FreshCart"
         description="Manage your saved delivery addresses or pin a new location on OpenStreetMap."
       />
 
       {/* Top Standalone Header Bar */}
-      <header className="bg-white border-b border-gray-200 py-4 px-6 md:px-12 sticky top-0 z-40 shadow-2xs">
+      <header className="bg-surface/95 backdrop-blur-sm border-b border-divider py-4 px-6 md:px-12 sticky top-0 z-40 shadow-2xs">
         <div className="max-w-[900px] mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link 
-              to="/" 
-              className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 transition-colors"
+            <Link
+              to="/"
+              className="w-9 h-9 rounded-full bg-background hover:bg-divider/60 flex items-center justify-center text-text-secondary transition-colors"
               aria-label="Back"
             >
               <ArrowLeft size={18} />
             </Link>
             <div>
-              <h1 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight font-display">
+              <h1 className="text-xl md:text-2xl font-black text-text-primary tracking-tight font-display">
                 {viewMode === 'form' ? (editingAddressId ? 'Edit Address' : 'Add New Location') : 'Saved Addresses'}
               </h1>
-              <p className="text-xs text-gray-500 font-semibold">
+              <p className="text-xs text-text-secondary font-semibold">
                 {viewMode === 'form' ? 'Enter receiver details & pin exact location on OpenStreetMap' : 'Select delivery location or manage saved addresses'}
               </p>
             </div>
@@ -340,7 +347,7 @@ export const CustomerAddresses: React.FC = () => {
             <button
               type="button"
               onClick={() => setViewMode('list')}
-              className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-extrabold text-xs px-3.5 py-2 rounded-xl transition-colors cursor-pointer"
+              className="bg-background hover:bg-divider/60 text-text-secondary font-extrabold text-xs px-3.5 py-2 rounded-xl transition-colors cursor-pointer"
             >
               Cancel
             </button>
@@ -350,10 +357,10 @@ export const CustomerAddresses: React.FC = () => {
 
       {/* Main Container */}
       <main className="w-full max-w-[900px] mx-auto px-4 md:px-8 py-6 flex flex-col gap-5">
-        
+
         {notificationMsg && (
-          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl text-xs font-bold flex items-center gap-2">
-            <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+          <div className="bg-primary/10 border border-primary/30 text-primary px-4 py-3 rounded-2xl text-xs font-bold flex items-center gap-2">
+            <CheckCircle2 size={16} className="shrink-0" />
             <span>{notificationMsg}</span>
           </div>
         )}
@@ -361,111 +368,115 @@ export const CustomerAddresses: React.FC = () => {
         {/* VIEW MODE 1: SAVED ADDRESSES LIST (Default View) */}
         {viewMode === 'list' && (
           <div className="flex flex-col gap-4">
-            
+
             {/* Top Add New Address Card Banner */}
-            <div 
+            <div
               onClick={handleOpenAddNew}
-              className="bg-white border-2 border-dashed border-emerald-300 hover:border-[#00A86B] p-5 rounded-2xl flex items-center justify-between cursor-pointer transition-all group shadow-2xs"
+              className="bg-surface border-2 border-dashed border-primary/30 hover:border-primary p-5 rounded-3xl flex items-center justify-between cursor-pointer transition-all group shadow-2xs"
             >
               <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-[#00A86B] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                <div className="w-11 h-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                   <Plus size={22} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-extrabold text-gray-900 group-hover:text-[#00A86B] transition-colors">
+                  <h3 className="text-sm font-extrabold text-text-primary group-hover:text-primary transition-colors">
                     Add New Delivery Address
                   </h3>
-                  <p className="text-xs font-medium text-gray-500 mt-0.5">
+                  <p className="text-xs font-medium text-text-secondary mt-0.5">
                     Pin your location on OpenStreetMap & save house/flat details
                   </p>
                 </div>
               </div>
 
-              <span className="bg-[#00A86B] text-white font-extrabold text-xs px-4 py-2 rounded-xl shadow-2xs">
+              <span className="bg-primary text-white font-extrabold text-xs px-4 py-2 rounded-full shadow-2xs">
                 Open Map
               </span>
             </div>
 
             {/* Saved Addresses List */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-5 md:p-6 shadow-2xs flex flex-col gap-4">
-              <h2 className="text-xs font-black text-gray-500 uppercase tracking-wider">
-                YOUR SAVED ADDRESSES ({savedAddresses.length})
+            <div className="bg-surface border border-divider rounded-3xl p-5 md:p-6 shadow-2xs flex flex-col gap-4">
+              <h2 className="text-xs font-black text-text-secondary uppercase tracking-wider">
+                Your Saved Addresses ({savedAddresses.length})
               </h2>
 
               {savedAddresses.length === 0 ? (
-                <div className="text-center py-8 text-gray-500 font-medium text-xs">
+                <div className="text-center py-8 text-text-secondary font-medium text-xs">
                   No saved addresses found. Click "Open Map" to pin your address on map.
                 </div>
               ) : (
                 <div className="flex flex-col gap-3">
-                  {savedAddresses.map((addr, index) => (
-                    <div
-                      key={addr.id || `addr_${index}`}
-                      onClick={() => handleSelectSavedAddress(addr)}
-                      className="bg-gray-50/70 hover:bg-emerald-50/40 border border-gray-200 hover:border-[#00A86B] p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer transition-all group"
-                    >
-                      <div className="flex items-start gap-3.5">
-                        <div className="w-10 h-10 rounded-xl bg-white text-gray-800 flex items-center justify-center shrink-0 font-extrabold text-base shadow-2xs mt-0.5">
-                          {addr.label === 'Home' ? '🏠' : addr.label === 'Work' ? '💼' : '📍'}
-                        </div>
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs sm:text-sm font-black text-gray-900 group-hover:text-[#00A86B]">
-                              {addr.label}
-                            </span>
-                            {addr.name && (
-                              <span className="text-xs font-bold text-gray-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
-                                {addr.name}
+                  {savedAddresses.map((addr, index) => {
+                    const LabelIcon = labelIcon(addr.label);
+                    return (
+                      <div
+                        key={addr.id || `addr_${index}`}
+                        onClick={() => handleSelectSavedAddress(addr)}
+                        className="bg-background hover:bg-primary/5 border border-divider hover:border-primary p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer transition-all group"
+                      >
+                        <div className="flex items-start gap-3.5">
+                          <div className="w-10 h-10 rounded-xl bg-surface text-primary flex items-center justify-center shrink-0 shadow-2xs mt-0.5 border border-divider">
+                            <LabelIcon size={18} />
+                          </div>
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs sm:text-sm font-black text-text-primary group-hover:text-primary">
+                                {addr.label}
                               </span>
-                            )}
-                            {addr.houseNo && (
-                              <span className="text-[11px] font-bold text-gray-500 bg-white px-2 py-0.5 rounded-md border border-gray-200">
-                                {addr.houseNo}
+                              {addr.name && (
+                                <span className="text-xs font-bold text-text-secondary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-md">
+                                  {addr.name}
+                                </span>
+                              )}
+                              {addr.houseNo && (
+                                <span className="text-[11px] font-bold text-text-secondary bg-surface px-2 py-0.5 rounded-md border border-divider">
+                                  {addr.houseNo}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-xs font-medium text-text-secondary leading-snug mt-1">
+                              {addr.fullAddress}
+                            </span>
+                            {addr.receiverPhone && (
+                              <span className="text-[11px] font-semibold text-text-tertiary mt-1 flex items-center gap-1">
+                                <Phone size={11} />
+                                {addr.receiverPhone}
                               </span>
                             )}
                           </div>
-                          <span className="text-xs font-medium text-gray-600 leading-snug mt-1">
-                            {addr.fullAddress}
-                          </span>
-                          {addr.receiverPhone && (
-                            <span className="text-[11px] font-semibold text-gray-500 mt-0.5">
-                              📞 {addr.receiverPhone}
-                            </span>
-                          )}
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => handleOpenEdit(addr, e)}
+                            className="bg-surface hover:bg-divider/40 border border-divider text-text-secondary font-bold text-xs px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                            title="Edit Address"
+                          >
+                            <Edit3 size={14} className="text-text-tertiary" />
+                            <span>Edit</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeleteAddress(addr.id, e)}
+                            className="bg-surface hover:bg-error/10 border border-divider text-text-tertiary hover:text-error p-1.5 rounded-lg transition-colors cursor-pointer"
+                            title="Delete Address"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleSelectSavedAddress(addr)}
+                            className="bg-primary hover:bg-secondary text-white font-extrabold text-xs px-4 py-1.5 rounded-full shadow-2xs cursor-pointer transition-colors"
+                          >
+                            Deliver Here
+                          </button>
                         </div>
                       </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                        <button
-                          type="button"
-                          onClick={(e) => handleOpenEdit(addr, e)}
-                          className="bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold text-xs px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
-                          title="Edit Address"
-                        >
-                          <Edit3 size={14} className="text-gray-500" />
-                          <span>Edit</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={(e) => handleDeleteAddress(addr.id, e)}
-                          className="bg-white hover:bg-rose-50 border border-gray-200 text-gray-400 hover:text-rose-600 p-1.5 rounded-lg transition-colors cursor-pointer"
-                          title="Delete Address"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleSelectSavedAddress(addr)}
-                          className="bg-[#00A86B] hover:bg-[#00915c] text-white font-extrabold text-xs px-4 py-1.5 rounded-lg shadow-2xs cursor-pointer transition-colors"
-                        >
-                          Deliver Here
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -476,24 +487,24 @@ export const CustomerAddresses: React.FC = () => {
         {/* VIEW MODE 2: INTERACTIVE MAP + ADDRESS FORM */}
         {viewMode === 'form' && (
           <div className="flex flex-col gap-5">
-            
+
             {/* Search Bar + Locate Me Button */}
-            <form onSubmit={handleSearchLocation} className="flex items-center gap-2 bg-white p-3 rounded-2xl border border-gray-200 shadow-2xs">
-              <div className="flex-1 bg-gray-50 border border-gray-200 focus-within:border-[#00A86B] rounded-xl px-4 py-2.5 flex items-center gap-2 transition-all">
-                <Search size={18} className="text-gray-400 shrink-0" />
+            <form onSubmit={handleSearchLocation} className="flex items-center gap-2 bg-surface p-3 rounded-2xl border border-divider shadow-2xs">
+              <div className="flex-1 bg-background border border-divider focus-within:border-primary rounded-xl px-4 py-2.5 flex items-center gap-2 transition-all">
+                <Search size={18} className="text-text-tertiary shrink-0" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Type area, landmark or street (e.g. HITEC City, Indiranagar)..."
-                  className="w-full bg-transparent border-none outline-none text-xs sm:text-sm font-semibold text-gray-900 placeholder:text-gray-400"
+                  className="w-full bg-transparent border-none outline-none text-xs sm:text-sm font-semibold text-text-primary placeholder:text-text-tertiary"
                 />
               </div>
 
               <button
                 type="button"
                 onClick={handleLocateMe}
-                className="bg-[#00A86B] hover:bg-[#00915c] text-white font-extrabold text-xs px-4 py-3 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-2xs"
+                className="bg-primary hover:bg-secondary text-white font-extrabold text-xs px-4 py-3 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-2xs"
               >
                 <Navigation size={15} />
                 <span>Locate Me</span>
@@ -502,7 +513,7 @@ export const CustomerAddresses: React.FC = () => {
 
             {/* Popular Locations */}
             <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-none">
-              <span className="text-[11px] font-black text-gray-400 uppercase tracking-wider shrink-0">POPULAR:</span>
+              <span className="text-[11px] font-black text-text-tertiary uppercase tracking-wider shrink-0">Popular:</span>
               {defaultPopularLocations.map((loc, idx) => (
                 <button
                   key={idx}
@@ -511,17 +522,17 @@ export const CustomerAddresses: React.FC = () => {
                     setPosition([loc.lat, loc.lng]);
                     fetchAddressForCoords(loc.lat, loc.lng);
                   }}
-                  className="bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold text-[11px] px-3.5 py-1.5 rounded-full flex items-center gap-1 shrink-0 transition-colors cursor-pointer"
+                  className="bg-surface hover:bg-primary/5 border border-divider hover:border-primary/40 text-text-secondary font-bold text-[11px] px-3.5 py-1.5 rounded-full flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer"
                 >
-                  <span>📍</span> {loc.name}
+                  <MapPin size={12} className="text-primary" /> {loc.name}
                 </button>
               ))}
             </div>
 
             {/* Interactive OpenStreetMap Container with Click/Tap Pinning */}
-            <div 
+            <div
               onClick={handleMapClick}
-              className="w-full h-56 md:h-64 rounded-2xl overflow-hidden border border-gray-200 relative shadow-2xs shrink-0 bg-gray-100 cursor-crosshair group"
+              className="w-full h-56 md:h-64 rounded-2xl overflow-hidden border border-divider relative shadow-2xs shrink-0 bg-background cursor-crosshair group"
             >
               <iframe
                 title="OpenStreetMap Location Picker"
@@ -535,49 +546,49 @@ export const CustomerAddresses: React.FC = () => {
 
               {/* Center Pin Marker Graphic Overlay */}
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full pointer-events-none flex flex-col items-center">
-                <div className="w-8 h-8 rounded-full bg-rose-500 text-white flex items-center justify-center shadow-lg border-2 border-white animate-bounce">
+                <div className="w-8 h-8 rounded-full bg-error text-white flex items-center justify-center shadow-lg border-2 border-white animate-bounce">
                   <MapPin size={20} />
                 </div>
                 <div className="w-3 h-1.5 bg-black/40 rounded-full blur-[1px] mt-0.5" />
               </div>
 
-              <div className="absolute top-3 right-3 z-10 bg-white/95 backdrop-blur-xs px-3.5 py-1.5 rounded-full text-xs font-bold text-gray-700 border border-gray-200 shadow-2xs flex items-center gap-1.5">
+              <div className="absolute top-3 right-3 z-10 bg-surface/95 backdrop-blur-xs px-3.5 py-1.5 rounded-full text-xs font-bold text-text-secondary border border-divider shadow-2xs flex items-center gap-1.5">
                 {isGeocoding ? (
-                  <span className="text-emerald-600 font-bold animate-pulse">Updating address...</span>
+                  <span className="text-primary font-bold animate-pulse">Updating address...</span>
                 ) : (
-                  <span>💡 Click anywhere on map to pin location</span>
+                  <span className="flex items-center gap-1.5"><Info size={13} className="text-text-tertiary" /> Click anywhere on map to pin location</span>
                 )}
               </div>
             </div>
 
             {/* Address Details Form */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-5 md:p-6 shadow-2xs flex flex-col gap-4">
+            <div className="bg-surface border border-divider rounded-3xl p-5 md:p-6 shadow-2xs flex flex-col gap-4">
               {/* Dynamic Area Header & Dynamic Pincode Badge */}
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-[#00A86B] flex items-center justify-center shrink-0 mt-0.5 font-bold">
+                <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5 font-bold">
                   <MapPin size={18} />
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-black text-[#00A86B] uppercase tracking-wider">
+                    <h3 className="text-xs font-black text-primary uppercase tracking-wider">
                       {detectedArea}
                     </h3>
-                    <span className="text-[11px] font-bold text-gray-500 bg-gray-100 px-2.5 py-0.5 rounded-md border border-gray-200">
+                    <span className="text-[11px] font-bold text-text-secondary bg-background px-2.5 py-0.5 rounded-md border border-divider">
                       PIN: {detectedPincode}
                     </span>
                   </div>
-                  <p className="text-xs sm:text-sm font-semibold text-gray-800 leading-snug mt-1">
+                  <p className="text-xs sm:text-sm font-semibold text-text-primary leading-snug mt-1">
                     {fullAddressText}
                   </p>
                 </div>
               </div>
 
               {/* Receiver Name & Contact Phone Inputs */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-gray-100">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-divider">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-black text-gray-500 uppercase tracking-wider flex items-center gap-1">
-                    <User size={13} className="text-gray-400" />
-                    <span>YOUR NAME *</span>
+                  <label className="text-[11px] font-black text-text-secondary uppercase tracking-wider flex items-center gap-1">
+                    <User size={13} className="text-text-tertiary" />
+                    <span>Your Name *</span>
                   </label>
                   <input
                     type="text"
@@ -585,14 +596,14 @@ export const CustomerAddresses: React.FC = () => {
                     value={receiverName}
                     onChange={(e) => setReceiverName(e.target.value)}
                     placeholder="e.g. Charan"
-                    className="bg-gray-50 border border-gray-200 focus:border-[#00A86B] rounded-xl px-4 py-2.5 text-xs font-bold text-gray-900 focus:outline-none"
+                    className="bg-background border border-divider focus:border-primary rounded-xl px-4 py-2.5 text-xs font-bold text-text-primary focus:outline-none"
                   />
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-black text-gray-500 uppercase tracking-wider flex items-center gap-1">
-                    <Phone size={13} className="text-gray-400" />
-                    <span>MOBILE NUMBER *</span>
+                  <label className="text-[11px] font-black text-text-secondary uppercase tracking-wider flex items-center gap-1">
+                    <Phone size={13} className="text-text-tertiary" />
+                    <span>Mobile Number *</span>
                   </label>
                   <input
                     type="tel"
@@ -600,7 +611,7 @@ export const CustomerAddresses: React.FC = () => {
                     value={receiverPhone}
                     onChange={(e) => setReceiverPhone(e.target.value)}
                     placeholder="e.g. +91 9626626626"
-                    className="bg-gray-50 border border-gray-200 focus:border-[#00A86B] rounded-xl px-4 py-2.5 text-xs font-bold text-gray-900 focus:outline-none"
+                    className="bg-background border border-divider focus:border-primary rounded-xl px-4 py-2.5 text-xs font-bold text-text-primary focus:outline-none"
                   />
                 </div>
               </div>
@@ -608,8 +619,8 @@ export const CustomerAddresses: React.FC = () => {
               {/* House / Flat & Landmark Inputs */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-black text-gray-500 uppercase tracking-wider">
-                    HOUSE / FLAT / DOOR NO *
+                  <label className="text-[11px] font-black text-text-secondary uppercase tracking-wider">
+                    House / Flat / Door No *
                   </label>
                   <input
                     type="text"
@@ -617,41 +628,45 @@ export const CustomerAddresses: React.FC = () => {
                     value={houseNo}
                     onChange={(e) => setHouseNo(e.target.value)}
                     placeholder="e.g. Flat 402, Sunshine Apts"
-                    className="bg-gray-50 border border-gray-200 focus:border-[#00A86B] rounded-xl px-4 py-2.5 text-xs font-bold text-gray-900 focus:outline-none"
+                    className="bg-background border border-divider focus:border-primary rounded-xl px-4 py-2.5 text-xs font-bold text-text-primary focus:outline-none"
                   />
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-black text-gray-500 uppercase tracking-wider">
-                    LANDMARK (OPTIONAL)
+                  <label className="text-[11px] font-black text-text-secondary uppercase tracking-wider">
+                    Landmark (Optional)
                   </label>
                   <input
                     type="text"
                     value={landmark}
                     onChange={(e) => setLandmark(e.target.value)}
                     placeholder="e.g. Near Metro Station"
-                    className="bg-gray-50 border border-gray-200 focus:border-[#00A86B] rounded-xl px-4 py-2.5 text-xs font-bold text-gray-900 focus:outline-none"
+                    className="bg-background border border-divider focus:border-primary rounded-xl px-4 py-2.5 text-xs font-bold text-text-primary focus:outline-none"
                   />
                 </div>
               </div>
 
               {/* Label Type Selector */}
-              <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
-                <span className="text-[11px] font-black text-gray-500 uppercase tracking-wider mr-1">SAVE AS:</span>
-                {(['Home', 'Work', 'Other'] as const).map((l) => (
-                  <button
-                    key={l}
-                    type="button"
-                    onClick={() => setLabel(l)}
-                    className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                      label === l
-                        ? 'bg-[#00A86B] text-white shadow-2xs'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    {l === 'Home' ? '🏠 Home' : l === 'Work' ? '💼 Work' : '📍 Other'}
-                  </button>
-                ))}
+              <div className="flex items-center gap-2 pt-2 border-t border-divider flex-wrap">
+                <span className="text-[11px] font-black text-text-secondary uppercase tracking-wider mr-1">Save As:</span>
+                {(['Home', 'Work', 'Other'] as const).map((l) => {
+                  const LIcon = labelIcon(l);
+                  return (
+                    <button
+                      key={l}
+                      type="button"
+                      onClick={() => setLabel(l)}
+                      className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                        label === l
+                          ? 'bg-primary text-white shadow-2xs'
+                          : 'bg-background text-text-secondary hover:bg-divider/40 border border-divider'
+                      }`}
+                    >
+                      <LIcon size={13} />
+                      {l}
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Footer Actions */}
@@ -659,7 +674,7 @@ export const CustomerAddresses: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setViewMode('list')}
-                  className="text-xs font-extrabold text-gray-500 hover:text-gray-800 px-4 py-2 cursor-pointer"
+                  className="text-xs font-extrabold text-text-secondary hover:text-text-primary px-4 py-2 cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -668,7 +683,7 @@ export const CustomerAddresses: React.FC = () => {
                   type="button"
                   disabled={isSavingDB}
                   onClick={handleSaveAndConfirm}
-                  className="bg-[#00A86B] hover:bg-[#00915c] disabled:opacity-50 text-white font-extrabold text-xs sm:text-sm px-8 py-3.5 rounded-xl flex items-center gap-2 shadow-2xs cursor-pointer transition-colors"
+                  className="bg-primary hover:bg-secondary disabled:opacity-50 text-white font-extrabold text-xs sm:text-sm px-8 py-3.5 rounded-full flex items-center gap-2 shadow-2xs cursor-pointer transition-colors"
                 >
                   <Check size={18} />
                   <span>{isSavingDB ? 'Saving to Database...' : 'Save & Deliver Here'}</span>
