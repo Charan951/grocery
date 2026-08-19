@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, ShoppingBag, Package, FolderTree, Award, Boxes, Warehouse, 
   Users, Truck, UserCheck, Ticket, Tag, Megaphone, Layers, DollarSign, FileText, 
-  LineChart, Star, LifeBuoy, Bell, Settings, ShieldAlert, ChevronLeft, ChevronRight, 
+  LineChart, Star, LifeBuoy, Bell, Settings, ShieldAlert, ChevronLeft, ChevronRight, ChevronDown, 
   Search, Sun, Moon, LogOut, CheckCircle2, AlertTriangle, Info
 } from 'lucide-react';
 
@@ -16,24 +16,62 @@ interface SidebarItem {
   icon: React.ComponentType<any>;
 }
 
-const sidebarItems: SidebarItem[] = [
-  { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
-  { name: 'Orders', path: '/admin/orders', icon: ShoppingBag },
-  { name: 'Products', path: '/admin/products', icon: Package },
-  { name: 'Categories', path: '/admin/categories', icon: FolderTree },
-  { name: 'Inventory', path: '/admin/inventory', icon: Boxes },
-  { name: 'Customers', path: '/admin/customers', icon: Users },
-  { name: 'Delivery Partners', path: '/admin/delivery', icon: Truck },
-  { name: 'Employees', path: '/admin/employees', icon: UserCheck },
-  { name: 'CMS Pages', path: '/admin/cms', icon: Layers },
-  { name: 'Finance', path: '/admin/finance', icon: DollarSign },
-  { name: 'Analytics', path: '/admin/analytics', icon: LineChart },
-  { name: 'Reviews', path: '/admin/reviews', icon: Star },
-  { name: 'Support', path: '/admin/support', icon: LifeBuoy },
-  { name: 'Notifications', path: '/admin/notifications', icon: Bell },
-  { name: 'Settings', path: '/admin/settings', icon: Settings },
-  { name: 'Audit Logs', path: '/admin/audit-logs', icon: ShieldAlert }
+interface SidebarSection {
+  id: string;
+  title: string;
+  items: SidebarItem[];
+}
+
+const sidebarSections: SidebarSection[] = [
+  {
+    id: 'overview',
+    title: 'Overview & Performance',
+    items: [
+      { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
+      { name: 'Analytics', path: '/admin/analytics', icon: LineChart },
+    ]
+  },
+  {
+    id: 'catalog',
+    title: 'Catalog & Inventory',
+    items: [
+      { name: 'Products', path: '/admin/products', icon: Package },
+      { name: 'Categories', path: '/admin/categories', icon: FolderTree },
+      { name: 'Inventory', path: '/admin/inventory', icon: Boxes },
+    ]
+  },
+  {
+    id: 'operations',
+    title: 'Sales & Fleet',
+    items: [
+      { name: 'Orders', path: '/admin/orders', icon: ShoppingBag },
+      { name: 'Customers', path: '/admin/customers', icon: Users },
+      { name: 'Delivery Partners', path: '/admin/delivery', icon: Truck },
+      { name: 'Employees', path: '/admin/employees', icon: UserCheck },
+    ]
+  },
+  {
+    id: 'content',
+    title: 'CMS & Engagement',
+    items: [
+      { name: 'CMS Pages', path: '/admin/cms', icon: Layers },
+      { name: 'Reviews', path: '/admin/reviews', icon: Star },
+      { name: 'Notifications', path: '/admin/notifications', icon: Bell },
+    ]
+  },
+  {
+    id: 'system',
+    title: 'System & Operations',
+    items: [
+      { name: 'Finance', path: '/admin/finance', icon: DollarSign },
+      { name: 'Support', path: '/admin/support', icon: LifeBuoy },
+      { name: 'Settings', path: '/admin/settings', icon: Settings },
+      { name: 'Audit Logs', path: '/admin/audit-logs', icon: ShieldAlert },
+    ]
+  }
 ];
+
+const allSidebarItems = sidebarSections.flatMap(s => s.items);
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -47,6 +85,22 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, onLogout }) 
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Accordion state
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
+    const initialState: Record<string, boolean> = {
+      overview: true,
+      catalog: true,
+      operations: true,
+      content: true,
+      system: true,
+    };
+    return initialState;
+  });
+
+  const toggleSection = (id: string) => {
+    setOpenSections(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   // Sample notifications
   const notifications = [
@@ -65,7 +119,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, onLogout }) 
 
   return (
     <div className="min-h-screen bg-admin-paper flex font-admin-body text-admin-text">
-      {/* SIDEBAR — control tower */}
+      {/* SIDEBAR — control tower with accordions */}
       <aside
         className={`bg-admin-ink flex flex-col transition-all duration-300 z-30 sticky top-0 h-screen ${collapsed ? 'w-[72px]' : 'w-[248px]'}`}
       >
@@ -77,15 +131,15 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, onLogout }) 
               animate={{ opacity: 1 }}
               className="flex items-center gap-2.5"
             >
-              <div className="w-7 h-7 rounded bg-admin-green flex items-center justify-center text-white font-admin-display font-bold text-xs">F</div>
+              <img src="/logo.png" alt="FreshCart Logo" className="w-8 h-8 object-contain" />
               <div>
-                <div className="font-admin-display font-bold text-[11px] tracking-wide text-white leading-none">FRESHCART</div>
-                <div className="font-admin-mono text-[9px] font-medium text-white/40 tracking-[0.12em] uppercase mt-1">Ops Console</div>
+                <div className="font-admin-display font-bold text-[12px] tracking-wide text-white leading-none">FRESHCART</div>
+                <div className="font-admin-mono text-[9px] font-medium text-admin-green tracking-[0.12em] uppercase mt-1">Ops Console</div>
               </div>
             </motion.div>
           )}
           {collapsed && (
-            <div className="w-7 h-7 rounded bg-admin-green flex items-center justify-center text-white font-admin-display font-bold text-xs mx-auto">F</div>
+            <img src="/logo.png" alt="FreshCart Logo" className="w-8 h-8 object-contain mx-auto" />
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
@@ -95,26 +149,64 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, onLogout }) 
           </button>
         </div>
 
-        {/* SIDEBAR SCROLLABLE LINK LIST */}
-        <nav className="flex-1 overflow-y-auto p-2.5 flex flex-col gap-0.5 no-scrollbar">
-          {sidebarItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname === item.path || (item.path !== '/admin' && location.pathname.startsWith(item.path));
+        {/* ACCORDION SIDEBAR SCROLLABLE LINK LIST */}
+        <nav className="flex-1 overflow-y-auto p-2.5 flex flex-col gap-2 no-scrollbar">
+          {sidebarSections.map((section) => {
+            const isOpen = openSections[section.id] ?? true;
+            const hasActiveChild = section.items.some(
+              item => location.pathname === item.path || (item.path !== '/admin' && location.pathname.startsWith(item.path))
+            );
+
             return (
-              <Link
-                key={item.name}
-                to={item.path}
-                className={`relative flex items-center gap-3 px-3 py-2.5 rounded-md text-[12px] font-medium transition-all ${
-                  isActive
-                    ? 'bg-admin-ink-soft text-white'
-                    : 'text-white/55 hover:bg-white/5 hover:text-white/90'
-                }`}
-                title={collapsed ? item.name : undefined}
-              >
-                {isActive && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r bg-admin-green" />}
-                <Icon size={16} className={isActive ? 'text-admin-green' : 'text-white/40'} />
-                {!collapsed && <span>{item.name}</span>}
-              </Link>
+              <div key={section.id} className="flex flex-col gap-0.5">
+                {/* Section Accordion Header */}
+                {!collapsed && (
+                  <button
+                    onClick={() => toggleSection(section.id)}
+                    className="flex items-center justify-between px-2.5 py-1.5 text-[10px] font-bold text-white/40 hover:text-white/80 uppercase tracking-wider transition-colors cursor-pointer select-none"
+                  >
+                    <span className={hasActiveChild ? 'text-admin-green' : ''}>{section.title}</span>
+                    <ChevronDown
+                      size={12}
+                      className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+                )}
+
+                {/* Section Items */}
+                <AnimatePresence initial={false}>
+                  {(isOpen || collapsed) && (
+                    <motion.div
+                      initial={collapsed ? false : { height: 0, opacity: 0 }}
+                      animate={collapsed ? {} : { height: 'auto', opacity: 1 }}
+                      exit={collapsed ? {} : { height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="flex flex-col gap-0.5 overflow-hidden"
+                    >
+                      {section.items.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = location.pathname === item.path || (item.path !== '/admin' && location.pathname.startsWith(item.path));
+                        return (
+                          <Link
+                            key={item.name}
+                            to={item.path}
+                            className={`relative flex items-center gap-3 px-3 py-2 rounded-md text-[12px] font-medium transition-all ${
+                              isActive
+                                ? 'bg-admin-ink-soft text-white'
+                                : 'text-white/60 hover:bg-white/5 hover:text-white'
+                            }`}
+                            title={collapsed ? item.name : undefined}
+                          >
+                            {isActive && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r bg-admin-green" />}
+                            <Icon size={15} className={isActive ? 'text-admin-green' : 'text-white/40'} />
+                            {!collapsed && <span>{item.name}</span>}
+                          </Link>
+                        );
+                      })}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             );
           })}
         </nav>
@@ -140,7 +232,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, onLogout }) 
             <span className="text-[11px] font-medium text-admin-text-faint uppercase tracking-wide">Enterprise</span>
             <span className="text-admin-text-faint">/</span>
             <span className="text-[11px] font-semibold text-admin-text uppercase tracking-wide">
-              {sidebarItems.find(item => item.path === location.pathname)?.name || 'Control Panel'}
+              {allSidebarItems.find(item => item.path === location.pathname)?.name || 'Control Panel'}
             </span>
           </div>
 

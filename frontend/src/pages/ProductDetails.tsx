@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useCMS, Product } from '../context/CMSContext';
-import { useCartWishlist } from '../context/CartWishlistContext';
+import { useCartWishlist, getProductStockQuantity } from '../context/CartWishlistContext';
 import { ProductCard } from '../components/ProductCard';
 import { SEO } from '../components/SEO';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -21,6 +21,10 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ onQuickView }) =
 
   // Find target product
   const product = useMemo(() => products.find((p) => p.id === id), [products, id]);
+
+  const stockQty = getProductStockQuantity(product);
+  const isOutOfStock = stockQty <= 0;
+  const isLimitedStock = stockQty > 0 && stockQty < 10;
 
   // Gallery, Quantity & Variant states
   const [activeThumb, setActiveThumb] = useState(0);
@@ -178,15 +182,24 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ onQuickView }) =
             </div>
 
             {/* Bright Magenta/Pink Add to Cart Button Full Width */}
-            <motion.button 
-              onClick={handleAddToCart}
-              className="w-full bg-[#ff0060] hover:bg-[#e00054] text-white font-black py-3.5 px-6 rounded-2xl text-base flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
-              whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.99 }}
-            >
-              <ShoppingBag size={20} />
-              <span>Add to Cart</span>
-            </motion.button>
+            {isOutOfStock ? (
+              <button 
+                disabled
+                className="w-full bg-gray-200 text-gray-500 font-extrabold py-3.5 px-6 rounded-2xl text-base flex items-center justify-center gap-2 cursor-not-allowed border border-gray-300"
+              >
+                <span>Out of Stock</span>
+              </button>
+            ) : (
+              <motion.button 
+                onClick={handleAddToCart}
+                className="w-full bg-[#ff0060] hover:bg-[#e00054] text-white font-black py-3.5 px-6 rounded-2xl text-base flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+              >
+                <ShoppingBag size={20} />
+                <span>Add to Cart</span>
+              </motion.button>
+            )}
 
           </div>
 
@@ -219,6 +232,11 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ onQuickView }) =
                   <p className="text-xs text-text-tertiary font-extrabold mt-1">
                     Net Qty: {selectedWeight || product.netQuantity || '500 g'}
                   </p>
+                  {isOutOfStock && (
+                    <span className="inline-block mt-2 bg-rose-100 text-rose-700 text-xs font-black px-2.5 py-1 rounded-lg border border-rose-200">
+                      Out of Stock
+                    </span>
+                  )}
                 </div>
 
                 <button 

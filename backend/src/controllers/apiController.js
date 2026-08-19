@@ -1255,7 +1255,7 @@ export const bannerController = {
 
   createBanner: async (req, res) => {
     try {
-      const { id, title, subtitle, tag, gradient, imageUrl, buttonText, linkUrl, positionIndex, subCategoryName, active } = req.body;
+      const { id, title, subtitle, tag, gradient, imageUrl, buttonText, linkUrl, positionIndex, subCategoryName, active, displayOn, categoryId, subcategoryId, position } = req.body;
       const bannerId = id || 'banner_' + Date.now();
       const banner = await Banner.create({
         id: bannerId,
@@ -1268,7 +1268,11 @@ export const bannerController = {
         linkUrl,
         positionIndex: positionIndex || 1,
         subCategoryName,
-        active: active !== undefined ? active : true
+        active: active !== undefined ? active : true,
+        displayOn: displayOn || 'HOME',
+        categoryId,
+        subcategoryId,
+        position
       });
       res.status(201).json({ success: true, banner });
     } catch (err) {

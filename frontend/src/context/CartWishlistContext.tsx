@@ -23,6 +23,17 @@ interface CartWishlistContextProps {
 
 const CartWishlistContext = createContext<CartWishlistContextProps | undefined>(undefined);
 
+export function getProductStockQuantity(product: Product | any): number {
+  if (!product) return 0;
+  if (typeof product.stock === 'number') return product.stock;
+  if (typeof product.stock === 'object' && product.stock !== null) {
+    if (typeof product.stock.quantity === 'number') return product.stock.quantity;
+  }
+  if (typeof product.countInStock === 'number') return product.countInStock;
+  if (typeof product.stockQty === 'number') return product.stockQty;
+  return 50;
+}
+
 export const CartWishlistProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [cart, setCart] = useState<CartItem[]>(() => {
     const cached = localStorage.getItem('freshcart_cart');
@@ -43,6 +54,12 @@ export const CartWishlistProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, [wishlist]);
 
   const addToCart = (product: Product, quantity = 1, weight?: string) => {
+    const maxStock = getProductStockQuantity(product);
+    if (maxStock <= 0) {
+      alert(`Sorry, "${product.name}" is currently Out of Stock!`);
+      return;
+    }
+
     const selectedWeight = weight || product.defaultWeight || (product.weightOptions && product.weightOptions[0]) || '1 pc';
     
     setCart((prevCart) => {
@@ -51,10 +68,19 @@ export const CartWishlistProvider: React.FC<{ children: React.ReactNode }> = ({ 
       );
 
       if (existingIndex > -1) {
+        const currentQty = prevCart[existingIndex].quantity;
+        if (currentQty + quantity > maxStock) {
+          alert(`Cannot add more! Only ${maxStock} units of "${product.name}" available in stock.`);
+          const newCart = [...prevCart];
+          newCart[existingIndex].quantity = maxStock;
+          return newCart;
+        }
         const newCart = [...prevCart];
         newCart[existingIndex].quantity += quantity;
         return newCart;
       }
+
+      const initialQty = Math.min(quantity, maxStock);
 
       // Trigger premium burst animation
       confetti({
@@ -64,7 +90,7 @@ export const CartWishlistProvider: React.FC<{ children: React.ReactNode }> = ({ 
         colors: ['#4CAF50', '#81C784', '#FFFFFF'],
       });
 
-      return [...prevCart, { product, quantity, selectedWeight }];
+      return [...prevCart, { product, quantity: initialQty, selectedWeight }];
     });
   };
 
@@ -80,11 +106,17 @@ export const CartWishlistProvider: React.FC<{ children: React.ReactNode }> = ({ 
       return;
     }
     setCart((prevCart) =>
-      prevCart.map((item) =>
-        item.product.id === productId && item.selectedWeight === weight
-          ? { ...item, quantity }
-          : item
-      )
+      prevCart.map((item) => {
+        if (item.product.id === productId && item.selectedWeight === weight) {
+          const maxStock = getProductStockQuantity(item.product);
+          if (quantity > maxStock) {
+            alert(`Cannot increase quantity! Only ${maxStock} units of "${item.product.name}" available in stock.`);
+            return { ...item, quantity: maxStock };
+          }
+          return { ...item, quantity };
+        }
+        return item;
+      })
     );
   };
 

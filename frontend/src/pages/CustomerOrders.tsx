@@ -340,38 +340,50 @@ export const CustomerOrders: React.FC = () => {
           </h2>
 
           <div className="flex flex-col gap-5">
-            {selectedOrder.items.map((item, idx) => (
-              <div key={item.id || `ord_item_${idx}`} className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3.5 min-w-0">
-                  <div className="w-14 h-14 rounded-xl bg-gray-50 border border-gray-200/80 p-1 shrink-0 flex items-center justify-center">
-                    <img 
-                      src={item.image} 
-                      alt={item.name} 
-                      className="w-full h-full object-contain" 
-                    />
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <h3 className="text-xs sm:text-sm font-bold text-gray-900 leading-snug line-clamp-2">
-                      {item.name}
-                    </h3>
-                    <span className="text-[11px] font-semibold text-gray-500 mt-0.5">
-                      {item.weightSpec} • {item.qty} {item.qty === 1 ? 'unit' : 'units'}
-                    </span>
-                  </div>
-                </div>
+            {selectedOrder.items.map((item: any, idx: number) => {
+              const nameVal = item.name || item.productName || item.title || 'Grocery Product';
+              const weightVal = item.weightSpec || item.weight || item.selectedWeight || '1 unit';
+              const qtyVal = Number(item.qty || item.quantity || item.units || 1);
+              const priceVal = Number(item.price || item.unitPrice || item.productPrice || 0);
+              const mrpVal = Number(item.mrp || item.originalPrice || (priceVal ? priceVal + 20 : 0));
+              const imgVal = item.image || item.imageUrl || item.productImage || 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop';
+              const lineTotal = priceVal * qtyVal;
+              const lineTotalMrp = mrpVal * qtyVal;
 
-                <div className="text-right shrink-0">
-                  <span className="text-xs sm:text-sm font-black text-gray-900 block font-display">
-                    ₹{item.price * item.qty}
-                  </span>
-                  {item.mrp && item.mrp > item.price && (
-                    <span className="text-[11px] text-gray-400 line-through font-medium block">
-                      ₹{item.mrp * item.qty}
+              return (
+                <div key={item.id || `ord_item_${idx}`} className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <div className="w-14 h-14 rounded-xl bg-gray-50 border border-gray-200/80 p-1 shrink-0 flex items-center justify-center">
+                      <img 
+                        src={imgVal} 
+                        alt={nameVal} 
+                        className="w-full h-full object-contain" 
+                        onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop'; }}
+                      />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <h3 className="text-xs sm:text-sm font-bold text-gray-900 leading-snug line-clamp-2">
+                        {nameVal}
+                      </h3>
+                      <span className="text-[11px] font-semibold text-gray-500 mt-0.5">
+                        {weightVal} • {qtyVal} {qtyVal === 1 ? 'unit' : 'units'} (₹{priceVal} / unit)
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <span className="text-xs sm:text-sm font-black text-gray-900 block font-display">
+                      ₹{lineTotal}
                     </span>
-                  )}
+                    {mrpVal > priceVal && (
+                      <span className="text-[11px] text-gray-400 line-through font-medium block">
+                        ₹{lineTotalMrp}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -384,52 +396,62 @@ export const CustomerOrders: React.FC = () => {
             </h2>
           </div>
 
-          <div className="flex flex-col gap-2.5 text-xs md:text-sm">
-            <div className="flex items-center justify-between text-gray-600 font-medium">
-              <span>Item Total</span>
-              <div className="flex items-center gap-2">
-                <span className="line-through text-gray-400">₹{selectedOrder.itemTotalMrp}</span>
-                <span className="font-bold text-gray-900">₹{selectedOrder.itemTotal}</span>
+          {(() => {
+            const calcItemTotal = selectedOrder.items.reduce((sum: number, it: any) => sum + (Number(it.price || it.unitPrice || 0) * Number(it.qty || it.quantity || 1)), 0);
+            const calcItemMrpTotal = selectedOrder.items.reduce((sum: number, it: any) => sum + (Number(it.mrp || it.originalPrice || (Number(it.price || 0) + 20)) * Number(it.qty || it.quantity || 1)), 0);
+            const displayItemTotal = Number(selectedOrder.itemTotal || (selectedOrder as any).subTotal || calcItemTotal);
+            const displayItemMrpTotal = Number(selectedOrder.itemTotalMrp || calcItemMrpTotal);
+            const displayTotalAmount = Number(selectedOrder.totalAmount || (selectedOrder as any).totalPrice || displayItemTotal);
+
+            return (
+              <div className="flex flex-col gap-2.5 text-xs md:text-sm">
+                <div className="flex items-center justify-between text-gray-600 font-medium">
+                  <span>Item Total</span>
+                  <div className="flex items-center gap-2">
+                    <span className="line-through text-gray-400">₹{displayItemMrpTotal}</span>
+                    <span className="font-bold text-gray-900">₹{displayItemTotal}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-gray-600 font-medium">
+                  <span>Delivery Fee</span>
+                  <div className="flex items-center gap-2">
+                    <span className="line-through text-gray-400">₹30</span>
+                    <span className="font-extrabold text-[#2E7D32]">FREE</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-gray-600 font-medium">
+                  <span>Handling Fee</span>
+                  <div className="flex items-center gap-2">
+                    <span className="line-through text-gray-400">₹10</span>
+                    <span className="font-extrabold text-[#2E7D32]">FREE</span>
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-200 my-2" />
+
+                <div className="flex items-center justify-between font-black text-sm md:text-base text-gray-900">
+                  <span className="font-display">Total Bill</span>
+                  <div className="flex items-center gap-2">
+                    <span className="line-through text-xs font-normal text-gray-400">₹{displayItemMrpTotal + 40}</span>
+                    <span className="text-base font-black text-gray-900 font-display">₹{displayTotalAmount}</span>
+                  </div>
+                </div>
+
+                {/* Download Invoice Button */}
+                <div className="pt-3 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => alert(`Downloading Invoice for Order #${selectedOrder.orderNumber}...`)}
+                    className="bg-[#F3E8FF] hover:bg-[#E9D5FF] text-[#8E24AA] font-extrabold text-xs px-5 py-2.5 rounded-xl transition-colors cursor-pointer shadow-2xs"
+                  >
+                    Download Invoice / Credit Note
+                  </button>
+                </div>
               </div>
-            </div>
-
-            <div className="flex items-center justify-between text-gray-600 font-medium">
-              <span>Delivery Fee</span>
-              <div className="flex items-center gap-2">
-                <span className="line-through text-gray-400">₹30</span>
-                <span className="font-extrabold text-[#2E7D32]">FREE</span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between text-gray-600 font-medium">
-              <span>Handling Fee</span>
-              <div className="flex items-center gap-2">
-                <span className="line-through text-gray-400">₹10</span>
-                <span className="font-extrabold text-[#2E7D32]">FREE</span>
-              </div>
-            </div>
-
-            <div className="border-t border-gray-200 my-2" />
-
-            <div className="flex items-center justify-between font-black text-sm md:text-base text-gray-900">
-              <span className="font-display">Total Bill</span>
-              <div className="flex items-center gap-2">
-                <span className="line-through text-xs font-normal text-gray-400">₹{selectedOrder.itemTotalMrp + 40}</span>
-                <span className="text-base font-black text-gray-900 font-display">₹{selectedOrder.totalAmount}</span>
-              </div>
-            </div>
-
-            {/* Download Invoice Button */}
-            <div className="pt-3 flex justify-end">
-              <button
-                type="button"
-                onClick={() => alert(`Downloading Invoice for Order #${selectedOrder.orderNumber}...`)}
-                className="bg-[#F3E8FF] hover:bg-[#E9D5FF] text-[#8E24AA] font-extrabold text-xs px-5 py-2.5 rounded-xl transition-colors cursor-pointer shadow-2xs"
-              >
-                Download Invoice / Credit Note
-              </button>
-            </div>
-          </div>
+            );
+          })()}
         </div>
 
         {/* Order Details Section */}

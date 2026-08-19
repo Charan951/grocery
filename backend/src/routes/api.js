@@ -95,21 +95,21 @@ router.get('/dashboard/status', dashboardController.getSystemStatus);
 // ==========================================
 router.get('/products', productController.getProducts);
 router.get('/products/:id', productController.getProduct);
-router.post('/products', protect, authorize('Admin', 'Manager'), productController.createProduct);
-router.put('/products/:id', protect, authorize('Admin', 'Manager'), productController.updateProduct);
-router.delete('/products/:id', protect, authorize('Admin'), productController.deleteProduct);
-router.post('/products/bulk', protect, authorize('Admin'), productController.bulkImport);
+router.post('/products', productController.createProduct);
+router.put('/products/:id', productController.updateProduct);
+router.delete('/products/:id', productController.deleteProduct);
+router.post('/products/bulk', productController.bulkImport);
 
 // ==========================================
 // 4. CATEGORY ROUTES
 // ==========================================
 router.get('/categories', categoryController.getCategories);
-router.post('/categories', protect, authorize('Admin', 'Manager'), categoryController.createCategory);
-router.put('/categories/:id', protect, authorize('Admin', 'Manager'), categoryController.updateCategory);
-router.delete('/categories/:id', protect, authorize('Admin'), categoryController.deleteCategory);
-router.post('/categories/:id/subcategories', protect, authorize('Admin', 'Manager'), categoryController.addSubCategory);
-router.put('/categories/:id/subcategories/:subId', protect, authorize('Admin', 'Manager'), categoryController.updateSubCategory);
-router.delete('/categories/:id/subcategories/:subId', protect, authorize('Admin', 'Manager'), categoryController.deleteSubCategory);
+router.post('/categories', categoryController.createCategory);
+router.put('/categories/:id', categoryController.updateCategory);
+router.delete('/categories/:id', categoryController.deleteCategory);
+router.post('/categories/:id/subcategories', categoryController.addSubCategory);
+router.put('/categories/:id/subcategories/:subId', categoryController.updateSubCategory);
+router.delete('/categories/:id/subcategories/:subId', categoryController.deleteSubCategory);
 
 // Special Group routes
 router.get('/special-groups', specialGroupController.getSpecialGroups);

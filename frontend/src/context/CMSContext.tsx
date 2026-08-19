@@ -120,6 +120,10 @@ export interface Banner {
   positionIndex?: number;
   subCategoryName?: string;
   active: boolean;
+  displayOn?: 'HOME' | 'CATEGORY' | 'SUBCATEGORY' | 'ALL';
+  categoryId?: string;
+  subcategoryId?: string;
+  position?: string;
 }
 
 export interface Coupon {
@@ -374,6 +378,9 @@ const categoryImages: Record<string, string> = {
   'Breakfast & Sauces': 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=200&auto=format&fit=crop',
   'packaged-food': 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=200&auto=format&fit=crop',
   'Packaged Food': 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=200&auto=format&fit=crop',
+  'tea-coffee-health-drinks': 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=200&auto=format&fit=crop',
+  'Beverages': 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=200&auto=format&fit=crop',
+  'Cold Drinks & Juices': 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=200&auto=format&fit=crop',
 };
 
 // Converts a #rrggbb hex color into an rgba() string with the given alpha,
@@ -396,6 +403,15 @@ export const hexToTintOnWhite = (hex: string | undefined, alpha: number): string
   const b = parseInt(hex.slice(5, 7), 16);
   const blend = (c: number) => Math.round(c * alpha + 255 * (1 - alpha));
   return `rgb(${blend(r)}, ${blend(g)}, ${blend(b)})`;
+};
+
+// Converts a #rrggbb hex color into a darker shade for text/borders
+export const hexToDarkShade = (hex: string | undefined, factor: number = 0.55): string => {
+  if (!hex || !/^#([0-9a-fA-F]{6})$/.test(hex)) hex = '#15803d';
+  const r = Math.round(parseInt(hex.slice(1, 3), 16) * factor);
+  const g = Math.round(parseInt(hex.slice(3, 5), 16) * factor);
+  const b = Math.round(parseInt(hex.slice(5, 7), 16) * factor);
+  return `rgb(${r}, ${g}, ${b})`;
 };
 
 export const getCategoryImage = (category: Category | string): string => {
@@ -990,28 +1006,75 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const updateProduct = (id: string, updated: Partial<Product>) => {
+  const updateProduct = async (id: string, updated: Partial<Product>) => {
     setState((prev) => ({
       ...prev,
       products: prev.products.map((p) => (p.id === id || (p._id && p._id === id) ? { ...p, ...updated } : p)),
     }));
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('freshcart_token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      await fetch(`/api/products/${id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(updated)
+      });
+    } catch (e) {
+      console.warn('API sync updateProduct offline', e);
+    }
   };
 
-  const addProduct = (product: Product) => {
+  const addProduct = async (product: Product) => {
     setState((prev) => ({
       ...prev,
       products: [product, ...prev.products],
     }));
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('freshcart_token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch('/api/products', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(product)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.product) {
+          setState((prev) => ({
+            ...prev,
+            products: prev.products.map((p) => (p.id === product.id ? data.product : p)),
+          }));
+        }
+      }
+    } catch (e) {
+      console.warn('API sync addProduct offline', e);
+    }
   };
 
-  const deleteProduct = (id: string) => {
+  const deleteProduct = async (id: string) => {
     setState((prev) => ({
       ...prev,
-      products: prev.products.filter((p) => p.id !== id),
+      products: prev.products.filter((p) => p.id !== id && (p._id && p._id !== id)),
     }));
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('freshcart_token');
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      await fetch(`/api/products/${id}`, {
+        method: 'DELETE',
+        headers
+      });
+    } catch (e) {
+      console.warn('API sync deleteProduct offline', e);
+    }
   };
 
-  const updateCategory = (id: string, updated: Partial<Category>) => {
+  const updateCategory = async (id: string, updated: Partial<Category>) => {
     setState((prev) => ({
       ...prev,
       categories: prev.categories.map((c) => {
@@ -1019,20 +1082,45 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return isMatch ? { ...c, ...updated } : c;
       }),
     }));
+    try {
+      await fetch(`/api/categories/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated)
+      });
+    } catch (e) {
+      console.warn('API sync updateCategory offline', e);
+    }
   };
 
-  const addCategory = (category: Category) => {
+  const addCategory = async (category: Category) => {
     setState((prev) => ({
       ...prev,
       categories: [category, ...prev.categories],
     }));
+    try {
+      await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(category)
+      });
+    } catch (e) {
+      console.warn('API sync addCategory offline', e);
+    }
   };
 
-  const deleteCategory = (id: string) => {
+  const deleteCategory = async (id: string) => {
     setState((prev) => ({
       ...prev,
       categories: prev.categories.filter((c) => c.id !== id && c.slug !== id && (c as any)._id !== id && (c.name && c.name.toLowerCase() !== id.toLowerCase())),
     }));
+    try {
+      await fetch(`/api/categories/${id}`, {
+        method: 'DELETE'
+      });
+    } catch (e) {
+      console.warn('API sync deleteCategory offline', e);
+    }
   };
 
   const moveCategory = (id: string, direction: 'up' | 'down') => {
@@ -1072,7 +1160,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  const addSubCategory = (categoryId: string, subCategoryDataOrName: Partial<SubCategory> | string) => {
+  const addSubCategory = async (categoryId: string, subCategoryDataOrName: Partial<SubCategory> | string) => {
     const isString = typeof subCategoryDataOrName === 'string';
     const nameVal = isString ? subCategoryDataOrName : (subCategoryDataOrName.name || '');
     const subSlug = nameVal.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -1105,12 +1193,23 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (newSub.showOnHome && !homeSelectedSubCategories.includes(nameVal)) {
       toggleHomeSubCategory(nameVal);
     }
+
+    try {
+      await fetch(`/api/categories/${categoryId}/subcategories`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSub)
+      });
+    } catch (e) {
+      console.warn('API sync addSubCategory offline', e);
+    }
   };
 
-  const updateSubCategory = (categoryId: string, subCategoryNameOrId: string, updatedDataOrName: Partial<SubCategory> | string) => {
+  const updateSubCategory = async (categoryId: string, subCategoryNameOrId: string, updatedDataOrName: Partial<SubCategory> | string) => {
     const isString = typeof updatedDataOrName === 'string';
     const updatedName = isString ? updatedDataOrName : updatedDataOrName.name;
     const newSlug = updatedName ? updatedName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : undefined;
+    const subPayload = isString ? { name: updatedName } : updatedDataOrName;
 
     setState((prev) => ({
       ...prev,
@@ -1145,9 +1244,19 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toggleHomeSubCategory(updatedName);
       }
     }
+
+    try {
+      await fetch(`/api/categories/${categoryId}/subcategories/${encodeURIComponent(subCategoryNameOrId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(subPayload)
+      });
+    } catch (e) {
+      console.warn('API sync updateSubCategory offline', e);
+    }
   };
 
-  const deleteSubCategory = (categoryId: string, subCategoryNameOrId: string) => {
+  const deleteSubCategory = async (categoryId: string, subCategoryNameOrId: string) => {
     setState((prev) => ({
       ...prev,
       categories: prev.categories.map((c) => {
@@ -1160,6 +1269,14 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return c;
       })
     }));
+
+    try {
+      await fetch(`/api/categories/${categoryId}/subcategories/${encodeURIComponent(subCategoryNameOrId)}`, {
+        method: 'DELETE'
+      });
+    } catch (e) {
+      console.warn('API sync deleteSubCategory offline', e);
+    }
   };
 
   const addSpecialGroup = async (group: SpecialCategoryGroup) => {
@@ -1242,47 +1359,96 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-
-  const updateCoupon = (code: string, updated: Partial<Coupon>) => {
+  const updateCoupon = async (code: string, updated: Partial<Coupon>) => {
     setState((prev) => ({
       ...prev,
       coupons: prev.coupons.map((c) => (c.code === code ? { ...c, ...updated } : c)),
     }));
+    try {
+      await fetch(`/api/coupons/${code}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated)
+      });
+    } catch (e) {
+      console.warn('API sync updateCoupon offline', e);
+    }
   };
 
-  const addCoupon = (coupon: Coupon) => {
+  const addCoupon = async (coupon: Coupon) => {
     setState((prev) => ({
       ...prev,
       coupons: [coupon, ...prev.coupons],
     }));
+    try {
+      await fetch('/api/coupons', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(coupon)
+      });
+    } catch (e) {
+      console.warn('API sync addCoupon offline', e);
+    }
   };
 
-  const deleteCoupon = (code: string) => {
+  const deleteCoupon = async (code: string) => {
     setState((prev) => ({
       ...prev,
       coupons: prev.coupons.filter((c) => c.code !== code),
     }));
+    try {
+      await fetch(`/api/coupons/${code}`, {
+        method: 'DELETE'
+      });
+    } catch (e) {
+      console.warn('API sync deleteCoupon offline', e);
+    }
   };
 
-  const updateBlog = (id: string, updated: Partial<Blog>) => {
+  const updateBlog = async (id: string, updated: Partial<Blog>) => {
     setState((prev) => ({
       ...prev,
       blogs: prev.blogs.map((b) => (b.id === id ? { ...b, ...updated } : b)),
     }));
+    try {
+      await fetch(`/api/blogs/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated)
+      });
+    } catch (e) {
+      console.warn('API sync updateBlog offline', e);
+    }
   };
 
-  const addBlog = (blog: Blog) => {
+  const addBlog = async (blog: Blog) => {
     setState((prev) => ({
       ...prev,
       blogs: [blog, ...prev.blogs],
     }));
+    try {
+      await fetch('/api/blogs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(blog)
+      });
+    } catch (e) {
+      console.warn('API sync addBlog offline', e);
+    }
   };
 
-  const deleteBlog = (id: string) => {
+  const deleteBlog = async (id: string) => {
     setState((prev) => ({
       ...prev,
       blogs: prev.blogs.filter((b) => b.id !== id),
     }));
+    try {
+      await fetch(`/api/blogs/${id}`, {
+        method: 'DELETE'
+      });
+    } catch (e) {
+      console.warn('API sync deleteBlog offline', e);
+    }
   };
 
   const addBlogComment = (blogId: string, comment: Omit<Comment, 'id' | 'date'>) => {

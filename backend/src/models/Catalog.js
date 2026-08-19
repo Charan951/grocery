@@ -117,7 +117,11 @@ const bannerSchema = new mongoose.Schema({
   linkUrl: { type: String },
   positionIndex: { type: Number, default: 1 },
   subCategoryName: { type: String },
-  active: { type: Boolean, default: true }
+  active: { type: Boolean, default: true },
+  displayOn: { type: String, enum: ['HOME', 'CATEGORY', 'SUBCATEGORY'], default: 'HOME' },
+  categoryId: { type: String },
+  subcategoryId: { type: String },
+  position: { type: String }
 }, { timestamps: true });
 
 export const Category = mongoose.model('Category', categorySchema);

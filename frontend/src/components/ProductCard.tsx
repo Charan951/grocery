@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Product } from '../context/CMSContext';
-import { useCartWishlist } from '../context/CartWishlistContext';
+import { useCartWishlist, getProductStockQuantity } from '../context/CartWishlistContext';
 import { motion } from 'framer-motion';
 import { Star, Heart, Plus, Minus, Zap } from 'lucide-react';
 
@@ -24,15 +24,27 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
   const discountLabel = product.discount || (product.discountPercentage ? `${product.discountPercentage}% OFF` : product.discountText);
   const originalPrice = product.originalPrice || product.mrp || product.price;
 
+  const stockQty = getProductStockQuantity(product);
+  const isOutOfStock = stockQty <= 0;
+  const isLimitedStock = stockQty > 0 && stockQty < 10;
+
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (isOutOfStock) {
+      alert(`Sorry, "${product.name}" is Out of Stock!`);
+      return;
+    }
     addToCart(product, 1, netWeight);
   };
 
   const handleIncrement = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (cartQty >= stockQty) {
+      alert(`Only ${stockQty} items left in stock!`);
+      return;
+    }
     if (cartItem) {
       updateCartQuantity(product.id, cartItem.selectedWeight, cartQty + 1);
     } else {
@@ -75,20 +87,36 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
     >
       {/* Top Image Container (Zepto Style soft background box) */}
       <div className="relative w-full aspect-square rounded-2xl bg-neutral-100/60 dark:bg-neutral-800/40 mb-1.5 flex items-center justify-center p-1 group/img overflow-hidden">
+        {/* Out of Stock Badge */}
+        {isOutOfStock && (
+          <div className="absolute top-2 left-2 z-20 bg-rose-600 text-white text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-md shadow-xs">
+            Out of Stock
+          </div>
+        )}
+
         {/* Product Image */}
         <Link to={`/product/${product.id}`} className="w-full h-full flex items-center justify-center">
-          <img src={displayImage} alt={product.name} className="w-full h-full object-cover transition-transform duration-300 group-hover/img:scale-105" loading="lazy" />
+          <img src={displayImage} alt={product.name} className={`w-full h-full object-cover transition-transform duration-300 group-hover/img:scale-105 ${isOutOfStock ? 'opacity-50 grayscale' : ''}`} loading="lazy" />
         </Link>
 
         {/* Floating Add CTA inside Image Box (Bottom Right Corner) */}
         <div className="absolute bottom-2 right-2 z-20">
-          {cartQty > 0 ? (
+          {isOutOfStock ? (
+            <span className="bg-gray-200 text-gray-500 text-[10px] font-bold px-2 py-1 rounded-lg border border-gray-300">
+              Unavailable
+            </span>
+          ) : cartQty > 0 ? (
             <div className="flex items-center bg-pink-600 text-white rounded-xl shadow-md font-bold text-[10px] sm:text-xs overflow-hidden">
               <button onClick={handleDecrement} className="p-1 sm:p-1.5 hover:bg-pink-700 transition-colors">
                 <Minus size={12} />
               </button>
               <span className="px-1.5 sm:px-2 font-black text-[10px] sm:text-xs">{cartQty}</span>
-              <button onClick={handleIncrement} className="p-1 sm:p-1.5 hover:bg-pink-700 transition-colors">
+              <button 
+                onClick={handleIncrement} 
+                disabled={cartQty >= stockQty}
+                className={`p-1 sm:p-1.5 transition-colors ${cartQty >= stockQty ? 'opacity-40 cursor-not-allowed bg-pink-800' : 'hover:bg-pink-700'}`}
+                title={cartQty >= stockQty ? `Only ${stockQty} available in stock` : 'Increase'}
+              >
                 <Plus size={12} />
               </button>
             </div>

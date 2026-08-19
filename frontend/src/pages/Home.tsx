@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useCMS, Product } from '../context/CMSContext';
 import { ProductCard } from '../components/ProductCard';
 import { SEO } from '../components/SEO';
+import { BannerCarousel } from '../components/BannerCarousel';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowRight, ShieldCheck, Truck, Clock, 
@@ -17,7 +18,7 @@ interface HomeProps {
 export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
   const { banners, categories, specialCategoryGroups, products, testimonials, faqs, blogs, seoSettings, homeSelectedSubCategories } = useCMS();
 
-  const activeBanners = banners.filter(b => b.active);
+  const activeBanners = banners.filter(b => b.active && (!b.displayOn || b.displayOn === 'HOME' || b.displayOn === 'ALL'));
 
   // Countdown timer for Flash Sale (Midnight tonight)
   const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
@@ -61,8 +62,9 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
       subName: string;
       subImg?: string | null;
       catSlug: string;
+      categoryColor?: string;
       subProducts: Product[];
-      matchingBanner?: any;
+      matchingBanners?: any[];
       promoImage?: string;
     }[] = [];
 
@@ -153,16 +155,19 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
         subProducts = categoryProducts;
       }
 
-      const matchingBanner = activeBanners.find(b => (b.positionIndex || 1) === currentSectionIndex);
+      const matchingBanners = activeBanners.filter(b => (b.positionIndex || 1) === currentSectionIndex);
       const promoImage = typeof entry.sub === 'object' ? (entry.sub.promoImage || '') : '';
+
+      const categoryColor = category.color || '#10B981';
 
       sections.push({
         id: `${category.id}_sub_${subIdx}_${currentSectionIndex}`,
         subName,
         subImg,
         catSlug,
+        categoryColor,
         subProducts,
-        matchingBanner,
+        matchingBanners,
         promoImage,
       });
     });
@@ -237,7 +242,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                             ? "relative w-[calc(50%-0.25rem)] rounded-lg overflow-hidden group"
                             : "relative box-border flex w-[calc(25%-0.4rem)] flex-col items-center justify-between overflow-hidden rounded-lg p-1 group"
                           }
-                          style={{ aspectRatio: isWide ? '1.46 / 1' : '0.67568 / 1' }}
+                          style={{ aspectRatio: isWide ? '16 / 9' : '9 / 12' }}
                         >
                           <Link className="contents" to={targetLink}>
                             <img 
@@ -273,11 +278,15 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
               {/* Subcategory Title Header */}
               <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-3">
+                  {sec.categoryColor && (
+                    <span className="w-1.5 h-6 rounded-full shrink-0" style={{ backgroundColor: sec.categoryColor }} />
+                  )}
                   {sec.subImg && (
                     <img 
                       src={sec.subImg} 
                       alt={sec.subName} 
-                      className="w-8 h-8 rounded-lg object-cover shadow-xs border border-divider/60"
+                      style={{ borderColor: sec.categoryColor ? `${sec.categoryColor}60` : undefined }}
+                      className="w-8 h-8 rounded-lg object-cover shadow-xs border-2"
                       onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
                     />
                   )}
@@ -352,7 +361,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                                 ? "relative w-[calc(50%-0.25rem)] rounded-lg overflow-hidden group"
                                 : "relative box-border flex w-[calc(25%-0.4rem)] flex-col items-center justify-between overflow-hidden rounded-lg p-1 group"
                               }
-                              style={{ aspectRatio: isWide ? '1.46 / 1' : '0.67568 / 1' }}
+                              style={{ aspectRatio: isWide ? '16 / 9' : '9 / 12' }}
                             >
                               <Link className="contents" to={targetLink}>
                                 <img 
@@ -381,23 +390,9 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
               </div>
             )}
 
-            {/* Dynamic Inter-Section Banner rendering - Full 100% Image Visible - Zero Cut-off */}
-            {sec.matchingBanner && sec.matchingBanner.imageUrl && (
-              <div className="mb-8 w-full rounded-2xl md:rounded-3xl overflow-hidden shadow-sm hover:shadow-md border border-divider/60 bg-surface">
-                <Link 
-                  to={sec.matchingBanner.linkUrl || '/products'} 
-                  className="block w-full cursor-pointer group"
-                  title={sec.matchingBanner.title || 'Special Offer'}
-                >
-                  <img 
-                    key={sec.matchingBanner.imageUrl || sec.matchingBanner.id}
-                    src={sec.matchingBanner.imageUrl} 
-                    alt={sec.matchingBanner.title || 'Promo Banner'} 
-                    className="w-full h-auto block rounded-2xl md:rounded-3xl object-contain group-hover:scale-[1.005] transition-transform duration-300"
-                    onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
-                  />
-                </Link>
-              </div>
+            {/* Dynamic Inter-Section Banner Carousel rendering */}
+            {sec.matchingBanners && sec.matchingBanners.length > 0 && (
+              <BannerCarousel banners={sec.matchingBanners} className="my-2" />
             )}
           </React.Fragment>
         ))}
@@ -426,7 +421,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                             ? "relative w-[calc(50%-0.25rem)] rounded-lg overflow-hidden group"
                             : "relative box-border flex w-[calc(25%-0.4rem)] flex-col items-center justify-between overflow-hidden rounded-lg p-1 group"
                           }
-                          style={{ aspectRatio: isWide ? '1.46 / 1' : '0.67568 / 1' }}
+                          style={{ aspectRatio: isWide ? '16 / 9' : '9 / 12' }}
                         >
                           <Link className="contents" to={targetLink}>
                             <img 

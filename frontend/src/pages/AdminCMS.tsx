@@ -4,7 +4,7 @@ import { SEO } from '../components/SEO';
 import { Trash2, Plus, Edit2, CheckSquare, Square, Image, LayoutGrid, Upload } from 'lucide-react';
 
 export const AdminCMS: React.FC = () => {
-  const { 
+  const {
     banners, categories, specialCategoryGroups, products, coupons, blogs, seoSettings,
     homeSelectedSubCategories, updateHomeSubCategories, toggleHomeSubCategory,
     updateProduct, addProduct, deleteProduct,
@@ -14,7 +14,7 @@ export const AdminCMS: React.FC = () => {
     addBlog, deleteBlog, updateSEOSettings, resetToDefaults, uploadImage
   } = useCMS();
 
-  const allSubCategories = categories.flatMap(cat => 
+  const allSubCategories = categories.flatMap(cat =>
     (cat.subCategories || []).map(sub => ({
       id: sub.id || sub.name,
       name: sub.name,
@@ -32,8 +32,10 @@ export const AdminCMS: React.FC = () => {
   const [editingBannerId, setEditingBannerId] = useState<string | null>(null);
   const [bannerTitle, setBannerTitle] = useState('');
   const [bannerImageUrl, setBannerImageUrl] = useState('');
-  const [selectedSubCategory, setSelectedSubCategory] = useState('');
-  const [bannerPosition, setBannerPosition] = useState(1);
+  const [bannerDisplayOn, setBannerDisplayOn] = useState<'HOME' | 'CATEGORY' | 'SUBCATEGORY' | 'ALL'>('HOME');
+  const [selectedCategoryId, setSelectedCategoryId] = useState('');
+  const [selectedSubCategoryId, setSelectedSubCategoryId] = useState('');
+  const [bannerPosition, setBannerPosition] = useState<string | number>(1);
 
   // Product Add Form States
   const [showProductForm, setShowProductForm] = useState(false);
@@ -158,10 +160,10 @@ export const AdminCMS: React.FC = () => {
     }
     const subObj = allSubCategories.find(s => s.name === itemSubName);
     const catId = itemCatId || (subObj ? subObj.catId : (categories[0]?.id || 'cat_organic'));
-    const linkUrl = subObj 
+    const linkUrl = subObj
       ? `/products?category=${subObj.catSlug}&subCategory=${encodeURIComponent(subObj.name)}`
       : `/products?subCategory=${encodeURIComponent(itemSubName.trim())}`;
-    
+
     let nextItems = [...sgItems];
     if (editingItemIdx !== null) {
       nextItems[editingItemIdx] = {
@@ -263,8 +265,11 @@ export const AdminCMS: React.FC = () => {
     setEditingBannerId(b.id);
     setBannerTitle(b.title);
     setBannerImageUrl(b.imageUrl || '');
-    setBannerPosition(b.positionIndex || 1);
-    setSelectedSubCategory(b.subCategoryName || (b.linkUrl ? decodeURIComponent(b.linkUrl.split('subCategory=')[1] || '') : '') || (allSubCategories[0]?.name || ''));
+    const displayOnVal = b.displayOn || 'HOME';
+    setBannerDisplayOn(displayOnVal);
+    setSelectedCategoryId(b.categoryId || (categories[0]?.id || ''));
+    setSelectedSubCategoryId(b.subcategoryId || b.subCategoryName || '');
+    setBannerPosition(b.position || b.positionIndex || 1);
     setShowBannerForm(true);
   };
 
@@ -275,21 +280,52 @@ export const AdminCMS: React.FC = () => {
       return;
     }
 
-    const subObj = allSubCategories.find(s => s.name === selectedSubCategory);
-    const linkUrl = subObj 
-      ? `/products?category=${subObj.catSlug}&subCategory=${encodeURIComponent(subObj.name)}`
-      : (selectedSubCategory ? `/products?subCategory=${encodeURIComponent(selectedSubCategory)}` : '/products');
+    let linkUrl = '/products';
+    let gradient = ['#10B981', '#059669'];
+    let catId = selectedCategoryId || (categories[0]?.id || 'fruits-vegetables');
+    let subId = selectedSubCategoryId;
 
-    const payload = {
+    if (bannerDisplayOn === 'HOME' || bannerDisplayOn === 'ALL') {
+      linkUrl = '/products';
+    } else if (bannerDisplayOn === 'CATEGORY') {
+      const catObj = categories.find(c => c.id === catId || c.slug === catId);
+      if (catObj) {
+        catId = catObj.id || catObj.slug || catId;
+        if (catObj.color) {
+          gradient = [catObj.color, catObj.color];
+        }
+      }
+      linkUrl = `/products?category=${encodeURIComponent(catId)}`;
+    } else if (bannerDisplayOn === 'SUBCATEGORY') {
+      const catObj = categories.find(c => c.id === catId || c.slug === catId);
+      if (catObj) {
+        catId = catObj.id || catObj.slug || catId;
+        if (catObj.color) {
+          gradient = [catObj.color, catObj.color];
+        }
+      }
+      linkUrl = `/products?category=${encodeURIComponent(catId)}&subCategory=${encodeURIComponent(subId)}`;
+    }
+
+    const posNum = typeof bannerPosition === 'number' ? bannerPosition : (parseInt(String(bannerPosition)) || 1);
+    const posStr = String(bannerPosition);
+
+    const payload: Partial<Banner> = {
       title: bannerTitle.trim(),
       imageUrl: bannerImageUrl.trim(),
-      subCategoryName: selectedSubCategory || undefined,
+      displayOn: bannerDisplayOn,
+      categoryId: bannerDisplayOn !== 'HOME' ? catId : undefined,
+      subcategoryId: bannerDisplayOn === 'SUBCATEGORY' ? subId : undefined,
+      subCategoryName: bannerDisplayOn === 'SUBCATEGORY' ? subId : undefined,
+      position: posStr,
+      positionIndex: posNum,
       linkUrl: linkUrl,
-      positionIndex: bannerPosition,
-      subtitle: selectedSubCategory ? `Special deals on ${selectedSubCategory}` : 'Everyday Low Prices',
+      subtitle: bannerDisplayOn === 'SUBCATEGORY'
+        ? `Special deals on ${subId}`
+        : (bannerDisplayOn === 'CATEGORY' ? `Deals on ${catId}` : 'Everyday Low Prices'),
       tag: 'PROMO',
       buttonText: 'Shop Deals',
-      gradient: ['#10B981', '#059669'],
+      gradient: gradient,
       active: true
     };
 
@@ -300,7 +336,7 @@ export const AdminCMS: React.FC = () => {
       addBanner({
         ...payload,
         id: 'banner_' + Date.now(),
-      });
+      } as Banner);
       alert('Banner created successfully!');
     }
 
@@ -308,7 +344,10 @@ export const AdminCMS: React.FC = () => {
     setEditingBannerId(null);
     setBannerTitle('');
     setBannerImageUrl('');
-    setSelectedSubCategory('');
+    setBannerDisplayOn('HOME');
+    setSelectedCategoryId('');
+    setSelectedSubCategoryId('');
+    setBannerPosition(1);
   };
 
   const handleReset = () => {
@@ -432,38 +471,38 @@ export const AdminCMS: React.FC = () => {
 
   return (
     <div className="page-wrapper">
-      <SEO 
+      <SEO
         title="Admin CMS Dashboard | FreshCart Control"
         description="FreshCart content management system dashboard. Admin page to control sitemaps, categories, products, blogs, coupons, and testimonials."
       />
 
       <div className="container mx-auto px-4 md:px-6 max-w-[1280px] py-8 pb-16">
         <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-8">
-          
+
           {/* Left Navigation Sidebar */}
           <aside className="bg-surface border border-divider rounded-2xl p-4 shadow-card flex flex-col gap-1.5 h-fit">
             <div className="text-[10px] font-bold text-text-secondary px-3 py-1 border-b border-divider mb-2">CMS MODULES</div>
-            
-            <button 
+
+            <button
               className={`w-full text-left px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-colors ${activeTab === 'home_subcats' ? 'bg-primary/10 border border-primary/20 text-primary' : 'text-text-primary hover:bg-background'}`}
               onClick={() => setActiveTab('home_subcats')}
             >
               🏷️ Home Sub-Categories
             </button>
-            <button 
+            <button
               className={`w-full text-left px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-colors ${activeTab === 'special_groups' ? 'bg-primary/10 border border-primary/20 text-primary' : 'text-text-primary hover:bg-background'}`}
               onClick={() => setActiveTab('special_groups')}
             >
               ⭐ Special Subcategory Groups
             </button>
-            <button 
+            <button
               className={`w-full text-left px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-colors ${activeTab === 'banners' ? 'bg-primary/10 border border-primary/20 text-primary' : 'text-text-primary hover:bg-background'}`}
               onClick={() => setActiveTab('banners')}
             >
               🖼️ Inter-Section Banners
             </button>
 
-            <button 
+            <button
               onClick={handleReset}
               className="w-full text-left px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-colors text-error border-t border-divider mt-4 pt-4 hover:bg-error/5"
             >
@@ -473,7 +512,7 @@ export const AdminCMS: React.FC = () => {
 
           {/* Right Content Area */}
           <main className="bg-surface border border-divider rounded-2xl p-6 md:p-8 shadow-card flex flex-col gap-6">
-            
+
             {/* Header section */}
             <div className="border-b border-divider pb-4">
               <h2 className="text-xl font-extrabold text-text-primary font-display">
@@ -615,11 +654,10 @@ export const AdminCMS: React.FC = () => {
                               <label
                                 key={idx}
                                 onClick={() => toggleHomeSubCategory(subName)}
-                                className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer select-none text-xs font-bold ${
-                                  isSelected 
-                                    ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-700' 
-                                    : 'bg-surface border-divider/60 text-text-secondary opacity-60'
-                                }`}
+                                className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer select-none text-xs font-bold ${isSelected
+                                  ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-700'
+                                  : 'bg-surface border-divider/60 text-text-secondary opacity-60'
+                                  }`}
                               >
                                 <span>{subName}</span>
                                 {isSelected ? (
@@ -643,17 +681,20 @@ export const AdminCMS: React.FC = () => {
               <div className="flex flex-col gap-6">
                 <div className="flex justify-between items-center">
                   <p className="text-xs text-text-secondary font-medium">
-                    Add, edit and rearrange dynamic promo banners displayed between sub-category sections on the home page.
+                    Add, edit and target promo banners across Home, Category, and Subcategory pages.
                   </p>
                   {!showBannerForm && (
-                    <button 
+                    <button
                       onClick={() => {
                         setEditingBannerId(null);
                         setBannerTitle('');
                         setBannerImageUrl('');
-                        setSelectedSubCategory('');
+                        setBannerDisplayOn('HOME');
+                        setSelectedCategoryId(categories[0]?.id || '');
+                        setSelectedSubCategoryId('');
+                        setBannerPosition(1);
                         setShowBannerForm(true);
-                      }} 
+                      }}
                       className="bg-emerald-600 text-white font-bold py-2.5 px-5 rounded-full text-xs hover:bg-emerald-700 transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
                     >
                       <Plus size={16} />
@@ -666,42 +707,43 @@ export const AdminCMS: React.FC = () => {
                   <form onSubmit={handleBannerSubmit} className="bg-background p-6 rounded-2xl border border-divider flex flex-col gap-4 shadow-sm">
                     <div className="flex items-center justify-between border-b border-divider pb-3">
                       <h3 className="font-extrabold text-sm text-text-primary">
-                        {editingBannerId ? '✏️ Edit Inter-Section Banner' : '✨ Add Dynamic Inter-Section Banner'}
+                        {editingBannerId ? '✏️ Edit Banner' : '✨ Add New Banner'}
                       </h3>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {/* 1. Banner Name */}
                       <div className="flex flex-col gap-1.5 sm:col-span-2">
-                        <label className="text-xs font-bold text-text-primary">Banner Name</label>
-                        <input 
-                          type="text" 
-                          placeholder="e.g. Weekend Organic Freshness Banner" 
-                          value={bannerTitle} 
-                          onChange={(e) => setBannerTitle(e.target.value)} 
-                          className="w-full px-3.5 py-2 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-emerald-500 text-text-primary font-semibold" 
-                          required 
+                        <label className="text-xs font-bold text-text-primary">Banner Name *</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Weekend Organic Freshness Banner"
+                          value={bannerTitle}
+                          onChange={(e) => setBannerTitle(e.target.value)}
+                          className="w-full px-3.5 py-2 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-emerald-500 text-text-primary font-semibold"
+                          required
                         />
                       </div>
 
                       {/* 2. Banner Image & Upload */}
                       <div className="flex flex-col gap-1.5 sm:col-span-2">
-                        <label className="text-xs font-bold text-text-primary">Banner Image</label>
+                        <label className="text-xs font-bold text-text-primary">Banner Image *</label>
                         <div className="flex gap-2">
-                          <input 
-                            type="text" 
-                            placeholder="https://images.unsplash.com/... or upload file" 
-                            value={bannerImageUrl} 
-                            onChange={(e) => setBannerImageUrl(e.target.value)} 
-                            className="flex-1 px-3.5 py-2 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-emerald-500 text-text-primary font-medium" 
+                          <input
+                            type="text"
+                            placeholder="https://images.unsplash.com/... or upload file"
+                            value={bannerImageUrl}
+                            onChange={(e) => setBannerImageUrl(e.target.value)}
+                            className="flex-1 px-3.5 py-2 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-emerald-500 text-text-primary font-medium"
+                            required
                           />
                           <label className="bg-surface border border-divider text-text-primary px-4 py-2 rounded-xl text-xs font-bold hover:bg-background cursor-pointer flex items-center gap-1.5 shrink-0">
                             <Upload size={14} />
                             <span>Upload Image</span>
-                            <input 
-                              type="file" 
-                              accept="image/*" 
-                              className="hidden" 
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
                               onChange={async (e) => {
                                 const file = e.target.files?.[0];
                                 if (file) {
@@ -719,49 +761,157 @@ export const AdminCMS: React.FC = () => {
                                   };
                                   reader.readAsDataURL(file);
                                 }
-                              }} 
+                              }}
                             />
                           </label>
                         </div>
+                        <p className="text-[11px] text-text-tertiary font-semibold mt-1">
+                          Recommended: 1600 × 400 px · 4.2:1 landscape ratio
+                        </p>
                         {bannerImageUrl && (
-                          <div className="mt-2 w-full max-h-36 rounded-xl overflow-hidden border border-divider bg-surface">
-                            <img src={bannerImageUrl} alt="Banner Preview" className="w-full h-full object-cover" />
+                          <div className="mt-2 w-full aspect-[21/5] max-h-44 rounded-xl overflow-hidden border border-divider bg-surface">
+                            <img src={bannerImageUrl} alt="Banner Preview" className="w-full h-full object-cover object-center" />
                           </div>
                         )}
                       </div>
 
-                      {/* 3. Select Subcategory */}
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-text-primary">Select Subcategory</label>
+                      {/* 3. Display On * */}
+                      <div className="flex flex-col gap-1.5 sm:col-span-2">
+                        <label className="text-xs font-bold text-text-primary">Display On *</label>
                         <select
-                          value={selectedSubCategory}
-                          onChange={(e) => setSelectedSubCategory(e.target.value)}
+                          value={bannerDisplayOn}
+                          onChange={(e) => {
+                            const val = e.target.value as 'HOME' | 'CATEGORY' | 'SUBCATEGORY' | 'ALL';
+                            setBannerDisplayOn(val);
+                            if (val === 'HOME' || val === 'ALL') {
+                              setBannerPosition(1);
+                            } else if (val === 'CATEGORY' || val === 'SUBCATEGORY') {
+                              setBannerPosition('top');
+                              if (!selectedCategoryId && categories.length > 0) {
+                                setSelectedCategoryId(categories[0].id || categories[0].slug || '');
+                              }
+                            }
+                          }}
                           className="w-full px-3.5 py-2 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-emerald-500 text-text-primary font-bold"
+                          required
                         >
-                          <option value="">-- Select Target Subcategory --</option>
-                          {allSubCategories.map((sub) => (
-                            <option key={sub.id + sub.name} value={sub.name}>
-                              {sub.catName} &rarr; {sub.name}
-                            </option>
-                          ))}
+                          <option value="HOME">Home</option>
+                          <option value="CATEGORY">Category</option>
+                          <option value="SUBCATEGORY">Subcategory</option>
+                          <option value="ALL">All (Home, Category & Subcategory)</option>
                         </select>
                       </div>
 
-                      {/* 4. Display Position / Order */}
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-text-primary">Display Position (Order)</label>
-                        <select
-                          value={bannerPosition}
-                          onChange={(e) => setBannerPosition(parseInt(e.target.value) || 1)}
-                          className="w-full px-3.5 py-2 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-emerald-500 text-text-primary font-bold"
-                        >
-                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((pos) => (
-                            <option key={pos} value={pos}>
-                              After Sub-category Section #{pos}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      {/* 4. Dynamic Targeting Fields based on Display On */}
+                      {(bannerDisplayOn === 'HOME' || bannerDisplayOn === 'ALL') && (
+                        <div className="flex flex-col gap-1.5 sm:col-span-2">
+                          <label className="text-xs font-bold text-text-primary">Display Position (Order)</label>
+                          <select
+                            value={bannerPosition}
+                            onChange={(e) => setBannerPosition(parseInt(e.target.value) || 1)}
+                            className="w-full px-3.5 py-2 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-emerald-500 text-text-primary font-bold"
+                          >
+                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((pos) => (
+                              <option key={pos} value={pos}>
+                                After Sub-category Section #{pos}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {bannerDisplayOn === 'CATEGORY' && (
+                        <>
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-bold text-text-primary">Category *</label>
+                            <select
+                              value={selectedCategoryId}
+                              onChange={(e) => setSelectedCategoryId(e.target.value)}
+                              className="w-full px-3.5 py-2 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-emerald-500 text-text-primary font-bold"
+                              required
+                            >
+                              <option value="">-- Select Category --</option>
+                              {categories.map((cat) => (
+                                <option key={cat.id || cat.slug} value={cat.id || cat.slug}>
+                                  {cat.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-bold text-text-primary">Category Page Position *</label>
+                            <select
+                              value={bannerPosition}
+                              onChange={(e) => setBannerPosition(e.target.value)}
+                              className="w-full px-3.5 py-2 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-emerald-500 text-text-primary font-bold"
+                              required
+                            >
+                              <option value="top">Top of Category Page</option>
+                              <option value="before_subcategories">Before Subcategories</option>
+                              <option value="after_subcategories">After Subcategories</option>
+                              <option value="before_products">Before Products</option>
+                            </select>
+                          </div>
+                        </>
+                      )}
+
+                      {bannerDisplayOn === 'SUBCATEGORY' && (
+                        <>
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-bold text-text-primary">Category *</label>
+                            <select
+                              value={selectedCategoryId}
+                              onChange={(e) => {
+                                setSelectedCategoryId(e.target.value);
+                                setSelectedSubCategoryId('');
+                              }}
+                              className="w-full px-3.5 py-2 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-emerald-500 text-text-primary font-bold"
+                              required
+                            >
+                              <option value="">-- Select Category --</option>
+                              {categories.map((cat) => (
+                                <option key={cat.id || cat.slug} value={cat.id || cat.slug}>
+                                  {cat.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-bold text-text-primary">Subcategory *</label>
+                            <select
+                              value={selectedSubCategoryId}
+                              onChange={(e) => setSelectedSubCategoryId(e.target.value)}
+                              className="w-full px-3.5 py-2 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-emerald-500 text-text-primary font-bold"
+                              required
+                            >
+                              <option value="">-- Select Subcategory --</option>
+                              {(categories.find(c => c.id === selectedCategoryId || c.slug === selectedCategoryId)?.subCategories || []).map((sub, idx) => {
+                                const subName = typeof sub === 'string' ? sub : sub.name;
+                                return (
+                                  <option key={idx + subName} value={subName}>
+                                    {subName}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          </div>
+
+                          <div className="flex flex-col gap-1.5 sm:col-span-2">
+                            <label className="text-xs font-bold text-text-primary">Subcategory Page Position *</label>
+                            <select
+                              value={bannerPosition}
+                              onChange={(e) => setBannerPosition(e.target.value)}
+                              className="w-full px-3.5 py-2 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-emerald-500 text-text-primary font-bold"
+                              required
+                            >
+                              <option value="top">Top of Subcategory Page</option>
+                              <option value="before_products">Before Products</option>
+                            </select>
+                          </div>
+                        </>
+                      )}
                     </div>
 
                     <div className="flex gap-3 mt-4">
@@ -778,8 +928,8 @@ export const AdminCMS: React.FC = () => {
                 {/* Banner cards listing */}
                 <div className="grid grid-cols-1 gap-4">
                   {banners.map((b) => (
-                    <div 
-                      key={b.id} 
+                    <div
+                      key={b.id}
                       className="p-5 rounded-2xl border border-divider bg-background shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
                       style={{
                         background: b.gradient ? `linear-gradient(135deg, ${b.gradient[0]}15, ${b.gradient[1] || b.gradient[0]}25)` : undefined
@@ -790,12 +940,15 @@ export const AdminCMS: React.FC = () => {
                           <img src={b.imageUrl} alt={b.title} className="w-20 h-20 rounded-xl object-cover border border-divider/60 flex-shrink-0" />
                         )}
                         <div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
-                              {b.tag || 'BANNER'}
+                              {b.displayOn || 'HOME'}
                             </span>
                             <span className="text-[10px] font-bold text-text-tertiary px-2 py-0.5 rounded-full bg-surface border border-divider">
-                              Placement: After Section #{b.positionIndex || 1}
+                              {(!b.displayOn || b.displayOn === 'HOME') && `Position: After Section #${b.positionIndex || 1}`}
+                              {b.displayOn === 'ALL' && `All Pages · Pos: After Section #${b.positionIndex || 1}`}
+                              {b.displayOn === 'CATEGORY' && `Category: ${b.categoryId || 'All'} · Pos: ${b.position || 'top'}`}
+                              {b.displayOn === 'SUBCATEGORY' && `Subcategory: ${b.subcategoryId || b.subCategoryName} · Pos: ${b.position || 'top'}`}
                             </span>
                           </div>
                           <h4 className="text-sm font-extrabold text-text-primary mt-1.5">{b.title}</h4>
@@ -808,28 +961,28 @@ export const AdminCMS: React.FC = () => {
 
                       <div className="flex items-center gap-3 self-end md:self-center">
                         <label className="flex items-center gap-2 cursor-pointer bg-surface px-3 py-1.5 rounded-xl border border-divider shadow-2xs">
-                          <input 
-                            type="checkbox" 
-                            checked={b.active} 
+                          <input
+                            type="checkbox"
+                            checked={b.active}
                             onChange={(e) => updateBanner(b.id, { active: e.target.checked })}
                             className="w-4 h-4 rounded border-divider text-emerald-600 focus:ring-emerald-500"
                           />
                           <span className="text-xs font-bold text-text-primary">{b.active ? 'Active' : 'Disabled'}</span>
                         </label>
 
-                        <button 
-                          onClick={() => handleEditBanner(b)} 
-                          className="p-2 rounded-xl border border-divider text-text-secondary hover:text-emerald-600 hover:bg-emerald-500/10 transition-colors" 
+                        <button
+                          onClick={() => handleEditBanner(b)}
+                          className="p-2 rounded-xl border border-divider text-text-secondary hover:text-emerald-600 hover:bg-emerald-500/10 transition-colors"
                           title="Edit banner"
                         >
                           <Edit2 size={16} />
                         </button>
 
-                        <button 
+                        <button
                           onClick={() => {
                             if (window.confirm(`Delete banner "${b.title}"?`)) deleteBanner(b.id);
-                          }} 
-                          className="p-2 rounded-xl border border-divider text-text-secondary hover:text-error hover:bg-error/10 transition-colors" 
+                          }}
+                          className="p-2 rounded-xl border border-divider text-text-secondary hover:text-error hover:bg-error/10 transition-colors"
                           title="Delete banner"
                         >
                           <Trash2 size={16} />
@@ -930,7 +1083,7 @@ export const AdminCMS: React.FC = () => {
                 ) : (
                   <form onSubmit={handleBlogSubmit} className="bg-background p-6 rounded-xl border border-divider flex flex-col gap-4">
                     <h3 className="font-bold text-sm text-text-primary border-b border-divider pb-2 mb-2">Create Article</h3>
-                    
+
                     <div className="flex flex-col gap-1.5">
                       <label className="text-xs font-bold text-text-primary">Article Title</label>
                       <input type="text" placeholder="e.g. Why Raw Honey Improves Digestion" value={bTitle} onChange={(e) => setBTitle(e.target.value)} className="w-full px-3 py-2 border border-divider rounded-md text-xs bg-surface focus:outline-none focus:border-primary text-text-primary" required />
@@ -1013,13 +1166,13 @@ export const AdminCMS: React.FC = () => {
             {activeTab === 'special_groups' && (
               <div className="flex flex-col gap-6">
                 {!showSpecialGroupForm ? (
-                  <button 
+                  <button
                     onClick={() => {
                       setEditingGroupId(null);
                       setSgTitle('');
                       setSgItems([]);
                       setShowSpecialGroupForm(true);
-                    }} 
+                    }}
                     className="bg-primary text-white font-bold py-2.5 px-6 rounded-full text-xs hover:bg-secondary transition-colors cursor-pointer flex items-center gap-2 self-start shadow-md"
                   >
                     <Plus size={16} />
@@ -1035,13 +1188,13 @@ export const AdminCMS: React.FC = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="flex flex-col gap-1.5">
                         <label className="text-xs font-bold text-text-primary">Group Title / Special Name</label>
-                        <input 
-                          type="text" 
-                          placeholder="e.g. Grocery & Kitchen, Snacks & Beverages" 
-                          value={sgTitle} 
-                          onChange={(e) => setSgTitle(e.target.value)} 
-                          className="w-full px-3.5 py-2.5 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary font-semibold" 
-                          required 
+                        <input
+                          type="text"
+                          placeholder="e.g. Grocery & Kitchen, Snacks & Beverages"
+                          value={sgTitle}
+                          onChange={(e) => setSgTitle(e.target.value)}
+                          className="w-full px-3.5 py-2.5 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary font-semibold"
+                          required
                         />
                       </div>
 
@@ -1078,11 +1231,11 @@ export const AdminCMS: React.FC = () => {
                           </span>
                         )}
                       </h4>
-                      
+
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="flex flex-col gap-1">
                           <label className="text-[11px] font-bold text-text-secondary">Subcategory Name</label>
-                          <input 
+                          <input
                             type="text"
                             placeholder="e.g. Fruits & Vegetables"
                             list="subcat-options"
@@ -1113,19 +1266,19 @@ export const AdminCMS: React.FC = () => {
                               <span className="text-xs font-bold text-emerald-700 truncate">
                                 {isUploadingCloudinary ? 'Uploading image...' : itemImg ? 'Change Image File' : 'Upload Card Image to Cloudinary'}
                               </span>
-                              <input 
-                                type="file" 
-                                accept="image/*" 
+                              <input
+                                type="file"
+                                accept="image/*"
                                 onChange={handleCardImageUpload}
-                                className="hidden" 
+                                className="hidden"
                               />
                             </label>
 
                             {itemImg && (
                               <div className="relative w-9 h-9 rounded-lg overflow-hidden border border-divider flex-shrink-0 bg-surface shadow-xs group">
                                 <img src={itemImg} alt="Preview" className="w-full h-full object-cover" />
-                                <button 
-                                  type="button" 
+                                <button
+                                  type="button"
                                   onClick={() => setItemImg('')}
                                   className="absolute inset-0 bg-black/70 text-white text-[9px] font-bold opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
                                 >
@@ -1135,7 +1288,7 @@ export const AdminCMS: React.FC = () => {
                             )}
                           </div>
 
-                          <input 
+                          <input
                             type="text"
                             placeholder="Or paste image URL (Cloudinary / CDN)..."
                             value={itemImg}
@@ -1147,9 +1300,9 @@ export const AdminCMS: React.FC = () => {
 
                       <div className="flex items-center justify-between pt-1">
                         <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-text-primary">
-                          <input 
-                            type="checkbox" 
-                            checked={itemFeatured} 
+                          <input
+                            type="checkbox"
+                            checked={itemFeatured}
                             onChange={(e) => setItemFeatured(e.target.checked)}
                             className="rounded border-divider text-primary focus:ring-primary h-4 w-4"
                           />
@@ -1158,7 +1311,7 @@ export const AdminCMS: React.FC = () => {
 
                         <div className="flex items-center gap-2">
                           {editingItemIdx !== null && (
-                            <button 
+                            <button
                               type="button"
                               onClick={() => {
                                 setEditingItemIdx(null);
@@ -1171,7 +1324,7 @@ export const AdminCMS: React.FC = () => {
                               Cancel Edit
                             </button>
                           )}
-                          <button 
+                          <button
                             type="button"
                             onClick={handleAddItemToGroup}
                             className={`${editingItemIdx !== null ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600 hover:bg-emerald-700'} text-white font-bold py-1.5 px-4 rounded-lg text-xs transition-colors cursor-pointer flex items-center gap-1.5`}
@@ -1200,19 +1353,19 @@ export const AdminCMS: React.FC = () => {
                           <div className="w-full text-center text-xs text-text-tertiary p-4">No subcategories added to group yet. Select a subcategory above and click "+ Add Card to Group".</div>
                         ) : (
                           sgItems.map((item, idx) => (
-                            <div 
+                            <div
                               key={item.id || idx}
                               className={`relative group ${item.isFeatured || idx === 0 ? 'w-[calc(50%-0.25rem)] rounded-lg' : 'box-border flex w-[calc(25%-0.4rem)] flex-col items-center justify-between overflow-hidden rounded-lg p-1'} border ${editingItemIdx === idx ? 'border-blue-500 ring-2 ring-blue-500/50 scale-[1.02]' : 'border-divider'} bg-background transition-all`}
                               style={{ aspectRatio: item.isFeatured || idx === 0 ? '1.46 / 1' : '0.67568 / 1' }}
                             >
-                              <img 
-                                src={item.image} 
-                                alt={item.name} 
+                              <img
+                                src={item.image}
+                                alt={item.name}
                                 className="w-full h-full object-contain rounded-lg"
                                 onError={(e) => { (e.target as HTMLImageElement).src = 'https://cdn.zeptonow.com/production/tr:w-210,ar-225-333,pr-true,f-auto,q-40/cms/category/474e6e58-1894-4378-86f1-168cc7266d1a.png'; }}
                               />
                               <div className="absolute top-1 right-1 flex items-center gap-1 z-10">
-                                <button 
+                                <button
                                   type="button"
                                   onClick={() => handleEditItemInGroup(idx)}
                                   className="p-1.5 bg-blue-600 text-white rounded-full shadow-md hover:bg-blue-700 hover:scale-110 transition-all active:scale-95 cursor-pointer"
@@ -1220,7 +1373,7 @@ export const AdminCMS: React.FC = () => {
                                 >
                                   <Edit2 size={12} />
                                 </button>
-                                <button 
+                                <button
                                   type="button"
                                   onClick={() => handleRemoveItemFromGroup(idx)}
                                   className="p-1.5 bg-red-600 text-white rounded-full shadow-md hover:bg-red-700 hover:scale-110 transition-all active:scale-95 cursor-pointer"
@@ -1239,15 +1392,15 @@ export const AdminCMS: React.FC = () => {
                     </div>
 
                     <div className="flex gap-3 justify-end pt-3 border-t border-divider">
-                      <button 
-                        type="button" 
-                        onClick={() => setShowSpecialGroupForm(false)} 
+                      <button
+                        type="button"
+                        onClick={() => setShowSpecialGroupForm(false)}
                         className="px-5 py-2.5 rounded-xl border border-divider text-xs font-bold text-text-secondary hover:bg-surface cursor-pointer"
                       >
                         Cancel
                       </button>
-                      <button 
-                        type="submit" 
+                      <button
+                        type="submit"
                         className="bg-primary text-white font-bold py-2.5 px-6 rounded-xl text-xs hover:bg-secondary transition-colors cursor-pointer shadow-md"
                       >
                         Save Special Group
@@ -1266,14 +1419,14 @@ export const AdminCMS: React.FC = () => {
                           <span className="text-[11px] text-text-secondary font-bold uppercase">{group.items?.length || 0} Subcategory Cards</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <button 
+                          <button
                             onClick={() => handleOpenEditGroup(group)}
                             className="px-3 py-1.5 rounded-xl bg-surface border border-divider text-xs font-bold text-text-secondary hover:text-primary hover:bg-primary/10 transition-colors flex items-center gap-1 cursor-pointer"
                           >
                             <Edit2 size={13} />
                             <span>Edit Group</span>
                           </button>
-                          <button 
+                          <button
                             onClick={() => {
                               if (window.confirm(`Delete special group "${group.title}"?`)) {
                                 deleteSpecialGroup(group.id);
@@ -1290,17 +1443,17 @@ export const AdminCMS: React.FC = () => {
                       {/* Zepto Mobile Grid V3 Live Preview */}
                       <div className="flex cursor-pointer flex-row flex-wrap items-center justify-start gap-y-3 gap-x-2 p-4 bg-surface rounded-xl border border-divider">
                         {(group.items || []).map((item, idx) => (
-                          <div 
+                          <div
                             key={item.id || idx}
-                            className={item.isFeatured || idx === 0 
-                              ? 'w-[calc(50%-0.25rem)] rounded-lg lg:mr-1 lg:w-[calc(24%-0.5rem)] lg:first:ml-[0.3rem]' 
+                            className={item.isFeatured || idx === 0
+                              ? 'w-[calc(50%-0.25rem)] rounded-lg lg:mr-1 lg:w-[calc(24%-0.5rem)] lg:first:ml-[0.3rem]'
                               : 'box-border flex w-[calc(25%-0.4rem)] flex-col items-center justify-between overflow-hidden rounded-lg p-1 lg:w-[calc(12.3%-0.4rem)]'
                             }
                             style={{ aspectRatio: item.isFeatured || idx === 0 ? '1.46 / 1' : '0.67568 / 1' }}
                           >
-                            <img 
-                              src={item.image} 
-                              alt={item.name} 
+                            <img
+                              src={item.image}
+                              alt={item.name}
                               className="w-full h-full object-contain rounded-lg"
                               onError={(e) => { (e.target as HTMLImageElement).src = 'https://cdn.zeptonow.com/production/tr:w-210,ar-225-333,pr-true,f-auto,q-40/cms/category/474e6e58-1894-4378-86f1-168cc7266d1a.png'; }}
                             />
@@ -1318,11 +1471,11 @@ export const AdminCMS: React.FC = () => {
             {activeTab === 'seo' && (
               <form onSubmit={handleSeoUpdate} className="bg-background p-6 rounded-xl border border-divider flex flex-col gap-4">
                 <h3 className="font-bold text-sm text-text-primary border-b border-divider pb-2 mb-2">Global SEO Head Engine</h3>
-                
+
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-text-primary">Select Target Page to Configure</label>
-                  <select 
-                    value={selectedSeoPage} 
+                  <select
+                    value={selectedSeoPage}
                     onChange={(e) => handleSeoSelectChange(e.target.value)}
                     className="w-full px-3 py-2 border border-divider rounded-md text-xs bg-surface focus:outline-none focus:border-primary text-text-primary"
                   >
@@ -1339,32 +1492,32 @@ export const AdminCMS: React.FC = () => {
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-text-primary">Page Title Tag (&lt;title&gt;)</label>
-                  <input 
-                    type="text" 
-                    value={seoTitle} 
-                    onChange={(e) => setSeoTitle(e.target.value)} 
+                  <input
+                    type="text"
+                    value={seoTitle}
+                    onChange={(e) => setSeoTitle(e.target.value)}
                     className="w-full px-3 py-2 border border-divider rounded-md text-xs bg-surface focus:outline-none focus:border-primary text-text-primary"
-                    required 
+                    required
                   />
                 </div>
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-text-primary">Meta Description Tag</label>
-                  <textarea 
-                    rows={3} 
-                    value={seoDesc} 
-                    onChange={(e) => setSeoDesc(e.target.value)} 
+                  <textarea
+                    rows={3}
+                    value={seoDesc}
+                    onChange={(e) => setSeoDesc(e.target.value)}
                     className="w-full px-3 py-2 border border-divider rounded-md text-xs bg-surface focus:outline-none focus:border-primary text-text-primary"
-                    required 
+                    required
                   />
                 </div>
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-text-primary">Meta Keywords Tag (Comma separated)</label>
-                  <input 
-                    type="text" 
-                    value={seoKeys} 
-                    onChange={(e) => setSeoKeys(e.target.value)} 
+                  <input
+                    type="text"
+                    value={seoKeys}
+                    onChange={(e) => setSeoKeys(e.target.value)}
                     className="w-full px-3 py-2 border border-divider rounded-md text-xs bg-surface focus:outline-none focus:border-primary text-text-primary"
                   />
                 </div>

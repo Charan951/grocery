@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useCartWishlist } from '../context/CartWishlistContext';
+import { useCartWishlist, getProductStockQuantity } from '../context/CartWishlistContext';
 import { useCMS } from '../context/CMSContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ShoppingBag, Plus, Minus, Trash2, Tag, MapPin, AlertCircle } from 'lucide-react';
@@ -154,7 +154,9 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                             <span className="w-6 text-center text-xs font-bold text-text-primary">{item.quantity}</span>
                             <button 
                               onClick={() => updateCartQuantity(item.product.id, item.selectedWeight, item.quantity + 1)} 
-                              className="p-1.5 text-text-secondary hover:text-primary transition-colors"
+                              disabled={item.quantity >= getProductStockQuantity(item.product)}
+                              className={`p-1.5 transition-colors ${item.quantity >= getProductStockQuantity(item.product) ? 'opacity-30 cursor-not-allowed text-gray-400' : 'text-text-secondary hover:text-primary'}`}
+                              title={item.quantity >= getProductStockQuantity(item.product) ? `Max stock (${getProductStockQuantity(item.product)}) reached` : 'Increase'}
                             >
                               <Plus size={10} />
                             </button>

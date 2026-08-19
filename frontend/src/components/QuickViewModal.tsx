@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Product } from '../context/CMSContext';
-import { useCartWishlist } from '../context/CartWishlistContext';
+import { useCartWishlist, getProductStockQuantity } from '../context/CartWishlistContext';
 import { motion } from 'framer-motion';
 import { X, Star, ShoppingBag, Plus, Minus, Zap, ShieldCheck, Store, Truck, CheckCircle2 } from 'lucide-react';
 
@@ -12,6 +12,10 @@ interface QuickViewModalProps {
 export const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, onClose }) => {
   const { addToCart } = useCartWishlist();
 
+  const stockQty = getProductStockQuantity(product);
+  const isOutOfStock = stockQty <= 0;
+  const isLimitedStock = stockQty > 0 && stockQty < 10;
+
   const imageList = (product.images && product.images.length > 0) 
     ? product.images 
     : [product.imageUrl || 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&q=80&w=600'];
@@ -20,10 +24,20 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, onClose
   const netWeight = product.netQuantity || product.defaultWeight || (product.weightOptions && product.weightOptions[0]) || '500 g';
   const [quantity, setQuantity] = useState(1);
 
-  const incrementQty = () => setQuantity((prev) => prev + 1);
+  const incrementQty = () => {
+    if (quantity >= stockQty) {
+      alert(`Only ${stockQty} items left in stock!`);
+      return;
+    }
+    setQuantity((prev) => prev + 1);
+  };
   const decrementQty = () => setQuantity((prev) => (prev > 1 ? prev - 1 : 1));
 
   const handleAddToCart = () => {
+    if (isOutOfStock) {
+      alert(`Sorry, "${product.name}" is Out of Stock!`);
+      return;
+    }
     addToCart(product, quantity, netWeight);
     onClose();
   };
@@ -91,6 +105,11 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, onClose
               </span>
               <h2 className="text-2xl font-black text-text-primary leading-tight mt-2">{product.name}</h2>
               <p className="text-xs text-text-tertiary font-bold mt-1">Net Quantity: {netWeight}</p>
+              {isOutOfStock && (
+                <span className="inline-block mt-2 bg-rose-100 text-rose-700 text-xs font-black px-2.5 py-1 rounded-lg border border-rose-200">
+                  Out of Stock
+                </span>
+              )}
             </div>
 
             {/* Price Row */}
@@ -149,27 +168,39 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, onClose
             )}
 
             {/* Quantity Selector & Add Button */}
-            <div className="flex items-center gap-4 pt-2">
-              <div className="flex items-center border border-divider rounded-xl overflow-hidden bg-background">
-                <button onClick={decrementQty} className="px-3.5 py-2.5 text-text-secondary hover:bg-surface font-bold">
-                  <Minus size={16} />
-                </button>
-                <span className="px-4 font-black text-sm text-text-primary">{quantity}</span>
-                <button onClick={incrementQty} className="px-3.5 py-2.5 text-text-secondary hover:bg-surface font-bold">
-                  <Plus size={16} />
+            {isOutOfStock ? (
+              <div className="pt-2">
+                <button disabled className="w-full bg-gray-200 text-gray-500 font-extrabold py-3 px-6 rounded-xl text-sm border border-gray-300 cursor-not-allowed">
+                  Out of Stock
                 </button>
               </div>
+            ) : (
+              <div className="flex items-center gap-4 pt-2">
+                <div className="flex items-center border border-divider rounded-xl overflow-hidden bg-background">
+                  <button onClick={decrementQty} className="px-3.5 py-2.5 text-text-secondary hover:bg-surface font-bold">
+                    <Minus size={16} />
+                  </button>
+                  <span className="px-4 font-black text-sm text-text-primary">{quantity}</span>
+                  <button 
+                    onClick={incrementQty} 
+                    disabled={quantity >= stockQty}
+                    className={`px-3.5 py-2.5 font-bold transition-colors ${quantity >= stockQty ? 'opacity-30 cursor-not-allowed text-gray-400' : 'text-text-secondary hover:bg-surface'}`}
+                  >
+                    <Plus size={16} />
+                  </button>
+                </div>
 
-              <motion.button 
-                onClick={handleAddToCart}
-                className="flex-1 bg-emerald-600 text-white py-3 px-6 rounded-xl font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <ShoppingBag size={18} />
-                <span>Add to Cart • ₹{product.price * quantity}</span>
-              </motion.button>
-            </div>
+                <motion.button 
+                  onClick={handleAddToCart}
+                  className="flex-1 bg-emerald-600 text-white py-3 px-6 rounded-xl font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <ShoppingBag size={18} />
+                  <span>Add to Cart • ₹{product.price * quantity}</span>
+                </motion.button>
+              </div>
+            )}
           </div>
         </div>
       </motion.div>

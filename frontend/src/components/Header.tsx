@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useCartWishlist } from '../context/CartWishlistContext';
-import { useCMS, getCategoryImage, hexToRgba, hexToTintOnWhite } from '../context/CMSContext';
+import { useCMS, getCategoryImage, hexToRgba, hexToTintOnWhite, hexToDarkShade } from '../context/CMSContext';
 import { LocationModal } from './LocationModal';
 import { CustomerAuthModal } from './CustomerAuthModal';
 import { CustomerProfileDrawer } from './CustomerProfileDrawer';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Search, Heart, ShoppingBag, MapPin, Menu, X, 
-  ChevronDown, Leaf, Settings, Percent, User, Zap, LogOut, Shield
+import {
+  Search, Heart, ShoppingBag, MapPin, Menu, X,
+  ChevronDown, Leaf, Settings, Percent, User, Zap, LogOut, Shield, LayoutGrid
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -29,21 +29,21 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
     [categories, location.search]
   );
   const isHomeActive = location.pathname === '/' && !activeCategory;
-  const navAccent = activeCategory ? (activeCategory.color || '#4CAF50') : '#7000ff';
-  const appBarBg = isHomeActive || !activeCategory ? '#EBE0FF' : hexToTintOnWhite(navAccent, 0.16);
-  const appBarBorder = isHomeActive || !activeCategory ? 'rgba(216,194,255,0.6)' : hexToRgba(navAccent, 0.35);
+  const navAccent = activeCategory ? (activeCategory.color || '#4CAF50') : '#4CAF50';
+  const appBarBg = '#FFFFFF';
+  const appBarBorder = '#ECECEC';
 
   const [announcementVisible, setAnnouncementVisible] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchResults, setSearchResults] = useState<typeof products>([]);
-  
+
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [isCustomerAuthOpen, setIsCustomerAuthOpen] = useState(false);
   const [isCustomerProfileOpen, setIsCustomerProfileOpen] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showCategoriesDropdown, setShowCategoriesDropdown] = useState(false);
-  
+
   const [customerUser, setCustomerUser] = useState<any>(() => {
     const cached = localStorage.getItem('customer_user');
     return cached ? JSON.parse(cached) : null;
@@ -136,224 +136,295 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
 
   const activeAnnouncement = coupons.length > 0 ? coupons[0] : null;
 
+  // Derived Header dynamic background color based on active category
+  const dynamicHeaderBg = useMemo(() => {
+    if (activeCategory && activeCategory.color) {
+      return hexToTintOnWhite(activeCategory.color, 0.12);
+    }
+    return '#ffffff';
+  }, [activeCategory]);
+
   return (
     <>
       {/* Top Header Row + Search Bar + Category Nav: fixed to the viewport top
           (not sticky) so it is never subject to flow/stacking edge cases.
           Page content gets an explicit padding-top matching this bar's real
           height (see App.tsx), so there is never a flow-reservation guess. */}
-      <div ref={appBarRef} className="fixed top-0 left-0 right-0 z-[1000] w-full">
-      <header
-        style={{ backgroundColor: appBarBg, borderBottomColor: appBarBorder }}
-        className="flex items-center justify-between w-full px-4 md:px-8 py-2.5 border-b transition-colors duration-300"
-      >
-        {/* Delivery Time & Location Selector (Zepto Style) */}
-        <div className="flex items-center gap-3 md:gap-6">
-          <Link to="/" className="hidden sm:flex items-center group shrink-0">
-            <span className="text-[28px] sm:text-[36px] md:text-[40px] font-extrabold tracking-tight text-emerald-600 font-display leading-none group-hover:opacity-90 transition-opacity">
-              FreshCart
-            </span>
-          </Link>
-
-          {/* Delivery Time & Location Selector */}
-          <div 
-            onClick={() => navigate('/account/addresses')}
-            className="flex flex-col cursor-pointer select-none group"
-          >
-            <div className="flex items-center gap-1 text-black font-extrabold text-xs sm:text-sm tracking-tight leading-tight">
-              <Zap size={15} className="text-amber-500 fill-amber-400 shrink-0" />
-              <span className="text-black font-black">10 minutes</span>
-            </div>
-            <div className="flex items-center gap-0.5 text-[11px] sm:text-xs font-semibold text-slate-800 group-hover:text-black transition-colors">
-              <span className="truncate max-w-[200px] sm:max-w-[340px]">
-                {(() => {
-                  const customerUser = (() => {
-                    const cached = localStorage.getItem('customer_user');
-                    return cached ? JSON.parse(cached) : null;
-                  })();
-                  const userPhoneKey = customerUser?.phone ? customerUser.phone.replace(/\D/g, '') : '';
-                  const saved = userPhoneKey ? localStorage.getItem(`saved_addresses_${userPhoneKey}`) : null;
-                  const addrs = saved ? JSON.parse(saved) : [];
-
-                  if (!customerUser || addrs.length === 0) {
-                    return '📍 Add Address';
-                  }
-
-                  if (typeof userLocation === 'object' && userLocation !== null) {
-                    const parts = [];
-                    if (userLocation.label) parts.push(userLocation.label);
-                    if (userLocation.houseNo) parts.push(userLocation.houseNo);
-                    parts.push(userLocation.area || userLocation.address || 'KPHB Colony');
-                    return parts.join(' - ');
-                  }
-
-                  return 'KPHB Colony - Balaji Nagar, KPHB ...';
-                })()}
+      <div ref={appBarRef} className="fixed top-0 left-0 right-0 z-[1000] w-full shadow-xs transition-colors duration-300" style={{ backgroundColor: dynamicHeaderBg }}>
+        <header
+          className="flex items-center justify-between w-full px-4 md:px-8 py-2.5 border-b border-divider transition-colors duration-300 gap-3 md:gap-6"
+          style={{ backgroundColor: dynamicHeaderBg }}
+        >
+          {/* Delivery Time & Location Selector + Logo */}
+          <div className="flex items-center gap-3 sm:gap-4 shrink-0">
+            <Link to="/" className="hidden sm:flex items-center gap-2 group shrink-0">
+              <img src="/logo.png" alt="FreshCart Logo" className="h-10 sm:h-12 w-auto object-contain transition-transform group-hover:scale-105" />
+              <span className="hidden xl:inline text-2xl font-extrabold tracking-tight text-primary font-display leading-none">
+                FreshCart
               </span>
-              <ChevronDown size={14} className="text-slate-800 shrink-0" />
+            </Link>
+
+            {/* Delivery Time & Location Selector */}
+            <div
+              onClick={() => navigate('/account/addresses')}
+              className="flex flex-col cursor-pointer select-none group sm:border-l sm:border-divider sm:pl-4 pl-0"
+            >
+              <div className="flex items-center gap-1 text-text-primary font-extrabold text-xs sm:text-sm tracking-tight leading-tight">
+                <Zap size={14} className="text-amber-500 fill-amber-400 shrink-0" />
+                <span className="text-text-primary font-black">10 minutes</span>
+              </div>
+              <div className="flex items-center gap-0.5 text-[11px] sm:text-xs font-semibold text-text-secondary group-hover:text-primary transition-colors">
+                <span className="truncate max-w-[120px] sm:max-w-[180px] lg:max-w-[240px]">
+                  {(() => {
+                    const customerUser = (() => {
+                      const cached = localStorage.getItem('customer_user');
+                      return cached ? JSON.parse(cached) : null;
+                    })();
+                    const userPhoneKey = customerUser?.phone ? customerUser.phone.replace(/\D/g, '') : '';
+                    const saved = userPhoneKey ? localStorage.getItem(`saved_addresses_${userPhoneKey}`) : null;
+                    const addrs = saved ? JSON.parse(saved) : [];
+
+                    if (!customerUser || addrs.length === 0) {
+                      return '📍 Add Address';
+                    }
+
+                    if (typeof userLocation === 'object' && userLocation !== null) {
+                      const parts = [];
+                      if (userLocation.label) parts.push(userLocation.label);
+                      if (userLocation.houseNo) parts.push(userLocation.houseNo);
+                      parts.push(userLocation.area || userLocation.address || 'KPHB Colony');
+                      return parts.join(' - ');
+                    }
+
+                    return 'KPHB Colony - Balaji Nagar, KPHB ...';
+                  })()}
+                </span>
+                <ChevronDown size={14} className="text-text-secondary shrink-0" />
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Top Right Actions */}
-        <div className="flex items-center gap-3 sm:gap-5 font-medium text-[14px] text-text-primary">
-          {/* Circular Profile/Login Button */}
-          <div className="relative">
-            <button 
-              onClick={handleProfileClick}
-              className="w-8.5 h-8.5 rounded-full border border-black/80 flex items-center justify-center text-black hover:bg-black/10 transition-colors cursor-pointer shrink-0"
-              title={customerUser ? `Logged in as ${customerUser.phone}` : "Customer Login"}
-            >
-              <User size={18} className="text-black" />
-            </button>
+          {/* Inline Search Bar Beside Location */}
+          <div className="flex-1 max-w-xl md:max-w-2xl relative hidden sm:block" ref={searchRef}>
+            <form onSubmit={handleSearchSubmit} className="flex items-center w-full px-4 py-2 bg-background border border-divider rounded-full transition-all focus-within:border-primary focus-within:bg-white focus-within:ring-2 focus-within:ring-primary/20 shadow-2xs">
+              <Search size={17} className="text-text-tertiary mr-2.5 shrink-0" />
+              <input
+                type="text"
+                placeholder='Search for "chocolate box", "kurkure", "milk"...'
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => searchQuery.length > 1 && setShowSearchResults(true)}
+                className="w-full text-xs sm:text-sm font-normal bg-transparent border-none outline-none text-text-primary placeholder:text-text-tertiary"
+              />
+            </form>
 
-            {/* Customer Profile Dropdown */}
+            {/* Real-time search results */}
             <AnimatePresence>
-              {showProfileMenu && customerUser && (
+              {showSearchResults && searchResults.length > 0 && (
                 <motion.div
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="absolute right-0 top-[calc(100%+8px)] w-56 bg-white border border-divider rounded-2xl shadow-premium p-3 z-[1002] flex flex-col gap-1 text-xs"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="absolute top-[calc(100%+8px)] left-0 right-0 bg-white border border-divider rounded-2xl shadow-premium overflow-hidden max-h-[380px] overflow-y-auto z-[1002] flex flex-col"
                 >
-                  <div className="px-3 py-2 border-b border-divider flex flex-col">
-                    <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider">Logged In Customer</span>
-                    <span className="text-xs font-extrabold text-text-primary truncate mt-0.5">{customerUser.phone}</span>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      setShowProfileMenu(false);
-                      navigate('/admin');
-                    }}
-                    className="flex items-center gap-2 px-3 py-2 font-bold text-text-primary hover:bg-background rounded-xl transition-colors text-left cursor-pointer"
-                  >
-                    <Shield size={14} className="text-primary shrink-0" />
-                    <span>Admin Control Console</span>
-                  </button>
-
-                  <button
-                    onClick={handleCustomerLogout}
-                    className="flex items-center gap-2 px-3 py-2 font-bold text-rose-600 hover:bg-rose-50 rounded-xl transition-colors text-left cursor-pointer"
-                  >
-                    <LogOut size={14} className="shrink-0" />
-                    <span>Log Out</span>
-                  </button>
+                  {searchResults.map((product) => (
+                    <div
+                      key={product.id}
+                      className="flex items-center gap-3 p-3 border-b border-divider cursor-pointer hover:bg-background transition-colors last:border-b-0"
+                      onClick={() => handleSearchResultClick(product.id)}
+                    >
+                      <img src={product.imageUrl || (product.images && product.images[0]) || ''} alt={product.name} className="w-10 h-10 object-contain rounded-md border border-divider bg-white p-1" />
+                      <div className="flex-1 flex flex-col">
+                        <span className="text-sm font-bold text-text-primary">{product.name}</span>
+                        <span className="text-xs text-text-secondary">{product.brand}</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-black text-primary">₹{product.price}</div>
+                      </div>
+                    </div>
+                  ))}
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
 
-          {/* Cart Button (Desktop / Tablet only) */}
-          <button 
-            onClick={onCartOpen}
-            className="hidden sm:flex flex-col items-center gap-1 hover:text-[#7000ff] transition-colors relative cursor-pointer"
-          >
-            <div className="w-8 h-8 rounded-full border border-black/80 flex items-center justify-center bg-transparent relative">
-              <ShoppingBag size={18} className="text-black" />
+          {/* Top Right Actions */}
+          <div className="flex items-center gap-3 sm:gap-5 font-medium text-[14px] text-text-primary shrink-0">
+            {/* Profile Button */}
+            <div className="relative">
+              <button
+                onClick={handleProfileClick}
+                className="w-9 h-9 rounded-full border border-divider bg-background flex items-center justify-center text-text-primary hover:border-primary hover:text-primary transition-colors cursor-pointer shrink-0"
+                title={customerUser ? `Logged in as ${customerUser.phone}` : "Customer Login"}
+              >
+                <User size={18} />
+              </button>
+
+              {/* Customer Profile Dropdown */}
+              <AnimatePresence>
+                {showProfileMenu && customerUser && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute right-0 top-[calc(100%+8px)] w-56 bg-white border border-divider rounded-2xl shadow-premium p-3 z-[1002] flex flex-col gap-1 text-xs"
+                  >
+                    <div className="px-3 py-2 border-b border-divider flex flex-col">
+                      <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider">Logged In Customer</span>
+                      <span className="text-xs font-extrabold text-text-primary truncate mt-0.5">{customerUser.phone}</span>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        navigate('/admin');
+                      }}
+                      className="flex items-center gap-2 px-3 py-2 font-bold text-text-primary hover:bg-background rounded-xl transition-colors text-left cursor-pointer"
+                    >
+                      <Shield size={14} className="text-primary shrink-0" />
+                      <span>Admin Control Console</span>
+                    </button>
+
+                    <button
+                      onClick={handleCustomerLogout}
+                      className="flex items-center gap-2 px-3 py-2 font-bold text-rose-600 hover:bg-rose-50 rounded-xl transition-colors text-left cursor-pointer"
+                    >
+                      <LogOut size={14} className="shrink-0" />
+                      <span>Log Out</span>
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Cart Button */}
+            <button
+              onClick={onCartOpen}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-primary text-white font-extrabold text-xs sm:text-sm shadow-sm hover:bg-secondary transition-colors cursor-pointer shrink-0"
+            >
+              <ShoppingBag size={17} />
+              <span className="hidden sm:inline">My Cart</span>
               {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-[#7000ff] text-white text-[10px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center">
+                <span className="bg-white text-primary text-[11px] font-black px-1.5 py-0.5 rounded-full ml-0.5">
                   {cartCount}
                 </span>
               )}
-            </div>
-          </button>
-        </div>
-      </header>
+            </button>
+          </div>
+        </header>
 
-        {/* Search Input Bar */}
-        <div style={{ backgroundColor: appBarBg, borderBottomColor: appBarBorder }} className="w-full px-4 md:px-8 py-2 sm:py-2.5 relative border-b shadow-xs transition-colors duration-300" ref={searchRef}>
-          <form onSubmit={handleSearchSubmit} className="flex items-center w-full px-4 sm:px-5 py-2 sm:py-2.5 bg-white border border-[#D8C2FF] rounded-full transition-all focus-within:border-[#7000ff] focus-within:bg-white shadow-2xs">
-            <Search size={18} className="text-text-tertiary mr-2.5 flex-shrink-0" />
+        {/* Mobile Search bar row (mobile screens only) */}
+        <div className="sm:hidden w-full px-3 py-2 border-b border-divider relative transition-colors duration-300" style={{ backgroundColor: dynamicHeaderBg }} ref={searchRef}>
+          <form onSubmit={handleSearchSubmit} className="flex items-center w-full px-3.5 py-2 bg-background border border-divider rounded-full">
+            <Search size={16} className="text-text-tertiary mr-2 shrink-0" />
             <input
               type="text"
-              placeholder='Search for "chocolate box", "kurkure", "milk"...'
+              placeholder="Search groceries..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => searchQuery.length > 1 && setShowSearchResults(true)}
-              className="w-full text-xs sm:text-[16px] font-normal bg-transparent border-none outline-none text-text-primary placeholder:text-text-tertiary"
+              className="w-full text-xs bg-transparent border-none outline-none text-text-primary placeholder:text-text-tertiary"
             />
           </form>
-
-          {/* Real-time search results */}
-          <AnimatePresence>
-            {showSearchResults && searchResults.length > 0 && (
-              <motion.div 
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 15 }}
-                className="absolute top-[calc(100%+8px)] left-0 right-0 bg-white border border-[#D8C2FF] rounded-xl shadow-premium overflow-hidden max-h-[380px] overflow-y-auto z-[1002] flex flex-col"
-              >
-                {searchResults.map((product) => (
-                  <div 
-                    key={product.id} 
-                    className="flex items-center gap-3 p-3 border-b border-divider cursor-pointer hover:bg-[#EBE0FF]/50 transition-colors last:border-b-0"
-                    onClick={() => handleSearchResultClick(product.id)}
-                  >
-                    <img src={product.imageUrl || (product.images && product.images[0]) || ''} alt={product.name} className="w-10 h-10 object-contain rounded-md" />
-                    <div className="flex-1 flex flex-col">
-                      <span className="text-sm font-bold text-text-primary">{product.name}</span>
-                      <span className="text-xs text-text-secondary">{product.brand}</span>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm font-black text-text-primary">₹{product.price}</div>
-                    </div>
-                  </div>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
 
-        {/* Category Nav Tabs — driven by admin-managed categories, not hardcoded. */}
+        {/* Category Nav Tabs */}
         <nav
-          style={{ backgroundColor: appBarBg, borderBottomColor: appBarBorder }}
-          className="border-b px-3 md:px-8 py-2.5 overflow-x-auto scrollbar-none transition-colors duration-300"
+          className="border-b border-divider px-3 md:px-8 py-2 overflow-x-auto scrollbar-none transition-colors duration-300"
+          style={{ backgroundColor: activeCategory ? hexToTintOnWhite(activeCategory.color, 0.05) : '#ffffff' }}
         >
-          <div className="flex items-start gap-2 md:gap-3 min-w-max">
+          <div className="flex items-center gap-1 md:gap-1.5 min-w-max pb-0.5">
+            {/* All Link */}
             <Link
               to="/"
-              className="flex flex-col items-center gap-1.5 group"
+              style={location.pathname === '/' && !location.search.includes('category=') ? {
+                backgroundColor: hexToTintOnWhite('#10B981', 0.18),
+                borderColor: hexToRgba('#10B981', 0.5),
+              } : undefined}
+              className={`flex flex-col items-center justify-between p-1.5 md:p-2 rounded-2xl transition-all relative shrink-0 w-20 md:w-24 h-[104px] md:h-[114px] border ${
+                location.pathname === '/' && !location.search.includes('category=')
+                  ? 'shadow-2xs'
+                  : 'bg-transparent border-transparent hover:bg-background/80'
+              }`}
             >
-              <div className={`w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center transition-all ${
-                location.pathname === '/'
-                  ? 'bg-primary text-white shadow-sm'
-                  : 'bg-white/70 text-text-secondary group-hover:bg-white group-hover:text-primary'
+              <div className={`w-11 h-11 md:w-13 md:h-13 rounded-full flex items-center justify-center transition-all ${
+                location.pathname === '/' && !location.search.includes('category=')
+                  ? 'bg-emerald-600 text-white shadow-2xs'
+                  : 'bg-background text-text-secondary border border-divider'
               }`}>
-                <ShoppingBag size={22} />
+                <LayoutGrid size={22} />
               </div>
-              <span className={`text-xs font-semibold transition-colors ${
-                location.pathname === '/' ? 'text-primary' : 'text-text-secondary group-hover:text-primary'
-              }`}>All</span>
+              <div className="h-[2.4em] flex items-center justify-center text-center w-full px-0.5">
+                <span 
+                  style={location.pathname === '/' && !location.search.includes('category=') ? { color: hexToDarkShade('#10B981', 0.4) } : undefined}
+                  className={`text-[11px] md:text-xs font-bold text-center leading-tight line-clamp-2 ${
+                    location.pathname === '/' && !location.search.includes('category=')
+                      ? 'font-black'
+                      : 'text-text-primary font-semibold'
+                  }`}
+                >
+                  All
+                </span>
+              </div>
+              {location.pathname === '/' && !location.search.includes('category=') ? (
+                <div className="w-full h-1 bg-emerald-600 rounded-full mt-1" />
+              ) : (
+                <div className="w-full h-1 bg-transparent rounded-full mt-1" />
+              )}
             </Link>
+
+            {/* Categories Links */}
             {categories.map((cat) => {
               const catSlug = cat.slug || cat.id;
               const isActive = location.search.includes(`category=${catSlug}`);
               const label = cat.displayName?.trim() || cat.name;
               const catColor = cat.color || '#4CAF50';
+
+              const activeBg = hexToTintOnWhite(catColor, 0.20);
+              const activeBorder = hexToRgba(catColor, 0.5);
+              const activeTextColor = hexToDarkShade(catColor, 0.4);
+
               return (
                 <Link
                   key={cat.id}
                   to={`/products?category=${catSlug}`}
-                  className="flex flex-col items-center gap-1.5 group shrink-0"
+                  style={isActive ? {
+                    backgroundColor: activeBg,
+                    borderColor: activeBorder,
+                  } : undefined}
+                  className={`flex flex-col items-center justify-between p-1.5 md:p-2 rounded-2xl transition-all relative shrink-0 w-20 md:w-24 h-[104px] md:h-[114px] border ${
+                    isActive
+                      ? 'shadow-2xs'
+                      : 'bg-transparent border-transparent hover:bg-background/80'
+                  }`}
                 >
-                  <div
+                  <div 
                     style={{
-                      backgroundColor: isActive ? catColor : hexToRgba(catColor, 0.22),
-                      boxShadow: isActive ? `0 0 0 3px ${appBarBg}, 0 0 0 5px ${catColor}` : undefined,
+                      borderColor: isActive ? activeBorder : hexToRgba(catColor, 0.45),
+                      backgroundColor: isActive ? activeBg : hexToTintOnWhite(catColor, 0.08)
                     }}
-                    className={`w-14 h-14 md:w-16 md:h-16 rounded-full overflow-hidden transition-all duration-200 ${
-                      isActive ? '' : 'group-hover:ring-2 group-hover:ring-primary/30 group-hover:ring-offset-2'
-                    }`}
+                    className="w-11 h-11 md:w-13 md:h-13 rounded-full overflow-hidden border-2 shrink-0 transition-colors shadow-2xs"
                   >
                     <img src={getCategoryImage(cat)} alt={label} className="w-full h-full object-cover" />
                   </div>
-                  <span
-                    style={{ color: isActive ? catColor : undefined }}
-                    className={`text-xs font-semibold w-16 md:w-[72px] text-center leading-tight line-clamp-2 transition-colors ${
-                      isActive ? '' : 'text-text-secondary group-hover:text-primary'
-                    }`}
-                  >{label}</span>
+                  <div className="h-[2.4em] flex items-center justify-center text-center w-full px-0.5">
+                    <span 
+                      style={isActive ? { color: activeTextColor } : undefined}
+                      className={`text-[11px] md:text-xs font-bold text-center leading-tight line-clamp-2 ${
+                        isActive ? 'font-black' : 'text-text-primary font-semibold'
+                      }`}
+                    >
+                      {label}
+                    </span>
+                  </div>
+                  {isActive ? (
+                    <div 
+                      style={{ backgroundColor: catColor }} 
+                      className="w-full h-1 rounded-full mt-1" 
+                    />
+                  ) : (
+                    <div className="w-full h-1 bg-transparent rounded-full mt-1" />
+                  )}
                 </Link>
               );
             })}
@@ -374,7 +445,7 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
         {mobileMenuOpen && (
           <>
             {/* Backdrop */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -382,7 +453,7 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
               onClick={() => setMobileMenuOpen(false)}
             />
             {/* Drawer */}
-            <motion.div 
+            <motion.div
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
