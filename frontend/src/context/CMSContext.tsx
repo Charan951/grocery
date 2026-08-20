@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { normalizeCategoryImageUrl } from '../components/SubcategoryCardImage';
 
 // Interfaces for our CMS models
 export interface SubCategory {
@@ -7,6 +8,7 @@ export interface SubCategory {
   slug?: string;
   icon?: string;
   image?: string;
+  color?: string;
   showOnHome?: boolean;
   displayOrder?: number;
   promoImage?: string;
@@ -314,53 +316,111 @@ const defaultBanners: Banner[] = [
   },
 ];
 
-const subCategoryImages: Record<string, string> = {
-  // Dairy, Bread & Eggs
-  'Milk': 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=200&auto=format&fit=crop',
-  'Breads & Buns': 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=200&auto=format&fit=crop',
-  'Fresh Bakery': 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=200&auto=format&fit=crop',
-  'Eggs': 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=200&auto=format&fit=crop',
-  'Curd & Probiotic Drinks': 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=200&auto=format&fit=crop',
-  'Batters & Mixes': 'https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?w=200&auto=format&fit=crop',
-  'High Protein': 'https://images.unsplash.com/photo-1571212515416-fef01fc43637?w=200&auto=format&fit=crop',
-  'Milk Based Drinks': 'https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?w=200&auto=format&fit=crop',
-  'Paneer & Cream': 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=200&auto=format&fit=crop',
-  'Gut Friendly': 'https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?w=200&auto=format&fit=crop',
-  'Butter': 'https://images.unsplash.com/photo-1589985270826-4b7bb135bc9d?w=200&auto=format&fit=crop',
-  'Cheese': 'https://images.unsplash.com/photo-1452195100486-9cc805987862?w=200&auto=format&fit=crop',
-  'Indian Breads': 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=200&auto=format&fit=crop',
-  'Yogurt & Shrikhand': 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=200&auto=format&fit=crop',
-
+export const subCategoryImages: Record<string, string> = {
   // Fruits & Vegetables
-  'Fresh Vegetables': 'https://images.unsplash.com/photo-1597362925123-77861d3fbac7?w=200&auto=format&fit=crop',
-  'Fresh Fruits': 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=200&auto=format&fit=crop',
-  'Exotics & Premium': 'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=200&auto=format&fit=crop',
-  'Mangoes & Melons': 'https://images.unsplash.com/photo-1553279768-865429fa0078?w=200&auto=format&fit=crop',
-  'Organics & Hydroponics': 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=200&auto=format&fit=crop',
-  'Leafy, Herbs & Seasonings': 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=200&auto=format&fit=crop',
-  'Cuts & Sprouts': 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=200&auto=format&fit=crop',
+  'Fresh Vegetables': 'https://images.unsplash.com/photo-1597362925123-77861d3fbac7?w=300&auto=format&fit=crop',
+  'Fresh Fruits': 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=300&auto=format&fit=crop',
+  'Exotics & Premium': 'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=300&auto=format&fit=crop',
+  'Mangoes & Melons': 'https://images.unsplash.com/photo-1553279768-865429fa0078?w=300&auto=format&fit=crop',
+  'Organics & Hydroponics': 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=300&auto=format&fit=crop',
+  'Leafy, Herbs & Seasonings': 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=300&auto=format&fit=crop',
+  'Flowers & Leaves': 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?w=300&auto=format&fit=crop',
+  'Bouquets & Plants': 'https://images.unsplash.com/photo-1509423350716-97f9360b4e09?w=300&auto=format&fit=crop',
+  'Cuts & Sprouts': 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=300&auto=format&fit=crop',
+  'Plants & Gardening': 'https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=300&auto=format&fit=crop',
+  'Gardening Accessories': 'https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=300&auto=format&fit=crop',
+  'Frozen Veggies & Pulp': 'https://images.unsplash.com/photo-1597362925123-77861d3fbac7?w=300&auto=format&fit=crop',
+
+  // Dairy, Bread & Eggs
+  'Milk': 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=300&auto=format&fit=crop',
+  'Breads & Buns': 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300&auto=format&fit=crop',
+  'Fresh Bakery': 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=300&auto=format&fit=crop',
+  'Eggs': 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=300&auto=format&fit=crop',
+  'Curd & Probiotic Drinks': 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=300&auto=format&fit=crop',
+  'Batters & Mixes': 'https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?w=300&auto=format&fit=crop',
+  'High Protein': 'https://images.unsplash.com/photo-1571212515416-fef01fc43637?w=300&auto=format&fit=crop',
+  'Milk Based Drinks': 'https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?w=300&auto=format&fit=crop',
+  'Paneer & Cream': 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=300&auto=format&fit=crop',
+  'Gut Friendly': 'https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?w=300&auto=format&fit=crop',
+  'Butter': 'https://images.unsplash.com/photo-1589985270826-4b7bb135bc9d?w=300&auto=format&fit=crop',
+  'Cheese': 'https://images.unsplash.com/photo-1452195100486-9cc805987862?w=300&auto=format&fit=crop',
+  'Indian Breads': 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=300&auto=format&fit=crop',
+  'Yogurt & Shrikhand': 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=300&auto=format&fit=crop',
 
   // Atta, Rice, Oil & Dals
-  'Atta': 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=200&auto=format&fit=crop',
-  'Rice': 'https://images.unsplash.com/photo-1536304929831-ee1ca9d44906?w=200&auto=format&fit=crop',
-  'Edible Oils': 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=200&auto=format&fit=crop',
-  'Dals & Pulses': 'https://images.unsplash.com/photo-1585994191611-726a88060c2d?w=200&auto=format&fit=crop',
-  'Ghee': 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=200&auto=format&fit=crop',
+  'Atta': 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=300&auto=format&fit=crop',
+  'Rice': 'https://images.unsplash.com/photo-1536304929831-ee1ca9d44906?w=300&auto=format&fit=crop',
+  'Edible Oils': 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=300&auto=format&fit=crop',
+  'Dals & Pulses': 'https://images.unsplash.com/photo-1585994191611-726a88060c2d?w=300&auto=format&fit=crop',
+  'Ghee': 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=300&auto=format&fit=crop',
+  'Spices & Masala': 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=300&auto=format&fit=crop',
+  'Dry Fruits & Nuts': 'https://images.unsplash.com/photo-1599599810769-bcde5a160d32?w=300&auto=format&fit=crop',
+
+  // Cold Drinks & Juices
+  'Soft Drinks': 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=300&auto=format&fit=crop',
+  'Fruit Juices': 'https://images.unsplash.com/photo-1613478223719-2ab802602423?w=300&auto=format&fit=crop',
+  'Energy Drinks': 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=300&auto=format&fit=crop',
+  'Cold Drinks': 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=300&auto=format&fit=crop',
+
+  // Snacks & Munchies
+  'Chips & Namkeen': 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=300&auto=format&fit=crop',
+  'Biscuits & Cookies': 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=300&auto=format&fit=crop',
+  'Chocolates & Candies': 'https://images.unsplash.com/photo-1549007994-cb92caebd54b?w=300&auto=format&fit=crop',
 
   // Breakfast & Sauces
-  'Cereals & Oats': 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=200&auto=format&fit=crop',
-  'Spreads & Peanut Butter': 'https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?w=200&auto=format&fit=crop',
-  'Ketchup & Sauces': 'https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=200&auto=format&fit=crop'
+  'Cereals & Oats': 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=300&auto=format&fit=crop',
+  'Spreads & Peanut Butter': 'https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?w=300&auto=format&fit=crop',
+  'Ketchup & Sauces': 'https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=300&auto=format&fit=crop',
+
+  // Cleaning & Household
+  'Detergents & Dishwash': 'https://images.unsplash.com/photo-1585832770485-e68a5fcfad52?w=300&auto=format&fit=crop',
+  'Surface Cleaners': 'https://images.unsplash.com/photo-1584813470613-5b1c1cad3d69?w=300&auto=format&fit=crop',
+
+  // Personal Care
+  'Soaps & Body Wash': 'https://images.unsplash.com/photo-1600857544200-b2f666a9a2ec?w=300&auto=format&fit=crop',
+  'Shampoos & Hair Care': 'https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?w=300&auto=format&fit=crop'
 };
 
 export const getSubCategoryImage = (subName: string, catName?: string, customImg?: string) => {
   if (customImg && (customImg.startsWith('http://') || customImg.startsWith('https://') || customImg.startsWith('data:'))) {
-    return customImg;
+    if (!customImg.includes('cdn.zeptonow.com')) {
+      return normalizeCategoryImageUrl(customImg);
+    }
   }
+
+  // Exact subcategory match
   if (subCategoryImages[subName]) {
-    return subCategoryImages[subName];
+    return normalizeCategoryImageUrl(subCategoryImages[subName]);
   }
-  return 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=200&auto=format&fit=crop';
+
+  // Case-insensitive match or substring match
+  const sLower = (subName || '').toLowerCase();
+  for (const [key, url] of Object.entries(subCategoryImages)) {
+    if (key.toLowerCase() === sLower || sLower.includes(key.toLowerCase()) || key.toLowerCase().includes(sLower)) {
+      return normalizeCategoryImageUrl(url);
+    }
+  }
+
+  // Category fallback matching
+  const cLower = (catName || '').toLowerCase();
+  if (cLower.includes('dairy') || cLower.includes('milk') || cLower.includes('egg') || sLower.includes('milk') || sLower.includes('cheese') || sLower.includes('butter') || sLower.includes('paneer')) {
+    return 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=300&auto=format&fit=crop';
+  }
+  if (cLower.includes('atta') || cLower.includes('rice') || cLower.includes('dal') || cLower.includes('oil') || sLower.includes('atta') || sLower.includes('flour') || sLower.includes('grain')) {
+    return 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=300&auto=format&fit=crop';
+  }
+  if (cLower.includes('drink') || cLower.includes('beverage') || cLower.includes('juice') || sLower.includes('drink') || sLower.includes('juice') || sLower.includes('soda')) {
+    return 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=300&auto=format&fit=crop';
+  }
+  if (cLower.includes('snack') || cLower.includes('munch') || cLower.includes('biscuit') || sLower.includes('snack') || sLower.includes('chip') || sLower.includes('biscuit')) {
+    return 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=300&auto=format&fit=crop';
+  }
+  if (cLower.includes('clean') || cLower.includes('household') || sLower.includes('clean') || sLower.includes('wash')) {
+    return 'https://images.unsplash.com/photo-1585832770485-e68a5fcfad52?w=300&auto=format&fit=crop';
+  }
+
+  // Default fallback
+  return 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=300&auto=format&fit=crop';
 };
 
 const categoryImages: Record<string, string> = {
@@ -1175,6 +1235,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         image: subCategoryDataOrName.image || subCategoryDataOrName.icon || '',
         showOnHome: subCategoryDataOrName.showOnHome !== undefined ? subCategoryDataOrName.showOnHome : true,
         displayOrder: subCategoryDataOrName.displayOrder !== undefined ? Number(subCategoryDataOrName.displayOrder) : 0,
+        color: subCategoryDataOrName.color || '#10B981',
         promoImage: subCategoryDataOrName.promoImage || '',
         promoLink: subCategoryDataOrName.promoLink || ''
       };

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useCMS, Product } from '../context/CMSContext';
+import { useCMS, getSubCategoryImage, getCategoryImage, hexToRgba, hexToTintOnWhite, Product } from '../context/CMSContext';
 import { ProductCard } from '../components/ProductCard';
+import { SubcategoryCardImage } from '../components/SubcategoryCardImage';
 import { SEO } from '../components/SEO';
 import { BannerCarousel } from '../components/BannerCarousel';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -218,58 +219,65 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
 
       <div className="w-full px-4 md:px-8 pt-3 pb-6">
 
-        {/* Helper component rendering a Special Subcategory Group (Mobile Only - md:hidden) */}
-        {specialCategoryGroups && specialCategoryGroups.length > 0 && (
-          <div className="md:hidden w-full">
-            {specialCategoryGroups
-              .filter(g => g.active !== false && g.items && g.items.length > 0 && (!g.insertAfterSubCategoryIndex || g.insertAfterSubCategoryIndex === 0))
-              .map((group, grpIdx) => (
-                <div key={group.id || `grp_${grpIdx}`} className="mb-3 bg-surface rounded-3xl border border-divider/60 p-2 sm:p-4 shadow-sm">
-                  {group.title && (
-                    <h2 className="text-lg font-black text-text-primary tracking-tight font-display px-3 pt-2 pb-1">
-                      {group.title}
-                    </h2>
-                  )}
-                  <div className="flex cursor-pointer flex-row flex-wrap items-center justify-start gap-y-3 gap-x-2 p-2">
-                    {group.items.map((item, idx) => {
-                      const isWide = item.isFeatured || idx === 0;
-                      const targetLink = item.link || `/products?subCategory=${encodeURIComponent(item.name)}`;
+        {/* 1. Categories & Subcategories Sections (FIRST ON HOME PAGE) */}
+        <section className="mb-6 space-y-6">
+          <div className="space-y-6">
+            {categories.map((cat, cIdx) => {
+              const catSlug = cat.slug || cat.id;
+              const subList = cat.subCategories || [];
+              const catColor = cat.color || '#10B981';
+              if (subList.length === 0) return null;
+
+              return (
+                <div key={cat.id || `cat_home_${cIdx}`} className="space-y-3">
+                  <div className="flex items-center justify-between px-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="w-1.5 h-5 rounded-full shrink-0" style={{ backgroundColor: catColor }} />
+                      <h3 className="text-base sm:text-lg font-black text-text-primary font-display">
+                        {cat.name}
+                      </h3>
+                    </div>
+                    <Link
+                      to={`/products?category=${catSlug}`}
+                      className="text-xs font-bold text-emerald-600 hover:underline"
+                    >
+                      See All
+                    </Link>
+                  </div>
+
+                  {/* 4-column Subcategory Grid */}
+                  <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5 sm:gap-3.5">
+                    {subList.slice(0, 8).map((sub, sIdx) => {
+                      const subName = typeof sub === 'string' ? sub : sub.name;
+                      const customImg = typeof sub === 'object' ? (sub.image || sub.icon) : undefined;
+                      const imgUrl = getSubCategoryImage(subName, cat.name, customImg);
+
                       return (
-                        <div 
-                          key={item.id || idx}
-                          id="CATEGORY_GRID_V3-element"
-                          className={isWide 
-                            ? "relative w-[calc(50%-0.25rem)] rounded-lg overflow-hidden group"
-                            : "relative box-border flex w-[calc(25%-0.4rem)] flex-col items-center justify-between overflow-hidden rounded-lg p-1 group"
-                          }
-                          style={{ aspectRatio: isWide ? '16 / 9' : '9 / 12' }}
+                        <Link
+                          key={`sub_home_${cIdx}_${sIdx}`}
+                          to={`/products?category=${catSlug}&subCategory=${encodeURIComponent(subName)}`}
+                          className="flex flex-col items-center group cursor-pointer text-center col-span-1"
                         >
-                          <Link className="contents" to={targetLink}>
-                            <img 
-                              key={item.image || item.id || idx}
-                              alt={item.name} 
-                              fetchPriority="high" 
-                              loading="eager" 
-                              decoding="async" 
-                              className="relative overflow-hidden rounded-lg w-full h-full object-cover transition-transform group-hover:scale-105"
-                              src={item.image}
-                              style={{ color: 'transparent', objectFit: 'cover' }}
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = 'https://cdn.zeptonow.com/production/tr:w-210,ar-225-333,pr-true,f-auto,q-40/cms/category/474e6e58-1894-4378-86f1-168cc7266d1a.png';
-                              }}
+                          <div className="w-full aspect-square bg-[#F4F5F7] rounded-2xl sm:rounded-3xl p-1 flex items-center justify-center overflow-hidden group-hover:scale-[1.03] transition-transform duration-200">
+                            <SubcategoryCardImage
+                              src={imgUrl}
+                              alt={subName}
+                              fallbackSrc={getCategoryImage(cat)}
+                              className="w-full h-full"
                             />
-                            <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] sm:text-[10px] font-extrabold p-1 text-center truncate rounded-b-lg tracking-wide z-10 backdrop-blur-[1px]">
-                              {item.name}
-                            </div>
-                          </Link>
-                        </div>
+                          </div>
+                          <span className="text-[11px] sm:text-xs font-bold text-text-primary line-clamp-2 leading-tight mt-1.5 group-hover:text-emerald-600 transition-colors">
+                            {subName}
+                          </span>
+                        </Link>
                       );
                     })}
                   </div>
                 </div>
-              ))}
+              );
+            })}
           </div>
-        )}
+        </section>
 
         {/* 2. Dynamic Subcategories Home Sections & Dynamic Inter-Section Banners & In-Between Mobile Special Groups */}
         {subCategorySections.map((sec, secIdx) => (
@@ -333,8 +341,8 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
               <div className="md:hidden w-full">
                 {specialCategoryGroups
                   .filter(g => g.active !== false && g.items && g.items.length > 0 && g.insertAfterSubCategoryIndex === (secIdx + 1))
-                  .map((group) => (
-                    <div key={group.id} className="mb-3 bg-surface rounded-3xl border border-divider/60 p-2 sm:p-4 shadow-sm">
+                  .map((group, grpIdx) => (
+                    <div key={group.id || `sp_grp_${secIdx}_${grpIdx}`} className="mb-3 bg-surface rounded-3xl border border-divider/60 p-2 sm:p-4 shadow-sm">
                       {group.title && (
                         <h2 className="text-lg font-black text-text-primary tracking-tight font-display px-3 pt-2 pb-1">
                           {group.title}
@@ -346,7 +354,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                           const targetLink = item.link || `/products?subCategory=${encodeURIComponent(item.name)}`;
                           return (
                             <div 
-                              key={item.id || idx}
+                              key={item.id || `item_${secIdx}_${idx}`}
                               id="CATEGORY_GRID_V3-element"
                               className={isWide 
                                 ? "relative w-[calc(50%-0.25rem)] rounded-lg overflow-hidden group"
@@ -356,16 +364,14 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                             >
                               <Link className="contents" to={targetLink}>
                                 <img 
-                                  key={item.image || item.id || idx}
                                   alt={item.name} 
-                                  fetchPriority="high" 
-                                  loading="eager" 
+                                  loading="lazy" 
                                   decoding="async" 
                                   className="relative overflow-hidden rounded-lg w-full h-full object-contain transition-transform group-hover:scale-105" 
                                   src={item.image} 
                                   style={{ color: 'transparent', objectFit: 'contain' }}
                                   onError={(e) => {
-                                    (e.target as HTMLImageElement).src = 'https://cdn.zeptonow.com/production/tr:w-210,ar-225-333,pr-true,f-auto,q-40/cms/category/474e6e58-1894-4378-86f1-168cc7266d1a.png';
+                                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=300&auto=format&fit=crop';
                                   }}
                                 />
                                 <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] sm:text-[10px] font-extrabold p-1 text-center truncate rounded-b-lg tracking-wide z-10 backdrop-blur-[1px]">
@@ -393,8 +399,8 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
           <div className="md:hidden w-full">
             {specialCategoryGroups
               .filter(g => g.active !== false && g.items && g.items.length > 0 && g.insertAfterSubCategoryIndex !== undefined && g.insertAfterSubCategoryIndex >= 99)
-              .map((group) => (
-                <div key={group.id} className="mb-3 bg-surface rounded-3xl border border-divider/60 p-2 sm:p-4 shadow-sm">
+              .map((group, grpIdx) => (
+                <div key={group.id || `btm_grp_${grpIdx}`} className="mb-3 bg-surface rounded-3xl border border-divider/60 p-2 sm:p-4 shadow-sm">
                   {group.title && (
                     <h2 className="text-lg font-black text-text-primary tracking-tight font-display px-3 pt-2 pb-1">
                       {group.title}
@@ -406,7 +412,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                       const targetLink = item.link || `/products?subCategory=${encodeURIComponent(item.name)}`;
                       return (
                         <div 
-                          key={item.id || idx}
+                          key={item.id || `btm_item_${grpIdx}_${idx}`}
                           id="CATEGORY_GRID_V3-element"
                           className={isWide 
                             ? "relative w-[calc(50%-0.25rem)] rounded-lg overflow-hidden group"
@@ -416,16 +422,14 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                         >
                           <Link className="contents" to={targetLink}>
                             <img 
-                              key={item.image || item.id || idx}
                               alt={item.name} 
-                              fetchPriority="high" 
-                              loading="eager" 
+                              loading="lazy" 
                               decoding="async" 
-                              className="relative overflow-hidden rounded-lg w-full h-full object-cover transition-transform group-hover:scale-105"
+                              className="relative overflow-hidden rounded-lg w-full h-full object-contain transition-transform group-hover:scale-105"
                               src={item.image}
-                              style={{ color: 'transparent', objectFit: 'cover' }}
+                              style={{ color: 'transparent', objectFit: 'contain' }}
                               onError={(e) => {
-                                (e.target as HTMLImageElement).src = 'https://cdn.zeptonow.com/production/tr:w-210,ar-225-333,pr-true,f-auto,q-40/cms/category/474e6e58-1894-4378-86f1-168cc7266d1a.png';
+                                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=300&auto=format&fit=crop';
                               }}
                             />
                             <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] sm:text-[10px] font-extrabold p-1 text-center truncate rounded-b-lg tracking-wide z-10 backdrop-blur-[1px]">

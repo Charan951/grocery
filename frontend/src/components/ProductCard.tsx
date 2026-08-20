@@ -79,14 +79,25 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
   return (
     <motion.div 
       layout
-      className="bg-surface border border-divider/60 rounded-2xl p-2.5 sm:p-3 relative flex flex-col h-full transition-all duration-300 shadow-2xs hover:shadow-md hover:border-primary/40 group overflow-hidden"
+      className="bg-surface border border-divider/60 rounded-3xl p-2.5 sm:p-3 relative flex flex-col h-full transition-all duration-300 shadow-2xs hover:shadow-md hover:border-emerald-500/40 group overflow-hidden"
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.3 }}
     >
-      {/* Top Image Container (Zepto Style soft background box) */}
-      <div className="relative w-full aspect-square rounded-2xl bg-neutral-100/60 dark:bg-neutral-800/40 mb-1.5 flex items-center justify-center p-1 group/img overflow-hidden">
+      {/* Top Image Box */}
+      <div className="relative w-full aspect-square rounded-2xl bg-white border border-divider/60 mb-2 flex items-center justify-center p-1.5 group/img overflow-hidden shadow-2xs">
+        {/* Wishlist Heart Icon */}
+        <button
+          onClick={handleWishlistToggle}
+          className={`absolute top-2 right-2 z-20 w-7 h-7 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center border border-divider/60 shadow-xs transition-transform active:scale-90 ${
+            favorited ? 'text-rose-500 fill-rose-500' : 'text-text-tertiary hover:text-rose-500'
+          }`}
+          title={favorited ? 'Remove from Wishlist' : 'Add to Wishlist'}
+        >
+          <Heart size={14} className={favorited ? 'fill-rose-500 text-rose-500' : ''} />
+        </button>
+
         {/* Out of Stock Badge */}
         {isOutOfStock && (
           <div className="absolute top-2 left-2 z-20 bg-rose-600 text-white text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-md shadow-xs">
@@ -96,82 +107,84 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
 
         {/* Product Image */}
         <Link to={`/product/${product.id}`} className="w-full h-full flex items-center justify-center">
-          <img src={displayImage} alt={product.name} className={`w-full h-full object-cover transition-transform duration-300 group-hover/img:scale-105 ${isOutOfStock ? 'opacity-50 grayscale' : ''}`} loading="lazy" />
+          <img 
+            src={displayImage} 
+            alt={product.name} 
+            className={`w-full h-full object-cover rounded-xl transition-transform duration-300 group-hover/img:scale-105 ${isOutOfStock ? 'opacity-50 grayscale' : ''}`} 
+            loading="lazy" 
+          />
         </Link>
+      </div>
 
-        {/* Floating Add CTA inside Image Box (Bottom Right Corner) */}
-        <div className="absolute bottom-2 right-2 z-20">
+      {/* Weight Variant & ADD Button Row (Matching Image 4) */}
+      <div className="flex items-center justify-between gap-1 mb-2">
+        <span className="bg-white border border-divider text-text-primary text-[11px] sm:text-xs font-black px-2.5 py-1 rounded-xl shadow-xs truncate max-w-[55%]">
+          {netWeight}
+        </span>
+
+        <div>
           {isOutOfStock ? (
-            <span className="bg-gray-200 text-gray-500 text-[10px] font-bold px-2 py-1 rounded-lg border border-gray-300">
-              Unavailable
+            <span className="bg-gray-100 text-gray-400 text-[10px] font-bold px-2.5 py-1 rounded-xl border border-gray-200">
+              Offstock
             </span>
           ) : cartQty > 0 ? (
-            <div className="flex items-center bg-pink-600 text-white rounded-xl shadow-md font-bold text-[10px] sm:text-xs overflow-hidden">
-              <button onClick={handleDecrement} className="p-1 sm:p-1.5 hover:bg-pink-700 transition-colors">
-                <Minus size={12} />
+            <div className="flex items-center bg-emerald-600 text-white rounded-xl shadow-xs font-black text-xs overflow-hidden">
+              <button onClick={handleDecrement} className="p-1 sm:p-1.5 hover:bg-emerald-700 transition-colors">
+                <Minus size={13} strokeWidth={2.5} />
               </button>
-              <span className="px-1.5 sm:px-2 font-black text-[10px] sm:text-xs">{cartQty}</span>
+              <span className="px-1.5 sm:px-2 font-black text-xs">{cartQty}</span>
               <button 
                 onClick={handleIncrement} 
                 disabled={cartQty >= stockQty}
-                className={`p-1 sm:p-1.5 transition-colors ${cartQty >= stockQty ? 'opacity-40 cursor-not-allowed bg-pink-800' : 'hover:bg-pink-700'}`}
-                title={cartQty >= stockQty ? `Only ${stockQty} available in stock` : 'Increase'}
+                className={`p-1 sm:p-1.5 transition-colors ${cartQty >= stockQty ? 'opacity-40 cursor-not-allowed bg-emerald-800' : 'hover:bg-emerald-700'}`}
+                title={cartQty >= stockQty ? `Only ${stockQty} available` : 'Increase'}
               >
-                <Plus size={12} />
+                <Plus size={13} strokeWidth={2.5} />
               </button>
             </div>
           ) : (
-            <motion.button 
+            <button
               onClick={handleAddToCart}
-              className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-white border-2 border-pink-500 text-pink-600 flex items-center justify-center shadow-md font-extrabold hover:bg-pink-600 hover:text-white transition-all duration-200 cursor-pointer"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              title="Add to Cart"
+              className="bg-white border-2 border-emerald-600 text-emerald-600 font-extrabold text-xs sm:text-xs px-3 sm:px-4 py-1 rounded-xl hover:bg-emerald-600 hover:text-white transition-all duration-200 cursor-pointer shadow-2xs uppercase tracking-wider"
             >
-              <Plus size={16} strokeWidth={3} />
-            </motion.button>
+              ADD
+            </button>
           )}
         </div>
       </div>
 
-      {/* Info Details below Image Box */}
-      <div className="flex flex-col flex-1">
-        {/* Price Row: Green solid badge + MRP */}
-        <div className="flex items-center gap-1.5 flex-wrap mb-1">
-          <span className="bg-emerald-600 text-white text-xs sm:text-sm font-extrabold px-2 py-0.5 rounded-lg inline-block shadow-2xs">
-            ₹{product.price}
-          </span>
-          {originalPrice > product.price && (
-            <span className="text-[10px] sm:text-xs line-through text-text-tertiary font-medium">
-              ₹{originalPrice}
+      {/* Info Details below (Price, Title, Delivery Time - Image 4 Style) */}
+      <div className="flex flex-col flex-1 justify-between pt-0.5">
+        <div>
+          {/* Price Row: Bold Price + Line-through MRP */}
+          <div className="flex items-baseline gap-1.5 flex-wrap">
+            <span className="text-sm sm:text-base font-black text-text-primary">
+              ₹{product.price}
             </span>
-          )}
+            {originalPrice > product.price && (
+              <span className="text-xs line-through text-text-tertiary font-semibold">
+                ₹{originalPrice}
+              </span>
+            )}
+            {discountLabel && (
+              <span className="text-[10px] font-black text-emerald-600 ml-auto">
+                {discountLabel}
+              </span>
+            )}
+          </div>
+
+          {/* Product Title */}
+          <Link to={`/product/${product.id}`}>
+            <h3 className="text-xs sm:text-[13px] font-extrabold text-text-primary leading-snug mt-1 line-clamp-2 group-hover:text-emerald-600 transition-colors">
+              {product.name}
+            </h3>
+          </Link>
         </div>
 
-        {/* Discount Tag below price */}
-        {discountLabel && (
-          <span className="text-emerald-600 font-extrabold text-[10px] block mb-1">
-            {discountLabel}
-          </span>
-        )}
-
-        {/* Product Title */}
-        <Link to={`/product/${product.id}`}>
-          <h3 className="text-xs sm:text-[13px] font-bold text-text-primary leading-snug mb-1 line-clamp-2 min-h-[2.2em] sm:min-h-[2.4em] group-hover:text-primary transition-colors">
-            {product.name}
-          </h3>
-        </Link>
-
-        {/* Net Quantity / Weight */}
-        <span className="text-[10px] sm:text-[11px] font-semibold text-text-tertiary mb-1.5">{netWeight}</span>
-
-        {/* Rating Badge at Bottom */}
-        <div className="flex items-center gap-1 text-[10px] font-semibold text-emerald-700 mt-auto pt-1">
-          <div className="flex items-center gap-0.5 bg-emerald-500/10 text-emerald-600 px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] font-bold">
-            <Star size={9} className="fill-emerald-500 text-emerald-500" />
-            <span>{product.rating || 4.8}</span>
-          </div>
-          <span className="text-text-tertiary text-[9px] sm:text-[10px]">({product.reviewsCount || 45})</span>
+        {/* Delivery Time (Clock icon + 8 mins - Image 4 Style) */}
+        <div className="flex items-center gap-1 text-[10px] sm:text-xs font-black text-text-tertiary mt-2">
+          <Zap size={12} className="text-emerald-600 fill-emerald-600" />
+          <span>8 mins delivery</span>
         </div>
       </div>
     </motion.div>

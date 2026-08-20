@@ -184,7 +184,7 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
                       return parts.join(' - ');
                     }
 
-                    if (typeof userLocation === 'string' && userLocation.trim()) {
+                    if (typeof userLocation === 'string' && (userLocation as string).trim()) {
                       return userLocation;
                     }
 

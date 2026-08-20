@@ -5,7 +5,7 @@ import { Home, History, Grid3x3, CircleUserRound } from 'lucide-react';
 const NAV_ITEMS = [
   { label: 'Home', path: '/', icon: Home, match: (p: string) => p === '/' },
   { label: 'Order Again', path: '/orders', icon: History, match: (p: string) => p.startsWith('/orders') || p.startsWith('/account/orders') },
-  { label: 'Categories', path: '/products', icon: Grid3x3, match: (p: string) => p.startsWith('/products') },
+  { label: 'Categories', path: '/categories', icon: Grid3x3, match: (p: string) => p.startsWith('/categories') || p.startsWith('/products') },
   { label: 'Profile', path: '/profile', icon: CircleUserRound, match: (p: string) => p.startsWith('/profile') || p.startsWith('/account/profile') },
 ];
 

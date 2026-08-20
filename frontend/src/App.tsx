@@ -6,6 +6,7 @@ import { CartWishlistProvider } from './context/CartWishlistContext';
 // Pages
 import { Home } from './pages/Home';
 import { About } from './pages/About';
+import { Categories } from './pages/Categories';
 import { Products as ShopProducts } from './pages/Products';
 import { ProductDetails } from './pages/ProductDetails';
 import { Brands } from './pages/Brands';
@@ -125,6 +126,7 @@ const AppContent: React.FC = () => {
 
 
   const isStandalonePage =
+    location.pathname.startsWith('/categories') ||
     (location.pathname.startsWith('/products') && productsListView) ||
     location.pathname.startsWith('/s/') ||
     location.pathname.startsWith('/terms-of-service') ||
@@ -161,6 +163,7 @@ const AppContent: React.FC = () => {
         <Routes>
           <Route path="/" element={<Home onQuickView={setQuickViewProduct} />} />
           <Route path="/about" element={<About />} />
+          <Route path="/categories" element={<Categories />} />
           <Route path="/products" element={<ShopProducts onQuickView={setQuickViewProduct} onListViewChange={setProductsListView} />} />
           <Route path="/product/:id" element={<ProductDetails onQuickView={setQuickViewProduct} />} />
           <Route path="/brands" element={<Brands onQuickView={setQuickViewProduct} />} />

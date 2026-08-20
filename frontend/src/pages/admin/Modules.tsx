@@ -468,6 +468,7 @@ export const SubCategoriesModule: React.FC = () => {
   const [targetCatId, setTargetCatId] = useState<string>('');
   const [subNameInput, setSubNameInput] = useState<string>('');
   const [subImageInput, setSubImageInput] = useState<string>('');
+  const [subColorInput, setSubColorInput] = useState<string>('#10B981');
   const [subShowOnHome, setSubShowOnHome] = useState<boolean>(true);
   const [subOrderInput, setSubOrderInput] = useState<number>(1);
   const [subPromoImageInput, setSubPromoImageInput] = useState<string>('');
@@ -478,6 +479,7 @@ export const SubCategoriesModule: React.FC = () => {
     subId: string;
     name: string;
     image: string;
+    color: string;
     showOnHome: boolean;
     displayOrder: number;
     promoImage: string;
@@ -504,6 +506,7 @@ export const SubCategoriesModule: React.FC = () => {
       name: string;
       slug: string;
       image: string;
+      color: string;
       showOnHome: boolean;
       displayOrder: number;
       promoImage: string;
@@ -531,6 +534,8 @@ export const SubCategoriesModule: React.FC = () => {
           return isCatMatch && isSubMatch;
         }).length;
 
+        const sColor = typeof sub === 'object' && sub.color ? sub.color : '#10B981';
+
         items.push({
           categoryId: cat.id,
           categoryName: cat.name,
@@ -539,6 +544,7 @@ export const SubCategoriesModule: React.FC = () => {
           name: sName,
           slug: sSlug,
           image: sImage,
+          color: sColor,
           showOnHome: isSelectedOnHome,
           displayOrder: sOrder,
           promoImage: sPromoImage,
@@ -615,6 +621,7 @@ export const SubCategoriesModule: React.FC = () => {
       name: sName,
       image: subImageInput,
       icon: subImageInput,
+      color: subColorInput || '#10B981',
       showOnHome: subShowOnHome,
       displayOrder: targetOrder,
       promoImage: subPromoImageInput,
@@ -698,8 +705,8 @@ export const SubCategoriesModule: React.FC = () => {
 
   const handleEditSubCategorySubmit = async () => {
     if (!editingSub || !editingSub.name.trim()) return;
-    const { categoryId, subId, name, image, showOnHome, displayOrder, promoImage } = editingSub;
-    const subPayload = { name: name.trim(), image, icon: image, showOnHome, displayOrder: Number(displayOrder) || 1, promoImage };
+    const { categoryId, subId, name, image, color, showOnHome, displayOrder, promoImage } = editingSub;
+    const subPayload = { name: name.trim(), image, icon: image, color: color || '#10B981', showOnHome, displayOrder: Number(displayOrder) || 1, promoImage };
 
     updateSubCategory(categoryId, subId, subPayload);
 
@@ -949,6 +956,7 @@ export const SubCategoriesModule: React.FC = () => {
                             subId: item.subId,
                             name: item.name,
                             image: item.image || 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=200&auto=format&fit=crop',
+                            color: item.color || '#10B981',
                             showOnHome: item.showOnHome,
                             displayOrder: item.displayOrder || 1,
                             promoImage: item.promoImage || ''
@@ -1047,6 +1055,54 @@ export const SubCategoriesModule: React.FC = () => {
                   onChange={(e) => setSubOrderInput(parseInt(e.target.value) || 1)}
                   className="w-full px-4 py-2.5 border border-divider rounded-xl text-xs bg-background text-text-primary font-bold focus:outline-none focus:border-primary"
                 />
+              </div>
+
+              {/* Subcategory Background Color & Accent Tint Input */}
+              <div className="p-3 bg-background rounded-2xl border border-divider flex flex-col gap-2">
+                <label className="text-[11px] font-bold text-text-primary uppercase flex items-center justify-between">
+                  <span>Subcategory Background Color & Accent Tint</span>
+                  <span className="text-primary font-mono text-[11px] font-bold">{subColorInput}</span>
+                </label>
+                <div className="flex flex-wrap items-center gap-2 mb-1">
+                  {[
+                    { name: 'Emerald', hex: '#10B981' },
+                    { name: 'Light Green', hex: '#E8F5E9' },
+                    { name: 'Teal', hex: '#14B8A6' },
+                    { name: 'Cyan', hex: '#06B6D4' },
+                    { name: 'Sky', hex: '#0EA5E9' },
+                    { name: 'Blue', hex: '#3B82F6' },
+                    { name: 'Amber', hex: '#F59E0B' },
+                    { name: 'Light Amber', hex: '#FFF8E1' },
+                    { name: 'Rose', hex: '#F43F5E' },
+                    { name: 'Purple', hex: '#8B5CF6' }
+                  ].map((preset) => (
+                    <button
+                      key={preset.hex}
+                      type="button"
+                      onClick={() => setSubColorInput(preset.hex)}
+                      className={`w-7 h-7 rounded-full border-2 transition-all cursor-pointer flex items-center justify-center ${
+                        subColorInput === preset.hex ? 'border-primary scale-110 shadow-sm' : 'border-divider hover:scale-105'
+                      }`}
+                      style={{ backgroundColor: preset.hex }}
+                      title={`${preset.name} (${preset.hex})`}
+                    />
+                  ))}
+                </div>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="color"
+                    value={subColorInput || '#10B981'}
+                    onChange={(e) => setSubColorInput(e.target.value)}
+                    className="w-10 h-10 rounded-xl cursor-pointer border border-divider p-1 bg-surface shrink-0"
+                  />
+                  <input
+                    type="text"
+                    placeholder="#10B981 or #E8F5E9"
+                    value={subColorInput}
+                    onChange={(e) => setSubColorInput(e.target.value)}
+                    className="flex-1 px-4 py-2 border border-divider rounded-xl text-xs bg-surface text-text-primary font-bold focus:outline-none focus:border-primary font-mono"
+                  />
+                </div>
               </div>
 
               {/* Subcategory Image Upload & Field */}
@@ -1227,6 +1283,54 @@ export const SubCategoriesModule: React.FC = () => {
                   onChange={(e) => setEditingSub({ ...editingSub, displayOrder: parseInt(e.target.value) || 1 })}
                   className="w-full px-4 py-2.5 border border-divider rounded-xl text-xs bg-background text-text-primary font-bold focus:outline-none focus:border-primary"
                 />
+              </div>
+
+              {/* Subcategory Background Color & Accent Tint Input */}
+              <div className="p-3 bg-background rounded-2xl border border-divider flex flex-col gap-2">
+                <label className="text-[11px] font-bold text-text-primary uppercase flex items-center justify-between">
+                  <span>Subcategory Background Color & Accent Tint</span>
+                  <span className="text-primary font-mono text-[11px] font-bold">{editingSub.color || '#10B981'}</span>
+                </label>
+                <div className="flex flex-wrap items-center gap-2 mb-1">
+                  {[
+                    { name: 'Emerald', hex: '#10B981' },
+                    { name: 'Light Green', hex: '#E8F5E9' },
+                    { name: 'Teal', hex: '#14B8A6' },
+                    { name: 'Cyan', hex: '#06B6D4' },
+                    { name: 'Sky', hex: '#0EA5E9' },
+                    { name: 'Blue', hex: '#3B82F6' },
+                    { name: 'Amber', hex: '#F59E0B' },
+                    { name: 'Light Amber', hex: '#FFF8E1' },
+                    { name: 'Rose', hex: '#F43F5E' },
+                    { name: 'Purple', hex: '#8B5CF6' }
+                  ].map((preset) => (
+                    <button
+                      key={preset.hex}
+                      type="button"
+                      onClick={() => setEditingSub({ ...editingSub, color: preset.hex })}
+                      className={`w-7 h-7 rounded-full border-2 transition-all cursor-pointer flex items-center justify-center ${
+                        editingSub.color === preset.hex ? 'border-primary scale-110 shadow-sm' : 'border-divider hover:scale-105'
+                      }`}
+                      style={{ backgroundColor: preset.hex }}
+                      title={`${preset.name} (${preset.hex})`}
+                    />
+                  ))}
+                </div>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="color"
+                    value={editingSub.color || '#10B981'}
+                    onChange={(e) => setEditingSub({ ...editingSub, color: e.target.value })}
+                    className="w-10 h-10 rounded-xl cursor-pointer border border-divider p-1 bg-surface shrink-0"
+                  />
+                  <input
+                    type="text"
+                    placeholder="#10B981 or #E8F5E9"
+                    value={editingSub.color || '#10B981'}
+                    onChange={(e) => setEditingSub({ ...editingSub, color: e.target.value })}
+                    className="flex-1 px-4 py-2 border border-divider rounded-xl text-xs bg-surface text-text-primary font-bold focus:outline-none focus:border-primary font-mono"
+                  />
+                </div>
               </div>
 
               {/* Subcategory Image Upload & Field */}

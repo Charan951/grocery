@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
-import { useCMS, getCategoryImage, Product, Banner } from '../context/CMSContext';
+import { useSearchParams, Link, useNavigate, useLocation } from 'react-router-dom';
+import { useCMS, getCategoryImage, getSubCategoryImage, subCategoryImages, Product, Banner } from '../context/CMSContext';
 import { ProductCard } from '../components/ProductCard';
 import { SEO } from '../components/SEO';
 import { BannerCarousel } from '../components/BannerCarousel';
+import { SubcategoryCardImage } from '../components/SubcategoryCardImage';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowUpDown, ChevronRight, RefreshCw, X } from 'lucide-react';
 
@@ -15,6 +16,8 @@ interface ProductsProps {
 export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChange }) => {
   const { products, categories, seoSettings, banners = [] } = useCMS();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   // Search filter from URL
   const urlSearch = searchParams.get('search') || '';
@@ -76,51 +79,51 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
     }
   };
 
-  // Unique high-quality thumbnail image for EVERY subcategory
+  // Unique high-quality cutout sticker image for EVERY subcategory
   const subCategoryImages: Record<string, string> = {
     // Dairy, Bread & Eggs
-    'Milk': 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=200&auto=format&fit=crop',
-    'Breads & Buns': 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=200&auto=format&fit=crop',
-    'Fresh Bakery': 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=200&auto=format&fit=crop',
-    'Eggs': 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=200&auto=format&fit=crop',
-    'Curd & Probiotic Drinks': 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=200&auto=format&fit=crop',
-    'Batters & Mixes': 'https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?w=200&auto=format&fit=crop',
-    'High Protein': 'https://images.unsplash.com/photo-1571212515416-fef01fc43637?w=200&auto=format&fit=crop',
-    'Milk Based Drinks': 'https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?w=200&auto=format&fit=crop',
-    'Paneer & Cream': 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=200&auto=format&fit=crop',
-    'Gut Friendly': 'https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?w=200&auto=format&fit=crop',
-    'Butter': 'https://images.unsplash.com/photo-1589985270826-4b7bb135bc9d?w=200&auto=format&fit=crop',
-    'Cheese': 'https://images.unsplash.com/photo-1452195100486-9cc805987862?w=200&auto=format&fit=crop',
-    'Indian Breads': 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=200&auto=format&fit=crop',
-    'Yogurt & Shrikhand': 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=200&auto=format&fit=crop',
-    'Gourmet Store': 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=200&auto=format&fit=crop',
+    'Milk': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/474e6e58-1894-4378-86f1-168cc7266d1a.png',
+    'Breads & Buns': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/474e6e58-1894-4378-86f1-168cc7266d1a.png',
+    'Fresh Bakery': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/474e6e58-1894-4378-86f1-168cc7266d1a.png',
+    'Eggs': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/229a0614-71cc-410d-9242-88bcc1b4d0e7.png',
+    'Curd & Probiotic Drinks': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/474e6e58-1894-4378-86f1-168cc7266d1a.png',
+    'Batters & Mixes': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/dc4a299d-521f-4a64-8205-c5ba8e1d13e3.png',
+    'High Protein': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/474e6e58-1894-4378-86f1-168cc7266d1a.png',
+    'Milk Based Drinks': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/474e6e58-1894-4378-86f1-168cc7266d1a.png',
+    'Paneer & Cream': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/474e6e58-1894-4378-86f1-168cc7266d1a.png',
+    'Gut Friendly': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/474e6e58-1894-4378-86f1-168cc7266d1a.png',
+    'Butter': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/474e6e58-1894-4378-86f1-168cc7266d1a.png',
+    'Cheese': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/474e6e58-1894-4378-86f1-168cc7266d1a.png',
+    'Indian Breads': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/dc4a299d-521f-4a64-8205-c5ba8e1d13e3.png',
+    'Yogurt & Shrikhand': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/474e6e58-1894-4378-86f1-168cc7266d1a.png',
+    'Gourmet Store': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/474e6e58-1894-4378-86f1-168cc7266d1a.png',
 
     // Fruits & Vegetables
-    'Fresh Vegetables': 'https://images.unsplash.com/photo-1597362925123-77861d3fbac7?w=200&auto=format&fit=crop',
-    'New Launches in Fruits & Vegetables': 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=200&auto=format&fit=crop',
-    'Fresh Fruits': 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=200&auto=format&fit=crop',
-    'Exotics & Premium': 'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=200&auto=format&fit=crop',
-    'Mangoes & Melons': 'https://images.unsplash.com/photo-1553279768-865429fa0078?w=200&auto=format&fit=crop',
-    'Organics & Hydroponics': 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=200&auto=format&fit=crop',
-    'Leafy, Herbs & Seasonings': 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=200&auto=format&fit=crop',
-    'Flowers & Leaves': 'https://images.unsplash.com/photo-1561181286-d3fee7d55364?w=200&auto=format&fit=crop',
-    'Bouquets & Plants': 'https://images.unsplash.com/photo-1512428559087-560fa5ceab42?w=200&auto=format&fit=crop',
-    'Cuts & Sprouts': 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=200&auto=format&fit=crop',
-    'Plants & Gardening': 'https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=200&auto=format&fit=crop',
-    'Gardening Accessories': 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=200&auto=format&fit=crop',
-    'Frozen Veggies & Pulp': 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=200&auto=format&fit=crop',
+    'Fresh Vegetables': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/2b5f2be5-cada-4cd7-b0af-e46c0c065f71.png',
+    'New Launches in Fruits & Vegetables': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/2b5f2be5-cada-4cd7-b0af-e46c0c065f71.png',
+    'Fresh Fruits': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/54a11f26-d621-4f36-b6b2-659f230263f3.png',
+    'Exotics & Premium': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/c1615f10-9118-472e-8d82-e3d8f895fb66.png',
+    'Mangoes & Melons': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/54a11f26-d621-4f36-b6b2-659f230263f3.png',
+    'Organics & Hydroponics': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/2b5f2be5-cada-4cd7-b0af-e46c0c065f71.png',
+    'Leafy, Herbs & Seasonings': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/2b5f2be5-cada-4cd7-b0af-e46c0c065f71.png',
+    'Flowers & Leaves': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/2b5f2be5-cada-4cd7-b0af-e46c0c065f71.png',
+    'Bouquets & Plants': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/2b5f2be5-cada-4cd7-b0af-e46c0c065f71.png',
+    'Cuts & Sprouts': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/2b5f2be5-cada-4cd7-b0af-e46c0c065f71.png',
+    'Plants & Gardening': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/2b5f2be5-cada-4cd7-b0af-e46c0c065f71.png',
+    'Gardening Accessories': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/2b5f2be5-cada-4cd7-b0af-e46c0c065f71.png',
+    'Frozen Veggies & Pulp': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/2b5f2be5-cada-4cd7-b0af-e46c0c065f71.png',
 
     // Atta, Rice, Oil & Dals
-    'Atta': 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=200&auto=format&fit=crop',
-    'Rice': 'https://images.unsplash.com/photo-1536304929831-ee1ca9d44906?w=200&auto=format&fit=crop',
-    'Edible Oils': 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=200&auto=format&fit=crop',
-    'Dals & Pulses': 'https://images.unsplash.com/photo-1585994191611-726a88060c2d?w=200&auto=format&fit=crop',
-    'Ghee': 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=200&auto=format&fit=crop',
+    'Atta': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/dc4a299d-521f-4a64-8205-c5ba8e1d13e3.png',
+    'Rice': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/dc4a299d-521f-4a64-8205-c5ba8e1d13e3.png',
+    'Edible Oils': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/dc4a299d-521f-4a64-8205-c5ba8e1d13e3.png',
+    'Dals & Pulses': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/dc4a299d-521f-4a64-8205-c5ba8e1d13e3.png',
+    'Ghee': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/dc4a299d-521f-4a64-8205-c5ba8e1d13e3.png',
 
     // Breakfast & Sauces
-    'Cereals & Oats': 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=200&auto=format&fit=crop',
-    'Spreads & Peanut Butter': 'https://images.unsplash.com/photo-1563227812-0ea4c22e6cc8?w=200&auto=format&fit=crop',
-    'Ketchup & Sauces': 'https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=200&auto=format&fit=crop'
+    'Cereals & Oats': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/ab241d87-da5b-4830-b38f-1a6cd30d0d41.png',
+    'Spreads & Peanut Butter': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/ab241d87-da5b-4830-b38f-1a6cd30d0d41.png',
+    'Ketchup & Sauces': 'https://cdn.zeptonow.com/production/tr:w-210,ar-1-1,pr-true,f-auto,q-80/cms/category/ab241d87-da5b-4830-b38f-1a6cd30d0d41.png'
   };
 
   // Subcategory descriptions and fallback thumbnail images
@@ -160,23 +163,24 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
   useEffect(() => {
     if (urlCategory) {
       setSelectedCategory(urlCategory);
+      if (urlSubCategory) {
+        setSelectedSubCategory(urlSubCategory === 'All' ? '' : urlSubCategory);
+        setInCategoryView(true);
+      } else {
+        setSelectedSubCategory('');
+        setInCategoryView(false);
+      }
     } else if (urlSearch) {
       setSelectedCategory('');
-    } else if (categories.length > 0) {
-      setSelectedCategory(categories[0].slug || categories[0].id);
-    }
-
-    if (urlSubCategory) {
-      setSelectedSubCategory(urlSubCategory);
-      setInCategoryView(true);
-    } else if (urlSearch) {
       setSelectedSubCategory('');
       setInCategoryView(true);
     } else {
+      setSelectedCategory('');
       setSelectedSubCategory('');
       setInCategoryView(false);
+      navigate('/categories', { replace: true });
     }
-  }, [urlCategory, urlSubCategory, urlSearch, categories]);
+  }, [urlCategory, urlSubCategory, urlSearch, categories, navigate]);
 
   useEffect(() => {
     setOnlyOrganic(urlOrganic);
@@ -215,6 +219,41 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
     }
     return [];
   }, [currentCategoryObj]);
+
+  // Active Subcategory Object & Color Tint for Products Panel
+  const activeSubCatObj = useMemo(() => {
+    if (!currentCategoryObj || !selectedSubCategory) return null;
+    const subs = currentCategoryObj.subCategories || [];
+    return subs.find((s: any) => (typeof s === 'string' ? s : s.name).toLowerCase() === selectedSubCategory.toLowerCase());
+  }, [currentCategoryObj, selectedSubCategory]);
+
+  const activeSubCatColor = useMemo(() => {
+    let rawColor = '#10B981';
+    if (activeSubCatObj && typeof activeSubCatObj === 'object' && activeSubCatObj.color) {
+      rawColor = activeSubCatObj.color;
+    } else if (currentCategoryObj && currentCategoryObj.color) {
+      rawColor = currentCategoryObj.color;
+    }
+
+    if (!rawColor) return 'rgba(16, 185, 129, 0.12)';
+
+    if (rawColor.startsWith('#')) {
+      const hex = rawColor.length === 4 
+        ? '#' + rawColor[1] + rawColor[1] + rawColor[2] + rawColor[2] + rawColor[3] + rawColor[3]
+        : rawColor;
+      if (hex.length === 7) {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+        if (brightness > 225) {
+          return hex;
+        }
+        return `rgba(${r}, ${g}, ${b}, 0.16)`;
+      }
+    }
+    return rawColor;
+  }, [activeSubCatObj, currentCategoryObj]);
 
   // Filter and Sort Logic
   const filteredProducts = useMemo(() => {
@@ -353,14 +392,14 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
 
   const renderBannerItem = (b: Banner) => (
     <div key={b.id} className="w-full rounded-2xl md:rounded-3xl overflow-hidden shadow-sm hover:shadow-md border border-divider/60 bg-surface h-[180px] sm:h-[220px] md:h-[260px] lg:h-[280px]">
-      <a 
-        href={b.linkUrl || '#'} 
+      <a
+        href={b.linkUrl || '#'}
         className="block w-full h-full cursor-pointer group"
         title={b.title || 'Special Offer'}
       >
-        <img 
-          src={b.imageUrl} 
-          alt={b.title || 'Promo Banner'} 
+        <img
+          src={b.imageUrl}
+          alt={b.title || 'Promo Banner'}
           className="w-full h-full block rounded-2xl md:rounded-3xl object-cover object-center group-hover:scale-[1.005] transition-transform duration-300"
           onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
         />
@@ -391,114 +430,102 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
         {inCategoryView ? (
           <>
             <button
-              onClick={() => { setSelectedSubCategory(''); setInCategoryView(false); setSearchParams({}); }}
+              onClick={() => {
+                if (location.state && (location.state as any).from) {
+                  navigate((location.state as any).from);
+                } else {
+                  navigate('/categories');
+                }
+              }}
               className="mb-3 text-[11px] sm:text-xs font-black text-emerald-600 hover:text-emerald-700 flex items-center gap-1 transition-colors cursor-pointer"
             >
-              ← {urlSearch ? 'Clear Search & Show All Categories' : `Back to All ${currentCategoryObj?.name || ''} Subcategories`}
+              ← Back to Categories
             </button>
-            <div className="grid grid-cols-[104px_1fr] sm:grid-cols-[132px_1fr] lg:grid-cols-[300px_1fr] gap-3 sm:gap-4 lg:gap-6 items-start">
+            <div className="grid grid-cols-[72px_1fr] sm:grid-cols-[84px_1fr] lg:grid-cols-[96px_1fr] gap-2 sm:gap-3 lg:gap-4 items-start">
 
-              {/* Left Subcategory Rail / Sidebar */}
+              {/* Left Subcategory Rail / Sidebar (Narrow Icon Rail Matching Image 3) */}
               <aside
                 style={{
                   top: '12px',
                   maxHeight: 'calc(100vh - 24px)',
                 }}
-                className="bg-surface border border-divider/70 rounded-2xl p-2 lg:p-3 shadow-xs sticky overflow-y-auto no-scrollbar"
+                className="bg-white border-r border-divider/60 py-2 px-1 sticky top-3 overflow-y-auto no-scrollbar rounded-2xl flex flex-col gap-1 shadow-2xs"
               >
-                <div className="hidden lg:flex items-center justify-between border-b border-divider/60 px-1 pb-3 mb-2">
-                  <h3 className="font-black text-xs text-text-primary tracking-wider uppercase">
-                    Subcategories
-                  </h3>
-                  <span className="text-[11px] font-bold text-text-tertiary bg-background rounded-full px-2 py-0.5">
-                    {activeSubCategories.length}
-                  </span>
-                </div>
-
-                <div className="flex flex-col gap-1.5 lg:gap-1">
+                <div className="flex flex-col gap-2">
+                  {/* All Subcategories Button */}
                   <button
                     onClick={() => setSelectedSubCategory('')}
-                    className={`relative w-full flex flex-col items-center gap-1.5 lg:flex-row lg:items-center lg:gap-3 p-1.5 lg:pl-2.5 lg:pr-3 lg:py-2 rounded-xl text-center lg:text-left transition-all duration-200 ${selectedSubCategory === ''
-                      ? 'bg-emerald-600 text-white shadow-sm'
-                      : 'hover:bg-background text-text-primary'
-                      }`}
+                    className={`relative w-full flex flex-col items-center justify-center p-1 py-1.5 rounded-xl text-center transition-all duration-200 group cursor-pointer ${
+                      selectedSubCategory === '' ? 'font-black' : 'hover:bg-background'
+                    }`}
                   >
-                    <div className={`w-9 h-9 lg:w-10 lg:h-10 rounded-full flex items-center justify-center flex-shrink-0 ${selectedSubCategory === '' ? 'bg-white/20' : 'bg-emerald-500/10'
-                      }`}>
-                      <span className="text-base lg:text-lg">🛍️</span>
+                    {selectedSubCategory === '' && (
+                      <span className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-8 rounded-l-full bg-emerald-600" />
+                    )}
+                    <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center flex-shrink-0 border ${
+                      selectedSubCategory === '' ? 'border-emerald-500 bg-emerald-100/60 shadow-2xs' : 'border-divider/60 bg-gray-50'
+                    }`}>
+                      <span className="text-base sm:text-lg">🛍️</span>
                     </div>
-                    <span className="text-[10px] lg:text-xs font-black leading-tight line-clamp-2 lg:line-clamp-1">
-                      All {currentCategoryObj?.name}
+                    <span className={`text-[10px] leading-tight line-clamp-2 mt-1 text-center font-extrabold ${
+                      selectedSubCategory === '' ? 'text-emerald-950 font-black' : 'text-text-secondary'
+                    }`}>
+                      All
                     </span>
                   </button>
 
+                  {/* Subcategories List */}
                   {activeSubCategories.map((sub, idx) => {
                     const subName = typeof sub === 'string' ? sub : sub.name;
                     const isActive = selectedSubCategory.toLowerCase() === subName.toLowerCase();
-                    const catSlug = currentCategoryObj?.slug || currentCategoryObj?.id || 'fruits-vegetables';
-                    const subImg = subCategoryImages[subName] || categoryMetaData[catSlug]?.icon || 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=150&auto=format&fit=crop';
+                    const customImg = typeof sub === 'object' ? (sub.image || sub.icon || '') : '';
+                    const subImg = getSubCategoryImage(subName, currentCategoryObj?.name, customImg);
 
                     return (
                       <button
                         key={idx}
                         onClick={() => setSelectedSubCategory(subName)}
-                        className={`relative w-full flex flex-col items-center gap-1.5 lg:flex-row lg:items-center lg:gap-3 p-1.5 lg:pl-2.5 lg:pr-3 lg:py-2 rounded-xl text-center lg:text-left transition-all duration-200 group ${isActive
-                          ? 'bg-emerald-600 text-white shadow-sm'
-                          : 'hover:bg-background text-text-primary'
-                          }`}
+                        className={`relative w-full flex flex-col items-center justify-center p-1 py-1.5 rounded-xl text-center transition-all duration-200 group cursor-pointer`}
                       >
                         {isActive && (
-                          <span className="hidden lg:block absolute left-0 top-1/2 -translate-y-1/2 w-1 h-7 rounded-r bg-white/70" />
+                          <span className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-8 rounded-l-full bg-emerald-600" />
                         )}
-                        <div className={`w-9 h-9 lg:w-10 lg:h-10 rounded-full overflow-hidden flex-shrink-0 border-2 ${isActive ? 'border-white/70' : 'border-divider group-hover:border-emerald-300'} bg-background transition-colors`}>
-                          <img
+                        <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full overflow-hidden flex-shrink-0 p-0.5 border ${
+                          isActive ? 'border-emerald-500 bg-emerald-100/60 shadow-2xs' : 'border-divider/60 bg-gray-50 group-hover:border-emerald-300'
+                        } transition-all`}>
+                          <SubcategoryCardImage
                             src={subImg}
                             alt={subName}
-                            loading="lazy"
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              const fallback = 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=150&auto=format&fit=crop';
-                              if (target.src !== fallback) target.src = fallback;
-                            }}
+                            className="w-full h-full object-contain"
                           />
                         </div>
-                        <span className={`text-[10px] lg:text-xs leading-tight line-clamp-2 lg:line-clamp-2 flex-1 min-w-0 ${isActive ? 'font-black' : 'font-bold'}`}>
+                        <span className={`text-[10px] leading-tight line-clamp-2 mt-1 text-center font-extrabold ${
+                          isActive ? 'text-emerald-950 font-black' : 'text-text-secondary group-hover:text-text-primary'
+                        }`}>
                           {subName}
                         </span>
-
-                        <ChevronRight size={14} className={`hidden lg:block flex-shrink-0 opacity-60 ${isActive ? 'text-white' : 'text-text-tertiary'}`} />
                       </button>
                     );
                   })}
                 </div>
-
-                <div className="hidden lg:block mt-2 pt-3 border-t border-divider/60">
-                  <label className="flex items-center justify-between px-1 cursor-pointer">
-                    <span className="text-xs font-bold text-text-secondary">Organic Only</span>
-                    <input
-                      type="checkbox"
-                      checked={onlyOrganic}
-                      onChange={(e) => setOnlyOrganic(e.target.checked)}
-                      className="w-4 h-4 rounded border-divider text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                    />
-                  </label>
-                </div>
               </aside>
 
-              {/* Right Main Content Area: Subcategory Header & Products Grid */}
+              {/* Right Main Content Area: Dynamic Background Color Tint & Products Grid */}
               <main
-                style={{ maxHeight: 'calc(100vh - 24px)' }}
-                className="flex flex-col gap-3 sm:gap-6 min-w-0 overflow-y-auto no-scrollbar"
+                style={{
+                  maxHeight: 'calc(100vh - 24px)',
+                  backgroundColor: activeSubCatColor
+                }}
+                className="flex flex-col gap-3 sm:gap-4 min-w-0 overflow-y-auto no-scrollbar p-2.5 sm:p-4 rounded-3xl border border-divider/60 shadow-xs transition-colors duration-300"
               >
 
                 {/* Top Subcategory Banners */}
                 <BannerCarousel banners={topSubCategoryBanners} />
 
-                <div className="bg-surface border border-divider/70 rounded-2xl p-3 sm:p-5 shadow-xs flex flex-col gap-3">
+                <div className="bg-surface/90 backdrop-blur-xs border border-divider/70 rounded-2xl p-3 sm:p-4 shadow-xs flex flex-col gap-2">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
                     <div>
-                      <h1 className="text-lg sm:text-2xl font-black text-text-primary tracking-tight font-display">
+                      <h1 className="text-lg sm:text-xl font-black text-text-primary tracking-tight font-display">
                         {urlSearch ? `Search Results for "${urlSearch}"` : (selectedSubCategory || `All ${currentCategoryObj?.name || ''}`)}
                       </h1>
                       <p className="text-[11px] sm:text-xs text-text-tertiary font-bold mt-0.5">
@@ -600,21 +627,18 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
 
                     return (
                       <div
-                        key={idx}
-                        onClick={() => { setSelectedSubCategory(subName); setInCategoryView(true); }}
+                        key={subName || `subcard_${idx}`}
+                        onClick={() => {
+                          const catSlug = currentCategoryObj?.slug || currentCategoryObj?.id || 'fruits-vegetables';
+                          navigate(`/products?category=${catSlug}&subCategory=${encodeURIComponent(subName)}`);
+                        }}
                         className="p-3.5 rounded-2xl border bg-surface border-divider/70 hover:border-emerald-500/50 hover:shadow-xs transition-all duration-200 cursor-pointer flex gap-3 items-start group"
                       >
-                        <div className="w-12 h-12 rounded-xl overflow-hidden border border-divider flex-shrink-0 bg-background group-hover:scale-105 transition-transform">
-                          <img
+                        <div className="w-12 h-12 rounded-xl overflow-hidden border border-divider flex-shrink-0 bg-transparent group-hover:scale-105 transition-transform">
+                          <SubcategoryCardImage
                             src={subImg}
                             alt={subName}
-                            loading="lazy"
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              const fallback = 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=150&auto=format&fit=crop';
-                              if (target.src !== fallback) target.src = fallback;
-                            }}
+                            className="w-full h-full p-0.5"
                           />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -635,6 +659,32 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
 
             {/* Before Products Category Banners */}
             <BannerCarousel banners={beforeProductsCategoryBanners} />
+
+            {/* Related Items / Products Grid below Subcategories Cards */}
+            <div className="mt-4">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg sm:text-xl font-extrabold text-text-primary tracking-tight font-display">
+                    All {currentCategoryObj?.name || 'Category'} Products
+                  </h3>
+                  <p className="text-[11px] sm:text-xs text-text-tertiary font-bold mt-0.5">
+                    {filteredProducts.length} Products available in 10 mins
+                  </p>
+                </div>
+              </div>
+
+              {filteredProducts.length === 0 ? (
+                <div className="bg-surface border border-divider rounded-2xl p-8 text-center text-xs text-text-tertiary font-bold">
+                  No products available in this category currently.
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
+                  {filteredProducts.map((product, idx) => (
+                    <ProductCard key={product.id || product._id || `cat_prod_${idx}`} product={product} onQuickView={onQuickView} />
+                  ))}
+                </div>
+              )}
+            </div>
 
           </main>
         )}
