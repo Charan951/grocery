@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { useCMS, getCategoryImage, Product, Banner } from '../context/CMSContext';
 import { ProductCard } from '../components/ProductCard';
 import { SEO } from '../components/SEO';
@@ -323,7 +323,6 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
     });
   }, [activeBanners, selectedCategory, currentCategoryObj]);
 
-  const topCategoryBanners = useMemo(() => categoryBanners.filter(b => !b.position || b.position === 'top'), [categoryBanners]);
   const beforeSubCategoryBanners = useMemo(() => categoryBanners.filter(b => b.position === 'before_subcategories'), [categoryBanners]);
   const afterSubCategoryBanners = useMemo(() => categoryBanners.filter(b => b.position === 'after_subcategories'), [categoryBanners]);
   const beforeProductsCategoryBanners = useMemo(() => categoryBanners.filter(b => b.position === 'before_products'), [categoryBanners]);
@@ -555,8 +554,32 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
           /* CONDITION 2: NO Subcategory Selected -> Show Category Landing Page with 3-Column Cards Grid */
           <main className="flex flex-col gap-6">
 
-            {/* Top Category Banners */}
-            <BannerCarousel banners={topCategoryBanners} />
+            {/* Breadcrumb */}
+            <div className="flex items-center gap-1.5 text-xs font-bold text-text-secondary">
+              <Link to="/" className="hover:text-emerald-600 transition-colors">Home</Link>
+              <ChevronRight size={13} className="text-text-tertiary" />
+              <span className="text-text-primary">{currentCategoryObj?.name}</span>
+            </div>
+
+            {/* Category Hero Banner */}
+            <div className="relative rounded-3xl overflow-hidden border border-divider/70 bg-gradient-to-r from-emerald-50 via-teal-50 to-rose-50 p-6 sm:p-8">
+              <div className="relative z-10 w-full sm:pr-40 md:pr-52">
+                <h1 className="w-full text-3xl sm:text-4xl font-black text-text-primary tracking-tight font-display">
+                  {currentCategoryObj?.name}
+                </h1>
+                <p className="w-full mt-2 text-xs sm:text-sm text-text-secondary font-semibold leading-relaxed">
+                  {activeCategoryMeta.description}
+                </p>
+              </div>
+              <div className="hidden sm:block absolute z-10 top-6 right-6 md:top-8 md:right-8 w-32 md:w-44 h-32 md:h-44 rounded-2xl overflow-hidden border border-white/60 shadow-md">
+                <img
+                  src={activeCategoryMeta.bannerImg}
+                  alt={currentCategoryObj?.name}
+                  className="w-full h-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              </div>
+            </div>
 
             {/* Before Subcategories Category Banners */}
             <BannerCarousel banners={beforeSubCategoryBanners} />
@@ -582,7 +605,17 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
                         className="p-3.5 rounded-2xl border bg-surface border-divider/70 hover:border-emerald-500/50 hover:shadow-xs transition-all duration-200 cursor-pointer flex gap-3 items-start group"
                       >
                         <div className="w-12 h-12 rounded-xl overflow-hidden border border-divider flex-shrink-0 bg-background group-hover:scale-105 transition-transform">
-                          <img src={subImg} alt={subName} className="w-full h-full object-cover" />
+                          <img
+                            src={subImg}
+                            alt={subName}
+                            loading="lazy"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              const fallback = 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=150&auto=format&fit=crop';
+                              if (target.src !== fallback) target.src = fallback;
+                            }}
+                          />
                         </div>
                         <div className="flex-1 min-w-0">
                           <h4 className="text-xs font-black text-text-primary truncate group-hover:text-emerald-600 transition-colors">{subName}</h4>

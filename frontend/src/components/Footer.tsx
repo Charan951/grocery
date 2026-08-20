@@ -95,7 +95,7 @@ export const Footer: React.FC = () => {
           </div>
 
           {/* Newsletter Column */}
-          <div className="flex flex-col gap-3">
+          <div className="hidden md:flex flex-col gap-3">
             <h4 className="text-sm font-bold text-text-primary mb-5 font-display">Stay Updated</h4>
             <p className="text-sm text-text-secondary leading-normal">
               Subscribe to get exclusive discount coupon codes, recipes, and weekly fresh notifications.

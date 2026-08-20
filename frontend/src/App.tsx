@@ -42,6 +42,7 @@ import { WishlistDrawer } from './components/WishlistDrawer';
 import { CartDrawer } from './components/CartDrawer';
 import { QuickViewModal } from './components/QuickViewModal';
 import { FloatingCartBar } from './components/FloatingCartBar';
+import { BottomNav } from './components/BottomNav';
 
 // Scroll To Top on page navigation
 const ScrollToTop: React.FC = () => {
@@ -189,6 +190,10 @@ const AppContent: React.FC = () => {
 
       {/* Footer Layout (Home page only) */}
       {location.pathname === '/' && <Footer />}
+
+      {/* Bottom Tab Navigation (mobile only) */}
+      <BottomNav />
+      <div className="sm:hidden" style={{ height: 'calc(64px + env(safe-area-inset-bottom))' }} />{/* spacer so content isn't hidden behind bottom nav */}
 
       {/* Overlays Drawers & Modals */}
       <WishlistDrawer 

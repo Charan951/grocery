@@ -7,7 +7,7 @@ import { CustomerAuthModal } from './CustomerAuthModal';
 import { CustomerProfileDrawer } from './CustomerProfileDrawer';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Search, Heart, ShoppingBag, MapPin, Menu, X,
+  Search, Heart, MapPin, Menu, X,
   ChevronDown, Leaf, Settings, Percent, User, Zap, LogOut, Shield, LayoutGrid
 } from 'lucide-react';
 
@@ -16,8 +16,8 @@ interface HeaderProps {
   onCartOpen: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) => {
-  const { cartCount, wishlist } = useCartWishlist();
+export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
+  const { wishlist } = useCartWishlist();
   const { categories, products, coupons, userLocation, updateUserLocation } = useCMS();
   const navigate = useNavigate();
   const location = useLocation();
@@ -169,34 +169,26 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
               onClick={() => navigate('/account/addresses')}
               className="flex flex-col cursor-pointer select-none group sm:border-l sm:border-divider sm:pl-4 pl-0"
             >
-              <div className="flex items-center gap-1 text-text-primary font-extrabold text-xs sm:text-sm tracking-tight leading-tight">
-                <Zap size={14} className="text-amber-500 fill-amber-400 shrink-0" />
+              <div className="flex items-center gap-1 text-text-primary font-extrabold text-sm sm:text-sm tracking-tight leading-tight">
+                <Zap size={15} className="text-black fill-black shrink-0" />
                 <span className="text-text-primary font-black">10 minutes</span>
               </div>
-              <div className="flex items-center gap-0.5 text-[11px] sm:text-xs font-semibold text-text-secondary group-hover:text-primary transition-colors">
-                <span className="truncate max-w-[120px] sm:max-w-[180px] lg:max-w-[240px]">
+              <div className="flex items-center gap-0.5 text-[13px] sm:text-xs font-bold text-text-secondary group-hover:text-primary transition-colors">
+                <span className="truncate max-w-[200px] sm:max-w-[220px] lg:max-w-[280px]">
                   {(() => {
-                    const customerUser = (() => {
-                      const cached = localStorage.getItem('customer_user');
-                      return cached ? JSON.parse(cached) : null;
-                    })();
-                    const userPhoneKey = customerUser?.phone ? customerUser.phone.replace(/\D/g, '') : '';
-                    const saved = userPhoneKey ? localStorage.getItem(`saved_addresses_${userPhoneKey}`) : null;
-                    const addrs = saved ? JSON.parse(saved) : [];
-
-                    if (!customerUser || addrs.length === 0) {
-                      return '📍 Add Address';
-                    }
-
-                    if (typeof userLocation === 'object' && userLocation !== null) {
+                    if (typeof userLocation === 'object' && userLocation !== null && (userLocation.houseNo || userLocation.area || userLocation.address || userLocation.fullAddress)) {
                       const parts = [];
                       if (userLocation.label) parts.push(userLocation.label);
                       if (userLocation.houseNo) parts.push(userLocation.houseNo);
-                      parts.push(userLocation.area || userLocation.address || 'KPHB Colony');
+                      parts.push(userLocation.area || userLocation.address || userLocation.fullAddress);
                       return parts.join(' - ');
                     }
 
-                    return 'KPHB Colony - Balaji Nagar, KPHB ...';
+                    if (typeof userLocation === 'string' && userLocation.trim()) {
+                      return userLocation;
+                    }
+
+                    return '📍 Add Address';
                   })()}
                 </span>
                 <ChevronDown size={14} className="text-text-secondary shrink-0" />
@@ -296,20 +288,6 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
                 )}
               </AnimatePresence>
             </div>
-
-            {/* Cart Button */}
-            <button
-              onClick={onCartOpen}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-primary text-white font-extrabold text-xs sm:text-sm shadow-sm hover:bg-secondary transition-colors cursor-pointer shrink-0"
-            >
-              <ShoppingBag size={17} />
-              <span className="hidden sm:inline">My Cart</span>
-              {cartCount > 0 && (
-                <span className="bg-white text-primary text-[11px] font-black px-1.5 py-0.5 rounded-full ml-0.5">
-                  {cartCount}
-                </span>
-              )}
-            </button>
           </div>
         </header>
 

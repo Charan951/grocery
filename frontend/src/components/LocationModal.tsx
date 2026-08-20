@@ -243,7 +243,7 @@ export const LocationModal: React.FC<LocationModalProps> = ({
                       type="text"
                       value={houseNo}
                       onChange={(e) => setHouseNo(e.target.value)}
-                      placeholder="e.g. Flat 402, Sunshine Apts"
+                      placeholder="e.g. Flat No, Building Name"
                       className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-900 focus:outline-none focus:border-[#00A86B]"
                     />
                   </div>
@@ -256,7 +256,7 @@ export const LocationModal: React.FC<LocationModalProps> = ({
                       type="text"
                       value={landmark}
                       onChange={(e) => setLandmark(e.target.value)}
-                      placeholder="e.g. Near Metro Station"
+                      placeholder="e.g. Near Bus Stop"
                       className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-900 focus:outline-none focus:border-[#00A86B]"
                     />
                   </div>

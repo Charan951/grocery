@@ -281,15 +281,6 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                   {sec.categoryColor && (
                     <span className="w-1.5 h-6 rounded-full shrink-0" style={{ backgroundColor: sec.categoryColor }} />
                   )}
-                  {sec.subImg && (
-                    <img 
-                      src={sec.subImg} 
-                      alt={sec.subName} 
-                      style={{ borderColor: sec.categoryColor ? `${sec.categoryColor}60` : undefined }}
-                      className="w-8 h-8 rounded-lg object-cover shadow-xs border-2"
-                      onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
-                    />
-                  )}
                   <h2 className="text-xl md:text-2xl font-black text-text-primary tracking-tight font-display">
                     {sec.subName}
                   </h2>
@@ -562,7 +553,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
 
         {/* 10. Latest Blogs */}
         {blogs.length > 0 && (
-          <section className="mb-12 md:mb-16">
+          <section className="hidden md:block mb-12 md:mb-16">
             <div className="flex justify-between items-end mb-6">
               <div>
                 <h2 className="text-2xl md:text-3xl font-extrabold text-text-primary">Latest Health Articles</h2>
