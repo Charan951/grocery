@@ -126,6 +126,11 @@ export interface Banner {
   categoryId?: string;
   subcategoryId?: string;
   position?: string;
+  themeBgColor?: string;
+  themeTextColor?: string;
+  themeAccentColor?: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface Coupon {
@@ -280,13 +285,16 @@ const CMSContext = createContext<CMSContextProps | undefined>(undefined);
 const defaultBanners: Banner[] = [
   {
     id: 'banner_1',
-    title: 'Weekend Organic Freshness',
-    subtitle: 'Up to 30% OFF on Fresh Greens & Organic Vegetables',
-    tag: 'FLASH SALE',
-    gradient: ['#10B981', '#059669'],
+    title: 'Varalakshmi Vratham Festival Campaign',
+    subtitle: 'Special Puja Flowers, Fresh Fruits & Organic Sweets Delivered in 10 Mins',
+    tag: 'FESTIVAL SPECIAL',
+    gradient: ['#8F1239', '#8F1239'],
+    themeBgColor: '#8F1239',
+    themeTextColor: '#FFFFFF',
+    themeAccentColor: '#F6C453',
     imageUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&auto=format&fit=crop',
-    buttonText: 'Shop Organic',
-    linkUrl: '/products?category=cat_organic',
+    buttonText: 'Shop Festive Needs',
+    linkUrl: '/products',
     positionIndex: 1,
     active: true,
   },
@@ -1067,39 +1075,54 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateProduct = async (id: string, updated: Partial<Product>) => {
+    const payload = { ...updated };
+    delete payload._id;
+
     setState((prev) => ({
       ...prev,
-      products: prev.products.map((p) => (p.id === id || (p._id && p._id === id) ? { ...p, ...updated } : p)),
+      products: prev.products.map((p) => (p.id === id || (p._id && p._id === id) ? { ...p, ...payload } : p)),
     }));
     try {
-      const token = localStorage.getItem('token') || localStorage.getItem('freshcart_token');
+      const token = localStorage.getItem('admin_token') || localStorage.getItem('token') || localStorage.getItem('freshcart_token');
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      await fetch(`/api/products/${id}`, {
+      const res = await fetch(`/api/products/${id}`, {
         method: 'PUT',
         headers,
-        body: JSON.stringify(updated)
+        body: JSON.stringify(payload)
       });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.product) {
+          setState((prev) => ({
+            ...prev,
+            products: prev.products.map((p) => (p.id === id || (p._id && p._id === id) ? { ...p, ...data.product } : p)),
+          }));
+        }
+      }
     } catch (e) {
-      console.warn('API sync updateProduct offline', e);
+      console.warn('API sync updateProduct offline/error', e);
     }
   };
 
   const addProduct = async (product: Product) => {
+    const payload = { ...product };
+    delete payload._id;
+
     setState((prev) => ({
       ...prev,
-      products: [product, ...prev.products],
+      products: [payload as Product, ...prev.products],
     }));
     try {
-      const token = localStorage.getItem('token') || localStorage.getItem('freshcart_token');
+      const token = localStorage.getItem('admin_token') || localStorage.getItem('token') || localStorage.getItem('freshcart_token');
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
       const res = await fetch('/api/products', {
         method: 'POST',
         headers,
-        body: JSON.stringify(product)
+        body: JSON.stringify(payload)
       });
       if (res.ok) {
         const data = await res.json();
@@ -1111,7 +1134,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
     } catch (e) {
-      console.warn('API sync addProduct offline', e);
+      console.warn('API sync addProduct offline/error', e);
     }
   };
 

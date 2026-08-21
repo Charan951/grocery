@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SEO } from '../components/SEO';
 import { Link, useNavigate } from 'react-router-dom';
@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useCMS } from '../context/CMSContext';
 import { useSmartBack } from '../hooks/useSmartBack';
+import { searchCitiesByPrefix, CityLocation } from '../data/citiesData';
 
 interface SavedAddress {
   id: string;
@@ -136,11 +137,66 @@ export const CustomerAddresses: React.FC = () => {
     fetchAddressForCoords(newLat, newLng);
   };
 
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [prefixSuggestions, setPrefixSuggestions] = useState<CityLocation[]>([]);
+  const [apiSuggestions, setApiSuggestions] = useState<any[]>([]);
+
+  // Automatic starting letter prefix search for delivery search bar
+  useEffect(() => {
+    const raw = searchQuery.trim();
+    const cleanQ = raw.replace(/[-_]+$/, '').trim();
+
+    if (cleanQ.length > 0) {
+      const localMatches = searchCitiesByPrefix(cleanQ);
+      setPrefixSuggestions(localMatches);
+      setShowSuggestions(true);
+
+      const timer = setTimeout(async () => {
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&countrycodes=in&q=${encodeURIComponent(cleanQ)}`
+          );
+          const data = await res.json();
+          if (data && Array.isArray(data)) {
+            setApiSuggestions(data.slice(0, 5));
+          }
+        } catch (err) {
+          console.warn(err);
+        }
+      }, 250);
+
+      return () => clearTimeout(timer);
+    } else {
+      setPrefixSuggestions([]);
+      setApiSuggestions([]);
+      setShowSuggestions(false);
+    }
+  }, [searchQuery]);
+
+  const handleSelectSuggestion = (
+    cityName: string,
+    stateName: string,
+    lat: number,
+    lng: number,
+    pincode?: string,
+    fullAddr?: string
+  ) => {
+    setPosition([lat, lng]);
+    const areaUpper = cityName.split(',')[0].toUpperCase();
+    const finalAddr = fullAddr || `${cityName}, ${stateName}${pincode ? ' - ' + pincode : ''}, India`;
+    setFullAddressText(finalAddr);
+    setDetectedArea(areaUpper);
+    if (pincode) setDetectedPincode(pincode);
+    setSearchQuery(cityName);
+    setShowSuggestions(false);
+  };
+
   // Search location handler
   const handleSearchLocation = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!searchQuery.trim()) return;
 
+    setShowSuggestions(false);
     setIsGeocoding(true);
     try {
       const res = await fetch(
@@ -491,27 +547,105 @@ export const CustomerAddresses: React.FC = () => {
           <div className="flex flex-col gap-5">
 
             {/* Search Bar + Locate Me Button */}
-            <form onSubmit={handleSearchLocation} className="flex items-center gap-2 bg-surface p-3 rounded-2xl border border-divider shadow-2xs">
-              <div className="flex-1 bg-background border border-divider focus-within:border-primary rounded-xl px-4 py-2.5 flex items-center gap-2 transition-all">
-                <Search size={18} className="text-text-tertiary shrink-0" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Type area, landmark or street (e.g. HITEC City, Indiranagar)..."
-                  className="w-full bg-transparent border-none outline-none text-xs sm:text-sm font-semibold text-text-primary placeholder:text-text-tertiary"
-                />
-              </div>
+            <div className="relative">
+              <form onSubmit={handleSearchLocation} className="flex items-center gap-2 bg-surface p-3 rounded-2xl border border-divider shadow-2xs">
+                <div className="flex-1 bg-background border border-divider focus-within:border-primary rounded-xl px-4 py-2.5 flex items-center gap-2 transition-all">
+                  <Search size={18} className="text-text-tertiary shrink-0" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onFocus={() => searchQuery.trim().length > 0 && setShowSuggestions(true)}
+                    placeholder="Type city or area (e.g. E for Eluru, G for Guntur)..."
+                    className="w-full bg-transparent border-none outline-none text-xs sm:text-sm font-semibold text-text-primary placeholder:text-text-tertiary"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => { setSearchQuery(''); setShowSuggestions(false); }}
+                      className="text-text-tertiary hover:text-text-primary text-xs font-bold px-1"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
 
-              <button
-                type="button"
-                onClick={handleLocateMe}
-                className="bg-primary hover:bg-secondary text-white font-extrabold text-xs px-4 py-3 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-2xs"
-              >
-                <Navigation size={15} />
-                <span>Locate Me</span>
-              </button>
-            </form>
+                <button
+                  type="button"
+                  onClick={handleLocateMe}
+                  className="bg-primary hover:bg-secondary text-white font-extrabold text-xs px-4 py-3 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-2xs"
+                >
+                  <Navigation size={15} />
+                  <span>Locate Me</span>
+                </button>
+              </form>
+
+              {/* Autocomplete Starting-Letter City Suggestions Dropdown */}
+              {showSuggestions && (prefixSuggestions.length > 0 || apiSuggestions.length > 0) && (
+                <div className="absolute top-[calc(100%+6px)] left-0 right-0 bg-white border border-divider rounded-2xl shadow-premium overflow-hidden z-[500] max-h-72 overflow-y-auto p-1.5 flex flex-col gap-0.5">
+                  <div className="px-3 py-1 text-[10px] font-black text-text-tertiary uppercase tracking-wider bg-background/60 rounded-lg">
+                    Matching Locations ({prefixSuggestions.length + apiSuggestions.length})
+                  </div>
+
+                  {prefixSuggestions.map((city, idx) => (
+                    <div
+                      key={`prefix_addr_${idx}`}
+                      onClick={() => handleSelectSuggestion(city.name, city.state, city.lat, city.lng, city.pincode)}
+                      className="px-3.5 py-2.5 hover:bg-primary/10 rounded-xl cursor-pointer flex items-center justify-between border-b border-divider/40 last:border-b-0 group transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 font-bold text-xs">
+                          📍
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-xs font-extrabold text-text-primary group-hover:text-primary">
+                            {city.name}
+                          </span>
+                          <span className="text-[10px] font-semibold text-text-tertiary">
+                            {city.state} {city.pincode ? `• PIN: ${city.pincode}` : ''}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-extrabold text-primary bg-primary/10 px-2.5 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity">
+                        Select City
+                      </span>
+                    </div>
+                  ))}
+
+                  {apiSuggestions.map((item, idx) => {
+                    const mainName = item.display_name.split(',')[0];
+                    return (
+                      <div
+                        key={`api_addr_${idx}`}
+                        onClick={() => handleSelectSuggestion(
+                          mainName,
+                          item.display_name.split(',')[1] || '',
+                          parseFloat(item.lat),
+                          parseFloat(item.lon),
+                          item.display_name.match(/\b\d{6}\b/)?.[0],
+                          item.display_name
+                        )}
+                        className="px-3.5 py-2.5 hover:bg-primary/10 rounded-xl cursor-pointer flex items-center justify-between border-b border-divider/40 last:border-b-0 group transition-colors"
+                      >
+                        <div className="flex items-center gap-3 max-w-[85%]">
+                          <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 font-bold text-xs">
+                            🗺️
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-text-primary line-clamp-1 group-hover:text-primary">
+                              {mainName}
+                            </span>
+                            <span className="text-[10px] font-medium text-text-tertiary line-clamp-1">
+                              {item.display_name}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
             {/* Popular Locations */}
             <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-none">

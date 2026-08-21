@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ShoppingBag, Plus, Minus, Trash2, Tag, MapPin, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { CheckoutModal } from './CheckoutModal';
+import { getProductImage } from '../utils/imageUtils';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -135,7 +136,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, x: 50 }}
                   >
-                    <img src={item.product.imageUrl} alt={item.product.name} className="w-20 h-20 object-cover rounded-md border border-divider" />
+                    <img src={getProductImage(item.product)} alt={item.product.name} className="w-20 h-20 object-cover rounded-md border border-divider" />
                     <div className="flex-1 flex flex-col">
                       <h4 className="text-sm font-bold text-text-primary mb-0.5 line-clamp-1">{item.product.name}</h4>
                       <span className="text-xs text-text-secondary font-medium mb-2">{item.selectedWeight}</span>

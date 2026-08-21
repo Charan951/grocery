@@ -5,6 +5,7 @@ import { useCartWishlist, getProductStockQuantity } from '../context/CartWishlis
 import { ProductCard } from '../components/ProductCard';
 import { SEO } from '../components/SEO';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getProductImage } from '../utils/imageUtils';
 import { 
   Star, Heart, Plus, Minus, ShoppingBag, Truck, 
   RotateCcw, ChevronDown, ChevronUp, CheckSquare, Square 
@@ -82,11 +83,10 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ onQuickView }) =
     );
   }
 
-  // Generate 3 mock gallery thumbnails
+  const mainProductImg = getProductImage(product);
   const galleryImages = [
-    product.imageUrl,
-    'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=800&auto=format&fit=crop',
+    mainProductImg,
+    ...(Array.isArray(product.images) && product.images.length > 1 ? product.images.slice(1).filter(Boolean) : [])
   ];
 
   const handleAddToCart = () => {
@@ -369,7 +369,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ onQuickView }) =
             <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-8 justify-between">
               {/* Main Product */}
               <div className="flex items-center gap-4 bg-background p-4 rounded-xl border border-divider w-full max-w-[280px]">
-                <img src={product.imageUrl} alt={product.name} className="w-16 h-16 object-contain" />
+                <img src={getProductImage(product)} alt={product.name} className="w-16 h-16 object-contain" />
                 <div className="flex flex-col gap-1">
                   <span className="text-xs font-bold text-text-primary line-clamp-1">{product.name}</span>
                   <span className="text-xs font-bold text-primary">₹{product.price}</span>
@@ -386,7 +386,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ onQuickView }) =
                     {bundleChecked1 ? <CheckSquare size={20} fill="rgba(76,175,80,0.1)" /> : <Square size={20} />}
                   </button>
                   <div className="flex items-center gap-4 bg-background p-4 rounded-xl border border-divider w-full max-w-[280px]">
-                    <img src={bundleItems[0].imageUrl} alt={bundleItems[0].name} className="w-16 h-16 object-contain" />
+                    <img src={getProductImage(bundleItems[0])} alt={bundleItems[0].name} className="w-16 h-16 object-contain" />
                     <div className="flex flex-col gap-1">
                       <span className="text-xs font-bold text-text-primary line-clamp-1">{bundleItems[0].name}</span>
                       <span className="text-xs font-bold text-primary">₹{bundleItems[0].price}</span>
@@ -405,7 +405,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ onQuickView }) =
                     {bundleChecked2 ? <CheckSquare size={20} fill="rgba(76,175,80,0.1)" /> : <Square size={20} />}
                   </button>
                   <div className="flex items-center gap-4 bg-background p-4 rounded-xl border border-divider w-full max-w-[280px]">
-                    <img src={bundleItems[1].imageUrl} alt={bundleItems[1].name} className="w-16 h-16 object-contain" />
+                    <img src={getProductImage(bundleItems[1])} alt={bundleItems[1].name} className="w-16 h-16 object-contain" />
                     <div className="flex flex-col gap-1">
                       <span className="text-xs font-bold text-text-primary line-clamp-1">{bundleItems[1].name}</span>
                       <span className="text-xs font-bold text-primary">₹{bundleItems[1].price}</span>

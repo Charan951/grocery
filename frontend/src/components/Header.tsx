@@ -6,6 +6,7 @@ import { LocationModal } from './LocationModal';
 import { CustomerAuthModal } from './CustomerAuthModal';
 import { CustomerProfileDrawer } from './CustomerProfileDrawer';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getProductImage } from '../utils/imageUtils';
 import {
   Search, Heart, MapPin, Menu, X,
   ChevronDown, Leaf, Settings, Percent, User, Zap, LogOut, Shield, LayoutGrid
@@ -18,20 +19,17 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
   const { wishlist } = useCartWishlist();
-  const { categories, products, coupons, userLocation, updateUserLocation } = useCMS();
+  const { categories, products, coupons, banners, userLocation, updateUserLocation } = useCMS();
   const navigate = useNavigate();
   const location = useLocation();
 
   // Entire app bar (top header, search bar, category nav) tints to the active
-  // category's own colour; defaults to violet when "All" / home is active.
+  // category's own colour; defaults to campaign or green theme when home is active.
   const activeCategory = useMemo(
     () => categories.find(cat => location.search.includes(`category=${cat.slug || cat.id}`)),
     [categories, location.search]
   );
   const isHomeActive = location.pathname === '/' && !activeCategory;
-  const navAccent = activeCategory ? (activeCategory.color || '#4CAF50') : '#4CAF50';
-  const appBarBg = '#FFFFFF';
-  const appBarBorder = '#ECECEC';
 
   const [announcementVisible, setAnnouncementVisible] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,15 +48,67 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
   });
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [headerHidden, setHeaderHidden] = useState(false);
+  const [isScrolledDown, setIsScrolledDown] = useState(false);
+
+  // Rotating sample search placeholders every 2 seconds
+  const SAMPLE_SEARCHES = useMemo(() => [
+    'Search "ice cream"',
+    'Search "bread & buns"',
+    'Search "chocolate box"',
+    'Search "fresh milk"',
+    'Search "kurkure & snacks"',
+    'Search "mangoes & fruits"',
+    'Search "organic ghee"',
+    'Search "paneer & cream"'
+  ], []);
+
+  const [sampleSearchIndex, setSampleSearchIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSampleSearchIndex((prev) => (prev + 1) % SAMPLE_SEARCHES.length);
+    }, 2000);
+    return () => clearInterval(timer);
+  }, [SAMPLE_SEARCHES.length]);
+
+  const currentPlaceholder = SAMPLE_SEARCHES[sampleSearchIndex];
 
   const searchRef = useRef<HTMLDivElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const appBarRef = useRef<HTMLDivElement>(null);
+  const lastScrollY = useRef(0);
+  const ticking = useRef(false);
 
-  // The top bar (logo/location + search) and the category nav are stacked
-  // inside ONE sticky container (top-0) — no cross-element offset math needed,
-  // so there's no timing gap on route navigation. Just measure the combined
-  // height so other pages can offset their own sticky elements correctly.
+  // Scroll direction listener for smooth AppBar hide/show behavior & scroll color transition
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      setIsScrolledDown(currentScrollY > 40);
+
+      if (!ticking.current) {
+        window.requestAnimationFrame(() => {
+          const diff = currentScrollY - lastScrollY.current;
+
+          if (currentScrollY <= 15) {
+            setHeaderHidden(false);
+          } else if (diff > 8 && currentScrollY > 50) {
+            setHeaderHidden(true);
+          } else if (diff < -8) {
+            setHeaderHidden(false);
+          }
+          lastScrollY.current = currentScrollY;
+          ticking.current = false;
+        });
+        ticking.current = true;
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Measure header height for page padding
   useEffect(() => {
     const el = appBarRef.current;
     if (!el) return;
@@ -71,9 +121,7 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
     return () => observer.disconnect();
   }, []);
 
-  // Reopen the profile drawer when routed home from a sub-page's Back
-  // button with `state: { openProfile: true }` (the drawer is a UI
-  // overlay on "/", not its own route — see useSmartBack).
+  // Reopen the profile drawer when routed home from a sub-page's Back button
   useEffect(() => {
     if ((location.state as { openProfile?: boolean } | null)?.openProfile && customerUser) {
       setIsCustomerProfileOpen(true);
@@ -145,47 +193,111 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
     navigate(`/product/${productId}`);
   };
 
-  const activeAnnouncement = coupons.length > 0 ? coupons[0] : null;
+  const isHomePage = location.pathname === '/';
 
-  // Derived Header dynamic background color based on active category
+  // Active campaign banner for header background tinting (Home Page ONLY)
+  const activeCampaignBanner = useMemo(() => {
+    if (!isHomePage) return null;
+    const now = new Date();
+    return banners.find(b => {
+      if (b.active === false) return false;
+      const isDisplayValid = !b.displayOn || b.displayOn === 'HOME' || b.displayOn === 'ALL';
+      if (!isDisplayValid) return false;
+      if (b.startDate) {
+        const start = new Date(b.startDate);
+        if (now < start) return false;
+      }
+      if (b.endDate) {
+        const end = new Date(b.endDate);
+        if (now > end) return false;
+      }
+      return true;
+    });
+  }, [banners, isHomePage]);
+
+  const campaignBgColor = isHomePage ? (activeCampaignBanner?.themeBgColor || activeCampaignBanner?.gradient?.[0]) : null;
+  const campaignTextColor = isHomePage ? activeCampaignBanner?.themeTextColor : null;
+  const campaignAccentColor = isHomePage ? (activeCampaignBanner?.themeAccentColor || '#F6C453') : '#10B981';
+
+  const getIsDarkColor = (colorHexOrRgb?: string) => {
+    if (!colorHexOrRgb) return false;
+    let hex = colorHexOrRgb;
+    if (hex.startsWith('#')) {
+      hex = hex.slice(1);
+      if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      return luma < 150;
+    }
+    return false;
+  };
+
   const dynamicHeaderBg = useMemo(() => {
+    if (isScrolledDown) {
+      return '#ffffff';
+    }
+    if (isHomePage && campaignBgColor) {
+      return campaignBgColor;
+    }
     if (activeCategory && activeCategory.color) {
-      return hexToTintOnWhite(activeCategory.color, 0.12);
+      return hexToTintOnWhite(activeCategory.color, 0.14);
     }
     return '#ffffff';
-  }, [activeCategory]);
+  }, [isScrolledDown, isHomePage, campaignBgColor, activeCategory]);
+
+  const isDarkHeader = useMemo(() => {
+    if (isScrolledDown) return false;
+    if (!isHomePage) return false;
+    if (campaignTextColor) {
+      return !getIsDarkColor(campaignTextColor);
+    }
+    return getIsDarkColor(dynamicHeaderBg);
+  }, [isScrolledDown, isHomePage, dynamicHeaderBg, campaignTextColor]);
+
+  const headerTextColor = isDarkHeader ? 'text-white' : 'text-text-primary';
+  const headerSubTextColor = isDarkHeader ? 'text-white/90 hover:text-white' : 'text-text-secondary hover:text-primary';
+  const iconColorClass = isDarkHeader ? 'text-white fill-white' : 'text-text-primary fill-text-primary';
 
   return (
     <>
-      {/* Top Header Row + Search Bar + Category Nav: fixed to the viewport top
-          (not sticky) so it is never subject to flow/stacking edge cases.
-          Page content gets an explicit padding-top matching this bar's real
-          height (see App.tsx), so there is never a flow-reservation guess. */}
-      <div ref={appBarRef} className="fixed top-0 left-0 right-0 z-[1000] w-full shadow-xs transition-colors duration-300" style={{ backgroundColor: dynamicHeaderBg }}>
+      <div
+        ref={appBarRef}
+        className={`fixed top-0 left-0 right-0 z-[1000] w-full transition-all duration-300 transform translate-y-0 border-none outline-none ${
+          isScrolledDown ? 'shadow-sm' : 'shadow-none'
+        }`}
+        style={{ backgroundColor: dynamicHeaderBg }}
+      >
+        {/* Desktop & Mobile Header Content */}
         <header
-          className="flex items-center justify-between w-full px-4 md:px-8 py-2.5 border-b border-divider transition-colors duration-300 gap-3 md:gap-6"
+          className={`flex items-center justify-between w-full px-3 md:px-8 transition-all duration-300 gap-2 md:gap-6 border-none outline-none ${
+            headerHidden
+              ? 'py-0 sm:py-1 max-h-0 sm:max-h-24 opacity-0 sm:opacity-100 overflow-hidden sm:overflow-visible pointer-events-none sm:pointer-events-auto'
+              : 'py-2 md:py-2.5 max-h-24 opacity-100'
+          }`}
           style={{ backgroundColor: dynamicHeaderBg }}
         >
-          {/* Delivery Time & Location Selector + Logo */}
-          <div className="flex items-center gap-3 sm:gap-4 shrink-0">
-            <Link to="/" className="hidden sm:flex items-center gap-2 group shrink-0">
+          {/* Desktop Logo & Location */}
+          <div className="hidden sm:flex items-center gap-3 sm:gap-4 shrink-0">
+            <Link to="/" className="flex items-center gap-2 group shrink-0">
               <img src="/logo.png" alt="FreshCart Logo" className="h-10 sm:h-12 w-auto object-contain transition-transform group-hover:scale-105" />
               <span className="hidden xl:inline text-2xl font-extrabold tracking-tight text-primary font-display leading-none">
                 FreshCart
               </span>
             </Link>
 
-            {/* Delivery Time & Location Selector */}
+            {/* Location Selector (Desktop) */}
             <div
               onClick={() => navigate('/account/addresses')}
-              className="flex flex-col cursor-pointer select-none group sm:border-l sm:border-divider sm:pl-4 pl-0"
+              className="flex flex-col cursor-pointer select-none group pl-3 sm:pl-4"
             >
-              <div className="flex items-center gap-1 text-text-primary font-extrabold text-sm sm:text-sm tracking-tight leading-tight">
-                <Zap size={15} className="text-black fill-black shrink-0" />
-                <span className="text-text-primary font-black">10 minutes</span>
+              <div className={`flex items-center gap-1 font-extrabold text-sm tracking-tight leading-tight ${headerTextColor}`}>
+                <Zap size={15} className={`shrink-0 ${iconColorClass}`} />
+                <span className="font-black">10 minutes</span>
               </div>
-              <div className="flex items-center gap-0.5 text-[13px] sm:text-xs font-bold text-text-secondary group-hover:text-primary transition-colors">
-                <span className="truncate max-w-[200px] sm:max-w-[220px] lg:max-w-[280px]">
+              <div className={`flex items-center gap-0.5 text-xs font-bold transition-colors ${headerSubTextColor}`}>
+                <span className="truncate max-w-[220px] lg:max-w-[280px]">
                   {(() => {
                     if (typeof userLocation === 'object' && userLocation !== null && (userLocation.houseNo || userLocation.area || userLocation.address || userLocation.fullAddress)) {
                       const parts = [];
@@ -194,26 +306,80 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
                       parts.push(userLocation.area || userLocation.address || userLocation.fullAddress);
                       return parts.join(' - ');
                     }
-
                     if (typeof userLocation === 'string' && (userLocation as string).trim()) {
                       return userLocation;
                     }
-
                     return '📍 Add Address';
                   })()}
                 </span>
-                <ChevronDown size={14} className="text-text-secondary shrink-0" />
+                <ChevronDown size={14} className="shrink-0" />
               </div>
             </div>
           </div>
 
-          {/* Inline Search Bar Beside Location */}
+          {/* Mobile Header Row (Compact Delivery & Profile) */}
+          <div className={`flex sm:hidden items-center justify-between w-full gap-2 transition-all duration-300 ease-in-out overflow-hidden ${
+            headerHidden ? 'max-h-0 opacity-0 py-0 pointer-events-none' : 'max-h-16 opacity-100 py-0.5'
+          }`}>
+            {/* Left: Express delivery badge & location dropdown */}
+            <div
+              onClick={() => navigate('/account/addresses')}
+              className="flex flex-col cursor-pointer select-none group min-w-0"
+            >
+              <div className={`flex items-center gap-1 font-black text-xs tracking-tight leading-tight ${headerTextColor}`}>
+                <Zap size={14} className={`shrink-0 ${iconColorClass}`} />
+                <span>10 minutes</span>
+              </div>
+              <div className={`flex items-center gap-0.5 text-[11px] font-extrabold truncate transition-colors ${headerSubTextColor}`}>
+                <span className="truncate max-w-[210px]">
+                  {(() => {
+                    if (typeof userLocation === 'object' && userLocation !== null && (userLocation.houseNo || userLocation.area || userLocation.address || userLocation.fullAddress)) {
+                      const parts = [];
+                      if (userLocation.label) parts.push(userLocation.label);
+                      if (userLocation.houseNo) parts.push(userLocation.houseNo);
+                      parts.push(userLocation.area || userLocation.address || userLocation.fullAddress);
+                      return parts.join(' - ');
+                    }
+                    if (typeof userLocation === 'string' && (userLocation as string).trim()) {
+                      return userLocation;
+                    }
+                    return '📍 Select Location';
+                  })()}
+                </span>
+                <ChevronDown size={12} className="shrink-0" />
+              </div>
+            </div>
+
+            {/* Right: Profile Icon Button */}
+            <button
+              onClick={handleProfileClick}
+              className={`w-8 h-8 rounded-full border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
+                isDarkHeader
+                  ? 'border-white/40 bg-white/10 text-white hover:bg-white/20'
+                  : 'border-divider bg-background text-text-primary hover:border-primary hover:text-primary'
+              }`}
+              title={customerUser ? `Logged in as ${customerUser.phone}` : "Customer Login"}
+              aria-label={customerUser ? `Account menu — logged in as ${customerUser.phone}` : "Customer login"}
+            >
+              <User size={16} />
+            </button>
+          </div>
+
+          {/* Desktop Search Bar */}
           <div className="flex-1 max-w-xl md:max-w-2xl relative hidden sm:block" ref={searchRef}>
-            <form onSubmit={handleSearchSubmit} className="flex items-center w-full px-4 py-2 bg-background border border-divider rounded-full transition-all focus-within:border-primary focus-within:bg-white focus-within:ring-2 focus-within:ring-primary/20 shadow-2xs">
+            <form 
+              onSubmit={handleSearchSubmit} 
+              style={{
+                borderColor: isDarkHeader 
+                  ? (campaignAccentColor || 'rgba(255,255,255,0.4)') 
+                  : '#CBD5E1'
+              }}
+              className="flex items-center w-full px-4 py-2 bg-white/95 rounded-full transition-all border focus-within:bg-white focus-within:ring-2 focus-within:ring-primary/20 shadow-2xs"
+            >
               <Search size={17} className="text-text-tertiary mr-2.5 shrink-0" />
               <input
                 type="text"
-                placeholder='Search for "chocolate box", "kurkure", "milk"...'
+                placeholder={currentPlaceholder}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={() => searchQuery.length > 1 && setShowSearchResults(true)}
@@ -236,7 +402,7 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
                       className="flex items-center gap-3 p-3 border-b border-divider cursor-pointer hover:bg-background transition-colors last:border-b-0"
                       onClick={() => handleSearchResultClick(product.id)}
                     >
-                      <img src={product.imageUrl || (product.images && product.images[0]) || ''} alt={product.name} className="w-10 h-10 object-contain rounded-md border border-divider bg-white p-1" />
+                      <img src={getProductImage(product)} alt={product.name} className="w-10 h-10 object-contain rounded-md border border-divider bg-white p-1" />
                       <div className="flex-1 flex flex-col">
                         <span className="text-sm font-bold text-text-primary">{product.name}</span>
                         <span className="text-xs text-text-secondary">{product.brand}</span>
@@ -251,13 +417,16 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
             </AnimatePresence>
           </div>
 
-          {/* Top Right Actions */}
-          <div className="flex items-center gap-3 sm:gap-5 font-medium text-[14px] text-text-primary shrink-0">
-            {/* Profile Button */}
+          {/* Desktop Right Actions */}
+          <div className="hidden sm:flex items-center gap-3 sm:gap-5 font-medium text-[14px] text-text-primary shrink-0">
             <div className="relative">
               <button
                 onClick={handleProfileClick}
-                className="w-9 h-9 rounded-full border border-divider bg-background flex items-center justify-center text-text-primary hover:border-primary hover:text-primary transition-colors cursor-pointer shrink-0"
+                className={`w-9 h-9 rounded-full border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
+                  isDarkHeader
+                    ? 'border-white/40 bg-white/10 text-white hover:bg-white/20'
+                    : 'border-divider bg-background text-text-primary hover:border-primary hover:text-primary'
+                }`}
                 title={customerUser ? `Logged in as ${customerUser.phone}` : "Customer Login"}
                 aria-label={customerUser ? `Account menu — logged in as ${customerUser.phone}` : "Customer login"}
               >
@@ -303,63 +472,105 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
           </div>
         </header>
 
-        {/* Mobile Search bar row (mobile screens only) */}
-        <div className="sm:hidden w-full px-3 py-2 border-b border-divider relative transition-colors duration-300" style={{ backgroundColor: dynamicHeaderBg }} ref={searchRef}>
-          <form onSubmit={handleSearchSubmit} className="flex items-center w-full px-3.5 py-2 bg-background border border-divider rounded-full">
-            <Search size={16} className="text-text-tertiary mr-2 shrink-0" />
+        {/* Mobile Search bar row */}
+        <div className="sm:hidden w-full px-3 py-1.5 relative transition-colors duration-300 border-none outline-none" style={{ backgroundColor: dynamicHeaderBg }} ref={searchRef}>
+          <form 
+            onSubmit={handleSearchSubmit} 
+            style={{
+              borderColor: isDarkHeader 
+                ? (campaignAccentColor || 'rgba(255,255,255,0.4)') 
+                : '#CBD5E1'
+            }}
+            className="flex items-center w-full px-3.5 py-1.5 bg-white rounded-full shadow-2xs border"
+          >
+            <Search size={15} className="text-text-tertiary mr-2 shrink-0" />
             <input
               type="text"
-              placeholder="Search groceries..."
+              placeholder={currentPlaceholder}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => searchQuery.length > 1 && setShowSearchResults(true)}
-              className="w-full text-xs bg-transparent border-none outline-none text-text-primary placeholder:text-text-tertiary"
+              className="w-full text-xs bg-transparent border-none outline-none text-text-primary placeholder:text-text-tertiary font-medium"
             />
           </form>
+
+          {/* Mobile Real-time search results */}
+          <AnimatePresence>
+            {showSearchResults && searchResults.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 5 }}
+                className="absolute top-[calc(100%+4px)] left-3 right-3 bg-white border border-divider rounded-2xl shadow-premium overflow-hidden max-h-[300px] overflow-y-auto z-[1002] flex flex-col"
+              >
+                {searchResults.map((product) => (
+                  <div
+                    key={product.id}
+                    className="flex items-center gap-2.5 p-2.5 border-b border-divider cursor-pointer hover:bg-background transition-colors last:border-b-0"
+                    onClick={() => handleSearchResultClick(product.id)}
+                  >
+                    <img src={getProductImage(product)} alt={product.name} className="w-8 h-8 object-contain rounded-md border border-divider bg-white p-0.5" />
+                    <div className="flex-1 flex flex-col">
+                      <span className="text-xs font-bold text-text-primary line-clamp-1">{product.name}</span>
+                      <span className="text-[10px] text-text-secondary">{product.brand}</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs font-black text-primary">₹{product.price}</div>
+                    </div>
+                  </div>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        {/* Category Nav Tabs */}
+        {/* Compact Horizontal Category Navigation Bar */}
         <nav
-          className="border-b border-divider px-3 md:px-8 py-2 overflow-x-auto scrollbar-none transition-colors duration-300"
-          style={{ backgroundColor: activeCategory ? hexToTintOnWhite(activeCategory.color, 0.05) : '#ffffff' }}
+          className="px-2 md:px-8 py-1 md:py-2 overflow-x-auto scrollbar-none transition-colors duration-300 border-none outline-none ring-0 shadow-none"
+          style={{ backgroundColor: dynamicHeaderBg }}
         >
-          <div className="flex items-center gap-1 md:gap-1.5 min-w-max pb-0.5">
+          <div className="flex items-center gap-1 sm:gap-1.5 min-w-max pb-0.5">
             {/* All Link */}
             <Link
               to="/"
               style={location.pathname === '/' && !location.search.includes('category=') ? {
-                backgroundColor: hexToTintOnWhite('#10B981', 0.18),
-                borderColor: hexToRgba('#10B981', 0.5),
+                backgroundColor: isDarkHeader ? 'rgba(255, 255, 255, 0.18)' : hexToTintOnWhite('#10B981', 0.16),
               } : undefined}
-              className={`flex flex-col items-center justify-between p-1.5 md:p-2 rounded-2xl transition-all relative shrink-0 w-20 md:w-24 h-[104px] md:h-[114px] border ${
+              className={`flex flex-col items-center justify-between p-1 sm:p-1.5 md:p-2 rounded-xl sm:rounded-2xl transition-all shrink-0 w-[60px] sm:w-20 md:w-24 h-[72px] sm:h-[94px] md:h-[104px] border-0 shadow-none ${
                 location.pathname === '/' && !location.search.includes('category=')
-                  ? 'shadow-2xs'
-                  : 'bg-transparent border-transparent hover:bg-background/80'
+                  ? ''
+                  : (isDarkHeader ? 'bg-transparent hover:bg-white/10' : 'bg-transparent hover:bg-black/5')
               }`}
             >
-              <div className={`w-11 h-11 md:w-13 md:h-13 rounded-full flex items-center justify-center transition-all ${
+              <div className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full flex items-center justify-center transition-all ${
                 location.pathname === '/' && !location.search.includes('category=')
-                  ? 'bg-emerald-600 text-white shadow-2xs'
-                  : 'bg-background text-text-secondary border border-divider'
+                  ? (isDarkHeader ? 'bg-white text-emerald-700 shadow-2xs' : 'bg-emerald-600 text-white shadow-2xs')
+                  : (isDarkHeader ? 'bg-white/20 text-white' : 'bg-background text-text-secondary border border-divider/40')
               }`}>
-                <LayoutGrid size={22} />
+                <LayoutGrid size={18} className="sm:hidden" />
+                <LayoutGrid size={22} className="hidden sm:block" />
               </div>
-              <div className="h-[2.4em] flex items-center justify-center text-center w-full px-0.5">
-                <span 
-                  style={location.pathname === '/' && !location.search.includes('category=') ? { color: hexToDarkShade('#10B981', 0.4) } : undefined}
-                  className={`text-[11px] md:text-xs font-bold text-center leading-tight line-clamp-2 ${
+              <div className="h-[2.2em] flex items-center justify-center text-center w-full px-0.5">
+                <span
+                  style={location.pathname === '/' && !location.search.includes('category=') ? {
+                    color: isDarkHeader ? '#ffffff' : hexToDarkShade('#10B981', 0.4)
+                  } : undefined}
+                  className={`text-[10px] sm:text-xs text-center leading-tight line-clamp-2 ${
                     location.pathname === '/' && !location.search.includes('category=')
                       ? 'font-black'
-                      : 'text-text-primary font-semibold'
+                      : (isDarkHeader ? 'text-white/90 font-semibold' : 'text-text-primary font-semibold')
                   }`}
                 >
                   All
                 </span>
               </div>
               {location.pathname === '/' && !location.search.includes('category=') ? (
-                <div className="w-full h-1 bg-emerald-600 rounded-full mt-1" />
+                <div
+                  className="w-full h-1 rounded-full mt-0.5"
+                  style={{ backgroundColor: isDarkHeader ? (campaignAccentColor || '#ffffff') : '#10B981' }}
+                />
               ) : (
-                <div className="w-full h-1 bg-transparent rounded-full mt-1" />
+                <div className="w-full h-1 bg-transparent rounded-full mt-0.5" />
               )}
             </Link>
 
@@ -370,9 +581,8 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
               const label = cat.displayName?.trim() || cat.name;
               const catColor = cat.color || '#4CAF50';
 
-              const activeBg = hexToTintOnWhite(catColor, 0.20);
-              const activeBorder = hexToRgba(catColor, 0.5);
-              const activeTextColor = hexToDarkShade(catColor, 0.4);
+              const activeBg = isDarkHeader ? 'rgba(255, 255, 255, 0.18)' : hexToTintOnWhite(catColor, 0.16);
+              const activeTextColor = isDarkHeader ? '#ffffff' : hexToDarkShade(catColor, 0.4);
 
               return (
                 <Link
@@ -380,40 +590,40 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
                   to={`/products?category=${catSlug}`}
                   style={isActive ? {
                     backgroundColor: activeBg,
-                    borderColor: activeBorder,
                   } : undefined}
-                  className={`flex flex-col items-center justify-between p-1.5 md:p-2 rounded-2xl transition-all relative shrink-0 w-20 md:w-24 h-[104px] md:h-[114px] border ${
+                  className={`flex flex-col items-center justify-between p-1 sm:p-1.5 md:p-2 rounded-xl sm:rounded-2xl transition-all shrink-0 w-[60px] sm:w-20 md:w-24 h-[72px] sm:h-[94px] md:h-[104px] border-0 shadow-none ${
                     isActive
-                      ? 'shadow-2xs'
-                      : 'bg-transparent border-transparent hover:bg-background/80'
+                      ? ''
+                      : (isDarkHeader ? 'bg-transparent hover:bg-white/10' : 'bg-transparent hover:bg-black/5')
                   }`}
                 >
-                  <div 
+                  <div
                     style={{
-                      borderColor: isActive ? activeBorder : hexToRgba(catColor, 0.45),
-                      backgroundColor: isActive ? activeBg : hexToTintOnWhite(catColor, 0.08)
+                      backgroundColor: isActive 
+                        ? (isDarkHeader ? 'rgba(255, 255, 255, 0.25)' : hexToTintOnWhite(catColor, 0.18))
+                        : (isDarkHeader ? 'rgba(255, 255, 255, 0.15)' : hexToTintOnWhite(catColor, 0.08))
                     }}
-                    className="w-11 h-11 md:w-13 md:h-13 rounded-full overflow-hidden border-2 shrink-0 transition-colors shadow-2xs"
+                    className="w-9 h-9 sm:w-11 sm:h-11 rounded-full overflow-hidden border-0 shrink-0 transition-colors"
                   >
                     <img src={getCategoryImage(cat)} alt={label} className="w-full h-full object-cover" />
                   </div>
-                  <div className="h-[2.4em] flex items-center justify-center text-center w-full px-0.5">
-                    <span 
+                  <div className="h-[2.2em] flex items-center justify-center text-center w-full px-0.5">
+                    <span
                       style={isActive ? { color: activeTextColor } : undefined}
-                      className={`text-[11px] md:text-xs font-bold text-center leading-tight line-clamp-2 ${
-                        isActive ? 'font-black' : 'text-text-primary font-semibold'
+                      className={`text-[10px] sm:text-xs text-center leading-tight line-clamp-2 ${
+                        isActive ? 'font-black' : (isDarkHeader ? 'text-white/90 font-semibold' : 'text-text-primary font-semibold')
                       }`}
                     >
                       {label}
                     </span>
                   </div>
                   {isActive ? (
-                    <div 
-                      style={{ backgroundColor: catColor }} 
-                      className="w-full h-1 rounded-full mt-1" 
+                    <div
+                      style={{ backgroundColor: isDarkHeader ? (campaignAccentColor || '#ffffff') : catColor }}
+                      className="w-full h-1 rounded-full mt-0.5"
                     />
                   ) : (
-                    <div className="w-full h-1 bg-transparent rounded-full mt-1" />
+                    <div className="w-full h-1 bg-transparent rounded-full mt-0.5" />
                   )}
                 </Link>
               );

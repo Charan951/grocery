@@ -2,6 +2,7 @@ import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import mongoose from 'mongoose';
 
 const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_STX1H1R9XvVjSZ';
 const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'iMtdlSgzu1h9vQgytwxSOiJI';
@@ -246,7 +247,11 @@ export const productController = {
 
   getProduct: async (req, res) => {
     try {
-      const prod = await Product.findOne({ $or: [{ id: req.params.id }, { _id: mongoose.isValidObjectId(req.params.id) ? req.params.id : null }] });
+      const productId = req.params.id;
+      const query = mongoose.isValidObjectId(productId)
+        ? { $or: [{ id: productId }, { _id: productId }] }
+        : { id: productId };
+      const prod = await Product.findOne(query);
       if (!prod) return res.status(404).json({ success: false, message: 'Product not found' });
       res.json({ success: true, product: prod });
     } catch (err) {
@@ -256,7 +261,8 @@ export const productController = {
 
   createProduct: async (req, res) => {
     try {
-      const prodData = req.body;
+      const prodData = { ...req.body };
+      delete prodData._id;
       if (!prodData.id) {
         prodData.id = 'prod_' + Date.now();
       }
@@ -266,9 +272,19 @@ export const productController = {
       if (prodData.price && !prodData.mrp) prodData.mrp = prodData.originalPrice || prodData.price;
       if (prodData.mrp && !prodData.originalPrice) prodData.originalPrice = prodData.mrp;
       
-      if (!prodData.imageUrl && prodData.images && prodData.images.length > 0) {
-        prodData.imageUrl = prodData.images[0];
+      // Clean and normalize image fields
+      let validImages = Array.isArray(prodData.images) 
+        ? prodData.images.filter(img => typeof img === 'string' && img.trim().length > 0)
+        : [];
+      let mainImg = prodData.imageUrl || prodData.image || (validImages.length > 0 ? validImages[0] : '');
+      if (mainImg) mainImg = mainImg.trim();
+
+      if (mainImg && !validImages.includes(mainImg)) {
+        validImages.unshift(mainImg);
       }
+
+      prodData.imageUrl = mainImg || 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&q=80&w=600';
+      prodData.images = validImages.length > 0 ? validImages : [prodData.imageUrl];
 
       const prod = await Product.create(prodData);
       if (prod.categoryId) {
@@ -282,29 +298,54 @@ export const productController = {
 
   updateProduct: async (req, res) => {
     try {
-      const prodData = req.body;
+      const prodData = { ...req.body };
+      const productId = req.params.id;
+
+      // Crucial: remove immutable _id property from update payload to avoid MongoDB 500 error
+      delete prodData._id;
+      if (!prodData.id) prodData.id = productId;
+
       if (prodData.price && prodData.originalPrice) {
         prodData.mrp = prodData.originalPrice;
       }
-      if (!prodData.imageUrl && prodData.images && prodData.images.length > 0) {
-        prodData.imageUrl = prodData.images[0];
+      
+      // Clean and normalize image fields
+      let validImages = Array.isArray(prodData.images) 
+        ? prodData.images.filter(img => typeof img === 'string' && img.trim().length > 0)
+        : [];
+      let mainImg = prodData.imageUrl || prodData.image || (validImages.length > 0 ? validImages[0] : '');
+      if (mainImg) mainImg = mainImg.trim();
+
+      if (mainImg && !validImages.includes(mainImg)) {
+        validImages.unshift(mainImg);
       }
 
+      if (mainImg) prodData.imageUrl = mainImg;
+      if (validImages.length > 0) prodData.images = validImages;
+
+      const query = mongoose.isValidObjectId(productId)
+        ? { $or: [{ id: productId }, { _id: productId }] }
+        : { id: productId };
+
       const prod = await Product.findOneAndUpdate(
-        { $or: [{ id: req.params.id }, { _id: mongoose.isValidObjectId(req.params.id) ? req.params.id : null }] },
-        prodData,
-        { new: true }
+        query,
+        { $set: prodData },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
       );
-      if (!prod) return res.status(404).json({ success: false, message: 'Product not found' });
       res.json({ success: true, product: prod });
     } catch (err) {
+      console.error('Error in updateProduct:', err);
       res.status(500).json({ success: false, message: err.message });
     }
   },
 
   deleteProduct: async (req, res) => {
     try {
-      const prod = await Product.findOneAndDelete({ $or: [{ id: req.params.id }, { _id: mongoose.isValidObjectId(req.params.id) ? req.params.id : null }] });
+      const productId = req.params.id;
+      const query = mongoose.isValidObjectId(productId)
+        ? { $or: [{ id: productId }, { _id: productId }] }
+        : { id: productId };
+      const prod = await Product.findOneAndDelete(query);
       if (!prod) return res.status(404).json({ success: false, message: 'Product not found' });
       if (prod.categoryId) {
         await Category.updateOne({ $or: [{ id: prod.categoryId }, { slug: prod.categoryId }] }, { $inc: { productCount: -1 } });
@@ -384,7 +425,7 @@ export const categoryController = {
 
   addSubCategory: async (req, res) => {
     try {
-      const { name, icon, image, showOnHome, displayOrder, promoImage, promoLink } = req.body;
+      const { name, icon, image, color, showOnHome, displayOrder, promoImage, promoLink } = req.body;
       const subSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
       const subId = 'sub_' + Date.now();
       const imgVal = image || icon || '';
@@ -399,6 +440,7 @@ export const categoryController = {
               slug: subSlug, 
               icon: imgVal, 
               image: imgVal, 
+              color: color || '#10B981',
               showOnHome: showOnHome !== undefined ? showOnHome : true, 
               displayOrder: displayOrder !== undefined ? Number(displayOrder) : 0,
               promoImage: promoImage || '',
@@ -418,7 +460,7 @@ export const categoryController = {
   updateSubCategory: async (req, res) => {
     try {
       const { id, subId } = req.params;
-      const { name, icon, image, showOnHome, displayOrder, promoImage, promoLink } = req.body;
+      const { name, icon, image, color, showOnHome, displayOrder, promoImage, promoLink } = req.body;
       const subSlug = name ? name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : undefined;
 
       const cat = await Category.findOne({ $or: [{ id }, { slug: id }] });
@@ -431,6 +473,7 @@ export const categoryController = {
       if (subSlug !== undefined) sub.slug = subSlug;
       if (icon !== undefined) sub.icon = icon;
       if (image !== undefined) sub.image = image;
+      if (color !== undefined) sub.color = color;
       if (showOnHome !== undefined) sub.showOnHome = showOnHome;
       if (displayOrder !== undefined) sub.displayOrder = Number(displayOrder);
       if (promoImage !== undefined) sub.promoImage = promoImage;
@@ -1161,12 +1204,22 @@ export const uploadController = {
       if (!image) {
         return res.status(400).json({ success: false, message: 'No image data provided' });
       }
-      const result = await uploadToCloudinary(image, folder || 'freshcart');
-      res.json({
-        success: true,
-        url: result.url,
-        public_id: result.public_id
-      });
+      try {
+        const result = await uploadToCloudinary(image, folder || 'freshcart');
+        return res.json({
+          success: true,
+          url: result.url,
+          public_id: result.public_id
+        });
+      } catch (cloudErr) {
+        console.warn('Cloudinary upload warning, returning local data URI fallback:', cloudErr.message);
+        return res.json({
+          success: true,
+          url: image,
+          public_id: 'local_fallback_' + Date.now(),
+          fallback: true
+        });
+      }
     } catch (err) {
       console.error('Upload controller error:', err);
       res.status(500).json({ success: false, message: err.message || 'Image upload failed' });

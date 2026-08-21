@@ -7,6 +7,7 @@ const subCategorySchema = new mongoose.Schema({
   slug: { type: String },
   icon: { type: String },
   image: { type: String },
+  color: { type: String, default: '#10B981' },
   showOnHome: { type: Boolean, default: true },
   displayOrder: { type: Number, default: 0 },
   promoImage: { type: String, default: '' },
@@ -118,10 +119,15 @@ const bannerSchema = new mongoose.Schema({
   positionIndex: { type: Number, default: 1 },
   subCategoryName: { type: String },
   active: { type: Boolean, default: true },
-  displayOn: { type: String, enum: ['HOME', 'CATEGORY', 'SUBCATEGORY'], default: 'HOME' },
+  displayOn: { type: String, enum: ['HOME', 'CATEGORY', 'SUBCATEGORY', 'ALL'], default: 'HOME' },
   categoryId: { type: String },
   subcategoryId: { type: String },
-  position: { type: String }
+  position: { type: String },
+  themeBgColor: { type: String, default: '' },
+  themeTextColor: { type: String, default: '' },
+  themeAccentColor: { type: String, default: '' },
+  startDate: { type: Date },
+  endDate: { type: Date }
 }, { timestamps: true });
 
 export const Category = mongoose.model('Category', categorySchema);

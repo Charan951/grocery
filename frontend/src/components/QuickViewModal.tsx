@@ -3,6 +3,7 @@ import { Product } from '../context/CMSContext';
 import { useCartWishlist, getProductStockQuantity } from '../context/CartWishlistContext';
 import { motion } from 'framer-motion';
 import { X, Star, ShoppingBag, Plus, Minus, Zap, ShieldCheck, Store, Truck, CheckCircle2 } from 'lucide-react';
+import { getProductImage } from '../utils/imageUtils';
 
 interface QuickViewModalProps {
   product: Product;
@@ -16,9 +17,8 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, onClose
   const isOutOfStock = stockQty <= 0;
   const isLimitedStock = stockQty > 0 && stockQty < 10;
 
-  const imageList = (product.images && product.images.length > 0) 
-    ? product.images 
-    : [product.imageUrl || 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&q=80&w=600'];
+  const validImages = Array.isArray(product.images) ? product.images.filter(img => typeof img === 'string' && img.trim().length > 0) : [];
+  const imageList = validImages.length > 0 ? validImages : [getProductImage(product)];
 
   const [activeImgIndex, setActiveImgIndex] = useState(0);
   const netWeight = product.netQuantity || product.defaultWeight || (product.weightOptions && product.weightOptions[0]) || '500 g';

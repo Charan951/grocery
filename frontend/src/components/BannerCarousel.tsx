@@ -46,18 +46,20 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({
   if (validBanners.length === 1) {
     const banner = validBanners[0];
     return (
-      <div className={`mb-6 w-full rounded-2xl md:rounded-3xl overflow-hidden shadow-sm hover:shadow-md border border-divider/60 bg-surface ${aspectRatioClass} ${className}`}>
+      <div className={`mb-4 sm:mb-6 w-full rounded-none sm:rounded-2xl md:sm:rounded-3xl overflow-hidden border-none shadow-none relative ${aspectRatioClass} ${className}`}>
         <Link 
           to={banner.linkUrl || '/products'} 
-          className="block w-full h-full cursor-pointer group"
+          className="block w-full h-full cursor-pointer group relative"
           title={banner.title || 'Special Offer'}
         >
           <img 
             src={banner.imageUrl} 
             alt={banner.title || 'Promo Banner'} 
-            className="w-full h-full block rounded-2xl md:rounded-3xl object-cover object-center group-hover:scale-[1.005] transition-transform duration-300"
+            className="w-full h-full block rounded-none sm:rounded-2xl md:sm:rounded-3xl object-cover object-center group-hover:scale-[1.005] transition-transform duration-300"
             onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
           />
+
+          {/* Banner Image */}
         </Link>
       </div>
     );
@@ -78,9 +80,9 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({
   };
 
   return (
-    <div className={`mb-6 w-full flex flex-col items-center ${className}`}>
+    <div className={`mb-4 sm:mb-6 w-full flex flex-col items-center ${className}`}>
       {/* Main Banner Slide Container */}
-      <div className={`relative w-full rounded-2xl md:rounded-3xl overflow-hidden shadow-sm hover:shadow-md border border-divider/60 bg-surface ${aspectRatioClass} group`}>
+      <div className={`relative w-full rounded-none sm:rounded-2xl md:sm:rounded-3xl overflow-hidden border-none shadow-none ${aspectRatioClass} group`}>
         <AnimatePresence mode="wait">
           <motion.div
             key={currentBanner.id || currentIndex}
@@ -88,17 +90,17 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.35, ease: 'easeOut' }}
-            className="w-full h-full"
+            className="w-full h-full relative"
           >
             <Link 
               to={currentBanner.linkUrl || '/products'} 
-              className="block w-full h-full cursor-pointer"
+              className="block w-full h-full cursor-pointer relative"
               title={currentBanner.title || 'Special Offer'}
             >
               <img 
                 src={currentBanner.imageUrl} 
                 alt={currentBanner.title || 'Promo Banner'} 
-                className="w-full h-full block rounded-2xl md:rounded-3xl object-cover object-center group-hover:scale-[1.005] transition-transform duration-300"
+                className="w-full h-full block rounded-none sm:rounded-2xl md:sm:rounded-3xl object-cover object-center group-hover:scale-[1.005] transition-transform duration-300"
                 onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
               />
             </Link>

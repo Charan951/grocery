@@ -36,6 +36,11 @@ export const AdminCMS: React.FC = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [selectedSubCategoryId, setSelectedSubCategoryId] = useState('');
   const [bannerPosition, setBannerPosition] = useState<string | number>(1);
+  const [bannerThemeBg, setBannerThemeBg] = useState('#8F1239');
+  const [bannerThemeText, setBannerThemeText] = useState('#FFFFFF');
+  const [bannerThemeAccent, setBannerThemeAccent] = useState('#F6C453');
+  const [bannerStartDate, setBannerStartDate] = useState('');
+  const [bannerEndDate, setBannerEndDate] = useState('');
 
   // Product Add Form States
   const [showProductForm, setShowProductForm] = useState(false);
@@ -270,6 +275,11 @@ export const AdminCMS: React.FC = () => {
     setSelectedCategoryId(b.categoryId || (categories[0]?.id || ''));
     setSelectedSubCategoryId(b.subcategoryId || b.subCategoryName || '');
     setBannerPosition(b.position || b.positionIndex || 1);
+    setBannerThemeBg(b.themeBgColor || (b.gradient?.[0] || '#8F1239'));
+    setBannerThemeText(b.themeTextColor || '#FFFFFF');
+    setBannerThemeAccent(b.themeAccentColor || '#F6C453');
+    setBannerStartDate(b.startDate ? b.startDate.split('T')[0] : '');
+    setBannerEndDate(b.endDate ? b.endDate.split('T')[0] : '');
     setShowBannerForm(true);
   };
 
@@ -325,7 +335,12 @@ export const AdminCMS: React.FC = () => {
         : (bannerDisplayOn === 'CATEGORY' ? `Deals on ${catId}` : 'Everyday Low Prices'),
       tag: 'PROMO',
       buttonText: 'Shop Deals',
-      gradient: gradient,
+      gradient: [bannerThemeBg.trim() || gradient[0], bannerThemeBg.trim() || gradient[1] || gradient[0]],
+      themeBgColor: bannerThemeBg.trim(),
+      themeTextColor: bannerThemeText.trim(),
+      themeAccentColor: bannerThemeAccent.trim(),
+      startDate: bannerStartDate ? new Date(bannerStartDate).toISOString() : undefined,
+      endDate: bannerEndDate ? new Date(bannerEndDate).toISOString() : undefined,
       active: true
     };
 
@@ -348,6 +363,11 @@ export const AdminCMS: React.FC = () => {
     setSelectedCategoryId('');
     setSelectedSubCategoryId('');
     setBannerPosition(1);
+    setBannerThemeBg('#8F1239');
+    setBannerThemeText('#FFFFFF');
+    setBannerThemeAccent('#F6C453');
+    setBannerStartDate('');
+    setBannerEndDate('');
   };
 
   const handleReset = () => {
@@ -912,6 +932,94 @@ export const AdminCMS: React.FC = () => {
                           </div>
                         </>
                       )}
+
+                      {/* 5. Campaign Theme Colors & Active Dates (Admin CMS Manual Customization) */}
+                      <div className="sm:col-span-2 p-4 rounded-xl bg-surface border border-divider flex flex-col gap-4 mt-2">
+                        <div className="flex items-center gap-2 border-b border-divider pb-2">
+                          <span className="text-xs font-extrabold text-text-primary uppercase tracking-wide">🎨 Campaign Theme Colors & Active Dates</span>
+                          <span className="text-[10px] text-text-tertiary">(Controls Home AppBar, Header, Top Categories strip & Accents)</span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-bold text-text-primary">Theme Background Color</label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={bannerThemeBg}
+                                onChange={(e) => setBannerThemeBg(e.target.value)}
+                                className="w-9 h-9 p-0.5 rounded-lg border border-divider cursor-pointer bg-transparent"
+                              />
+                              <input
+                                type="text"
+                                value={bannerThemeBg}
+                                onChange={(e) => setBannerThemeBg(e.target.value)}
+                                placeholder="#8F1239"
+                                className="w-full px-3 py-2 border border-divider rounded-xl text-xs bg-background font-mono text-text-primary uppercase"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-bold text-text-primary">Theme Text Color</label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={bannerThemeText}
+                                onChange={(e) => setBannerThemeText(e.target.value)}
+                                className="w-9 h-9 p-0.5 rounded-lg border border-divider cursor-pointer bg-transparent"
+                              />
+                              <input
+                                type="text"
+                                value={bannerThemeText}
+                                onChange={(e) => setBannerThemeText(e.target.value)}
+                                placeholder="#FFFFFF"
+                                className="w-full px-3 py-2 border border-divider rounded-xl text-xs bg-background font-mono text-text-primary uppercase"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-bold text-text-primary">Theme Accent Color</label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={bannerThemeAccent}
+                                onChange={(e) => setBannerThemeAccent(e.target.value)}
+                                className="w-9 h-9 p-0.5 rounded-lg border border-divider cursor-pointer bg-transparent"
+                              />
+                              <input
+                                type="text"
+                                value={bannerThemeAccent}
+                                onChange={(e) => setBannerThemeAccent(e.target.value)}
+                                placeholder="#F6C453"
+                                className="w-full px-3 py-2 border border-divider rounded-xl text-xs bg-background font-mono text-text-primary uppercase"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-divider pt-3">
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-bold text-text-primary">Start Date (Optional)</label>
+                            <input
+                              type="date"
+                              value={bannerStartDate}
+                              onChange={(e) => setBannerStartDate(e.target.value)}
+                              className="w-full px-3 py-2 border border-divider rounded-xl text-xs bg-background text-text-primary"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-bold text-text-primary">End Date (Optional)</label>
+                            <input
+                              type="date"
+                              value={bannerEndDate}
+                              onChange={(e) => setBannerEndDate(e.target.value)}
+                              className="w-full px-3 py-2 border border-divider rounded-xl text-xs bg-background text-text-primary"
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="flex gap-3 mt-4">

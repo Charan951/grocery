@@ -2,6 +2,7 @@ import React from 'react';
 import { useCartWishlist } from '../context/CartWishlistContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Heart, ShoppingCart, Trash2 } from 'lucide-react';
+import { getProductImage } from '../utils/imageUtils';
 
 interface WishlistDrawerProps {
   isOpen: boolean;
@@ -60,7 +61,7 @@ export const WishlistDrawer: React.FC<WishlistDrawerProps> = ({ isOpen, onClose 
                     className="flex gap-4 p-3 border border-divider rounded-xl bg-background relative overflow-hidden transition-all hover:shadow-card"
                     exit={{ opacity: 0, x: 50 }}
                   >
-                    <img src={product.imageUrl} alt={product.name} className="w-20 h-20 object-cover rounded-md border border-divider" />
+                    <img src={getProductImage(product)} alt={product.name} className="w-20 h-20 object-cover rounded-md border border-divider" />
                     <div className="flex-1 flex flex-col">
                       <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-0.5">{product.brand}</span>
                       <h4 className="text-sm font-bold text-text-primary mb-1 line-clamp-1">{product.name}</h4>

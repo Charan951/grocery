@@ -217,10 +217,18 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
         schema={faqSchema}
       />
 
-      <div className="w-full px-4 md:px-8 pt-3 pb-6">
+      <div className="w-full px-0 sm:px-4 md:px-8 pt-0 sm:pt-3 pb-6">
 
-        {/* 1. Categories & Subcategories Sections (FIRST ON HOME PAGE) */}
-        <section className="mb-6 space-y-6">
+        {/* 1. Top Active Campaign Banners Carousel */}
+        {activeBanners.length > 0 && (
+          <BannerCarousel
+            banners={activeBanners.filter(b => (b.positionIndex || 1) === 1 || !b.positionIndex || b.positionIndex <= 1)}
+            className="mb-4 md:mb-6"
+          />
+        )}
+
+        {/* Categories & Subcategories Sections */}
+        <section className="mb-6 space-y-6 px-3 sm:px-0">
           <div className="space-y-6">
             {categories.map((cat, cIdx) => {
               const catSlug = cat.slug || cat.id;
@@ -258,7 +266,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                           to={`/products?category=${catSlug}&subCategory=${encodeURIComponent(subName)}`}
                           className="flex flex-col items-center group cursor-pointer text-center col-span-1"
                         >
-                          <div className="w-full aspect-square bg-[#F4F5F7] rounded-2xl sm:rounded-3xl p-1 flex items-center justify-center overflow-hidden group-hover:scale-[1.03] transition-transform duration-200">
+                          <div className="w-full aspect-square bg-[#EAF5ED] border border-emerald-100/60 rounded-2xl sm:rounded-3xl p-1 flex items-center justify-center overflow-hidden group-hover:scale-[1.03] transition-transform duration-200 shadow-2xs">
                             <SubcategoryCardImage
                               src={imgUrl}
                               alt={subName}
@@ -282,7 +290,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
         {/* 2. Dynamic Subcategories Home Sections & Dynamic Inter-Section Banners & In-Between Mobile Special Groups */}
         {subCategorySections.map((sec, secIdx) => (
           <React.Fragment key={sec.id}>
-            <section className="mb-3 border-b border-divider/40 pb-2 last:border-b-0">
+            <section className="mb-3 border-b border-divider/40 pb-2 last:border-b-0 px-3 sm:px-0">
               {/* Subcategory Title Header */}
               <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-3">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { CMSProvider } from './context/CMSContext';
 import { CartWishlistProvider } from './context/CartWishlistContext';
 
@@ -95,7 +95,6 @@ const AppContent: React.FC = () => {
 
 
   const isStandalonePage =
-    location.pathname.startsWith('/categories') ||
     (location.pathname.startsWith('/products') && productsListView) ||
     location.pathname.startsWith('/s/') ||
     location.pathname.startsWith('/terms-of-service') ||
@@ -132,7 +131,7 @@ const AppContent: React.FC = () => {
         <Routes>
           <Route path="/" element={<Home onQuickView={setQuickViewProduct} />} />
           <Route path="/about" element={<About />} />
-          <Route path="/categories" element={<Categories />} />
+          <Route path="/categories" element={<Navigate to="/" replace />} />
           <Route path="/products" element={<ShopProducts onQuickView={setQuickViewProduct} onListViewChange={setProductsListView} />} />
           <Route path="/product/:id" element={<ProductDetails onQuickView={setQuickViewProduct} />} />
           <Route path="/brands" element={<Brands onQuickView={setQuickViewProduct} />} />

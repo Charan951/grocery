@@ -1,22 +1,53 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Home, History, Grid3x3, CircleUserRound } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const NAV_ITEMS = [
   { label: 'Home', path: '/', icon: Home, match: (p: string) => p === '/' },
   { label: 'Order Again', path: '/orders', icon: History, match: (p: string) => p.startsWith('/orders') || p.startsWith('/account/orders') },
-  { label: 'Categories', path: '/categories', icon: Grid3x3, match: (p: string) => p.startsWith('/categories') || p.startsWith('/products') },
+  { label: 'Categories', path: '/products', icon: Grid3x3, match: (p: string) => p.startsWith('/products') },
   { label: 'Profile', path: '/profile', icon: CircleUserRound, match: (p: string) => p.startsWith('/profile') || p.startsWith('/account/profile') },
 ];
 
 export const BottomNav: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const [hidden, setHidden] = useState(false);
+  const lastScrollY = useRef(0);
+
+  // Auto-hide bottom bar on scroll down, reveal on scroll up
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      const scrollDiff = currentScrollY - lastScrollY.current;
+
+      // Only hide when scrolling down past 60px threshold
+      if (scrollDiff > 8 && currentScrollY > 60) {
+        setHidden(true);
+      } else if (scrollDiff < -8 || currentScrollY <= 20) {
+        setHidden(false);
+      }
+
+      lastScrollY.current = currentScrollY;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Always reset visibility on route change
+  useEffect(() => {
+    setHidden(false);
+  }, [location.pathname]);
 
   return (
-    <nav
-      className="sm:hidden fixed bottom-0 left-0 right-0 z-[998] bg-surface border-t border-divider"
+    <motion.nav
+      className="sm:hidden fixed bottom-0 left-0 right-0 z-[998] bg-surface border-t border-divider shadow-lg"
       style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 10px)' }}
+      initial={false}
+      animate={{ y: hidden ? '100%' : '0%' }}
+      transition={{ duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
     >
       <div className="flex items-center justify-around px-2 py-2.5">
         {NAV_ITEMS.map((item) => {
@@ -46,6 +77,6 @@ export const BottomNav: React.FC = () => {
           );
         })}
       </div>
-    </nav>
+    </motion.nav>
   );
 };

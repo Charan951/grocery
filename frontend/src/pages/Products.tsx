@@ -178,7 +178,7 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
       setSelectedCategory('');
       setSelectedSubCategory('');
       setInCategoryView(false);
-      navigate('/categories', { replace: true });
+      navigate('/', { replace: true });
     }
   }, [urlCategory, urlSubCategory, urlSearch, categories, navigate]);
 
@@ -411,28 +411,24 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
             sits beside the product grid at every viewport, widening into a labeled
             sidebar at lg+. */}
         {inCategoryView ? (
-          <>
+          <div className="flex flex-col h-[calc(100vh-var(--sticky-header-h,65px)-60px)] min-h-[480px] overflow-hidden">
             <button
               onClick={() => {
                 if (location.state && (location.state as any).from) {
                   navigate((location.state as any).from);
                 } else {
-                  navigate('/categories');
+                  navigate('/');
                 }
               }}
-              className="mb-3 text-[11px] sm:text-xs font-black text-emerald-600 hover:text-emerald-700 flex items-center gap-1 transition-colors cursor-pointer"
+              className="mb-2 text-[11px] sm:text-xs font-black text-emerald-600 hover:text-emerald-700 flex items-center gap-1 transition-colors cursor-pointer shrink-0"
             >
-              ← Back to Categories
+              ← Back to Home
             </button>
-            <div className="grid grid-cols-[72px_1fr] sm:grid-cols-[84px_1fr] lg:grid-cols-[96px_1fr] gap-2 sm:gap-3 lg:gap-4 items-start">
+            <div className="grid grid-cols-[72px_1fr] sm:grid-cols-[84px_1fr] lg:grid-cols-[96px_1fr] gap-2 sm:gap-3 lg:gap-4 items-stretch flex-1 min-h-0 overflow-hidden">
 
-              {/* Left Subcategory Rail / Sidebar (Narrow Icon Rail Matching Image 3) */}
+              {/* Left Subcategory Rail / Sidebar */}
               <aside
-                style={{
-                  top: '12px',
-                  maxHeight: 'calc(100vh - 24px)',
-                }}
-                className="bg-white border-r border-divider/60 py-2 px-1 sticky top-3 overflow-y-auto no-scrollbar rounded-2xl flex flex-col gap-1 shadow-2xs"
+                className="bg-white border-r border-divider/60 py-2 px-1 h-full overflow-y-auto no-scrollbar rounded-xl flex flex-col gap-1 shadow-2xs shrink-0"
               >
                 <div className="flex flex-col gap-2">
                   {/* All Subcategories Button */}
@@ -493,13 +489,12 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
                 </div>
               </aside>
 
-              {/* Right Main Content Area: Dynamic Background Color Tint & Products Grid */}
+              {/* Right Main Content Area: Fixed Height Scroll with Overscroll Contain */}
               <main
                 style={{
-                  maxHeight: 'calc(100vh - 24px)',
                   backgroundColor: activeSubCatColor
                 }}
-                className="flex flex-col gap-3 sm:gap-4 min-w-0 overflow-y-auto no-scrollbar p-2.5 sm:p-4 rounded-3xl border border-divider/60 shadow-xs transition-colors duration-300"
+                className="flex flex-col gap-3 sm:gap-4 min-w-0 h-full overflow-y-auto overscroll-contain no-scrollbar p-2.5 sm:p-4 rounded-xl border border-divider/60 shadow-xs transition-colors duration-300 pb-16"
               >
 
                 {/* Top Subcategory Banners */}
@@ -559,7 +554,7 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
 
               </main>
             </div>
-          </>
+          </div>
         ) : (
           /* CONDITION 2: NO Subcategory Selected -> Show Category Landing Page with 3-Column Cards Grid */
           <main className="flex flex-col gap-6">

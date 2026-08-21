@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Search, Navigation, X, Check } from 'lucide-react';
+import { searchCitiesByPrefix, CityLocation } from '../data/citiesData';
 
 interface LocationModalProps {
   isOpen: boolean;
@@ -44,6 +45,56 @@ export const LocationModal: React.FC<LocationModalProps> = ({
   const [landmark, setLandmark] = useState('');
   const [label, setLabel] = useState<'Home' | 'Work' | 'Other'>('Home');
   const [fullAddressText, setFullAddressText] = useState(initialString);
+
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [prefixSuggestions, setPrefixSuggestions] = useState<CityLocation[]>([]);
+  const [apiSuggestions, setApiSuggestions] = useState<any[]>([]);
+
+  useEffect(() => {
+    const raw = searchQuery.trim();
+    const cleanQ = raw.replace(/[-_]+$/, '').trim();
+
+    if (cleanQ.length > 0) {
+      const localMatches = searchCitiesByPrefix(cleanQ);
+      setPrefixSuggestions(localMatches);
+      setShowSuggestions(true);
+
+      const timer = setTimeout(async () => {
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&countrycodes=in&q=${encodeURIComponent(cleanQ)}`
+          );
+          const data = await res.json();
+          if (data && Array.isArray(data)) {
+            setApiSuggestions(data.slice(0, 5));
+          }
+        } catch (err) {
+          console.warn(err);
+        }
+      }, 250);
+
+      return () => clearTimeout(timer);
+    } else {
+      setPrefixSuggestions([]);
+      setApiSuggestions([]);
+      setShowSuggestions(false);
+    }
+  }, [searchQuery]);
+
+  const handleSelectSuggestion = (
+    cityName: string,
+    stateName: string,
+    lat: number,
+    lng: number,
+    pincode?: string,
+    fullAddr?: string
+  ) => {
+    setPosition([lat, lng]);
+    const finalAddr = fullAddr || `${cityName}, ${stateName}${pincode ? ' - ' + pincode : ''}, India`;
+    setFullAddressText(finalAddr);
+    setSearchQuery(cityName);
+    setShowSuggestions(false);
+  };
 
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>(() => {
     const cached = localStorage.getItem('saved_addresses');
@@ -155,26 +206,104 @@ export const LocationModal: React.FC<LocationModalProps> = ({
             <div className="p-5 overflow-y-auto flex flex-col gap-4">
               
               {/* Search Bar + Locate Me Button */}
-              <div className="flex items-center gap-2">
-                <div className="flex-1 bg-gray-50 border border-gray-200 focus-within:border-[#00A86B] rounded-2xl px-4 py-2.5 flex items-center gap-2 transition-all">
-                  <Search size={18} className="text-gray-400 shrink-0" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Type area, landmark or street (e.g. HITEC City, Indiranagar)..."
-                    className="w-full bg-transparent border-none outline-none text-xs font-semibold text-gray-900 placeholder:text-gray-400"
-                  />
+              <div className="relative">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-gray-50 border border-gray-200 focus-within:border-[#00A86B] rounded-2xl px-4 py-2.5 flex items-center gap-2 transition-all">
+                    <Search size={18} className="text-gray-400 shrink-0" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onFocus={() => searchQuery.trim().length > 0 && setShowSuggestions(true)}
+                      placeholder="Type city or area (e.g. E for Eluru, G for Guntur)..."
+                      className="w-full bg-transparent border-none outline-none text-xs font-semibold text-gray-900 placeholder:text-gray-400"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => { setSearchQuery(''); setShowSuggestions(false); }}
+                        className="text-gray-400 hover:text-gray-700 text-xs font-bold px-1"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleLocateMe}
+                    className="bg-[#00A86B] hover:bg-[#00915c] text-white font-extrabold text-xs px-4 py-3 rounded-2xl flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-2xs"
+                  >
+                    <Navigation size={15} />
+                    <span>Locate Me</span>
+                  </button>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleLocateMe}
-                  className="bg-[#00A86B] hover:bg-[#00915c] text-white font-extrabold text-xs px-4 py-3 rounded-2xl flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-2xs"
-                >
-                  <Navigation size={15} />
-                  <span>Locate Me</span>
-                </button>
+                {/* Autocomplete Starting-Letter City Suggestions Dropdown */}
+                {showSuggestions && (prefixSuggestions.length > 0 || apiSuggestions.length > 0) && (
+                  <div className="absolute top-[calc(100%+6px)] left-0 right-0 bg-white border border-gray-200 rounded-2xl shadow-2xl overflow-hidden z-[500] max-h-64 overflow-y-auto p-1.5 flex flex-col gap-0.5">
+                    <div className="px-3 py-1 text-[10px] font-black text-gray-400 uppercase tracking-wider bg-gray-50 rounded-lg">
+                      Matching Cities / Locations ({prefixSuggestions.length + apiSuggestions.length})
+                    </div>
+
+                    {prefixSuggestions.map((city, idx) => (
+                      <div
+                        key={`modal_prefix_${idx}`}
+                        onClick={() => handleSelectSuggestion(city.name, city.state, city.lat, city.lng, city.pincode)}
+                        className="px-3 py-2 hover:bg-emerald-50 rounded-xl cursor-pointer flex items-center justify-between border-b border-gray-100 last:border-b-0 group transition-colors"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-xl bg-emerald-100 text-[#00A86B] flex items-center justify-center shrink-0 font-bold text-xs">
+                            📍
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-xs font-extrabold text-gray-900 group-hover:text-[#00A86B]">
+                              {city.name}
+                            </span>
+                            <span className="text-[10px] font-semibold text-gray-400">
+                              {city.state} {city.pincode ? `• PIN: ${city.pincode}` : ''}
+                            </span>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-extrabold text-[#00A86B] bg-emerald-50 px-2 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity">
+                          Select
+                        </span>
+                      </div>
+                    ))}
+
+                    {apiSuggestions.map((item, idx) => {
+                      const mainName = item.display_name.split(',')[0];
+                      return (
+                        <div
+                          key={`modal_api_${idx}`}
+                          onClick={() => handleSelectSuggestion(
+                            mainName,
+                            item.display_name.split(',')[1] || '',
+                            parseFloat(item.lat),
+                            parseFloat(item.lon),
+                            item.display_name.match(/\b\d{6}\b/)?.[0],
+                            item.display_name
+                          )}
+                          className="px-3 py-2 hover:bg-emerald-50 rounded-xl cursor-pointer flex items-center justify-between border-b border-gray-100 last:border-b-0 group transition-colors"
+                        >
+                          <div className="flex items-center gap-2.5 max-w-[85%]">
+                            <div className="w-7 h-7 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 font-bold text-xs">
+                              🗺️
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold text-gray-900 line-clamp-1 group-hover:text-[#00A86B]">
+                                {mainName}
+                              </span>
+                              <span className="text-[10px] font-medium text-gray-400 line-clamp-1">
+                                {item.display_name}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Popular Location Tags */}
