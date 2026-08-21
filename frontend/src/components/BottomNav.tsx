@@ -26,6 +26,8 @@ export const BottomNav: React.FC = () => {
             <button
               key={item.path}
               onClick={() => navigate(item.path)}
+              aria-label={item.label}
+              aria-current={isActive ? 'page' : undefined}
               className={`flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
                 isActive ? 'bg-primary/10 rounded-full px-4 py-2' : 'p-2'
               }`}

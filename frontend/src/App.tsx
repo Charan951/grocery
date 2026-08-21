@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
+import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { CMSProvider } from './context/CMSContext';
 import { CartWishlistProvider } from './context/CartWishlistContext';
 
@@ -23,18 +23,8 @@ import { CustomerProfile } from './pages/CustomerProfile';
 import { CustomerSupport } from './pages/CustomerSupport';
 import { CustomerAddresses } from './pages/CustomerAddresses';
 
-// Admin Components
-import { Login } from './pages/admin/Login';
-import { AdminLayout } from './components/AdminLayout';
-import { Dashboard } from './pages/admin/Dashboard';
-import { Orders } from './pages/admin/Orders';
-import { Products as AdminProducts } from './pages/admin/Products';
-import { AdminCMS } from './pages/AdminCMS';
-import { 
-  CategoriesModule, SubCategoriesModule, InventoryModule, CustomersModule, 
-  DeliveryModule, EmployeesModule, CouponsModule, FinanceModule, 
-  AnalyticsModule, ReviewsModule, SupportModule, AuditLogsModule, SettingsModule 
-} from './pages/admin/Modules';
+// Admin bundle (code-split — a storefront shopper never loads this)
+const AdminApp = lazy(() => import('./AdminApp'));
 
 // Components
 import { Header } from './components/Header';
@@ -93,33 +83,12 @@ const AppContent: React.FC = () => {
   }, [isAdminRoute]);
 
   if (isAdminRoute) {
-    if (!adminUser) {
-      return <Login onLoginSuccess={handleLoginSuccess} />;
-    }
     return (
       <>
         <ScrollToTop />
-        <Routes>
-          <Route path="/admin/login" element={<Navigate to="/admin" replace />} />
-          <Route path="/admin" element={<AdminLayout onLogout={handleLogout}><Dashboard /></AdminLayout>} />
-          <Route path="/admin/orders" element={<AdminLayout onLogout={handleLogout}><Orders /></AdminLayout>} />
-          <Route path="/admin/products" element={<AdminLayout onLogout={handleLogout}><AdminProducts /></AdminLayout>} />
-          <Route path="/admin/categories" element={<AdminLayout onLogout={handleLogout}><CategoriesModule /></AdminLayout>} />
-          <Route path="/admin/subcategories" element={<AdminLayout onLogout={handleLogout}><SubCategoriesModule /></AdminLayout>} />
-          <Route path="/admin/inventory" element={<AdminLayout onLogout={handleLogout}><InventoryModule /></AdminLayout>} />
-          <Route path="/admin/customers" element={<AdminLayout onLogout={handleLogout}><CustomersModule /></AdminLayout>} />
-          <Route path="/admin/delivery" element={<AdminLayout onLogout={handleLogout}><DeliveryModule /></AdminLayout>} />
-          <Route path="/admin/employees" element={<AdminLayout onLogout={handleLogout}><EmployeesModule /></AdminLayout>} />
-          <Route path="/admin/coupons" element={<AdminLayout onLogout={handleLogout}><CouponsModule /></AdminLayout>} />
-          <Route path="/admin/cms" element={<AdminLayout onLogout={handleLogout}><AdminCMS /></AdminLayout>} />
-          <Route path="/admin/finance" element={<AdminLayout onLogout={handleLogout}><FinanceModule /></AdminLayout>} />
-          <Route path="/admin/analytics" element={<AdminLayout onLogout={handleLogout}><AnalyticsModule /></AdminLayout>} />
-          <Route path="/admin/reviews" element={<AdminLayout onLogout={handleLogout}><ReviewsModule /></AdminLayout>} />
-          <Route path="/admin/support" element={<AdminLayout onLogout={handleLogout}><SupportModule /></AdminLayout>} />
-          <Route path="/admin/notifications" element={<AdminLayout onLogout={handleLogout}><SupportModule /></AdminLayout>} />
-          <Route path="/admin/settings" element={<AdminLayout onLogout={handleLogout}><SettingsModule /></AdminLayout>} />
-          <Route path="/admin/audit-logs" element={<AdminLayout onLogout={handleLogout}><AuditLogsModule /></AdminLayout>} />
-        </Routes>
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-[#0F2A1B] text-white/70 text-sm font-semibold">Loading console…</div>}>
+          <AdminApp adminUser={adminUser} onLoginSuccess={handleLoginSuccess} onLogout={handleLogout} />
+        </Suspense>
       </>
     );
   }

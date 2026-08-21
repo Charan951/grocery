@@ -71,6 +71,17 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
     return () => observer.disconnect();
   }, []);
 
+  // Reopen the profile drawer when routed home from a sub-page's Back
+  // button with `state: { openProfile: true }` (the drawer is a UI
+  // overlay on "/", not its own route — see useSmartBack).
+  useEffect(() => {
+    if ((location.state as { openProfile?: boolean } | null)?.openProfile && customerUser) {
+      setIsCustomerProfileOpen(true);
+      navigate(location.pathname + location.search, { replace: true, state: {} });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
+
   const handleProfileClick = () => {
     if (customerUser) {
       setIsCustomerProfileOpen(true);
@@ -248,6 +259,7 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
                 onClick={handleProfileClick}
                 className="w-9 h-9 rounded-full border border-divider bg-background flex items-center justify-center text-text-primary hover:border-primary hover:text-primary transition-colors cursor-pointer shrink-0"
                 title={customerUser ? `Logged in as ${customerUser.phone}` : "Customer Login"}
+                aria-label={customerUser ? `Account menu — logged in as ${customerUser.phone}` : "Customer login"}
               >
                 <User size={18} />
               </button>
@@ -443,7 +455,7 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
                   <Leaf className="text-primary" fill="currentColor" size={24} />
                   <span className="text-text-primary font-extrabold">Fresh<span className="text-primary">Cart</span></span>
                 </div>
-                <button onClick={() => setMobileMenuOpen(false)} className="text-text-primary">
+                <button onClick={() => setMobileMenuOpen(false)} className="text-text-primary" aria-label="Close menu">
                   <X size={24} />
                 </button>
               </div>
@@ -458,7 +470,7 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full text-sm bg-transparent border-none outline-none text-text-primary"
                   />
-                  <button type="submit" className="text-text-secondary">
+                  <button type="submit" className="text-text-secondary" aria-label="Search">
                     <Search size={18} />
                   </button>
                 </div>

@@ -42,7 +42,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
       icon: ShoppingBag,
       onClick: () => {
         onClose();
-        navigate('/account/orders');
+        navigate('/account/orders', { state: { from: 'profile' } });
       },
     },
     {
@@ -51,7 +51,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
       icon: Headphones,
       onClick: () => {
         onClose();
-        navigate('/account/support');
+        navigate('/account/support', { state: { from: 'profile' } });
       },
     },
     {
@@ -60,7 +60,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
       icon: MapPin,
       onClick: () => {
         onClose();
-        navigate('/account/addresses');
+        navigate('/account/addresses', { state: { from: 'profile' } });
       },
     },
     {
@@ -69,7 +69,7 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
       icon: User,
       onClick: () => {
         onClose();
-        navigate('/account/profile');
+        navigate('/account/profile', { state: { from: 'profile' } });
       },
     },
   ];

@@ -51,20 +51,14 @@ export const SubcategoryCardImage: React.FC<SubcategoryCardImageProps> = ({
   };
 
   return (
-    <div className={`relative w-full h-full flex items-center justify-center bg-transparent p-0.5 select-none overflow-hidden ${className}`}>
-      {/* 
-        Clean Transparent Image Rendering:
-        - Image container is strictly bg-transparent.
-        - Preserves native transparency of PNG/WebP cutouts.
-        - Object-contain ensures consistent visual scaling without cropping or stretching.
-      */}
+    <div className={`relative w-full h-full flex items-center justify-center select-none overflow-hidden ${className}`}>
       <img
         src={imgSrc}
         alt={alt}
         loading="lazy"
         decoding="async"
         onError={handleError}
-        className="w-full h-full object-contain object-center scale-100 transition-transform duration-200 group-hover:scale-105 bg-transparent"
+        className="w-full h-full object-cover object-center transition-transform duration-200 group-hover:scale-105"
       />
     </div>
   );

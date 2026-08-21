@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-21T00:00:00.000Z",
+  "title": "Design System: FreshCart",
+  "extensions": {
+    "colorMeta": {
+      "primary": { "role": "primary", "displayName": "Fresh Green", "canonical": "#4CAF50", "tonalRamp": ["#0F2A1B", "#17402A", "#234F35", "#2E7D32", "#4CAF50", "#66BB6A", "#81C784", "#C8E6C9"] },
+      "secondary": { "role": "primary", "displayName": "Leaf Green", "canonical": "#66BB6A", "tonalRamp": ["#153A20", "#1F5A2E", "#2E7D32", "#4CAF50", "#66BB6A", "#81C784", "#A5D6A7", "#E8F5E9"] },
+      "accent": { "role": "primary", "displayName": "Sprout Green", "canonical": "#81C784", "tonalRamp": ["#1B4D22", "#2E7D32", "#4CAF50", "#66BB6A", "#81C784", "#A5D6A7", "#C8E6C9", "#F1F8F2"] },
+      "background": { "role": "neutral", "displayName": "Produce Paper", "canonical": "#F8FAF7", "tonalRamp": ["#1C1C1E", "#3A3A3C", "#7A7A7A", "#C7C7CC", "#ECECEC", "#F4F6F3", "#F8FAF7", "#FFFFFF"] },
+      "surface": { "role": "neutral", "displayName": "Market White", "canonical": "#FFFFFF", "tonalRamp": ["#1C1C1E", "#3A3A3C", "#7A7A7A", "#C7C7CC", "#ECECEC", "#F4F6F3", "#F8FAF7", "#FFFFFF"] },
+      "text-primary": { "role": "neutral", "displayName": "Ink Black", "canonical": "#1C1C1E", "tonalRamp": ["#000000", "#1C1C1E", "#3A3A3C", "#7A7A7A", "#A0A0A5", "#C7C7CC", "#E5E5EA", "#FFFFFF"] },
+      "text-secondary": { "role": "neutral", "displayName": "Stone Gray", "canonical": "#7A7A7A", "tonalRamp": ["#1C1C1E", "#3A3A3C", "#5C5C5E", "#7A7A7A", "#9C9C9E", "#C7C7CC", "#E5E5EA", "#F4F4F4"] },
+      "divider": { "role": "neutral", "displayName": "Hairline", "canonical": "#ECECEC", "tonalRamp": ["#B0B0B0", "#C7C7CC", "#D9D9D9", "#E5E5E5", "#ECECEC", "#F2F2F2", "#F8F8F8", "#FFFFFF"] },
+      "success": { "role": "tertiary", "displayName": "Confirm Green", "canonical": "#34C759", "tonalRamp": ["#0F3D1B", "#1D6B2E", "#2A9642", "#34C759", "#5FD57E", "#8AE0A3", "#B7EDC8", "#E7F9EC"] },
+      "warning": { "role": "tertiary", "displayName": "Caution Amber", "canonical": "#FFB800", "tonalRamp": ["#5C4200", "#8A6300", "#B88400", "#FFB800", "#FFC733", "#FFD666", "#FFE699", "#FFF6D9"] },
+      "error": { "role": "tertiary", "displayName": "Alert Red", "canonical": "#FF3B30", "tonalRamp": ["#5C0F0B", "#8A1712", "#B81F19", "#FF3B30", "#FF6259", "#FF8983", "#FFB0AC", "#FFE0DE"] },
+      "admin-ink": { "role": "secondary", "displayName": "Control-Tower Ink", "canonical": "#0F2A1B", "tonalRamp": ["#050F09", "#0F2A1B", "#17402A", "#234F35", "#2F6B47", "#4C9265", "#8FC4A3", "#DCEEE3"] },
+      "admin-paper": { "role": "neutral", "displayName": "Ledger Paper", "canonical": "#F5F5F0", "tonalRamp": ["#171B16", "#3A3A34", "#6E6C5F", "#A6A392", "#D8D6C9", "#E4E1D5", "#F5F5F0", "#FFFFFF"] },
+      "admin-signal-green": { "role": "tertiary", "displayName": "Wordmark Emerald", "canonical": "#059669", "tonalRamp": ["#022C22", "#064E3B", "#065F46", "#047857", "#059669", "#10B981", "#6EE7B7", "#E3F3EC"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Storefront Display", "purpose": "Page titles, hero headings, section headers (Plus Jakarta Sans)." },
+      "body": { "displayName": "Storefront Body", "purpose": "All storefront body copy, labels, product names (Inter)." },
+      "admin-display": { "displayName": "Admin Display", "purpose": "Admin page/section headings (Space Grotesk)." },
+      "admin-body": { "displayName": "Admin Body", "purpose": "Admin table/form copy (IBM Plex Sans)." },
+      "admin-mono": { "displayName": "Admin Mono", "purpose": "Order IDs, shelf-tag labels, ledger figures (IBM Plex Mono)." }
+    },
+    "shadows": [
+      { "name": "card-rest", "value": "0 1px 2px rgba(0,0,0,0.03)", "purpose": "Barely-visible resting shadow on product/subcategory cards; border does the real separating work." },
+      { "name": "shadow-card", "value": "0 4px 20px -2px rgba(0,0,0,0.05)", "purpose": "Dropdowns, search-results panels, sticky bars." },
+      { "name": "shadow-premium", "value": "0 20px 40px -15px rgba(0,0,0,0.05), 0 15px 25px -10px rgba(0,0,0,0.03)", "purpose": "Drawers and modals only." }
+    ],
+    "motion": [
+      { "name": "ease-standard", "value": "cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Default transition easing for hover/press/drawer states." },
+      { "name": "duration-fast", "value": "150ms", "purpose": "Hover/press feedback." },
+      { "name": "duration-base", "value": "300ms", "purpose": "Drawer/modal open-close, page tint transitions." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main CTA button — full pill, brand green.",
+      "html": "<button class=\"ds-btn-primary\">Add to Cart</button>",
+      "css": ".ds-btn-primary { background: #4CAF50; color: #fff; font-weight: 800; font-size: 13px; padding: 10px 20px; border: none; border-radius: 9999px; cursor: pointer; transition: background 150ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-primary:hover { background: #66BB6A; } .ds-btn-primary:focus-visible { outline: 2px solid #4CAF50; outline-offset: 2px; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary/dense CTA — used on product cards.",
+      "html": "<button class=\"ds-btn-outline\">Add</button>",
+      "css": ".ds-btn-outline { background: #fff; color: #4CAF50; font-weight: 800; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; padding: 4px 16px; border: 2px solid #4CAF50; border-radius: 12px; cursor: pointer; transition: all 200ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-outline:hover { background: #4CAF50; color: #fff; }"
+    },
+    {
+      "name": "Product Card",
+      "kind": "card",
+      "refersTo": "card-product",
+      "description": "Grid tile — image, price, add button.",
+      "html": "<div class=\"ds-card-product\"><div class=\"ds-card-product-img\"></div><div class=\"ds-card-price\">₹45 <span class=\"ds-card-mrp\">₹60</span></div><div class=\"ds-card-name\">Fresh Italian Basil Leaves</div></div>",
+      "css": ".ds-card-product { background: #fff; border: 1px solid #ECECEC; border-radius: 16px; padding: 6px; font-family: Inter, system-ui, sans-serif; } .ds-card-product-img { aspect-ratio: 1 / 1; border-radius: 12px; background: #F8FAF7; margin-bottom: 8px; } .ds-card-price { font-weight: 900; font-size: 13px; color: #1C1C1E; } .ds-card-mrp { font-weight: 600; font-size: 11px; color: #C7C7CC; text-decoration: line-through; margin-left: 4px; } .ds-card-name { font-weight: 700; font-size: 12px; color: #1C1C1E; margin-top: 4px; }"
+    },
+    {
+      "name": "Status Chip",
+      "kind": "chip",
+      "refersTo": "shelf-tag",
+      "description": "Small status pill used across admin (order status, stock) and storefront (discount/organic tags).",
+      "html": "<span class=\"ds-chip ds-chip-green\">Delivered</span>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 18px; border-radius: 4px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; position: relative; } .ds-chip::before { content: ''; position: absolute; left: 7px; top: 50%; transform: translateY(-50%); width: 3px; height: 3px; border-radius: 50%; background: currentColor; opacity: 0.55; } .ds-chip-green { background: #E3F3EC; color: #059669; }"
+    },
+    {
+      "name": "Search Input",
+      "kind": "input",
+      "refersTo": "input-search",
+      "description": "Header search bar — pill-shaped, focus ring.",
+      "html": "<div class=\"ds-input-search\"><input type=\"text\" placeholder='Search for &quot;milk&quot;...' /></div>",
+      "css": ".ds-input-search { display: flex; align-items: center; width: 100%; padding: 8px 16px; background: #F8FAF7; border: 1px solid #ECECEC; border-radius: 9999px; transition: all 150ms cubic-bezier(0.4,0,0.2,1); } .ds-input-search:focus-within { border-color: #4CAF50; background: #fff; box-shadow: 0 0 0 4px rgba(76,175,80,0.2); } .ds-input-search input { border: none; outline: none; background: transparent; font-size: 13px; font-family: Inter, system-ui, sans-serif; width: 100%; }"
+    },
+    {
+      "name": "Bottom Tab Nav",
+      "kind": "nav",
+      "refersTo": "bottom-nav",
+      "description": "Mobile 4-item tab bar; active tab expands to a labeled pill, inactive tabs show icon only.",
+      "html": "<nav class=\"ds-bottom-nav\"><button class=\"ds-tab ds-tab-active\">🏠 Home</button><button class=\"ds-tab\">↺</button><button class=\"ds-tab\">▦</button><button class=\"ds-tab\">◯</button></nav>",
+      "css": ".ds-bottom-nav { display: flex; justify-content: space-around; align-items: center; background: #fff; border-top: 1px solid #ECECEC; padding: 10px 8px; font-family: Inter, system-ui, sans-serif; } .ds-tab { background: none; border: none; color: #C7C7CC; font-size: 22px; padding: 8px; cursor: pointer; } .ds-tab-active { background: rgba(76,175,80,0.1); color: #4CAF50; border-radius: 9999px; padding: 8px 16px; font-size: 13px; font-weight: 900; display: flex; align-items: center; gap: 6px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Fresh Market Grid",
+    "overview": "FreshCart reads like a well-run neighborhood grocery digitized without losing its efficiency: bright white surfaces, produce-green accents, and a dense, honest grid of cards that never pretends to be more decorative than the job requires. The storefront is fast and legible — every screen is built to be scanned in seconds by someone who wants groceries delivered in 10 minutes, not to be admired. The admin console shares the same bones (tokens, radii, spacing) but shifts register to a deep-forest 'control tower' ink and warm paper background — a ledger, not a marketing surface. The system stays deliberately flat: depth comes from white cards against a soft off-white background and thin 1px dividers, not from shadow stacks or glassmorphism. Rounded corners are generous but restrained (12–16px on cards, full pill on buttons and badges) — soft enough to feel consumer-friendly, never soft enough to feel decorative or twee. Color is used sparingly and functionally: green means brand/action/success, amber means caution, red means stock/error — nothing is colored 'for interest.'",
+    "keyCharacteristics": [
+      "Bright, white-surface storefront on a warm off-white background (#F8FAF7), never true gray.",
+      "One brand green (#4CAF50) carries almost all accent weight; other colors are strictly functional.",
+      "Flat elevation: shadows are near-invisible at rest, reserved for floating/interactive elements only.",
+      "Consistent 12–16px card radius, full-pill radius on buttons, badges, and nav chips.",
+      "Two typographic registers: Inter/Plus Jakarta Sans on the storefront, Space Grotesk/IBM Plex on admin."
+    ],
+    "rules": [
+      { "name": "The One Accent Rule", "body": "#4CAF50 is the only color allowed to signal brand or primary action. Every other color is neutral or strictly functional.", "section": "colors" },
+      { "name": "The Paper, Not Gray Rule", "body": "Backgrounds are always a warm off-white/paper tone, never a cool or true gray.", "section": "colors" },
+      { "name": "The Small-and-Bold Rule", "body": "Body text runs small (text-xs/text-sm) but compensates with heavier weight rather than larger size.", "section": "typography" },
+      { "name": "The Earned-Shadow Rule", "body": "A shadow only appears on something genuinely floating above the page. In-flow surfaces use a border instead.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep the brand green as the single accent color.",
+      "Do separate in-flow surfaces with a 1px hairline border before reaching for a shadow.",
+      "Do use full-pill radius for buttons/badges/chips and 12–16px for cards.",
+      "Do keep body text small-and-bold rather than large-and-light.",
+      "Do reuse existing shared components instead of building page-specific one-offs."
+    ],
+    "donts": [
+      "Don't add gradients, glassmorphism, or heavy multi-layer shadows to static cards.",
+      "Don't introduce a second accent color for visual interest.",
+      "Don't mix the storefront and admin type pairings.",
+      "Don't redesign a page's structure to modernize it — refine within the existing identity."
+    ]
+  }
+}

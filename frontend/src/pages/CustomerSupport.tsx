@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SEO } from '../components/SEO';
 import { Link, useNavigate } from 'react-router-dom';
+import { useSmartBack } from '../hooks/useSmartBack';
 import { 
   ArrowLeft, 
   Headphones, 
@@ -55,6 +56,7 @@ const faqs: SupportFAQ[] = [
 
 export const CustomerSupport: React.FC = () => {
   const navigate = useNavigate();
+  const goBack = useSmartBack('/');
   const [selectedOrder, setSelectedOrder] = useState<string>('PNNHJHTYP81116');
   const [selectedIssue, setSelectedIssue] = useState<string>('');
   const [activeFaq, setActiveFaq] = useState<string | null>(null);
@@ -117,13 +119,13 @@ export const CustomerSupport: React.FC = () => {
       <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-2xs">
         <div className="container mx-auto px-4 md:px-8 max-w-[1000px] py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link 
-              to="/" 
-              className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 transition-colors"
+            <button
+              onClick={goBack}
+              className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 transition-colors cursor-pointer"
               aria-label="Back"
             >
               <ArrowLeft size={18} />
-            </Link>
+            </button>
             <div>
               <h1 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight font-display">
                 Customer Support
@@ -170,11 +172,11 @@ export const CustomerSupport: React.FC = () => {
             href="tel:+911800373742" 
             className="bg-white border border-gray-200 hover:border-[#4CAF50] rounded-2xl p-5 shadow-2xs cursor-pointer transition-all flex items-center gap-4 group"
           >
-            <div className="w-12 h-12 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+            <div className="w-12 h-12 rounded-2xl bg-gray-100 text-gray-700 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
               <PhoneCall size={24} />
             </div>
             <div className="flex flex-col">
-              <h3 className="text-sm font-extrabold text-gray-900 group-hover:text-violet-600 transition-colors">
+              <h3 className="text-sm font-extrabold text-gray-900 group-hover:text-[#4CAF50] transition-colors">
                 Call Support
               </h3>
               <span className="text-xs font-semibold text-gray-500 mt-0.5">

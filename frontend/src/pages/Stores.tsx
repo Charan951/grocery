@@ -69,7 +69,7 @@ export const Stores: React.FC = () => {
                   <div
                     key={store.id}
                     onClick={() => handleCardClick(store.id)}
-                    className={`p-4 border-b border-divider cursor-pointer hover:bg-background transition-all duration-150 last:border-b-0 ${isActive ? 'bg-primary/5 border-l-4 border-l-primary' : 'border-l-4 border-l-transparent'}`}
+                    className={`p-4 border-b border-divider cursor-pointer hover:bg-background transition-all duration-150 last:border-b-0 ${isActive ? 'bg-primary/5' : ''}`}
                   >
                     <div className="flex justify-between items-center mb-1">
                       <span className="text-sm font-bold text-text-primary">{store.name}</span>

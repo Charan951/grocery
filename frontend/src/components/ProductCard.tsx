@@ -94,6 +94,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
             favorited ? 'text-rose-500 fill-rose-500' : 'text-text-tertiary hover:text-rose-500'
           }`}
           title={favorited ? 'Remove from Wishlist' : 'Add to Wishlist'}
+          aria-label={favorited ? 'Remove from Wishlist' : 'Add to Wishlist'}
+          aria-pressed={favorited}
         >
           <Heart size={14} className={favorited ? 'fill-rose-500 text-rose-500' : ''} />
         </button>
@@ -129,15 +131,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
             </span>
           ) : cartQty > 0 ? (
             <div className="flex items-center bg-emerald-600 text-white rounded-xl shadow-xs font-black text-xs overflow-hidden">
-              <button onClick={handleDecrement} className="p-1 sm:p-1.5 hover:bg-emerald-700 transition-colors">
+              <button onClick={handleDecrement} className="p-1 sm:p-1.5 hover:bg-emerald-700 transition-colors" aria-label="Decrease quantity">
                 <Minus size={13} strokeWidth={2.5} />
               </button>
-              <span className="px-1.5 sm:px-2 font-black text-xs">{cartQty}</span>
-              <button 
-                onClick={handleIncrement} 
+              <span className="px-1.5 sm:px-2 font-black text-xs" aria-live="polite">{cartQty}</span>
+              <button
+                onClick={handleIncrement}
                 disabled={cartQty >= stockQty}
                 className={`p-1 sm:p-1.5 transition-colors ${cartQty >= stockQty ? 'opacity-40 cursor-not-allowed bg-emerald-800' : 'hover:bg-emerald-700'}`}
                 title={cartQty >= stockQty ? `Only ${stockQty} available` : 'Increase'}
+                aria-label={cartQty >= stockQty ? `Only ${stockQty} available` : 'Increase quantity'}
               >
                 <Plus size={13} strokeWidth={2.5} />
               </button>

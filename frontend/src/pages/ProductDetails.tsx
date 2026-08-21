@@ -57,6 +57,18 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ onQuickView }) =
     }
   }, [product]);
 
+  // Select 2 bundle products from other categories/products
+  const bundleItems = useMemo(() => {
+    if (!product) return [];
+    return products.filter((p) => p.id !== product.id).slice(0, 2);
+  }, [products, product]);
+
+  // Select related products (same category)
+  const relatedProducts = useMemo(() => {
+    if (!product) return [];
+    return products.filter((p) => p.categoryId === product.categoryId && p.id !== product.id).slice(0, 4);
+  }, [products, product]);
+
   // If product not found
   if (!product) {
     return (
@@ -76,16 +88,6 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ onQuickView }) =
     'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&auto=format&fit=crop',
     'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=800&auto=format&fit=crop',
   ];
-
-  // Select 2 bundle products from other categories/products
-  const bundleItems = useMemo(() => {
-    return products.filter((p) => p.id !== product.id).slice(0, 2);
-  }, [products, product]);
-
-  // Select related products (same category)
-  const relatedProducts = useMemo(() => {
-    return products.filter((p) => p.categoryId === product.categoryId && p.id !== product.id).slice(0, 4);
-  }, [products, product]);
 
   const handleAddToCart = () => {
     addToCart(product, quantity, selectedWeight);

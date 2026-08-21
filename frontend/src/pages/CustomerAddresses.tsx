@@ -21,6 +21,7 @@ import {
   Info
 } from 'lucide-react';
 import { useCMS } from '../context/CMSContext';
+import { useSmartBack } from '../hooks/useSmartBack';
 
 interface SavedAddress {
   id: string;
@@ -51,6 +52,7 @@ const labelIcon = (label: 'Home' | 'Work' | 'Other') => {
 
 export const CustomerAddresses: React.FC = () => {
   const navigate = useNavigate();
+  const goBack = useSmartBack('/');
   const { userLocation, updateUserLocation } = useCMS();
 
   const customerUser = (() => {
@@ -326,13 +328,13 @@ export const CustomerAddresses: React.FC = () => {
       <header className="bg-surface/95 backdrop-blur-sm border-b border-divider py-4 px-6 md:px-12 sticky top-0 z-40 shadow-2xs">
         <div className="max-w-[900px] mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link
-              to="/"
-              className="w-9 h-9 rounded-full bg-background hover:bg-divider/60 flex items-center justify-center text-text-secondary transition-colors"
+            <button
+              onClick={goBack}
+              className="w-9 h-9 rounded-full bg-background hover:bg-divider/60 flex items-center justify-center text-text-secondary transition-colors cursor-pointer"
               aria-label="Back"
             >
               <ArrowLeft size={18} />
-            </Link>
+            </button>
             <div>
               <h1 className="text-xl md:text-2xl font-black text-text-primary tracking-tight font-display">
                 {viewMode === 'form' ? (editingAddressId ? 'Edit Address' : 'Add New Location') : 'Saved Addresses'}
@@ -546,7 +548,7 @@ export const CustomerAddresses: React.FC = () => {
 
               {/* Center Pin Marker Graphic Overlay */}
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full pointer-events-none flex flex-col items-center">
-                <div className="w-8 h-8 rounded-full bg-error text-white flex items-center justify-center shadow-lg border-2 border-white animate-bounce">
+                <div className="w-8 h-8 rounded-full bg-error text-white flex items-center justify-center shadow-lg border-2 border-white">
                   <MapPin size={20} />
                 </div>
                 <div className="w-3 h-1.5 bg-black/40 rounded-full blur-[1px] mt-0.5" />

@@ -184,7 +184,7 @@ export const Categories: React.FC = () => {
                           }
                           className="flex flex-col items-center group cursor-pointer text-center col-span-1"
                         >
-                          <div className="w-full aspect-square bg-[#F4F5F7] rounded-2xl sm:rounded-3xl p-1 flex items-center justify-center overflow-hidden group-hover:scale-[1.03] transition-transform duration-200">
+                          <div className="w-full aspect-square bg-[#F4F5F7] rounded-2xl sm:rounded-3xl flex items-center justify-center overflow-hidden group-hover:scale-[1.03] transition-transform duration-200">
                             <SubcategoryCardImage
                               src={imgUrl}
                               alt={subName}

@@ -59,13 +59,18 @@ export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({
           exit={{ opacity: 0, scale: 0.9, y: 20 }}
           className="bg-white rounded-3xl w-full max-w-md p-6 sm:p-8 shadow-2xl flex flex-col items-center text-center relative overflow-hidden border border-gray-100"
         >
-          {/* Top Decorative Background Glow */}
-          <div className="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-emerald-500 via-teal-500 to-green-500" />
+          {/* Top Accent Bar */}
+          <div className="absolute top-0 inset-x-0 h-1.5 bg-primary" />
 
           {/* Success Icon */}
-          <div className="w-20 h-20 rounded-full bg-emerald-50 text-[#00A86B] flex items-center justify-center mb-4 shadow-sm border border-emerald-100/80">
-            <CheckCircle2 size={48} className="animate-bounce" />
-          </div>
+          <motion.div
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            className="w-20 h-20 rounded-full bg-emerald-50 text-[#00A86B] flex items-center justify-center mb-4 shadow-sm border border-emerald-100/80"
+          >
+            <CheckCircle2 size={48} />
+          </motion.div>
 
           <h2 className="text-2xl font-black text-gray-900 font-display tracking-tight">
             Order Placed Successfully!

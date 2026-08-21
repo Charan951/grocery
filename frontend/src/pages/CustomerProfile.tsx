@@ -3,9 +3,11 @@ import { motion } from 'framer-motion';
 import { SEO } from '../components/SEO';
 import { ArrowLeft, CheckCircle2, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useSmartBack } from '../hooks/useSmartBack';
 
 export const CustomerProfile: React.FC = () => {
   const navigate = useNavigate();
+  const goBack = useSmartBack('/');
   const [customerUser, setCustomerUser] = useState<any>(() => {
     const cached = localStorage.getItem('customer_user');
     return cached ? JSON.parse(cached) : null;
@@ -94,13 +96,13 @@ export const CustomerProfile: React.FC = () => {
       {/* Top Header */}
       <header className="bg-white border-b border-gray-100 py-4 px-6 md:px-12 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-3">
-          <Link 
-            to="/" 
-            className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 transition-colors"
+          <button
+            onClick={goBack}
+            className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 transition-colors cursor-pointer"
             aria-label="Back"
           >
             <ArrowLeft size={18} />
-          </Link>
+          </button>
           <span className="text-xl md:text-2xl font-black text-gray-900 tracking-tight font-display">
             Profile
           </span>

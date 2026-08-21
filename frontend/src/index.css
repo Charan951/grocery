@@ -231,12 +231,6 @@ h1, h2, h3, h4, h5, h6 {
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.text-gradient {
-  background: var(--primary-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
 .shadow-premium {
   box-shadow: var(--shadow-premium);
 }
@@ -280,5 +274,21 @@ h1, h2, h3, h4, h5, h6 {
   width: max-content;
   will-change: transform;
   animation: continuous-marquee-right 20s linear infinite;
+}
+
+/* Toast / small overlay entrance — smooth deceleration, no bounce */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-toast-in {
+  animation: toast-in 250ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 

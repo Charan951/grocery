@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, Link, useNavigate, useLocation } from 'react-router-dom';
-import { useCMS, getCategoryImage, getSubCategoryImage, subCategoryImages, Product, Banner } from '../context/CMSContext';
+import { useCMS, getSubCategoryImage, Product } from '../context/CMSContext';
 import { ProductCard } from '../components/ProductCard';
 import { SEO } from '../components/SEO';
 import { BannerCarousel } from '../components/BannerCarousel';
 import { SubcategoryCardImage } from '../components/SubcategoryCardImage';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowUpDown, ChevronRight, RefreshCw, X } from 'lucide-react';
+import { ArrowUpDown, ChevronRight, SearchX } from 'lucide-react';
 
 interface ProductsProps {
   onQuickView: (product: Product) => void;
@@ -390,23 +390,6 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
   const topSubCategoryBanners = useMemo(() => subCategoryBanners.filter(b => !b.position || b.position === 'top'), [subCategoryBanners]);
   const beforeProductsSubCategoryBanners = useMemo(() => subCategoryBanners.filter(b => b.position === 'before_products'), [subCategoryBanners]);
 
-  const renderBannerItem = (b: Banner) => (
-    <div key={b.id} className="w-full rounded-2xl md:rounded-3xl overflow-hidden shadow-sm hover:shadow-md border border-divider/60 bg-surface h-[180px] sm:h-[220px] md:h-[260px] lg:h-[280px]">
-      <a
-        href={b.linkUrl || '#'}
-        className="block w-full h-full cursor-pointer group"
-        title={b.title || 'Special Offer'}
-      >
-        <img
-          src={b.imageUrl}
-          alt={b.title || 'Promo Banner'}
-          className="w-full h-full block rounded-2xl md:rounded-3xl object-cover object-center group-hover:scale-[1.005] transition-transform duration-300"
-          onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
-        />
-      </a>
-    </div>
-  );
-
   const seo = seoSettings.products || {
     title: 'Shop Groceries by Category | FreshCart',
     description: 'Browse fresh fruits, vegetables, dairy, snacks, and grocery essentials.',
@@ -556,7 +539,7 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
                 {/* Products Grid */}
                 {paginatedProducts.length === 0 ? (
                   <div className="bg-surface border border-divider rounded-2xl p-12 text-center shadow-card flex flex-col items-center justify-center gap-3">
-                    <RefreshCw size={36} className="text-text-tertiary animate-spin" />
+                    <SearchX size={36} className="text-text-tertiary" />
                     <h3 className="text-base font-bold text-text-primary">No matching products found</h3>
                     <p className="text-xs text-text-secondary leading-normal">Try selecting another subcategory or clearing search queries.</p>
                     <button onClick={handleClearAll} className="text-xs font-bold bg-emerald-600 text-white py-2.5 px-6 rounded-full mt-2 hover:bg-emerald-700 transition-colors">Reset All Filters</button>

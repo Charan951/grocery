@@ -1616,7 +1616,7 @@ export const InventoryModule: React.FC = () => {
     <div className="bg-surface border border-divider p-6 rounded-[28px] shadow-card flex flex-col gap-6 relative">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-primary text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 text-xs font-semibold animate-bounce">
+        <div className="fixed bottom-6 right-6 z-50 bg-primary text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 text-xs font-semibold animate-toast-in">
           <Check className="w-4 h-4" />
           <span>{toastMessage}</span>
         </div>

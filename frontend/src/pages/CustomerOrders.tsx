@@ -4,6 +4,7 @@ import { SEO } from '../components/SEO';
 import { useCartWishlist } from '../context/CartWishlistContext';
 import { useCMS } from '../context/CMSContext';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useSmartBack } from '../hooks/useSmartBack';
 import { 
   Package, 
   Clock, 
@@ -203,10 +204,15 @@ export const CustomerOrders: React.FC = () => {
   });
   const [selectedOrder, setSelectedOrder] = useState<MockOrder | null>(null);
   const [copied, setCopied] = useState(false);
+  // Only show the loading skeleton on a genuine first fetch (no cached
+  // orders to render yet) — avoids a jarring "No orders found" flash
+  // before the real orders arrive for a customer opening this on a new device.
+  const [isLoadingOrders, setIsLoadingOrders] = useState(() => orders.length === 0);
 
   const { addToCart } = useCartWishlist();
   const { products } = useCMS();
   const navigate = useNavigate();
+  const goBack = useSmartBack('/');
 
   React.useEffect(() => {
     if (customerUser?.phone) {
@@ -219,7 +225,10 @@ export const CustomerOrders: React.FC = () => {
             localStorage.setItem(`customer_orders_${userPhoneKey}`, JSON.stringify(data.orders));
           }
         })
-        .catch(() => null);
+        .catch(() => null)
+        .finally(() => setIsLoadingOrders(false));
+    } else {
+      setIsLoadingOrders(false);
     }
   }, [userPhoneKey]);
 
@@ -511,13 +520,13 @@ export const CustomerOrders: React.FC = () => {
       <header className="w-full bg-white border-b border-gray-200 py-4 px-6 md:px-12 sticky top-0 z-40 shadow-2xs">
         <div className="w-full max-w-[900px] mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link 
-              to="/" 
-              className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 transition-colors"
+            <button
+              onClick={goBack}
+              className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 transition-colors cursor-pointer"
               aria-label="Back"
             >
               <ArrowLeft size={18} />
-            </Link>
+            </button>
             <div>
               <h1 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight font-display">
                 Your Orders
@@ -557,7 +566,20 @@ export const CustomerOrders: React.FC = () => {
 
       {/* Main Content Body */}
       <div className="w-full max-w-[900px] mx-auto px-4 md:px-8 py-6">
-        {filteredOrders.length === 0 ? (
+        {isLoadingOrders ? (
+          <div className="flex flex-col gap-5" aria-busy="true" aria-label="Loading your orders">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="bg-white rounded-2xl border border-gray-200/90 p-4 sm:p-6 flex flex-col gap-4 animate-pulse">
+                <div className="flex items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                  <div className="h-4 w-32 bg-gray-200 rounded" />
+                  <div className="h-6 w-24 bg-gray-200 rounded-full" />
+                </div>
+                <div className="h-14 w-full bg-gray-100 rounded-xl" />
+                <div className="h-3 w-48 bg-gray-200 rounded" />
+              </div>
+            ))}
+          </div>
+        ) : filteredOrders.length === 0 ? (
           <div className="w-full bg-white rounded-3xl p-8 sm:p-12 text-center border border-gray-200/80 shadow-2xs flex flex-col items-center justify-center gap-4 my-6">
             <div className="w-16 h-16 rounded-full bg-emerald-50 text-[#00A86B] flex items-center justify-center shrink-0 shadow-2xs">
               <Package size={32} />
