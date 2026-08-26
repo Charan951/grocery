@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams, Link, useNavigate, useLocation } from 'react-router-dom';
-import { useCMS, getSubCategoryImage, Product } from '../context/CMSContext';
+import { useCMS, getSubCategoryImage, Product, deduplicateSubCategories } from '../context/CMSContext';
 import { ProductCard } from '../components/ProductCard';
 import { SEO } from '../components/SEO';
 import { BannerCarousel } from '../components/BannerCarousel';
@@ -18,6 +18,64 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const subcategorySidebarRef = useRef<HTMLElement | null>(null);
+
+  // Lock scroll propagation on the left subcategories sidebar so page doesn't scroll up/down when reaching bounds
+  useEffect(() => {
+    const el = subcategorySidebarRef.current;
+    if (!el) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      const isScrollable = scrollHeight > clientHeight;
+      if (!isScrollable) return;
+
+      const isAtTop = scrollTop <= 0 && e.deltaY < 0;
+      const isAtBottom = Math.abs(scrollHeight - clientHeight - scrollTop) < 2 && e.deltaY > 0;
+
+      if (isAtTop || isAtBottom) {
+        e.preventDefault();
+      }
+    };
+
+    let startY = 0;
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        startY = e.touches[0].clientY;
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      const currentY = e.touches[0].clientY;
+      const deltaY = startY - currentY;
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      const isScrollable = scrollHeight > clientHeight;
+
+      if (!isScrollable) {
+        e.preventDefault();
+        return;
+      }
+
+      const isAtTop = scrollTop <= 0 && deltaY < 0;
+      const isAtBottom = Math.abs(scrollHeight - clientHeight - scrollTop) < 2 && deltaY > 0;
+
+      if (isAtTop || isAtBottom) {
+        e.preventDefault();
+      }
+    };
+
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    el.addEventListener('touchstart', handleTouchStart, { passive: true });
+    el.addEventListener('touchmove', handleTouchMove, { passive: false });
+
+    return () => {
+      el.removeEventListener('wheel', handleWheel);
+      el.removeEventListener('touchstart', handleTouchStart);
+      el.removeEventListener('touchmove', handleTouchMove);
+    };
+  }, []);
 
   // Search filter from URL
   const urlSearch = searchParams.get('search') || '';
@@ -212,10 +270,10 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
     };
   }, [currentCategoryObj]);
 
-  // Extract subcategories for active main category
+  // Extract subcategories for active main category (deduplicated)
   const activeSubCategories = useMemo(() => {
     if (currentCategoryObj && currentCategoryObj.subCategories) {
-      return currentCategoryObj.subCategories;
+      return deduplicateSubCategories(currentCategoryObj.subCategories);
     }
     return [];
   }, [currentCategoryObj]);
@@ -404,14 +462,14 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
         keywords={seo.keywords}
       />
 
-      <div className="container mx-auto px-4 md:px-6 max-w-[1360px] pt-4 pb-16">
+      <div className={`container mx-auto px-2 sm:px-4 md:px-6 max-w-[1360px] ${inCategoryView ? 'pt-2 sm:pt-3 pb-2 sm:pb-3' : 'pt-4 pb-16'}`}>
 
         {/* CONDITION 1: Sidebar + product-list view (either a specific subcategory
             or "All" within the current category). Mobile-first: a narrow icon rail
             sits beside the product grid at every viewport, widening into a labeled
             sidebar at lg+. */}
         {inCategoryView ? (
-          <div className="flex flex-col h-[calc(100vh-var(--sticky-header-h,65px)-60px)] min-h-[480px] overflow-hidden">
+          <div className="flex flex-col h-[calc(100dvh-16px)] sm:h-[calc(100vh-64px)] min-h-[480px] overflow-hidden">
             <button
               onClick={() => {
                 if (location.state && (location.state as any).from) {
@@ -428,7 +486,9 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
 
               {/* Left Subcategory Rail / Sidebar */}
               <aside
-                className="bg-white border-r border-divider/60 py-2 px-1 h-full overflow-y-auto no-scrollbar rounded-xl flex flex-col gap-1 shadow-2xs shrink-0"
+                ref={subcategorySidebarRef}
+                style={{ overscrollBehavior: 'contain', overscrollBehaviorY: 'contain' }}
+                className="bg-white border-r border-divider/60 py-2 px-1 h-full overflow-y-auto overscroll-contain overscroll-y-contain touch-pan-y no-scrollbar rounded-xl flex flex-col gap-1 shadow-2xs shrink-0"
               >
                 <div className="flex flex-col gap-2">
                   {/* All Subcategories Button */}

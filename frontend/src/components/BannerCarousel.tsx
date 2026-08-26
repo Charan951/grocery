@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Banner } from '../context/CMSContext';
+import { Banner, useCMS } from '../context/CMSContext';
 
 interface BannerCarouselProps {
   banners: Banner[];
@@ -17,10 +17,16 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({
   aspectRatioClass = "h-[180px] sm:h-[220px] md:h-[260px] lg:h-[280px] w-full",
   className = ""
 }) => {
+  const { setActiveHeroBannerIndex } = useCMS();
   const [currentIndex, setCurrentIndex] = useState(0);
 
   // Filter valid banners with images
   const validBanners = banners.filter((b) => b && (b.imageUrl || b.title));
+
+  // Sync current index with global context
+  useEffect(() => {
+    setActiveHeroBannerIndex(currentIndex);
+  }, [currentIndex, setActiveHeroBannerIndex]);
 
   // Reset index if banners array changes or index gets out of bounds
   useEffect(() => {

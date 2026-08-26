@@ -825,17 +825,22 @@ export const AdminCMS: React.FC = () => {
                       {/* 4. Dynamic Targeting Fields based on Display On */}
                       {(bannerDisplayOn === 'HOME' || bannerDisplayOn === 'ALL') && (
                         <div className="flex flex-col gap-1.5 sm:col-span-2">
-                          <label className="text-xs font-bold text-text-primary">Display Position (Order)</label>
+                          <label className="text-xs font-bold text-text-primary">Display Position on Home Page *</label>
                           <select
                             value={bannerPosition}
-                            onChange={(e) => setBannerPosition(parseInt(e.target.value) || 1)}
-                            className="w-full px-3.5 py-2 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-emerald-500 text-text-primary font-bold"
+                            onChange={(e) => setBannerPosition(parseInt(e.target.value) >= 0 ? parseInt(e.target.value) : 0)}
+                            className="w-full px-3.5 py-2 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-emerald-500 text-text-primary font-bold cursor-pointer"
                           >
-                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((pos) => (
-                              <option key={pos} value={pos}>
-                                After Sub-category Section #{pos}
-                              </option>
-                            ))}
+                            <option value={0}>Top Hero Carousel (Main Top Banner under App Bar / Header)</option>
+                            <option value={1}>In Between: After Sub-category Section #1</option>
+                            <option value={2}>In Between: After Sub-category Section #2</option>
+                            <option value={3}>In Between: After Sub-category Section #3</option>
+                            <option value={4}>In Between: After Sub-category Section #4</option>
+                            <option value={5}>In Between: After Sub-category Section #5</option>
+                            <option value={6}>In Between: After Sub-category Section #6</option>
+                            <option value={7}>In Between: After Sub-category Section #7</option>
+                            <option value={8}>In Between: After Sub-category Section #8</option>
+                            <option value={99}>Bottom of Home Page (After all subcategory sections & products)</option>
                           </select>
                         </div>
                       )}

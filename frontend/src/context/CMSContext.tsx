@@ -226,6 +226,8 @@ export interface CMSState {
 interface CMSContextProps extends CMSState {
   activeHub: string;
   setActiveHub: (hub: string) => void;
+  activeHeroBannerIndex: number;
+  setActiveHeroBannerIndex: (index: number) => void;
   homeSelectedSubCategories: string[];
   updateHomeSubCategories: (subCats: string[]) => void;
   toggleHomeSubCategory: (subCatName: string) => void;
@@ -515,6 +517,25 @@ export const getCategoryImage = (category: Category | string): string => {
   }
 
   return 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=200&auto=format&fit=crop';
+};
+
+export const deduplicateSubCategories = (subs: any[] = []): any[] => {
+  if (!Array.isArray(subs)) return [];
+  const seen = new Set<string>();
+  return subs.filter((sub) => {
+    const nameKey = (typeof sub === 'string' ? sub : sub?.name || '').toLowerCase().trim();
+    if (!nameKey || seen.has(nameKey)) return false;
+    seen.add(nameKey);
+    return true;
+  });
+};
+
+export const sanitizeCategoryList = (cats: Category[] = []): Category[] => {
+  if (!Array.isArray(cats)) return [];
+  return cats.map((cat) => ({
+    ...cat,
+    subCategories: deduplicateSubCategories(cat.subCategories || [])
+  }));
 };
 
 const defaultCategories: Category[] = [
@@ -895,6 +916,7 @@ const defaultSEOSettings: Record<string, SEOMetadata> = {
 };
 
 export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [activeHeroBannerIndex, setActiveHeroBannerIndex] = useState<number>(0);
   const [activeHub, setActiveHubState] = useState<string>(() => {
     return localStorage.getItem('freshcart_active_hub') || 'wh_bengaluru';
   });
@@ -918,6 +940,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (!parsed.categories || parsed.categories.length < 5) {
           parsed.categories = defaultCategories;
         }
+        parsed.categories = sanitizeCategoryList(parsed.categories);
         return parsed;
       } catch (e) {
         console.error('Failed to parse cached CMS data', e);
@@ -925,7 +948,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     return {
       banners: defaultBanners,
-      categories: defaultCategories,
+      categories: sanitizeCategoryList(defaultCategories),
       specialCategoryGroups: defaultSpecialGroups,
       products: defaultProducts,
       coupons: defaultCoupons,
@@ -968,7 +991,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setState((prev) => ({
           ...prev,
           products: pData?.success && pData.products?.length ? pData.products : prev.products,
-          categories: cData?.success && cData.categories?.length ? cData.categories : prev.categories,
+          categories: cData?.success && cData.categories?.length ? sanitizeCategoryList(cData.categories) : sanitizeCategoryList(prev.categories),
           specialCategoryGroups: sgData?.success && sgData.groups?.length ? sgData.groups : prev.specialCategoryGroups,
           banners: bannerData?.success && bannerData.banners?.length ? bannerData.banners : prev.banners,
           coupons: cpData?.success && cpData.coupons?.length ? cpData.coupons : prev.coupons,
@@ -1268,7 +1291,16 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       categories: prev.categories.map((c) => {
         if (c.id === categoryId || c.slug === categoryId) {
           const subs = c.subCategories || [];
-          return { ...c, subCategories: [...subs, newSub] };
+          const nameKey = nameVal.toLowerCase().trim();
+          const existingIdx = subs.findIndex((s: any) => (typeof s === 'string' ? s : s.name || '').toLowerCase().trim() === nameKey);
+          let newSubs;
+          if (existingIdx >= 0) {
+            newSubs = [...subs];
+            newSubs[existingIdx] = typeof subs[existingIdx] === 'object' ? { ...subs[existingIdx], ...newSub } : newSub;
+          } else {
+            newSubs = [...subs, newSub];
+          }
+          return { ...c, subCategories: deduplicateSubCategories(newSubs) };
         }
         return c;
       })
@@ -1656,6 +1688,8 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...state,
         activeHub,
         setActiveHub,
+        activeHeroBannerIndex,
+        setActiveHeroBannerIndex,
         homeSelectedSubCategories,
         updateHomeSubCategories,
         toggleHomeSubCategory,

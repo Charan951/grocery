@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useCMS, getSubCategoryImage, getCategoryImage, hexToRgba, hexToTintOnWhite, Product } from '../context/CMSContext';
+import { useCMS, getSubCategoryImage, getCategoryImage, hexToRgba, hexToTintOnWhite, Product, deduplicateSubCategories } from '../context/CMSContext';
 import { ProductCard } from '../components/ProductCard';
 import { SubcategoryCardImage } from '../components/SubcategoryCardImage';
 import { SEO } from '../components/SEO';
@@ -54,8 +54,6 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
   const organicPicks = products.filter((p) => p.isOrganic).slice(0, 4);
   const bestSellers = products.filter((p) => p.isBestSeller).slice(0, 4);
 
-
-
   // Generate flat dynamic list of active subcategory sections for Home Page, ordered by displayOrder
   const subCategorySections = useMemo(() => {
     const sections: {
@@ -82,9 +80,11 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
       subIdx: number;
     }> = [];
 
+    const seenSubNames = new Set<string>();
+
     categories.forEach((category, catIdx) => {
       const catSlug = category.slug || category.id;
-      const rawSubCats = category.subCategories || [];
+      const rawSubCats = deduplicateSubCategories(category.subCategories || []);
       const catNameLower = (category.name || '').toLowerCase();
       const catIdLower = (category.id || '').toLowerCase();
 
@@ -106,6 +106,12 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
 
       subList.forEach((sub: any, subIdx: number) => {
         const subName = typeof sub === 'string' ? sub : sub.name;
+        const subKey = (subName || '').toLowerCase().trim();
+
+        // Skip duplicate subcategory sections across categories
+        if (!subKey || seenSubNames.has(subKey)) return;
+        seenSubNames.add(subKey);
+
         const subImg = typeof sub === 'object' ? (sub.image || sub.icon || null) : null;
         const baseCatOrder = (catIdx + 1) * 100;
         const displayOrder = typeof sub === 'object' && sub.displayOrder !== undefined && sub.displayOrder > 0
@@ -156,13 +162,13 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
         subProducts = categoryProducts;
       }
 
-      const matchingBanners = activeBanners.filter(b => (b.positionIndex || 1) === currentSectionIndex);
+      const matchingBanners = activeBanners.filter(b => b.positionIndex === currentSectionIndex && b.positionIndex > 0 && b.positionIndex < 99);
       const promoImage = typeof entry.sub === 'object' ? (entry.sub.promoImage || '') : '';
 
       const categoryColor = category.color || '#10B981';
 
       sections.push({
-        id: `${category.id}_sub_${subIdx}_${currentSectionIndex}`,
+        id: `${category.id}_sub_${subName.replace(/[^a-zA-Z0-9]/g, '_')}_${currentSectionIndex}`,
         subName,
         subImg,
         catSlug,
@@ -222,7 +228,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
         {/* 1. Top Active Campaign Banners Carousel */}
         {activeBanners.length > 0 && (
           <BannerCarousel
-            banners={activeBanners.filter(b => (b.positionIndex || 1) === 1 || !b.positionIndex || b.positionIndex <= 1)}
+            banners={activeBanners.filter(b => b.positionIndex === 0 || !b.positionIndex || b.positionIndex <= 0 || (b.positionIndex === 1 && (!b.position || b.position === 'top')))}
             className="mb-4 md:mb-6"
           />
         )}
@@ -658,6 +664,16 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
             ))}
           </div>
         </section>
+
+        {/* Bottom Page Banners (Position 99) */}
+        {activeBanners.filter(b => b.positionIndex === 99).length > 0 && (
+          <section className="mb-8">
+            <BannerCarousel
+              banners={activeBanners.filter(b => b.positionIndex === 99)}
+              className="my-4"
+            />
+          </section>
+        )}
 
       </div>
     </div>

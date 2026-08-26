@@ -1,12 +1,15 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { Product } from './CMSContext';
 import confetti from 'canvas-confetti';
+import { AlertCircle } from 'lucide-react';
 
 export interface CartItem {
   product: Product;
   quantity: number;
   selectedWeight: string;
 }
+
+export const MAX_CUSTOMER_QTY_LIMIT = 3;
 
 interface CartWishlistContextProps {
   cart: CartItem[];
@@ -19,6 +22,7 @@ interface CartWishlistContextProps {
   isInWishlist: (productId: string) => boolean;
   cartCount: number;
   cartSubtotal: number;
+  showLimitToast: () => void;
 }
 
 const CartWishlistContext = createContext<CartWishlistContextProps | undefined>(undefined);
@@ -45,6 +49,15 @@ export const CartWishlistProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return cached ? JSON.parse(cached) : [];
   });
 
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimerRef = useRef<any>(null);
+
+  const showLimitToast = () => {
+    setToastMessage('Seller has limited to a customer only 3');
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToastMessage(null), 3000);
+  };
+
   useEffect(() => {
     localStorage.setItem('freshcart_cart', JSON.stringify(cart));
   }, [cart]);
@@ -54,8 +67,10 @@ export const CartWishlistProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, [wishlist]);
 
   const addToCart = (product: Product, quantity = 1, weight?: string) => {
-    const maxStock = getProductStockQuantity(product);
-    if (maxStock <= 0) {
+    const stockQty = getProductStockQuantity(product);
+    const maxAllowed = Math.min(stockQty, MAX_CUSTOMER_QTY_LIMIT);
+
+    if (stockQty <= 0) {
       alert(`Sorry, "${product.name}" is currently Out of Stock!`);
       return;
     }
@@ -69,10 +84,15 @@ export const CartWishlistProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       if (existingIndex > -1) {
         const currentQty = prevCart[existingIndex].quantity;
-        if (currentQty + quantity > maxStock) {
-          alert(`Cannot add more! Only ${maxStock} units of "${product.name}" available in stock.`);
+        if (currentQty >= MAX_CUSTOMER_QTY_LIMIT || currentQty + quantity > MAX_CUSTOMER_QTY_LIMIT) {
+          showLimitToast();
           const newCart = [...prevCart];
-          newCart[existingIndex].quantity = maxStock;
+          newCart[existingIndex].quantity = MAX_CUSTOMER_QTY_LIMIT;
+          return newCart;
+        }
+        if (currentQty + quantity > maxAllowed) {
+          const newCart = [...prevCart];
+          newCart[existingIndex].quantity = maxAllowed;
           return newCart;
         }
         const newCart = [...prevCart];
@@ -80,7 +100,11 @@ export const CartWishlistProvider: React.FC<{ children: React.ReactNode }> = ({ 
         return newCart;
       }
 
-      const initialQty = Math.min(quantity, maxStock);
+      if (quantity > MAX_CUSTOMER_QTY_LIMIT) {
+        showLimitToast();
+      }
+
+      const initialQty = Math.min(quantity, MAX_CUSTOMER_QTY_LIMIT, maxAllowed);
 
       // Trigger premium burst animation
       confetti({
@@ -105,13 +129,20 @@ export const CartWishlistProvider: React.FC<{ children: React.ReactNode }> = ({ 
       removeFromCart(productId, weight);
       return;
     }
+    if (quantity > MAX_CUSTOMER_QTY_LIMIT) {
+      showLimitToast();
+      quantity = MAX_CUSTOMER_QTY_LIMIT;
+    }
     setCart((prevCart) =>
       prevCart.map((item) => {
         if (item.product.id === productId && item.selectedWeight === weight) {
-          const maxStock = getProductStockQuantity(item.product);
-          if (quantity > maxStock) {
-            alert(`Cannot increase quantity! Only ${maxStock} units of "${item.product.name}" available in stock.`);
-            return { ...item, quantity: maxStock };
+          const stockQty = getProductStockQuantity(item.product);
+          const maxAllowed = Math.min(stockQty, MAX_CUSTOMER_QTY_LIMIT);
+          if (quantity > maxAllowed) {
+            if (stockQty < MAX_CUSTOMER_QTY_LIMIT) {
+              alert(`Cannot increase quantity! Only ${stockQty} units of "${item.product.name}" available in stock.`);
+            }
+            return { ...item, quantity: maxAllowed };
           }
           return { ...item, quantity };
         }
@@ -153,8 +184,16 @@ export const CartWishlistProvider: React.FC<{ children: React.ReactNode }> = ({ 
         isInWishlist,
         cartCount,
         cartSubtotal,
+        showLimitToast,
       }}
     >
+      {/* Floating Customer Limit Warning Toast Pill */}
+      {toastMessage && (
+        <div className="fixed top-16 sm:top-20 left-1/2 -translate-x-1/2 z-[9999] bg-slate-900/95 text-white text-xs sm:text-sm font-extrabold px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 border border-white/20 animate-bounce pointer-events-none transition-all">
+          <AlertCircle size={16} className="text-amber-400 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
       {children}
     </CartWishlistContext.Provider>
   );

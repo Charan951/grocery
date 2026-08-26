@@ -377,7 +377,20 @@ export const categoryController = {
   getCategories: async (req, res) => {
     try {
       const list = await Category.find().sort({ displayOrder: 1, createdAt: 1, _id: 1 });
-      res.json({ success: true, categories: list });
+      const sanitized = list.map((catDoc) => {
+        const cat = catDoc.toObject ? catDoc.toObject() : catDoc;
+        if (cat.subCategories && Array.isArray(cat.subCategories)) {
+          const seen = new Set();
+          cat.subCategories = cat.subCategories.filter((sub) => {
+            const nameKey = (sub.name || '').toLowerCase().trim();
+            if (!nameKey || seen.has(nameKey)) return false;
+            seen.add(nameKey);
+            return true;
+          });
+        }
+        return cat;
+      });
+      res.json({ success: true, categories: sanitized });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
     }
@@ -415,8 +428,7 @@ export const categoryController = {
 
   deleteCategory: async (req, res) => {
     try {
-      const cat = await Category.findOneAndDelete({ $or: [{ id: req.params.id }, { slug: req.params.id }] });
-      if (!cat) return res.status(404).json({ success: false, message: 'Category not found' });
+      await Category.findOneAndDelete({ $or: [{ id: req.params.id }, { slug: req.params.id }] });
       res.json({ success: true, message: 'Category deleted' });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
@@ -426,31 +438,43 @@ export const categoryController = {
   addSubCategory: async (req, res) => {
     try {
       const { name, icon, image, color, showOnHome, displayOrder, promoImage, promoLink } = req.body;
-      const subSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      const subSlug = name ? name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : '';
       const subId = 'sub_' + Date.now();
       const imgVal = image || icon || '';
 
-      const cat = await Category.findOneAndUpdate(
-        { $or: [{ id: req.params.id }, { slug: req.params.id }] },
-        { 
-          $push: { 
-            subCategories: { 
-              id: subId, 
-              name, 
-              slug: subSlug, 
-              icon: imgVal, 
-              image: imgVal, 
-              color: color || '#10B981',
-              showOnHome: showOnHome !== undefined ? showOnHome : true, 
-              displayOrder: displayOrder !== undefined ? Number(displayOrder) : 0,
-              promoImage: promoImage || '',
-              promoLink: promoLink || ''
-            } 
-          } 
-        },
-        { new: true }
-      );
+      const cat = await Category.findOne({ $or: [{ id: req.params.id }, { slug: req.params.id }] });
       if (!cat) return res.status(404).json({ success: false, message: 'Category not found' });
+
+      cat.subCategories = cat.subCategories || [];
+      const nameKey = (name || '').toLowerCase().trim();
+      const existingIdx = cat.subCategories.findIndex(
+        (s) => (s.name || '').toLowerCase().trim() === nameKey || (subSlug && s.slug === subSlug)
+      );
+
+      const subObject = { 
+        id: subId, 
+        name, 
+        slug: subSlug, 
+        icon: imgVal, 
+        image: imgVal, 
+        color: color || '#10B981',
+        showOnHome: showOnHome !== undefined ? showOnHome : true, 
+        displayOrder: displayOrder !== undefined ? Number(displayOrder) : 0,
+        promoImage: promoImage || '',
+        promoLink: promoLink || ''
+      };
+
+      if (existingIdx >= 0) {
+        cat.subCategories[existingIdx] = {
+          ...cat.subCategories[existingIdx],
+          ...subObject,
+          id: cat.subCategories[existingIdx].id || subId
+        };
+      } else {
+        cat.subCategories.push(subObject);
+      }
+
+      await cat.save();
       res.json({ success: true, category: cat });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
@@ -1308,7 +1332,7 @@ export const bannerController = {
 
   createBanner: async (req, res) => {
     try {
-      const { id, title, subtitle, tag, gradient, imageUrl, buttonText, linkUrl, positionIndex, subCategoryName, active, displayOn, categoryId, subcategoryId, position } = req.body;
+      const { id, title, subtitle, tag, gradient, imageUrl, buttonText, linkUrl, positionIndex, subCategoryName, active, displayOn, categoryId, subcategoryId, position, themeBgColor, themeTextColor, themeAccentColor, startDate, endDate } = req.body;
       const bannerId = id || 'banner_' + Date.now();
       const banner = await Banner.create({
         id: bannerId,
@@ -1325,7 +1349,12 @@ export const bannerController = {
         displayOn: displayOn || 'HOME',
         categoryId,
         subcategoryId,
-        position
+        position,
+        themeBgColor: themeBgColor || '',
+        themeTextColor: themeTextColor || '',
+        themeAccentColor: themeAccentColor || '',
+        startDate,
+        endDate
       });
       res.status(201).json({ success: true, banner });
     } catch (err) {

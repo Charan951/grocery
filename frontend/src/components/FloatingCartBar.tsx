@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useCartWishlist } from '../context/CartWishlistContext';
 import { ShoppingCart, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,17 +8,47 @@ interface FloatingCartBarProps {
 }
 
 export const FloatingCartBar: React.FC<FloatingCartBarProps> = ({ onCartOpen }) => {
-  const { cartCount, cartSubtotal } = useCartWishlist();
+  const { cartCount } = useCartWishlist();
+  const [isNavHidden, setIsNavHidden] = useState(false);
+  const [isMobile, setIsMobile] = useState<boolean>(() => typeof window !== 'undefined' ? window.innerWidth < 640 : false);
+  const lastScrollY = useRef(0);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener('resize', handleResize, { passive: true });
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Auto-move cart button down when bottom bar hides on scroll down, move back up when bottom bar reveals
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      const scrollDiff = currentScrollY - lastScrollY.current;
+
+      if (scrollDiff > 8 && currentScrollY > 60) {
+        setIsNavHidden(true);
+      } else if (scrollDiff < -8 || currentScrollY <= 20) {
+        setIsNavHidden(false);
+      }
+
+      lastScrollY.current = currentScrollY;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   if (cartCount === 0) return null;
+
+  const targetY = isMobile && isNavHidden ? 68 : 0;
 
   return (
     <AnimatePresence>
       <motion.div 
         initial={{ y: 80, opacity: 0, scale: 0.9 }}
-        animate={{ y: 0, opacity: 1, scale: 1 }}
+        animate={{ y: targetY, opacity: 1, scale: 1 }}
         exit={{ y: 80, opacity: 0, scale: 0.9 }}
-        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+        transition={{ duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
         className="fixed bottom-[92px] sm:bottom-6 left-1/2 -translate-x-1/2 z-[999] pointer-events-auto"
       >
         <button

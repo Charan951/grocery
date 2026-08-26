@@ -11,22 +11,28 @@ interface QuickViewModalProps {
 }
 
 export const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, onClose }) => {
-  const { addToCart } = useCartWishlist();
+  const { addToCart, showLimitToast } = useCartWishlist();
+
+  const [activeImgIndex, setActiveImgIndex] = useState(0);
+  const [quantity, setQuantity] = useState(1);
+
+  if (!product) return null;
+
+  const validImages = Array.isArray(product.images) ? product.images.filter(img => typeof img === 'string' && img.trim().length > 0) : [];
+  const imageList = validImages.length > 0 ? validImages : [getProductImage(product)];
+  const netWeight = product.netQuantity || product.defaultWeight || (product.weightOptions && product.weightOptions[0]) || '500 g';
 
   const stockQty = getProductStockQuantity(product);
   const isOutOfStock = stockQty <= 0;
   const isLimitedStock = stockQty > 0 && stockQty < 10;
 
-  const validImages = Array.isArray(product.images) ? product.images.filter(img => typeof img === 'string' && img.trim().length > 0) : [];
-  const imageList = validImages.length > 0 ? validImages : [getProductImage(product)];
-
-  const [activeImgIndex, setActiveImgIndex] = useState(0);
-  const netWeight = product.netQuantity || product.defaultWeight || (product.weightOptions && product.weightOptions[0]) || '500 g';
-  const [quantity, setQuantity] = useState(1);
-
   const incrementQty = () => {
+    if (quantity >= 3) {
+      showLimitToast();
+      return;
+    }
     if (quantity >= stockQty) {
-      alert(`Only ${stockQty} items left in stock!`);
+      alert(`Only ${stockQty} items available in stock!`);
       return;
     }
     setQuantity((prev) => prev + 1);

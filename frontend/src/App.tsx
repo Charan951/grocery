@@ -95,6 +95,8 @@ const AppContent: React.FC = () => {
 
 
   const isStandalonePage =
+    location.pathname.startsWith('/categories') ||
+    location.pathname.startsWith('/product/') ||
     (location.pathname.startsWith('/products') && productsListView) ||
     location.pathname.startsWith('/s/') ||
     location.pathname.startsWith('/terms-of-service') ||
@@ -110,6 +112,10 @@ const AppContent: React.FC = () => {
     location.pathname.startsWith('/locations') ||
     location.pathname.startsWith('/saved-addresses') ||
     location.pathname.startsWith('/account/addresses');
+
+  const isBottomNavHidden =
+    location.pathname.startsWith('/product/') ||
+    location.pathname.startsWith('/products');
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -131,7 +137,7 @@ const AppContent: React.FC = () => {
         <Routes>
           <Route path="/" element={<Home onQuickView={setQuickViewProduct} />} />
           <Route path="/about" element={<About />} />
-          <Route path="/categories" element={<Navigate to="/" replace />} />
+          <Route path="/categories" element={<Categories />} />
           <Route path="/products" element={<ShopProducts onQuickView={setQuickViewProduct} onListViewChange={setProductsListView} />} />
           <Route path="/product/:id" element={<ProductDetails onQuickView={setQuickViewProduct} />} />
           <Route path="/brands" element={<Brands onQuickView={setQuickViewProduct} />} />
@@ -162,9 +168,9 @@ const AppContent: React.FC = () => {
       {/* Footer Layout (Home page only) */}
       {location.pathname === '/' && <Footer />}
 
-      {/* Bottom Tab Navigation (mobile only) */}
-      <BottomNav />
-      <div className="sm:hidden" style={{ height: 'calc(64px + env(safe-area-inset-bottom))' }} />{/* spacer so content isn't hidden behind bottom nav */}
+      {/* Bottom Tab Navigation (mobile only - hidden on product details and subcategories pages) */}
+      {!isBottomNavHidden && <BottomNav />}
+      {!isBottomNavHidden && <div className="sm:hidden" style={{ height: 'calc(64px + env(safe-area-inset-bottom))' }} />}
 
       {/* Overlays Drawers & Modals */}
       <WishlistDrawer 

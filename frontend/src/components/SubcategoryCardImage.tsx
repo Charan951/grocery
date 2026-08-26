@@ -55,7 +55,6 @@ export const SubcategoryCardImage: React.FC<SubcategoryCardImageProps> = ({
       <img
         src={imgSrc}
         alt={alt}
-        loading="lazy"
         decoding="async"
         onError={handleError}
         className="w-full h-full object-cover object-center transition-transform duration-200 group-hover:scale-105"

@@ -629,19 +629,6 @@ export const SubCategoriesModule: React.FC = () => {
 
     addSubCategory(targetCatId, subPayload);
 
-    try {
-      await fetch(`${API_URL}/categories/${targetCatId}/subcategories`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...getAuthHeader()
-        },
-        body: JSON.stringify(subPayload)
-      });
-    } catch (err) {
-      console.warn('Subcategory save fallback to local state');
-    }
-
     setShowAddModal(false);
     setSubNameInput('');
     setSubImageInput('');

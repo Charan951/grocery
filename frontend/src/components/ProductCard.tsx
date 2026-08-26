@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Product } from '../context/CMSContext';
-import { useCartWishlist, getProductStockQuantity } from '../context/CartWishlistContext';
+import { useCartWishlist, getProductStockQuantity, MAX_CUSTOMER_QTY_LIMIT } from '../context/CartWishlistContext';
 import { motion } from 'framer-motion';
 import { Heart, Plus, Minus, Clock } from 'lucide-react';
 import { getProductImage } from '../utils/imageUtils';
@@ -12,7 +12,7 @@ interface ProductCardProps {
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }) => {
-  const { toggleWishlist, isInWishlist, addToCart, cart, updateCartQuantity, removeFromCart } = useCartWishlist();
+  const { cart, addToCart, removeFromCart, updateCartQuantity, toggleWishlist, isInWishlist, showLimitToast } = useCartWishlist();
   
   const netWeight = product.netQuantity || product.defaultWeight || (product.weightOptions && product.weightOptions[0]) || '500 g';
   const favorited = isInWishlist(product.id);
@@ -46,6 +46,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
   const handleIncrement = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (cartQty >= MAX_CUSTOMER_QTY_LIMIT) {
+      showLimitToast();
+      return;
+    }
     if (cartQty >= stockQty) {
       alert(`Only ${stockQty} items left in stock!`);
       return;

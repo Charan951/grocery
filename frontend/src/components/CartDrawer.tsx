@@ -13,7 +13,7 @@ interface CartDrawerProps {
 }
 
 export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
-  const { cart, updateCartQuantity, removeFromCart, cartSubtotal, clearCart } = useCartWishlist();
+  const { cart, updateCartQuantity, removeFromCart, cartSubtotal, clearCart, showLimitToast } = useCartWishlist();
   const { coupons } = useCMS();
 
   const [couponCode, setCouponCode] = useState('');
@@ -154,10 +154,16 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                             </button>
                             <span className="w-6 text-center text-xs font-bold text-text-primary">{item.quantity}</span>
                             <button 
-                              onClick={() => updateCartQuantity(item.product.id, item.selectedWeight, item.quantity + 1)} 
+                              onClick={() => {
+                                if (item.quantity >= 3) {
+                                  showLimitToast();
+                                } else {
+                                  updateCartQuantity(item.product.id, item.selectedWeight, item.quantity + 1);
+                                }
+                              }} 
                               disabled={item.quantity >= getProductStockQuantity(item.product)}
                               className={`p-1.5 transition-colors ${item.quantity >= getProductStockQuantity(item.product) ? 'opacity-30 cursor-not-allowed text-gray-400' : 'text-text-secondary hover:text-primary'}`}
-                              title={item.quantity >= getProductStockQuantity(item.product) ? `Max stock (${getProductStockQuantity(item.product)}) reached` : 'Increase'}
+                              title={item.quantity >= 3 ? 'Seller has limited to 3 units' : 'Increase'}
                             >
                               <Plus size={10} />
                             </button>

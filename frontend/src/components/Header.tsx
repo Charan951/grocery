@@ -19,9 +19,17 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
   const { wishlist } = useCartWishlist();
-  const { categories, products, coupons, banners, userLocation, updateUserLocation } = useCMS();
+  const { categories, products, coupons, banners, userLocation, updateUserLocation, activeHeroBannerIndex } = useCMS();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const [isMobile, setIsMobile] = useState<boolean>(() => typeof window !== 'undefined' ? window.innerWidth < 640 : false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener('resize', handleResize, { passive: true });
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Entire app bar (top header, search bar, category nav) tints to the active
   // category's own colour; defaults to campaign or green theme when home is active.
@@ -80,11 +88,17 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
   const lastScrollY = useRef(0);
   const ticking = useRef(false);
 
-  // Scroll direction listener for smooth AppBar hide/show behavior & scroll color transition
+  // Scroll direction listener for smooth mobile AppBar hide/show behavior (Desktop remains 100% static & fixed)
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
       setIsScrolledDown(currentScrollY > 40);
+
+      // On desktop, header never hides or moves
+      if (!isMobile) {
+        setHeaderHidden(false);
+        return;
+      }
 
       if (!ticking.current) {
         window.requestAnimationFrame(() => {
@@ -106,7 +120,7 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [isMobile]);
 
   // Measure header height for page padding
   useEffect(() => {
@@ -118,7 +132,10 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
     updateHeight();
     const observer = new ResizeObserver(updateHeight);
     observer.observe(el);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.removeProperty('--sticky-header-h');
+    };
   }, []);
 
   // Reopen the profile drawer when routed home from a sub-page's Back button
@@ -195,25 +212,26 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
 
   const isHomePage = location.pathname === '/';
 
-  // Active campaign banner for header background tinting (Home Page ONLY)
-  const activeCampaignBanner = useMemo(() => {
-    if (!isHomePage) return null;
+  // Active campaign banners list for Home Page
+  const validHomeBanners = useMemo(() => {
+    if (!isHomePage) return [];
     const now = new Date();
-    return banners.find(b => {
+    return banners.filter(b => {
       if (b.active === false) return false;
       const isDisplayValid = !b.displayOn || b.displayOn === 'HOME' || b.displayOn === 'ALL';
       if (!isDisplayValid) return false;
-      if (b.startDate) {
-        const start = new Date(b.startDate);
-        if (now < start) return false;
-      }
-      if (b.endDate) {
-        const end = new Date(b.endDate);
-        if (now > end) return false;
-      }
+      if (b.startDate && now < new Date(b.startDate)) return false;
+      if (b.endDate && now > new Date(b.endDate)) return false;
       return true;
     });
   }, [banners, isHomePage]);
+
+  // Dynamic active hero banner based on activeHeroBannerIndex from BannerCarousel
+  const activeCampaignBanner = useMemo(() => {
+    if (validHomeBanners.length === 0) return null;
+    const idx = (activeHeroBannerIndex || 0) % validHomeBanners.length;
+    return validHomeBanners[idx] || validHomeBanners[0];
+  }, [validHomeBanners, activeHeroBannerIndex]);
 
   const campaignBgColor = isHomePage ? (activeCampaignBanner?.themeBgColor || activeCampaignBanner?.gradient?.[0]) : null;
   const campaignTextColor = isHomePage ? activeCampaignBanner?.themeTextColor : null;
@@ -238,23 +256,24 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
     if (isScrolledDown) {
       return '#ffffff';
     }
-    if (isHomePage && campaignBgColor) {
+    // Dynamic banner color matching ONLY applies on mobile home page
+    if (isMobile && isHomePage && campaignBgColor) {
       return campaignBgColor;
     }
     if (activeCategory && activeCategory.color) {
       return hexToTintOnWhite(activeCategory.color, 0.14);
     }
     return '#ffffff';
-  }, [isScrolledDown, isHomePage, campaignBgColor, activeCategory]);
+  }, [isScrolledDown, isMobile, isHomePage, campaignBgColor, activeCategory]);
 
   const isDarkHeader = useMemo(() => {
     if (isScrolledDown) return false;
-    if (!isHomePage) return false;
+    if (!isHomePage || !isMobile) return false;
     if (campaignTextColor) {
       return !getIsDarkColor(campaignTextColor);
     }
     return getIsDarkColor(dynamicHeaderBg);
-  }, [isScrolledDown, isHomePage, dynamicHeaderBg, campaignTextColor]);
+  }, [isScrolledDown, isHomePage, isMobile, dynamicHeaderBg, campaignTextColor]);
 
   const headerTextColor = isDarkHeader ? 'text-white' : 'text-text-primary';
   const headerSubTextColor = isDarkHeader ? 'text-white/90 hover:text-white' : 'text-text-secondary hover:text-primary';
@@ -273,7 +292,7 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
         <header
           className={`flex items-center justify-between w-full px-3 md:px-8 transition-all duration-300 gap-2 md:gap-6 border-none outline-none ${
             headerHidden
-              ? 'py-0 sm:py-1 max-h-0 sm:max-h-24 opacity-0 sm:opacity-100 overflow-hidden sm:overflow-visible pointer-events-none sm:pointer-events-auto'
+              ? 'py-0 sm:py-2.5 max-h-0 sm:max-h-24 opacity-0 sm:opacity-100 overflow-hidden sm:overflow-visible pointer-events-none sm:pointer-events-auto'
               : 'py-2 md:py-2.5 max-h-24 opacity-100'
           }`}
           style={{ backgroundColor: dynamicHeaderBg }}

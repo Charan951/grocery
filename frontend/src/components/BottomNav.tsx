@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 const NAV_ITEMS = [
   { label: 'Home', path: '/', icon: Home, match: (p: string) => p === '/' },
   { label: 'Order Again', path: '/orders', icon: History, match: (p: string) => p.startsWith('/orders') || p.startsWith('/account/orders') },
-  { label: 'Categories', path: '/products', icon: Grid3x3, match: (p: string) => p.startsWith('/products') },
+  { label: 'Categories', path: '/categories', icon: Grid3x3, match: (p: string) => p.startsWith('/categories') || p.startsWith('/products') },
   { label: 'Profile', path: '/profile', icon: CircleUserRound, match: (p: string) => p.startsWith('/profile') || p.startsWith('/account/profile') },
 ];
 
@@ -40,6 +40,11 @@ export const BottomNav: React.FC = () => {
   useEffect(() => {
     setHidden(false);
   }, [location.pathname]);
+
+  // Hide BottomNav on product details and subcategories routes
+  if (location.pathname.startsWith('/product/') || location.pathname.startsWith('/products')) {
+    return null;
+  }
 
   return (
     <motion.nav

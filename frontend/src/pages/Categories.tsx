@@ -135,7 +135,10 @@ export const Categories: React.FC = () => {
 
         {/* Right Side: Search Icon */}
         <button
-          onClick={() => navigate('/products')}
+          onClick={() => {
+            const firstCat = categories[0]?.slug || categories[0]?.id || 'fruits-vegetables';
+            navigate(`/products?category=${firstCat}&subCategory=All`);
+          }}
           className="p-1.5 rounded-full hover:bg-background transition-colors text-text-primary cursor-pointer shrink-0 ml-2"
           aria-label="Search"
         >
