@@ -14,14 +14,30 @@ interface BannerCarouselProps {
 export const BannerCarousel: React.FC<BannerCarouselProps> = ({
   banners = [],
   autoSlideInterval = 3000,
-  aspectRatioClass = "h-[180px] sm:h-[220px] md:h-[260px] lg:h-[280px] w-full",
+  aspectRatioClass = "h-[180px] sm:h-[220px] md:h-[290px] lg:h-[320px] w-full",
   className = ""
 }) => {
   const { setActiveHeroBannerIndex } = useCMS();
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Filter valid banners with images
-  const validBanners = banners.filter((b) => b && (b.imageUrl || b.title));
+  const [isMobileDevice, setIsMobileDevice] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
+
+  useEffect(() => {
+    const handleResize = () => setIsMobileDevice(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Filter valid banners with images & target platform
+  const validBanners = banners.filter((b) => {
+    if (!b || (!b.imageUrl && !b.title)) return false;
+    const target = b.targetPlatform || 'ALL';
+    if (target === 'WEB' && isMobileDevice) return false;
+    if (target === 'MOBILE' && !isMobileDevice) return false;
+    return true;
+  });
 
   // Sync current index with global context
   useEffect(() => {
@@ -52,20 +68,18 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({
   if (validBanners.length === 1) {
     const banner = validBanners[0];
     return (
-      <div className={`mb-4 sm:mb-6 w-full rounded-none sm:rounded-2xl md:sm:rounded-3xl overflow-hidden border-none shadow-none relative ${aspectRatioClass} ${className}`}>
-        <Link 
-          to={banner.linkUrl || '/products'} 
+      <div className={`mb-3.5 sm:mb-6 w-screen relative left-1/2 -translate-x-1/2 sm:static sm:translate-x-0 sm:w-full rounded-none sm:rounded-2xl md:rounded-3xl overflow-hidden border-none shadow-none ${aspectRatioClass} ${className}`}>
+        <Link
+          to={banner.linkUrl || '/products'}
           className="block w-full h-full cursor-pointer group relative"
           title={banner.title || 'Special Offer'}
         >
-          <img 
-            src={banner.imageUrl} 
-            alt={banner.title || 'Promo Banner'} 
-            className="w-full h-full block rounded-none sm:rounded-2xl md:sm:rounded-3xl object-cover object-center group-hover:scale-[1.005] transition-transform duration-300"
+          <img
+            src={banner.imageUrl}
+            alt={banner.title || 'Promo Banner'}
+            className="w-full h-full block rounded-none sm:rounded-2xl md:rounded-3xl object-cover object-center group-hover:scale-[1.005] transition-transform duration-300"
             onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
           />
-
-          {/* Banner Image */}
         </Link>
       </div>
     );
@@ -86,9 +100,9 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({
   };
 
   return (
-    <div className={`mb-4 sm:mb-6 w-full flex flex-col items-center ${className}`}>
+    <div className={`mb-3.5 sm:mb-6 w-screen relative left-1/2 -translate-x-1/2 sm:static sm:translate-x-0 sm:w-full flex flex-col items-center ${className}`}>
       {/* Main Banner Slide Container */}
-      <div className={`relative w-full rounded-none sm:rounded-2xl md:sm:rounded-3xl overflow-hidden border-none shadow-none ${aspectRatioClass} group`}>
+      <div className={`relative w-full rounded-none sm:rounded-2xl md:rounded-3xl overflow-hidden border-none shadow-none ${aspectRatioClass} group`}>
         <AnimatePresence mode="wait">
           <motion.div
             key={currentBanner.id || currentIndex}
@@ -98,14 +112,14 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({
             transition={{ duration: 0.35, ease: 'easeOut' }}
             className="w-full h-full relative"
           >
-            <Link 
-              to={currentBanner.linkUrl || '/products'} 
+            <Link
+              to={currentBanner.linkUrl || '/products'}
               className="block w-full h-full cursor-pointer relative"
               title={currentBanner.title || 'Special Offer'}
             >
-              <img 
-                src={currentBanner.imageUrl} 
-                alt={currentBanner.title || 'Promo Banner'} 
+              <img
+                src={currentBanner.imageUrl}
+                alt={currentBanner.title || 'Promo Banner'}
                 className="w-full h-full block rounded-none sm:rounded-2xl md:sm:rounded-3xl object-cover object-center group-hover:scale-[1.005] transition-transform duration-300"
                 onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
               />
@@ -141,11 +155,10 @@ export const BannerCarousel: React.FC<BannerCarouselProps> = ({
               key={idx}
               onClick={() => setCurrentIndex(idx)}
               aria-label={`Go to banner slide ${idx + 1}`}
-              className={`transition-all duration-300 cursor-pointer flex items-center justify-center ${
-                isActive 
-                  ? 'w-3.5 h-3.5 bg-emerald-600 text-emerald-600 rounded-full scale-110 shadow-sm ring-2 ring-emerald-500/20' 
+              className={`transition-all duration-300 cursor-pointer flex items-center justify-center ${isActive
+                  ? 'w-3.5 h-3.5 bg-emerald-600 text-emerald-600 rounded-full scale-110 shadow-sm ring-2 ring-emerald-500/20'
                   : 'w-2.5 h-2.5 bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 rounded-full'
-              }`}
+                }`}
             />
           );
         })}

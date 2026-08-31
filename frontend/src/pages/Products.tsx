@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useSearchParams, Link, useNavigate, useLocation } from 'react-router-dom';
+import { useSearchParams, Link, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useCMS, getSubCategoryImage, Product, deduplicateSubCategories } from '../context/CMSContext';
 import { ProductCard } from '../components/ProductCard';
 import { SEO } from '../components/SEO';
@@ -18,6 +18,7 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { categorySlug } = useParams<{ categorySlug?: string }>();
 
   const subcategorySidebarRef = useRef<HTMLElement | null>(null);
 
@@ -79,7 +80,7 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
 
   // Search filter from URL
   const urlSearch = searchParams.get('search') || '';
-  const urlCategory = searchParams.get('category') || '';
+  const urlCategory = searchParams.get('category') || categorySlug || '';
   const urlSubCategory = searchParams.get('subCategory') || '';
   const urlOrganic = searchParams.get('organic') === 'true';
 
@@ -296,7 +297,7 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
     if (!rawColor) return 'rgba(16, 185, 129, 0.12)';
 
     if (rawColor.startsWith('#')) {
-      const hex = rawColor.length === 4 
+      const hex = rawColor.length === 4
         ? '#' + rawColor[1] + rawColor[1] + rawColor[2] + rawColor[2] + rawColor[3] + rawColor[3]
         : rawColor;
       if (hex.length === 7) {
@@ -403,7 +404,25 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
     setSearchParams({});
   };
 
-  const activeBanners = useMemo(() => (banners || []).filter(b => b.active), [banners]);
+  const [isMobileDevice, setIsMobileDevice] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
+
+  useEffect(() => {
+    const handleResize = () => setIsMobileDevice(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const activeBanners = useMemo(() => {
+    return (banners || []).filter(b => {
+      if (!b.active) return false;
+      const target = b.targetPlatform || 'ALL';
+      if (target === 'WEB' && isMobileDevice) return false;
+      if (target === 'MOBILE' && !isMobileDevice) return false;
+      return true;
+    });
+  }, [banners, isMobileDevice]);
 
   // Category targeted banners
   const categoryBanners = useMemo(() => {
@@ -494,21 +513,18 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
                   {/* All Subcategories Button */}
                   <button
                     onClick={() => setSelectedSubCategory('')}
-                    className={`relative w-full flex flex-col items-center justify-center p-1 py-1.5 rounded-xl text-center transition-all duration-200 group cursor-pointer ${
-                      selectedSubCategory === '' ? 'font-black' : 'hover:bg-background'
-                    }`}
+                    className={`relative w-full flex flex-col items-center justify-center p-1 py-1.5 rounded-xl text-center transition-all duration-200 group cursor-pointer ${selectedSubCategory === '' ? 'font-black' : 'hover:bg-background'
+                      }`}
                   >
                     {selectedSubCategory === '' && (
                       <span className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-8 rounded-l-full bg-emerald-600" />
                     )}
-                    <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center flex-shrink-0 border ${
-                      selectedSubCategory === '' ? 'border-emerald-500 bg-emerald-100/60 shadow-2xs' : 'border-divider/60 bg-gray-50'
-                    }`}>
+                    <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center flex-shrink-0 border ${selectedSubCategory === '' ? 'border-emerald-500 bg-emerald-100/60 shadow-2xs' : 'border-divider/60 bg-gray-50'
+                      }`}>
                       <span className="text-base sm:text-lg">🛍️</span>
                     </div>
-                    <span className={`text-[10px] leading-tight line-clamp-2 mt-1 text-center font-extrabold ${
-                      selectedSubCategory === '' ? 'text-emerald-950 font-black' : 'text-text-secondary'
-                    }`}>
+                    <span className={`text-[10px] leading-tight line-clamp-2 mt-1 text-center font-extrabold ${selectedSubCategory === '' ? 'text-emerald-950 font-black' : 'text-text-secondary'
+                      }`}>
                       All
                     </span>
                   </button>
@@ -529,18 +545,16 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
                         {isActive && (
                           <span className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-8 rounded-l-full bg-emerald-600" />
                         )}
-                        <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full overflow-hidden flex-shrink-0 p-0.5 border ${
-                          isActive ? 'border-emerald-500 bg-emerald-100/60 shadow-2xs' : 'border-divider/60 bg-gray-50 group-hover:border-emerald-300'
-                        } transition-all`}>
+                        <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full overflow-hidden flex-shrink-0 p-0.5 border ${isActive ? 'border-emerald-500 bg-emerald-100/60 shadow-2xs' : 'border-divider/60 bg-gray-50 group-hover:border-emerald-300'
+                          } transition-all`}>
                           <SubcategoryCardImage
                             src={subImg}
                             alt={subName}
                             className="w-full h-full object-contain"
                           />
                         </div>
-                        <span className={`text-[10px] leading-tight line-clamp-2 mt-1 text-center font-extrabold ${
-                          isActive ? 'text-emerald-950 font-black' : 'text-text-secondary group-hover:text-text-primary'
-                        }`}>
+                        <span className={`text-[10px] leading-tight line-clamp-2 mt-1 text-center font-extrabold ${isActive ? 'text-emerald-950 font-black' : 'text-text-secondary group-hover:text-text-primary'
+                          }`}>
                           {subName}
                         </span>
                       </button>
@@ -600,16 +614,11 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
                     <button onClick={handleClearAll} className="text-xs font-bold bg-emerald-600 text-white py-2.5 px-6 rounded-full mt-2 hover:bg-emerald-700 transition-colors">Reset All Filters</button>
                   </div>
                 ) : (
-                  <motion.div
-                    layout
-                    className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4"
-                  >
-                    <AnimatePresence mode="popLayout">
-                      {paginatedProducts.map((product, idx) => (
-                        <ProductCard key={product.id || `prod_${idx}`} product={product} onQuickView={onQuickView} />
-                      ))}
-                    </AnimatePresence>
-                  </motion.div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3">
+                    {paginatedProducts.map((product, idx) => (
+                      <ProductCard key={product.id || `prod_${idx}`} product={product} onQuickView={onQuickView} />
+                    ))}
+                  </div>
                 )}
 
               </main>

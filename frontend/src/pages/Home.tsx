@@ -5,10 +5,11 @@ import { ProductCard } from '../components/ProductCard';
 import { SubcategoryCardImage } from '../components/SubcategoryCardImage';
 import { SEO } from '../components/SEO';
 import { BannerCarousel } from '../components/BannerCarousel';
+import { FestivalCampaignWrapper } from '../components/FestivalCampaignWrapper';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ArrowRight, ShieldCheck, Truck, Clock, 
-  ChevronDown, ChevronUp, Star 
+import {
+  ArrowRight, ShieldCheck, Truck, Clock,
+  ChevronDown, ChevronUp, Star
 } from 'lucide-react';
 import { Instagram } from '../components/BrandIcons';
 
@@ -17,9 +18,35 @@ interface HomeProps {
 }
 
 export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
-  const { banners, categories, specialCategoryGroups, products, testimonials, faqs, blogs, seoSettings, homeSelectedSubCategories } = useCMS();
+  const { banners, promoCards, categories, specialCategoryGroups, products, testimonials, faqs, blogs, seoSettings, homeSelectedSubCategories, activeFestivalCampaign } = useCMS();
 
-  const activeBanners = banners.filter(b => b.active && (!b.displayOn || b.displayOn === 'HOME' || b.displayOn === 'ALL'));
+  const [isMobileDevice, setIsMobileDevice] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
+
+  useEffect(() => {
+    const handleResize = () => setIsMobileDevice(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const activeBanners = useMemo(() => {
+    return banners.filter(b => {
+      if (!b.active) return false;
+      const isDisplayValid = !b.displayOn || b.displayOn === 'HOME' || b.displayOn === 'ALL';
+      if (!isDisplayValid) return false;
+      const target = b.targetPlatform || 'ALL';
+      if (target === 'WEB' && isMobileDevice) return false;
+      if (target === 'MOBILE' && !isMobileDevice) return false;
+      return true;
+    });
+  }, [banners, isMobileDevice]);
+
+  const activePromoCards = useMemo(() => {
+    return (promoCards || [])
+      .filter((c) => c.active !== false)
+      .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+  }, [promoCards]);
 
   // Countdown timer for Flash Sale (Midnight tonight)
   const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
@@ -33,9 +60,9 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
       const now = new Date();
       const midnight = new Date();
       midnight.setHours(24, 0, 0, 0); // Midnight tonight
-      
+
       const diffMs = midnight.getTime() - now.getTime();
-      
+
       if (diffMs > 0) {
         const hours = Math.floor(diffMs / (1000 * 60 * 60));
         const minutes = Math.floor((diffMs / 1000 / 60) % 60);
@@ -43,7 +70,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
         setTimeLeft({ hours, minutes, seconds });
       }
     };
-    
+
     calculateTimeLeft();
     const interval = setInterval(calculateTimeLeft, 1000);
     return () => clearInterval(interval);
@@ -53,6 +80,52 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
   const freshPicks = products.filter((p) => p.isFreshPick).slice(0, 4);
   const organicPicks = products.filter((p) => p.isOrganic).slice(0, 4);
   const bestSellers = products.filter((p) => p.isBestSeller).slice(0, 4);
+
+  // Flat list of all subcategories across categories for unified 10-per-row grid (Blinkit Home Style)
+  const allHomeSubCategories = useMemo(() => {
+    const list: Array<{
+      id: string;
+      subName: string;
+      subImg: string | null;
+      catSlug: string;
+      catName: string;
+      catColor: string;
+    }> = [];
+
+    const seenSubs = new Set<string>();
+
+    categories.forEach((cat, cIdx) => {
+      const catSlug = cat.slug || cat.id;
+      const subList = cat.subCategories || [];
+      subList.forEach((sub: any, sIdx: number) => {
+        const subName = typeof sub === 'string' ? sub : sub.name;
+        if (!subName) return;
+
+        // Skip duplicates across categories
+        const subKey = subName.toLowerCase().trim();
+        if (seenSubs.has(subKey)) return;
+        seenSubs.add(subKey);
+
+        // Respect admin homeSelectedSubCategories if configured
+        if (homeSelectedSubCategories.length > 0 && !homeSelectedSubCategories.includes(subName)) {
+          return;
+        }
+        const customImg = typeof sub === 'object' ? (sub.image || sub.icon || '') : '';
+        const subImg = getSubCategoryImage(subName, cat.name, customImg);
+
+        list.push({
+          id: `sub_flat_${cIdx}_${sIdx}_${subName.replace(/[^a-zA-Z0-9]/g, '_')}`,
+          subName,
+          subImg,
+          catSlug,
+          catName: cat.name,
+          catColor: cat.color || '#10B981',
+        });
+      });
+    });
+
+    return list;
+  }, [categories, homeSelectedSubCategories]);
 
   // Generate flat dynamic list of active subcategory sections for Home Page, ordered by displayOrder
   const subCategorySections = useMemo(() => {
@@ -162,7 +235,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
         subProducts = categoryProducts;
       }
 
-      const matchingBanners = activeBanners.filter(b => b.positionIndex === currentSectionIndex && b.positionIndex > 0 && b.positionIndex < 99);
+      const matchingBanners = activeBanners.filter(b => b.positionIndex === currentSectionIndex && b.positionIndex > 0 && b.positionIndex < 99 && b.position !== 'top');
       const promoImage = typeof entry.sub === 'object' ? (entry.sub.promoImage || '') : '';
 
       const categoryColor = category.color || '#10B981';
@@ -216,82 +289,110 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
 
   return (
     <div className="w-full page-wrapper bg-background">
-      <SEO 
+      <SEO
         title={seo.title}
         description={seo.description}
         keywords={seo.keywords}
         schema={faqSchema}
       />
 
-      <div className="w-full px-0 sm:px-4 md:px-8 pt-0 sm:pt-3 pb-6">
+      {/* 0. Festival Campaign Continuous Themed Section (ONLY FOR MOBILE) */}
+      {isMobileDevice && activeFestivalCampaign && activeFestivalCampaign.isActive !== false && (
+        <FestivalCampaignWrapper campaign={activeFestivalCampaign} />
+      )}
 
-        {/* 1. Top Active Campaign Banners Carousel */}
+      {/* Centered Web Container Layout */}
+      <div className="w-full max-w-[1280px] mx-auto px-3 sm:px-6 lg:px-8 pt-0 sm:pt-3 pb-8">
+
+        {/* 1. Top Active Campaign Banners Carousel (Blinkit Aspect Ratio) */}
         {activeBanners.length > 0 && (
           <BannerCarousel
-            banners={activeBanners.filter(b => b.positionIndex === 0 || !b.positionIndex || b.positionIndex <= 0 || (b.positionIndex === 1 && (!b.position || b.position === 'top')))}
-            className="mb-4 md:mb-6"
+            banners={activeBanners.filter(b => b.positionIndex === 0 || !b.positionIndex || b.positionIndex <= 0 || b.position === 'top')}
+            className="mb-3.5 sm:mb-4 md:mb-6"
           />
         )}
 
-        {/* Categories & Subcategories Sections */}
-        <section className="mb-6 space-y-6 px-3 sm:px-0">
-          <div className="space-y-6">
-            {categories.map((cat, cIdx) => {
-              const catSlug = cat.slug || cat.id;
-              const subList = cat.subCategories || [];
-              const catColor = cat.color || '#10B981';
-              if (subList.length === 0) return null;
+        {/* 2. Blinkit Promotional Cards Row (WEB ONLY - Hidden on Mobile < 768px) */}
+        {activePromoCards.length > 0 && (
+          <section className="hidden md:block mb-6 w-full">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 sm:gap-4">
+              {activePromoCards.map((card) => {
+                const targetLink = card.subCategoryName && card.categoryId
+                  ? `/products?category=${card.categoryId}&subCategory=${encodeURIComponent(card.subCategoryName)}`
+                  : card.categoryId
+                    ? `/products?category=${card.categoryId}`
+                    : card.linkUrl || '/products';
 
-              return (
-                <div key={cat.id || `cat_home_${cIdx}`} className="space-y-3">
-                  <div className="flex items-center justify-between px-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="w-1.5 h-5 rounded-full shrink-0" style={{ backgroundColor: catColor }} />
-                      <h3 className="text-base sm:text-lg font-black text-text-primary font-display">
-                        {cat.name}
-                      </h3>
-                    </div>
-                    <Link
-                      to={`/products?category=${catSlug}`}
-                      className="text-xs font-bold text-emerald-600 hover:underline"
-                    >
-                      See All
-                    </Link>
+                const isBgImg = card.bgType === 'image' && card.bgImageUrl;
+
+                return (
+                  <Link
+                    key={card.id}
+                    to={targetLink}
+                    className="group relative rounded-2xl md:rounded-[20px] overflow-hidden flex flex-col justify-between shadow-xs hover:shadow-md transition-all duration-300 min-h-[150px] sm:min-h-[165px] border border-white/20 bg-cover bg-center"
+                    style={{
+                      background: isBgImg ? `url(${card.bgImageUrl}) center/cover no-repeat` : card.bgGradient || 'linear-gradient(135deg, #0284c7, #06b6d4)',
+                      color: card.textColor || '#ffffff'
+                    }}
+                  >
+                    {/* Render text overlay ONLY if color mode is active */}
+                    {!isBgImg && (
+                      <div className="z-10 p-5 sm:p-6 pr-24 sm:pr-28">
+                        <h3 className="text-base sm:text-lg font-black leading-tight tracking-tight drop-shadow-xs">
+                          {card.title}
+                        </h3>
+                        {card.subtitle && (
+                          <p className="text-xs sm:text-xs font-medium opacity-90 mt-1 leading-snug line-clamp-2">
+                            {card.subtitle}
+                          </p>
+                        )}
+                        <div className="mt-3.5 sm:mt-4 inline-flex items-center gap-1.5 bg-black/80 group-hover:bg-black text-white font-black text-[11px] sm:text-xs px-3.5 py-1.5 rounded-xl shadow-xs transition-transform group-hover:scale-105">
+                          <span>{card.buttonText || 'Order Now'}</span>
+                          <ArrowRight size={13} />
+                        </div>
+                      </div>
+                    )}
+
+                    {!isBgImg && card.imageUrl && (
+                      <img
+                        src={card.imageUrl}
+                        alt={card.title}
+                        className="absolute right-1 sm:right-2 bottom-1 sm:bottom-2 w-28 sm:w-32 h-28 sm:h-32 object-contain z-10 pointer-events-none transition-transform duration-300 group-hover:scale-105 drop-shadow-md"
+                        onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                      />
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* Unified 10-Subcategories per Row Grid (Blinkit Home Style) */}
+        {allHomeSubCategories.length > 0 && (
+          <section className="mb-8 w-full">
+            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-8 lg:grid-cols-10 gap-3 sm:gap-4">
+              {allHomeSubCategories.map((item) => (
+                <Link
+                  key={item.id}
+                  to={`/products?category=${item.catSlug}&subCategory=${encodeURIComponent(item.subName)}`}
+                  className="flex flex-col items-center group cursor-pointer text-center col-span-1"
+                >
+                  <div className="w-full aspect-square bg-[#eef6f7] dark:bg-emerald-950/20 border border-emerald-100/60 rounded-2xl p-2 sm:p-2.5 flex items-center justify-center overflow-hidden group-hover:scale-[1.04] transition-transform duration-200 shadow-2xs">
+                    <SubcategoryCardImage
+                      src={item.subImg || ''}
+                      alt={item.subName}
+                      className="w-full h-full object-contain"
+                    />
                   </div>
-
-                  {/* 4-column Subcategory Grid */}
-                  <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5 sm:gap-3.5">
-                    {subList.slice(0, 8).map((sub, sIdx) => {
-                      const subName = typeof sub === 'string' ? sub : sub.name;
-                      const customImg = typeof sub === 'object' ? (sub.image || sub.icon) : undefined;
-                      const imgUrl = getSubCategoryImage(subName, cat.name, customImg);
-
-                      return (
-                        <Link
-                          key={`sub_home_${cIdx}_${sIdx}`}
-                          to={`/products?category=${catSlug}&subCategory=${encodeURIComponent(subName)}`}
-                          className="flex flex-col items-center group cursor-pointer text-center col-span-1"
-                        >
-                          <div className="w-full aspect-square bg-[#EAF5ED] border border-emerald-100/60 rounded-2xl sm:rounded-3xl p-1 flex items-center justify-center overflow-hidden group-hover:scale-[1.03] transition-transform duration-200 shadow-2xs">
-                            <SubcategoryCardImage
-                              src={imgUrl}
-                              alt={subName}
-                              fallbackSrc={getCategoryImage(cat)}
-                              className="w-full h-full"
-                            />
-                          </div>
-                          <span className="text-[11px] sm:text-xs font-bold text-text-primary line-clamp-2 leading-tight mt-1.5 group-hover:text-emerald-600 transition-colors">
-                            {subName}
-                          </span>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
+                  <span className="text-[11px] sm:text-xs font-bold text-text-primary line-clamp-2 leading-tight mt-2 group-hover:text-emerald-600 transition-colors">
+                    {item.subName}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* 2. Dynamic Subcategories Home Sections & Dynamic Inter-Section Banners & In-Between Mobile Special Groups */}
         {subCategorySections.map((sec, secIdx) => (
@@ -319,14 +420,14 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
               {/* Special Subcategory Promo Banner (Full 100% Image Visible - Zero Cut-off) */}
               {sec.promoImage && (
                 <div className="mb-3 w-full rounded-2xl md:rounded-3xl overflow-hidden shadow-sm hover:shadow-md border border-divider/60 bg-surface">
-                  <Link 
+                  <Link
                     to={`/products?category=${sec.catSlug}&subCategory=${encodeURIComponent(sec.subName)}`}
                     className="block w-full cursor-pointer group"
                     title={`Click to view all ${sec.subName} promo products`}
                   >
-                    <img 
-                      src={sec.promoImage} 
-                      alt={`${sec.subName} Promo`} 
+                    <img
+                      src={sec.promoImage}
+                      alt={`${sec.subName} Promo`}
                       className="w-full h-auto block rounded-2xl md:rounded-3xl object-contain group-hover:scale-[1.005] transition-transform duration-300"
                       onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
                     />
@@ -367,22 +468,22 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                           const isWide = item.isFeatured || idx === 0;
                           const targetLink = item.link || `/products?subCategory=${encodeURIComponent(item.name)}`;
                           return (
-                            <div 
+                            <div
                               key={item.id || `item_${secIdx}_${idx}`}
                               id="CATEGORY_GRID_V3-element"
-                              className={isWide 
+                              className={isWide
                                 ? "relative w-[calc(50%-0.25rem)] rounded-lg overflow-hidden group"
                                 : "relative box-border flex w-[calc(25%-0.4rem)] flex-col items-center justify-between overflow-hidden rounded-lg p-1 group"
                               }
                               style={{ aspectRatio: isWide ? '16 / 9' : '9 / 12' }}
                             >
                               <Link className="contents" to={targetLink}>
-                                <img 
-                                  alt={item.name} 
-                                  loading="lazy" 
-                                  decoding="async" 
-                                  className="relative overflow-hidden rounded-lg w-full h-full object-contain transition-transform group-hover:scale-105" 
-                                  src={item.image} 
+                                <img
+                                  alt={item.name}
+                                  loading="lazy"
+                                  decoding="async"
+                                  className="relative overflow-hidden rounded-lg w-full h-full object-contain transition-transform group-hover:scale-105"
+                                  src={item.image}
                                   style={{ color: 'transparent', objectFit: 'contain' }}
                                   onError={(e) => {
                                     (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=300&auto=format&fit=crop';
@@ -425,20 +526,20 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                       const isWide = item.isFeatured || idx === 0;
                       const targetLink = item.link || `/products?subCategory=${encodeURIComponent(item.name)}`;
                       return (
-                        <div 
+                        <div
                           key={item.id || `btm_item_${grpIdx}_${idx}`}
                           id="CATEGORY_GRID_V3-element"
-                          className={isWide 
+                          className={isWide
                             ? "relative w-[calc(50%-0.25rem)] rounded-lg overflow-hidden group"
                             : "relative box-border flex w-[calc(25%-0.4rem)] flex-col items-center justify-between overflow-hidden rounded-lg p-1 group"
                           }
                           style={{ aspectRatio: isWide ? '16 / 9' : '9 / 12' }}
                         >
                           <Link className="contents" to={targetLink}>
-                            <img 
-                              alt={item.name} 
-                              loading="lazy" 
-                              decoding="async" 
+                            <img
+                              alt={item.name}
+                              loading="lazy"
+                              decoding="async"
                               className="relative overflow-hidden rounded-lg w-full h-full object-contain transition-transform group-hover:scale-105"
                               src={item.image}
                               style={{ color: 'transparent', objectFit: 'contain' }}
@@ -646,16 +747,16 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
             {instagramPhotos.map((url, idx) => (
-              <div 
+              <div
                 key={idx}
                 className="group rounded-2xl overflow-hidden aspect-square relative"
               >
-                <img 
-                  src={url} 
-                  alt={`Instagram recipe highlight ${idx + 1}`} 
-                  className="w-full h-full object-cover" 
+                <img
+                  src={url}
+                  alt={`Instagram recipe highlight ${idx + 1}`}
+                  className="w-full h-full object-cover"
                 />
-                <div 
+                <div
                   className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity duration-200 cursor-pointer"
                 >
                   <Instagram size={24} />

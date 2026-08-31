@@ -41,7 +41,9 @@ class ProductCard extends StatelessWidget {
                   height: 100,
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    color: isDark ? Colors.white.withOpacity(0.03) : Colors.black.withOpacity(0.02),
+                    color: isDark
+                        ? Colors.white.withOpacity(0.03)
+                        : Colors.black.withOpacity(0.02),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: ClipRRect(
@@ -54,25 +56,28 @@ class ProductCard extends StatelessWidget {
                               fit: BoxFit.cover,
                               width: double.infinity,
                               height: 100,
-                              loadingBuilder: (context, child, loadingProgress) {
-                                if (loadingProgress == null) return child;
-                                return const Center(
-                                  child: SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                );
-                              },
+                              loadingBuilder:
+                                  (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return const Center(
+                                      child: SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                    );
+                                  },
                               errorBuilder: (context, error, stackTrace) {
                                 return Center(
                                   child: Icon(
                                     _getProductIcon(product.imageUrl),
                                     size: 40,
-                                    color: product.isOrganic ? AppColors.primary : AppColors.accent,
+                                    color: product.isOrganic
+                                        ? AppColors.primary
+                                        : AppColors.accent,
                                   ),
                                 );
                               },
@@ -81,7 +86,9 @@ class ProductCard extends StatelessWidget {
                               child: Icon(
                                 _getProductIcon(product.imageUrl),
                                 size: 48,
-                                color: product.isOrganic ? AppColors.primary : AppColors.accent,
+                                color: product.isOrganic
+                                    ? AppColors.primary
+                                    : AppColors.accent,
                               ),
                             ),
                     ),
@@ -92,7 +99,8 @@ class ProductCard extends StatelessWidget {
                     top: -6,
                     left: -6,
                     child: DiscountBadge(
-                      text: '${product.discountPercent.toStringAsFixed(0)}% OFF',
+                      text:
+                          '${product.discountPercent.toStringAsFixed(0)}% OFF',
                     ),
                   ),
                 if (product.isOrganic)
@@ -126,7 +134,9 @@ class ProductCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppTypography.labelSmall(
-                      isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                      isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondary,
                     ).copyWith(letterSpacing: 0.6, fontSize: 9),
                   ),
                 ),
@@ -154,7 +164,9 @@ class ProductCard extends StatelessWidget {
               product.defaultWeight,
               style: TextStyle(
                 fontSize: 10,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondary,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -174,14 +186,18 @@ class ProductCard extends StatelessWidget {
                         '₹${product.mrp.toStringAsFixed(0)}',
                         style: TextStyle(
                           fontSize: 10,
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondary,
                           decoration: TextDecoration.lineThrough,
                         ),
                       ),
                     Text(
                       '₹${product.price.toStringAsFixed(0)}',
                       style: AppTypography.h3(
-                        isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                        isDark
+                            ? AppColors.textPrimaryDark
+                            : AppColors.textPrimary,
                       ).copyWith(fontSize: 14, fontWeight: FontWeight.bold),
                     ),
                   ],

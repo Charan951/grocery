@@ -123,6 +123,7 @@ export interface Banner {
   subCategoryName?: string;
   active: boolean;
   displayOn?: 'HOME' | 'CATEGORY' | 'SUBCATEGORY' | 'ALL';
+  targetPlatform?: 'ALL' | 'WEB' | 'MOBILE';
   categoryId?: string;
   subcategoryId?: string;
   position?: string;
@@ -131,6 +132,141 @@ export interface Banner {
   themeAccentColor?: string;
   startDate?: string;
   endDate?: string;
+}
+
+export interface PromoCard {
+  id: string;
+  title: string;
+  subtitle?: string;
+  buttonText?: string;
+  bgType?: 'color' | 'image';
+  bgGradient?: string;
+  bgImageUrl?: string;
+  imageUrl?: string;
+  textColor?: string;
+  displayOn?: 'HOME' | 'CATEGORY' | 'SUBCATEGORY' | 'ALL';
+  categoryId?: string;
+  subCategoryId?: string;
+  subCategoryName?: string;
+  linkUrl?: string;
+  displayOrder?: number;
+  active: boolean;
+}
+
+export interface CampaignSubcategory {
+  _id?: string;
+  subcategoryId: string;
+  title: string;
+  image?: {
+    url?: string;
+    publicId?: string;
+  };
+  badge?: string;
+  isFeatured?: boolean;
+  order?: number;
+}
+
+export interface CampaignTheme {
+  textColor?: string;
+  accentColor?: string;
+  cardBackground?: string;
+  cardTextColor?: string;
+  overlayOpacity?: number;
+  backgroundPosition?: string;
+  backgroundSize?: string;
+  cardBorderRadius?: string;
+  cardSpacing?: string;
+}
+
+export interface CampaignContent {
+  heading?: string;
+  subtitle?: string;
+  ctaText?: string;
+  ctaLink?: string;
+}
+
+export interface FeaturedCampaignItem {
+  name: string;
+  originalPrice?: string;
+  offerPrice?: string;
+  image?: string;
+  link?: string;
+}
+
+export interface DecorativeElement {
+  id?: string;
+  asset: string;
+  type?: string;
+  position: {
+    x: number;
+    y: number;
+    align?: 'left' | 'right' | 'center';
+  };
+  size: number;
+  opacity?: number;
+  animation?: 'none' | 'horizontal-move' | 'gentle-sway' | 'glow-flicker' | 'float-vertical' | 'pulse';
+  speed?: 'slow' | 'medium' | 'fast';
+  intensity?: 'low' | 'medium' | 'high';
+}
+
+export interface TitleConfig {
+  title?: string;
+  subtitle?: string;
+  position?: 'center' | 'left' | 'right';
+  textColor?: string;
+  fontStyle?: 'festive' | 'modern';
+  animation?: 'soft-reveal' | 'none';
+}
+
+export interface CampaignAnimationConfig {
+  enabled?: boolean;
+  type?: 'auto' | 'floral' | 'diya' | 'leaves' | 'particles' | 'none' | string;
+  intensity?: 'subtle' | 'medium' | 'high' | string;
+}
+
+export interface FestivalCampaign {
+  _id?: string;
+  id?: string;
+  name: string;
+  title: string;
+  subtitle?: string;
+  type?: 'Festival' | 'Seasonal' | 'Special Event';
+
+  // Layered Theme Engine
+  backgroundType?: 'solid' | 'gradient' | 'image';
+  backgroundColor?: string;
+  gradientStart?: string;
+  gradientEnd?: string;
+  gradientDirection?: string;
+  backgroundImage?: {
+    url: string;
+    publicId?: string;
+  };
+  backgroundPattern?: 'none' | 'floral' | 'mandala' | 'paisley' | 'traditional' | 'dots' | 'festival';
+  patternOpacity?: number;
+  patternScale?: 'small' | 'medium' | 'large';
+
+  decorativeElements?: DecorativeElement[];
+  titleConfig?: TitleConfig;
+
+  video?: {
+    url?: string;
+    publicId?: string;
+    posterUrl?: string;
+  };
+  featuredBannerTitle?: string;
+  featuredItems?: FeaturedCampaignItem[];
+  animationConfig?: CampaignAnimationConfig;
+  bottomDecoration?: 'scallop' | 'floral' | 'wave' | 'cutwork' | 'traditional' | 'plain' | 'none';
+  theme?: CampaignTheme;
+  content?: CampaignContent;
+  specialSubcategories: CampaignSubcategory[];
+  startDate: string | Date;
+  endDate: string | Date;
+  isActive: boolean;
+  priority: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Coupon {
@@ -211,6 +347,9 @@ export interface SEOMetadata {
 
 export interface CMSState {
   banners: Banner[];
+  promoCards: PromoCard[];
+  festivalCampaigns: FestivalCampaign[];
+  activeFestivalCampaign: FestivalCampaign | null;
   categories: Category[];
   specialCategoryGroups: SpecialCategoryGroup[];
   products: Product[];
@@ -248,6 +387,14 @@ interface CMSContextProps extends CMSState {
   addBanner: (banner: Banner) => void;
   updateBanner: (id: string, updated: Partial<Banner>) => void;
   deleteBanner: (id: string) => void;
+  addPromoCard: (card: PromoCard) => void;
+  updatePromoCard: (id: string, updated: Partial<PromoCard>) => void;
+  deletePromoCard: (id: string) => void;
+  addFestivalCampaign: (campaign: any) => Promise<void>;
+  updateFestivalCampaign: (id: string, updated: any) => Promise<void>;
+  deleteFestivalCampaign: (id: string) => Promise<void>;
+  toggleFestivalCampaignStatus: (id: string, isActive?: boolean) => Promise<void>;
+  fetchActiveFestivalCampaign: () => Promise<void>;
   updateProduct: (id: string, updated: Partial<Product>) => void;
   addProduct: (product: Product) => void;
   deleteProduct: (id: string) => void;
@@ -297,7 +444,9 @@ const defaultBanners: Banner[] = [
     imageUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&auto=format&fit=crop',
     buttonText: 'Shop Festive Needs',
     linkUrl: '/products',
-    positionIndex: 1,
+    positionIndex: 0,
+    displayOn: 'HOME',
+    targetPlatform: 'ALL',
     active: true,
   },
   {
@@ -310,6 +459,8 @@ const defaultBanners: Banner[] = [
     buttonText: 'Order Dairy',
     linkUrl: '/products?category=cat_dairy',
     positionIndex: 2,
+    displayOn: 'HOME',
+    targetPlatform: 'ALL',
     active: true,
   },
   {
@@ -322,6 +473,8 @@ const defaultBanners: Banner[] = [
     buttonText: 'Explore Fruits',
     linkUrl: '/products?category=cat_fruits',
     positionIndex: 3,
+    displayOn: 'HOME',
+    targetPlatform: 'ALL',
     active: true,
   },
 ];
@@ -904,6 +1057,166 @@ export const defaultSpecialGroups: SpecialCategoryGroup[] = [
   }
 ];
 
+const defaultFestivalCampaigns: FestivalCampaign[] = [
+  {
+    id: 'fc_krishna_janmashtami',
+    _id: 'fc_krishna_janmashtami',
+    name: 'Krishna Janmashtami',
+    title: 'Krishna Janmashtami',
+    subtitle: 'Celebrate the divine spirit',
+    type: 'Festival',
+    backgroundType: 'gradient',
+    backgroundColor: '#DFF4E8',
+    gradientStart: '#E8F6EF',
+    gradientEnd: '#C2E8D3',
+    gradientDirection: 'to bottom',
+    backgroundPattern: 'floral',
+    patternOpacity: 0.12,
+    patternScale: 'medium',
+    decorativeElements: [
+      {
+        id: 'el_krishna',
+        asset: 'krishna',
+        type: 'character',
+        position: { x: 50, y: 15, align: 'center' },
+        size: 45,
+        opacity: 100,
+        animation: 'none',
+        speed: 'slow'
+      },
+      {
+        id: 'el_cloud_1',
+        asset: 'cloud',
+        type: 'nature',
+        position: { x: 10, y: 8, align: 'left' },
+        size: 28,
+        opacity: 85,
+        animation: 'horizontal-move',
+        speed: 'slow'
+      },
+      {
+        id: 'el_peacock_feather',
+        asset: 'peacock_feather',
+        type: 'festive',
+        position: { x: 82, y: 12, align: 'right' },
+        size: 22,
+        opacity: 95,
+        animation: 'gentle-sway',
+        speed: 'slow'
+      },
+      {
+        id: 'el_diya_1',
+        asset: 'diya',
+        type: 'lighting',
+        position: { x: 15, y: 78, align: 'left' },
+        size: 18,
+        opacity: 90,
+        animation: 'glow-flicker',
+        speed: 'slow'
+      },
+      {
+        id: 'el_diya_2',
+        asset: 'diya',
+        type: 'lighting',
+        position: { x: 85, y: 78, align: 'right' },
+        size: 18,
+        opacity: 90,
+        animation: 'glow-flicker',
+        speed: 'slow'
+      }
+    ],
+    titleConfig: {
+      title: 'Krishna Janmashtami',
+      subtitle: 'Celebrate the divine spirit',
+      position: 'center',
+      textColor: '#1B4D3E',
+      fontStyle: 'festive',
+      animation: 'soft-reveal'
+    },
+    backgroundImage: {
+      url: ''
+    },
+    video: {
+      url: '',
+      posterUrl: ''
+    },
+    featuredBannerTitle: 'JANMASHTAMI POOJA SPECIALS',
+    featuredItems: [
+      { name: 'Makhan & Pure Organic Ghee', originalPrice: '299', offerPrice: '149', image: 'https://images.unsplash.com/photo-1599488615731-7e5c2823ff28?w=400&auto=format&fit=crop' },
+      { name: 'Pooja Flowers & Tulsi Garland', originalPrice: '199', offerPrice: '99', image: 'https://images.unsplash.com/photo-1608686207856-001b95cf60ca?w=400&auto=format&fit=crop' }
+    ],
+    animationConfig: {
+      enabled: true,
+      type: 'auto',
+      intensity: 'subtle'
+    },
+    bottomDecoration: 'scallop',
+    theme: {
+      textColor: '#1B4D3E',
+      accentColor: '#2E7D32',
+      cardBackground: '#FFF9E6',
+      cardTextColor: '#1B4D3E',
+      overlayOpacity: 0.05,
+      backgroundPosition: 'center top',
+      backgroundSize: 'cover',
+      cardBorderRadius: '18px',
+      cardSpacing: '8px'
+    },
+    content: {
+      heading: 'Varalakshmi Vratham Essentials',
+      subtitle: 'Everything for your divine celebration',
+      ctaText: 'Explore Collection',
+      ctaLink: '#festival-cards'
+    },
+    specialSubcategories: [
+      {
+        subcategoryId: 'Fresh Vegetables',
+        title: 'Pooja Essentials',
+        image: { url: 'https://images.unsplash.com/photo-1608686207856-001b95cf60ca?w=400&auto=format&fit=crop' },
+        badge: 'Up to 30% OFF',
+        isFeatured: true,
+        order: 1
+      },
+      {
+        subcategoryId: 'Fresh Fruits',
+        title: 'Naivedyam Essentials',
+        image: { url: 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=400&auto=format&fit=crop' },
+        badge: 'Fresh Daily',
+        isFeatured: false,
+        order: 2
+      },
+      {
+        subcategoryId: 'Organics & Hydroponics',
+        title: 'Thamboolam Needs',
+        image: { url: 'https://images.unsplash.com/photo-1588879460417-af2b369527f5?w=400&auto=format&fit=crop' },
+        badge: 'Special Combo',
+        isFeatured: false,
+        order: 3
+      },
+      {
+        subcategoryId: 'Breads & Buns',
+        title: 'Indian Sweets & Ghee',
+        image: { url: 'https://images.unsplash.com/photo-1599488615731-7e5c2823ff28?w=400&auto=format&fit=crop' },
+        badge: 'Pure Organic',
+        isFeatured: false,
+        order: 4
+      },
+      {
+        subcategoryId: 'Exotics & Premium',
+        title: 'Festive Ready Decor',
+        image: { url: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=400&auto=format&fit=crop' },
+        badge: 'Express 10 Min',
+        isFeatured: false,
+        order: 5
+      }
+    ],
+    startDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    isActive: true,
+    priority: 10
+  }
+];
+
 const defaultSEOSettings: Record<string, SEOMetadata> = {
   home: { title: 'FreshCart | Premium Organic Groceries Delivered in 15 Mins', description: 'Order fresh organic vegetables, fruits, dairy, bakery, snacks, and meats. High-quality produce sourced directly from local farms. First order free!', keywords: 'organic groceries, fresh vegetables, grocery delivery Bengaluru, online dairy, FreshCart' },
   about: { title: 'Our Story & Vision | FreshCart Groceries', description: 'Learn about FreshCart mission to bring fresh organic farm products directly to your doorstep. Explore our leadership, milestones, and core values.', keywords: 'about freshcart, local farming sustainable, freshcart timeline' },
@@ -941,6 +1254,15 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           parsed.categories = defaultCategories;
         }
         parsed.categories = sanitizeCategoryList(parsed.categories);
+        if (!parsed.promoCards) {
+          parsed.promoCards = [];
+        }
+        if (!parsed.festivalCampaigns || parsed.festivalCampaigns.length === 0) {
+          parsed.festivalCampaigns = defaultFestivalCampaigns;
+        }
+        if (!parsed.activeFestivalCampaign) {
+          parsed.activeFestivalCampaign = parsed.festivalCampaigns.find((c: any) => c.isActive) || null;
+        }
         return parsed;
       } catch (e) {
         console.error('Failed to parse cached CMS data', e);
@@ -948,6 +1270,9 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     return {
       banners: defaultBanners,
+      promoCards: [],
+      festivalCampaigns: defaultFestivalCampaigns,
+      activeFestivalCampaign: defaultFestivalCampaigns[0] || null,
       categories: sanitizeCategoryList(defaultCategories),
       specialCategoryGroups: defaultSpecialGroups,
       products: defaultProducts,
@@ -969,7 +1294,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const syncWithBackend = async () => {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1500);
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
 
       try {
         const fetchJson = async (url: string) => {
@@ -977,13 +1302,16 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return res.ok ? await res.json() : null;
         };
 
-        const [pData, cData, sgData, bannerData, cpData, bData] = await Promise.all([
+        const [pData, cData, sgData, bannerData, pcData, cpData, bData, fcActiveData, fcListData] = await Promise.all([
           fetchJson('/api/products').catch(() => null),
           fetchJson('/api/categories').catch(() => null),
           fetchJson('/api/special-groups').catch(() => null),
           fetchJson('/api/banners').catch(() => null),
+          fetchJson('/api/promo-cards').catch(() => null),
           fetchJson('/api/coupons').catch(() => null),
           fetchJson('/api/blogs').catch(() => null),
+          fetchJson('/api/festival-campaigns/active').catch(() => null),
+          fetchJson('/api/festival-campaigns').catch(() => null),
         ]);
 
         clearTimeout(timeoutId);
@@ -994,8 +1322,11 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           categories: cData?.success && cData.categories?.length ? sanitizeCategoryList(cData.categories) : sanitizeCategoryList(prev.categories),
           specialCategoryGroups: sgData?.success && sgData.groups?.length ? sgData.groups : prev.specialCategoryGroups,
           banners: bannerData?.success && bannerData.banners?.length ? bannerData.banners : prev.banners,
+          promoCards: pcData?.success && Array.isArray(pcData.promoCards) ? pcData.promoCards : (prev.promoCards || []),
           coupons: cpData?.success && cpData.coupons?.length ? cpData.coupons : prev.coupons,
           blogs: bData?.success && bData.blogs?.length ? bData.blogs : prev.blogs,
+          festivalCampaigns: fcListData?.success && fcListData.campaigns?.length ? fcListData.campaigns : prev.festivalCampaigns,
+          activeFestivalCampaign: fcActiveData?.success && fcActiveData.campaign ? fcActiveData.campaign : (prev.activeFestivalCampaign || prev.festivalCampaigns?.[0] || defaultFestivalCampaigns[0]),
         }));
         console.log('✅ FreshCart context synchronized with live MERN server database.');
       } catch (err) {
@@ -1096,6 +1427,159 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn('API sync updateBanner offline', e);
     }
   };
+
+  const addPromoCard = async (card: PromoCard) => {
+    setState((prev) => ({
+      ...prev,
+      promoCards: [...(prev.promoCards || []), card],
+    }));
+    try {
+      await fetch('/api/promo-cards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(card)
+      });
+    } catch (e) {
+      console.warn('API sync addPromoCard offline', e);
+    }
+  };
+
+  const updatePromoCard = async (id: string, updated: Partial<PromoCard>) => {
+    setState((prev) => ({
+      ...prev,
+      promoCards: (prev.promoCards || []).map((c) => (c.id === id ? { ...c, ...updated } : c)),
+    }));
+    try {
+      await fetch(`/api/promo-cards/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated)
+      });
+    } catch (e) {
+      console.warn('API sync updatePromoCard offline', e);
+    }
+  };
+
+  const deletePromoCard = async (id: string) => {
+    setState((prev) => ({
+      ...prev,
+      promoCards: (prev.promoCards || []).filter((c) => c.id !== id),
+    }));
+    try {
+      await fetch(`/api/promo-cards/${id}`, {
+        method: 'DELETE'
+      });
+    } catch (e) {
+      console.warn('API sync deletePromoCard offline', e);
+    }
+  };
+
+  const fetchActiveFestivalCampaign = async () => {
+    try {
+      const res = await fetch('/api/festival-campaigns/active');
+      const data = await res.json();
+      if (data.success && data.campaign !== undefined) {
+        setState(prev => ({ ...prev, activeFestivalCampaign: data.campaign }));
+      }
+    } catch (e) {
+      console.warn('Failed to fetch active festival campaign', e);
+    }
+  };
+
+  const addFestivalCampaign = async (campaignData: any) => {
+    try {
+      const res = await fetch('/api/festival-campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(campaignData)
+      });
+      const data = await res.json();
+      const newCamp = data.campaign || { ...campaignData, id: 'fc_' + Date.now(), _id: 'fc_' + Date.now() };
+      setState(prev => {
+        const nextList = [newCamp, ...(prev.festivalCampaigns || [])];
+        const nextActive = newCamp.isActive ? newCamp : prev.activeFestivalCampaign;
+        return { ...prev, festivalCampaigns: nextList, activeFestivalCampaign: nextActive };
+      });
+    } catch (e) {
+      console.warn('addFestivalCampaign fallback', e);
+      const newCamp = { ...campaignData, id: 'fc_' + Date.now(), _id: 'fc_' + Date.now() };
+      setState(prev => ({
+        ...prev,
+        festivalCampaigns: [newCamp, ...(prev.festivalCampaigns || [])],
+        activeFestivalCampaign: newCamp.isActive ? newCamp : prev.activeFestivalCampaign
+      }));
+    }
+  };
+
+  const updateFestivalCampaign = async (id: string, updatedData: any) => {
+    try {
+      const res = await fetch(`/api/festival-campaigns/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedData)
+      });
+      const data = await res.json();
+      const updatedCamp = data.campaign || updatedData;
+      setState(prev => {
+        const nextList = (prev.festivalCampaigns || []).map(c => (c.id === id || c._id === id) ? { ...c, ...updatedCamp } : c);
+        const activeOne = nextList.find(c => c.isActive) || null;
+        return { ...prev, festivalCampaigns: nextList, activeFestivalCampaign: activeOne };
+      });
+    } catch (e) {
+      console.warn('updateFestivalCampaign fallback', e);
+      setState(prev => {
+        const nextList = (prev.festivalCampaigns || []).map(c => (c.id === id || c._id === id) ? { ...c, ...updatedData } : c);
+        const activeOne = nextList.find(c => c.isActive) || null;
+        return { ...prev, festivalCampaigns: nextList, activeFestivalCampaign: activeOne };
+      });
+    }
+  };
+
+  const deleteFestivalCampaign = async (id: string) => {
+    try {
+      await fetch(`/api/festival-campaigns/${id}`, { method: 'DELETE' });
+    } catch (e) {
+      console.warn('deleteFestivalCampaign fallback', e);
+    }
+    setState(prev => {
+      const nextList = (prev.festivalCampaigns || []).filter(c => c.id !== id && c._id !== id);
+      const activeOne = nextList.find(c => c.isActive) || null;
+      return { ...prev, festivalCampaigns: nextList, activeFestivalCampaign: activeOne };
+    });
+  };
+
+  const toggleFestivalCampaignStatus = async (id: string, isActive?: boolean) => {
+    try {
+      const res = await fetch(`/api/festival-campaigns/${id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive })
+      });
+      const data = await res.json();
+      if (data.campaign) {
+        setState(prev => {
+          const nextList = (prev.festivalCampaigns || []).map(c => (c.id === id || c._id === id) ? data.campaign : c);
+          const activeOne = nextList.find(c => c.isActive) || null;
+          return { ...prev, festivalCampaigns: nextList, activeFestivalCampaign: activeOne };
+        });
+        return;
+      }
+    } catch (e) {
+      console.warn('toggleFestivalCampaignStatus fallback', e);
+    }
+    setState(prev => {
+      const nextList = (prev.festivalCampaigns || []).map(c => {
+        if (c.id === id || c._id === id) {
+          const nextVal = isActive !== undefined ? isActive : !c.isActive;
+          return { ...c, isActive: nextVal };
+        }
+        return c;
+      });
+      const activeOne = nextList.find(c => c.isActive) || null;
+      return { ...prev, festivalCampaigns: nextList, activeFestivalCampaign: activeOne };
+    });
+  };
+
 
   const updateProduct = async (id: string, updated: Partial<Product>) => {
     const payload = { ...updated };
@@ -1651,6 +2135,9 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const resetToDefaults = () => {
     setState({
       banners: defaultBanners,
+      promoCards: [],
+      festivalCampaigns: defaultFestivalCampaigns,
+      activeFestivalCampaign: defaultFestivalCampaigns[0] || null,
       categories: defaultCategories,
       specialCategoryGroups: defaultSpecialGroups,
       products: defaultProducts,
@@ -1698,6 +2185,14 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addBanner,
         updateBanner,
         deleteBanner,
+        addPromoCard,
+        updatePromoCard,
+        deletePromoCard,
+        addFestivalCampaign,
+        updateFestivalCampaign,
+        deleteFestivalCampaign,
+        toggleFestivalCampaignStatus,
+        fetchActiveFestivalCampaign,
         updateProduct,
         addProduct,
         deleteProduct,

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
-import { CMSProvider } from './context/CMSContext';
+import { CMSProvider, useCMS } from './context/CMSContext';
 import { CartWishlistProvider } from './context/CartWishlistContext';
 
 // Pages
@@ -97,6 +97,7 @@ const AppContent: React.FC = () => {
   const isStandalonePage =
     location.pathname.startsWith('/categories') ||
     location.pathname.startsWith('/product/') ||
+    location.pathname.startsWith('/prn/') ||
     (location.pathname.startsWith('/products') && productsListView) ||
     location.pathname.startsWith('/s/') ||
     location.pathname.startsWith('/terms-of-service') ||
@@ -115,31 +116,44 @@ const AppContent: React.FC = () => {
 
   const isBottomNavHidden =
     location.pathname.startsWith('/product/') ||
+    location.pathname.startsWith('/prn/') ||
     location.pathname.startsWith('/products');
+
+  const [isMobile, setIsMobile] = useState<boolean>(() => typeof window !== 'undefined' ? window.innerWidth < 640 : false);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener('resize', handleResize, { passive: true });
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isPDP = location.pathname.startsWith('/product/') || location.pathname.startsWith('/prn/');
+  const isCategoriesPage = location.pathname === '/categories' || location.pathname.startsWith('/categories/');
+  const { activeFestivalCampaign } = useCMS();
+  const isFestivalMobileHome = isMobile && location.pathname === '/' && !!activeFestivalCampaign && activeFestivalCampaign.isActive !== false;
 
   return (
     <div className="min-h-screen flex flex-col">
       <ScrollToTop />
       
-      {/* Header Layout (Hidden on standalone pages) */}
-      {!isStandalonePage && (
-        <Header 
-          onWishlistOpen={() => setWishlistOpen(true)} 
-          onCartOpen={() => setCartOpen(true)} 
-        />
-      )}
+      {/* Header Layout (Always rendered across all pages) */}
+      <Header 
+        onWishlistOpen={() => setWishlistOpen(true)} 
+        onCartOpen={() => setCartOpen(true)} 
+      />
 
       {/* Main Pages */}
       <main
         className="flex-grow"
-        style={!isStandalonePage ? { paddingTop: 'var(--sticky-header-h, 320px)' } : undefined}
+        style={isMobile && (isPDP || isCategoriesPage || isFestivalMobileHome) ? { paddingTop: 0 } : { paddingTop: 'var(--sticky-header-h, 140px)' }}
       >
         <Routes>
           <Route path="/" element={<Home onQuickView={setQuickViewProduct} />} />
           <Route path="/about" element={<About />} />
           <Route path="/categories" element={<Categories />} />
+          <Route path="/category/:categorySlug" element={<ShopProducts onQuickView={setQuickViewProduct} onListViewChange={setProductsListView} />} />
           <Route path="/products" element={<ShopProducts onQuickView={setQuickViewProduct} onListViewChange={setProductsListView} />} />
           <Route path="/product/:id" element={<ProductDetails onQuickView={setQuickViewProduct} />} />
+          <Route path="/prn/:slug/prid/:id" element={<ProductDetails onQuickView={setQuickViewProduct} />} />
           <Route path="/brands" element={<Brands onQuickView={setQuickViewProduct} />} />
           <Route path="/offers" element={<Offers />} />
           <Route path="/blog" element={<Blog />} />

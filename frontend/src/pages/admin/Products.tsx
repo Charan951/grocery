@@ -30,6 +30,8 @@ export const Products: React.FC = () => {
   const [netQuantity, setNetQuantity] = useState('500 g');
   const [desc, setDesc] = useState('');
   const [img, setImg] = useState('https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&q=80&w=600');
+  const [imagesList, setImagesList] = useState<string[]>([]);
+  const [newImageUrl, setNewImageUrl] = useState('');
   const [organic, setOrganic] = useState(false);
   const [stock, setStock] = useState(50);
 
@@ -94,7 +96,10 @@ export const Products: React.FC = () => {
     setMrp(85);
     setNetQuantity('500 g');
     setDesc('');
-    setImg('https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&q=80&w=600');
+    const defaultImg = 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&q=80&w=600';
+    setImg(defaultImg);
+    setImagesList([defaultImg]);
+    setNewImageUrl('');
     setOrganic(false);
     setStock(50);
     setDrawerOpen(true);
@@ -110,7 +115,12 @@ export const Products: React.FC = () => {
     setMrp(p.originalPrice || p.mrp);
     setNetQuantity(p.netQuantity || p.defaultWeight || '500 g');
     setDesc(p.description || '');
-    setImg(p.imageUrl || (p.images && p.images[0]) || '');
+    const existingImgs = (Array.isArray(p.images) && p.images.length > 0)
+      ? p.images.filter(Boolean)
+      : [p.imageUrl || (p.images && p.images[0]) || 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&q=80&w=600'];
+    setImg(p.imageUrl || existingImgs[0] || '');
+    setImagesList(existingImgs);
+    setNewImageUrl('');
     setOrganic(!!p.isOrganic);
     setStock(typeof p.stock === 'number' ? p.stock : (p.stock?.quantity || 50));
     setDrawerOpen(true);
@@ -144,6 +154,13 @@ export const Products: React.FC = () => {
     const discountText = discountVal > 0 ? `₹${discountVal} OFF` : 'Best Price';
     const discountPercentage = mrp > 0 ? Math.round((discountVal / mrp) * 100) : 0;
 
+    const validImages = imagesList.filter(url => typeof url === 'string' && url.trim().length > 0);
+    let primaryImg = img.trim();
+    if (!primaryImg && validImages.length > 0) primaryImg = validImages[0];
+    if (primaryImg && !validImages.includes(primaryImg)) validImages.unshift(primaryImg);
+    if (validImages.length === 0) validImages.push('https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&q=80&w=600');
+    if (!primaryImg) primaryImg = validImages[0];
+
     const pData: Partial<Product> = {
       name: name.trim(),
       brand: brand.trim() || 'FreshCart',
@@ -160,8 +177,8 @@ export const Products: React.FC = () => {
       weightOptions: [netQuantity.trim() || '500 g'],
       defaultWeight: netQuantity.trim() || '500 g',
       description: desc.trim() || `${name} fresh produce`,
-      imageUrl: img.trim(),
-      images: [img.trim()],
+      imageUrl: primaryImg,
+      images: validImages,
       isOrganic: organic,
       stock: { status: stock > 0 ? 'In Stock' : 'Out of Stock', quantity: stock },
       seller: { name: 'Geddit Convenience Private Limited', countryOfOrigin: 'India', shelfLife: '4 days' },
@@ -447,11 +464,30 @@ export const Products: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-bold text-text-primary">Product Image (Cloudinary or URL)</label>
+              {/* Multi-Image Gallery Section */}
+              <div className="flex flex-col gap-2 p-3 bg-background/60 rounded-2xl border border-divider">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-text-primary uppercase tracking-wider">Product Gallery Images ({imagesList.length})</label>
+                  <span className="text-[10px] text-text-secondary font-medium">Primary image shown on product cards</span>
+                </div>
+
+                {/* Primary Image Input & File Upload */}
                 <div className="flex gap-2 items-center">
-                  <input type="text" value={img} onChange={(e) => setImg(e.target.value)} placeholder="https://res.cloudinary.com/..." className="flex-1 px-3 py-2 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary" required />
-                  <label className="bg-emerald-600 text-white text-xs font-bold px-3 py-2 rounded-xl cursor-pointer hover:bg-emerald-700 transition-colors flex items-center gap-1.5 flex-shrink-0">
+                  <input
+                    type="text"
+                    value={img}
+                    onChange={(e) => {
+                      const newMain = e.target.value;
+                      setImg(newMain);
+                      if (newMain && !imagesList.includes(newMain)) {
+                        setImagesList(prev => [newMain, ...prev.filter(x => x !== img)]);
+                      }
+                    }}
+                    placeholder="Primary Image URL..."
+                    className="flex-1 px-3 py-2 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary font-mono"
+                    required
+                  />
+                  <label className="bg-emerald-600 text-white text-xs font-bold px-3.5 py-2 rounded-xl cursor-pointer hover:bg-emerald-700 transition-colors flex items-center gap-1.5 flex-shrink-0 shadow-2xs">
                     <Upload size={14} />
                     <span>Upload</span>
                     <input
@@ -464,15 +500,14 @@ export const Products: React.FC = () => {
                           const reader = new FileReader();
                           reader.onloadend = async () => {
                             const base64 = reader.result as string;
+                            let uploadedUrl = base64;
                             try {
-                              const uploadedUrl = await uploadImage(base64, 'freshcart/products');
-                              setImg(uploadedUrl || base64);
-                              alert('✅ Image uploaded successfully!');
-                            } catch (err: any) {
-                              console.warn('Upload API notice, using local image data:', err);
-                              setImg(base64);
-                              alert('✅ Image selected and loaded successfully!');
-                            }
+                              const cloudUrl = await uploadImage(base64, 'freshcart/products');
+                              if (cloudUrl) uploadedUrl = cloudUrl;
+                            } catch (err) {}
+                            setImg(uploadedUrl);
+                            setImagesList(prev => [uploadedUrl, ...prev.filter(x => x !== uploadedUrl)]);
+                            alert('✅ Image uploaded successfully!');
                           };
                           reader.readAsDataURL(file);
                         }
@@ -480,9 +515,76 @@ export const Products: React.FC = () => {
                     />
                   </label>
                 </div>
-                {img && (
-                  <div className="w-14 h-14 rounded-xl border border-divider overflow-hidden mt-1.5 bg-background">
-                    <img src={img} alt="Preview" className="w-full h-full object-cover" />
+
+                {/* Add Additional Image URL bar */}
+                <div className="flex gap-2 items-center mt-1">
+                  <input
+                    type="text"
+                    value={newImageUrl}
+                    onChange={(e) => setNewImageUrl(e.target.value)}
+                    placeholder="Paste additional image URL (e.g. back view, side view)..."
+                    className="flex-1 px-3 py-1.5 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary font-mono text-[11px]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!newImageUrl.trim()) return;
+                      const url = newImageUrl.trim();
+                      if (!imagesList.includes(url)) {
+                        setImagesList(prev => [...prev, url]);
+                        if (!img) setImg(url);
+                      }
+                      setNewImageUrl('');
+                    }}
+                    className="px-3 py-1.5 bg-admin-ink text-white rounded-xl text-xs font-bold hover:bg-admin-ink-soft transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                  >
+                    <Plus size={13} />
+                    <span>Add</span>
+                  </button>
+                </div>
+
+                {/* Thumbnails list */}
+                {imagesList.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-divider/60 mt-1">
+                    {imagesList.map((url, idx) => {
+                      const isMain = url === img;
+                      return (
+                        <div key={idx} className={`relative group w-16 h-16 rounded-xl border-2 overflow-hidden bg-white shadow-2xs ${isMain ? 'border-emerald-600 ring-2 ring-emerald-500/20' : 'border-divider'}`}>
+                          <img src={url} alt={`Thumb ${idx}`} className="w-full h-full object-cover" />
+                          {isMain && (
+                            <span className="absolute top-0.5 left-0.5 bg-emerald-600 text-white text-[8px] font-black px-1 rounded-sm leading-tight">
+                              MAIN
+                            </span>
+                          )}
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1 p-1">
+                            {!isMain && (
+                              <button
+                                type="button"
+                                onClick={() => setImg(url)}
+                                title="Set as Main Image"
+                                className="p-1 bg-emerald-600 text-white rounded-md text-[9px] font-bold cursor-pointer hover:bg-emerald-700"
+                              >
+                                Main
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nextList = imagesList.filter((_, i) => i !== idx);
+                                setImagesList(nextList);
+                                if (isMain && nextList.length > 0) {
+                                  setImg(nextList[0]);
+                                }
+                              }}
+                              title="Remove Image"
+                              className="p-1 bg-rose-600 text-white rounded-md text-[9px] font-bold cursor-pointer hover:bg-rose-700"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

@@ -120,6 +120,7 @@ const bannerSchema = new mongoose.Schema({
   subCategoryName: { type: String },
   active: { type: Boolean, default: true },
   displayOn: { type: String, enum: ['HOME', 'CATEGORY', 'SUBCATEGORY', 'ALL'], default: 'HOME' },
+  targetPlatform: { type: String, enum: ['ALL', 'WEB', 'MOBILE'], default: 'ALL' },
   categoryId: { type: String },
   subcategoryId: { type: String },
   position: { type: String },
@@ -130,10 +131,32 @@ const bannerSchema = new mongoose.Schema({
   endDate: { type: Date }
 }, { timestamps: true });
 
+const promoCardSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true, index: true },
+  title: { type: String, required: true },
+  subtitle: { type: String, default: '' },
+  buttonText: { type: String, default: 'Order Now' },
+  bgType: { type: String, enum: ['color', 'image'], default: 'color' },
+  bgGradient: { type: String, default: 'linear-gradient(135deg, #00b09b, #96c93d)' },
+  bgImageUrl: { type: String, default: '' },
+  imageUrl: { type: String, default: '' },
+  textColor: { type: String, default: '#ffffff' },
+  displayOn: { type: String, enum: ['HOME', 'CATEGORY', 'SUBCATEGORY', 'ALL'], default: 'HOME' },
+  categoryId: { type: String, default: '' },
+  subCategoryId: { type: String, default: '' },
+  subCategoryName: { type: String, default: '' },
+  linkUrl: { type: String, default: '' },
+  displayOrder: { type: Number, default: 0 },
+  active: { type: Boolean, default: true }
+}, { timestamps: true });
+
 export const Category = mongoose.model('Category', categorySchema);
 export const Brand = mongoose.model('Brand', brandSchema);
 export const Product = mongoose.model('Product', productSchema);
 export const SpecialGroup = mongoose.model('SpecialGroup', specialGroupSchema);
 export const Banner = mongoose.model('Banner', bannerSchema);
+export const PromoCard = mongoose.model('PromoCard', promoCardSchema);
+
+
 
 

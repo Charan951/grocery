@@ -12,7 +12,7 @@ const razorpayInstance = new Razorpay({
   key_secret: RAZORPAY_KEY_SECRET,
 });
 import { User } from '../models/User.js';
-import { Category, Product, Brand, SpecialGroup, Banner } from '../models/Catalog.js';
+import { Category, Product, Brand, SpecialGroup, Banner, PromoCard } from '../models/Catalog.js';
 import { Inventory } from '../models/Inventory.js';
 import { Order } from '../models/Order.js';
 import { Customer } from '../models/Customer.js';
@@ -198,7 +198,7 @@ export const productController = {
     try {
       const { categoryId, category, subCategory, search, isOrganic, minPrice, maxPrice, sort } = req.query;
       let query = {};
-      
+
       if (categoryId || category) {
         const catVal = categoryId || category;
         const catRegex = new RegExp(catVal.replace(/-/g, '.*'), 'i');
@@ -271,9 +271,9 @@ export const productController = {
       }
       if (prodData.price && !prodData.mrp) prodData.mrp = prodData.originalPrice || prodData.price;
       if (prodData.mrp && !prodData.originalPrice) prodData.originalPrice = prodData.mrp;
-      
+
       // Clean and normalize image fields
-      let validImages = Array.isArray(prodData.images) 
+      let validImages = Array.isArray(prodData.images)
         ? prodData.images.filter(img => typeof img === 'string' && img.trim().length > 0)
         : [];
       let mainImg = prodData.imageUrl || prodData.image || (validImages.length > 0 ? validImages[0] : '');
@@ -308,9 +308,9 @@ export const productController = {
       if (prodData.price && prodData.originalPrice) {
         prodData.mrp = prodData.originalPrice;
       }
-      
+
       // Clean and normalize image fields
-      let validImages = Array.isArray(prodData.images) 
+      let validImages = Array.isArray(prodData.images)
         ? prodData.images.filter(img => typeof img === 'string' && img.trim().length > 0)
         : [];
       let mainImg = prodData.imageUrl || prodData.image || (validImages.length > 0 ? validImages[0] : '');
@@ -451,14 +451,14 @@ export const categoryController = {
         (s) => (s.name || '').toLowerCase().trim() === nameKey || (subSlug && s.slug === subSlug)
       );
 
-      const subObject = { 
-        id: subId, 
-        name, 
-        slug: subSlug, 
-        icon: imgVal, 
-        image: imgVal, 
+      const subObject = {
+        id: subId,
+        name,
+        slug: subSlug,
+        icon: imgVal,
+        image: imgVal,
         color: color || '#10B981',
-        showOnHome: showOnHome !== undefined ? showOnHome : true, 
+        showOnHome: showOnHome !== undefined ? showOnHome : true,
         displayOrder: displayOrder !== undefined ? Number(displayOrder) : 0,
         promoImage: promoImage || '',
         promoLink: promoLink || ''
@@ -584,8 +584,8 @@ export const orderController = {
         paymentStatus: orderData.paymentStatus || 'Paid',
         paymentMethod: orderData.paymentMethod || 'Razorpay UPI/Card',
         status: orderData.status || 'In Transit',
-        deliveryAddress: typeof orderData.deliveryAddress === 'string' 
-          ? orderData.deliveryAddress 
+        deliveryAddress: typeof orderData.deliveryAddress === 'string'
+          ? orderData.deliveryAddress
           : orderData.address?.fullAddress || 'Selected Delivery Address'
       };
 
@@ -595,7 +595,7 @@ export const orderController = {
         if (normalizedOrder.items && Array.isArray(normalizedOrder.items)) {
           for (const item of normalizedOrder.items) {
             if (item.productId) {
-              await Product.updateOne({ id: item.productId }, { $inc: { stock: -item.quantity } }).catch(() => {});
+              await Product.updateOne({ id: item.productId }, { $inc: { stock: -item.quantity } }).catch(() => { });
             }
           }
         }
@@ -1332,7 +1332,7 @@ export const bannerController = {
 
   createBanner: async (req, res) => {
     try {
-      const { id, title, subtitle, tag, gradient, imageUrl, buttonText, linkUrl, positionIndex, subCategoryName, active, displayOn, categoryId, subcategoryId, position, themeBgColor, themeTextColor, themeAccentColor, startDate, endDate } = req.body;
+      const { id, title, subtitle, tag, gradient, imageUrl, buttonText, linkUrl, positionIndex, subCategoryName, active, displayOn, targetPlatform, categoryId, subcategoryId, position, themeBgColor, themeTextColor, themeAccentColor, startDate, endDate } = req.body;
       const bannerId = id || 'banner_' + Date.now();
       const banner = await Banner.create({
         id: bannerId,
@@ -1347,6 +1347,7 @@ export const bannerController = {
         subCategoryName,
         active: active !== undefined ? active : true,
         displayOn: displayOn || 'HOME',
+        targetPlatform: targetPlatform || 'ALL',
         categoryId,
         subcategoryId,
         position,
@@ -1394,6 +1395,77 @@ export const bannerController = {
   }
 };
 
+export const promoCardController = {
+  getPromoCards: async (req, res) => {
+    try {
+      const cards = await PromoCard.find().sort({ displayOrder: 1 });
+      res.json({ success: true, promoCards: cards });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  createPromoCard: async (req, res) => {
+    try {
+      const { id, title, subtitle, buttonText, bgType, bgGradient, bgImageUrl, imageUrl, textColor, displayOn, categoryId, subCategoryId, subCategoryName, linkUrl, displayOrder, active } = req.body;
+      const promoId = id || 'promo_' + Date.now();
+      const card = await PromoCard.create({
+        id: promoId,
+        title,
+        subtitle: subtitle || '',
+        buttonText: buttonText || 'Order Now',
+        bgType: bgType || 'color',
+        bgGradient: bgGradient || 'linear-gradient(135deg, #00b09b, #96c93d)',
+        bgImageUrl: bgImageUrl || '',
+        imageUrl: imageUrl || '',
+        textColor: textColor || '#ffffff',
+        displayOn: displayOn || 'HOME',
+        categoryId: categoryId || '',
+        subCategoryId: subCategoryId || '',
+        subCategoryName: subCategoryName || '',
+        linkUrl: linkUrl || '',
+        displayOrder: displayOrder !== undefined ? Number(displayOrder) : 0,
+        active: active !== undefined ? active : true
+      });
+      res.status(201).json({ success: true, promoCard: card });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  updatePromoCard: async (req, res) => {
+    try {
+      const { id } = req.params;
+      let card = await PromoCard.findOneAndUpdate(
+        { id },
+        { $set: req.body },
+        { new: true }
+      );
+      if (!card) {
+        card = await PromoCard.findOneAndUpdate(
+          { id },
+          { $set: { ...req.body, id } },
+          { new: true, upsert: true }
+        );
+      }
+      res.json({ success: true, promoCard: card });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  deletePromoCard: async (req, res) => {
+    try {
+      const { id } = req.params;
+      await PromoCard.findOneAndDelete({ id });
+      res.json({ success: true, message: 'Promo card deleted' });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+};
+
+
 export const paymentController = {
   createRazorpayOrder: async (req, res) => {
     try {
@@ -1427,7 +1499,7 @@ export const paymentController = {
   verifyPayment: async (req, res) => {
     try {
       const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
-      
+
       if (!razorpay_order_id || !razorpay_payment_id) {
         return res.json({ success: true, verified: true, message: 'Mock payment verified' });
       }

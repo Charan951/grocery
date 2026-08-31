@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { getProductImage } from '../utils/imageUtils';
 import {
   Search, Heart, MapPin, Menu, X,
-  ChevronDown, Leaf, Settings, Percent, User, Zap, LogOut, Shield, LayoutGrid
+  ChevronDown, Leaf, Settings, Percent, User, Zap, LogOut, Shield, LayoutGrid, ShoppingCart
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -17,9 +17,11 @@ interface HeaderProps {
   onCartOpen: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
-  const { wishlist } = useCartWishlist();
-  const { categories, products, coupons, banners, userLocation, updateUserLocation, activeHeroBannerIndex } = useCMS();
+export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) => {
+  const { wishlist, cartCount } = useCartWishlist();
+  const totalItems = cartCount;
+  const setIsCartOpen = (open: boolean) => { if (open) onCartOpen(); };
+  const { categories, products, coupons, banners, userLocation, updateUserLocation, activeHeroBannerIndex, activeFestivalCampaign } = useCMS();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -34,10 +36,31 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
   // Entire app bar (top header, search bar, category nav) tints to the active
   // category's own colour; defaults to campaign or green theme when home is active.
   const activeCategory = useMemo(
-    () => categories.find(cat => location.search.includes(`category=${cat.slug || cat.id}`)),
-    [categories, location.search]
+    () => categories.find(cat => {
+      const catSlug = cat.slug || cat.id;
+      return location.search.includes(`category=${catSlug}`) || location.pathname === `/category/${catSlug}`;
+    }),
+    [categories, location.search, location.pathname]
   );
   const isHomeActive = location.pathname === '/' && !activeCategory;
+
+  const isProductListingPage =
+    location.pathname === '/products' || location.pathname.startsWith('/products/');
+
+  const isProductDetailPage =
+    location.pathname.startsWith('/product/') || location.pathname.startsWith('/prn/');
+
+  const isProfilePage =
+    location.pathname.startsWith('/profile') || location.pathname.startsWith('/account/profile');
+
+  const isOrdersPage =
+    location.pathname.startsWith('/orders') || location.pathname.startsWith('/account/orders');
+
+  const isCategoriesPage =
+    location.pathname === '/categories' || location.pathname.startsWith('/categories/');
+
+  const shouldHideCategoryAppbar =
+    isProductListingPage || isProductDetailPage || isProfilePage || isOrdersPage || isCategoriesPage;
 
   const [announcementVisible, setAnnouncementVisible] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -100,15 +123,20 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
         return;
       }
 
+      // Always expand and unhide header when near top of page
+      if (currentScrollY <= 20) {
+        setHeaderHidden(false);
+        lastScrollY.current = currentScrollY;
+        return;
+      }
+
       if (!ticking.current) {
         window.requestAnimationFrame(() => {
           const diff = currentScrollY - lastScrollY.current;
 
-          if (currentScrollY <= 15) {
-            setHeaderHidden(false);
-          } else if (diff > 8 && currentScrollY > 50) {
+          if (diff > 10 && currentScrollY > 80) {
             setHeaderHidden(true);
-          } else if (diff < -8) {
+          } else if (diff < -10) {
             setHeaderHidden(false);
           }
           lastScrollY.current = currentScrollY;
@@ -122,21 +150,32 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [isMobile]);
 
+  // Reset header state on EVERY route change
+  useEffect(() => {
+    setHeaderHidden(false);
+    setIsScrolledDown(false);
+    lastScrollY.current = 0;
+    if (appBarRef.current && appBarRef.current.offsetHeight > 0) {
+      document.documentElement.style.setProperty('--sticky-header-h', `${appBarRef.current.offsetHeight}px`);
+    }
+  }, [location.pathname, location.search]);
+
   // Measure header height for page padding
   useEffect(() => {
     const el = appBarRef.current;
     if (!el) return;
     const updateHeight = () => {
-      document.documentElement.style.setProperty('--sticky-header-h', `${el.offsetHeight}px`);
+      if (el.offsetHeight > 0) {
+        document.documentElement.style.setProperty('--sticky-header-h', `${el.offsetHeight}px`);
+      }
     };
     updateHeight();
     const observer = new ResizeObserver(updateHeight);
     observer.observe(el);
     return () => {
       observer.disconnect();
-      document.documentElement.style.removeProperty('--sticky-header-h');
     };
-  }, []);
+  }, [location.pathname]);
 
   // Reopen the profile drawer when routed home from a sub-page's Back button
   useEffect(() => {
@@ -212,6 +251,9 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
 
   const isHomePage = location.pathname === '/';
 
+  // Festival campaign continuous header mode for Mobile
+  const isFestivalActive = isHomePage && isMobile && activeFestivalCampaign && activeFestivalCampaign.isActive !== false;
+
   // Active campaign banners list for Home Page
   const validHomeBanners = useMemo(() => {
     if (!isHomePage) return [];
@@ -220,11 +262,14 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
       if (b.active === false) return false;
       const isDisplayValid = !b.displayOn || b.displayOn === 'HOME' || b.displayOn === 'ALL';
       if (!isDisplayValid) return false;
+      const target = b.targetPlatform || 'ALL';
+      if (target === 'WEB' && isMobile) return false;
+      if (target === 'MOBILE' && !isMobile) return false;
       if (b.startDate && now < new Date(b.startDate)) return false;
       if (b.endDate && now > new Date(b.endDate)) return false;
       return true;
     });
-  }, [banners, isHomePage]);
+  }, [banners, isHomePage, isMobile]);
 
   // Dynamic active hero banner based on activeHeroBannerIndex from BannerCarousel
   const activeCampaignBanner = useMemo(() => {
@@ -234,8 +279,8 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
   }, [validHomeBanners, activeHeroBannerIndex]);
 
   const campaignBgColor = isHomePage ? (activeCampaignBanner?.themeBgColor || activeCampaignBanner?.gradient?.[0]) : null;
-  const campaignTextColor = isHomePage ? activeCampaignBanner?.themeTextColor : null;
-  const campaignAccentColor = isHomePage ? (activeCampaignBanner?.themeAccentColor || '#F6C453') : '#10B981';
+  const campaignTextColor = isHomePage ? (activeFestivalCampaign?.theme?.textColor || activeCampaignBanner?.themeTextColor) : null;
+  const campaignAccentColor = isHomePage ? (activeFestivalCampaign?.theme?.accentColor || activeCampaignBanner?.themeAccentColor || '#F6C453') : '#10B981';
 
   const getIsDarkColor = (colorHexOrRgb?: string) => {
     if (!colorHexOrRgb) return false;
@@ -256,6 +301,9 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
     if (isScrolledDown) {
       return '#ffffff';
     }
+    if (isFestivalActive) {
+      return 'transparent';
+    }
     // Dynamic banner color matching ONLY applies on mobile home page
     if (isMobile && isHomePage && campaignBgColor) {
       return campaignBgColor;
@@ -264,38 +312,51 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
       return hexToTintOnWhite(activeCategory.color, 0.14);
     }
     return '#ffffff';
-  }, [isScrolledDown, isMobile, isHomePage, campaignBgColor, activeCategory]);
+  }, [isScrolledDown, isFestivalActive, isMobile, isHomePage, campaignBgColor, activeCategory]);
 
   const isDarkHeader = useMemo(() => {
     if (isScrolledDown) return false;
     if (!isHomePage || !isMobile) return false;
+    if (isFestivalActive && activeFestivalCampaign?.theme?.textColor) {
+      return true; // Use themed white/light text contrast over continuous campaign background
+    }
     if (campaignTextColor) {
       return !getIsDarkColor(campaignTextColor);
     }
     return getIsDarkColor(dynamicHeaderBg);
-  }, [isScrolledDown, isHomePage, isMobile, dynamicHeaderBg, campaignTextColor]);
+  }, [isScrolledDown, isHomePage, isMobile, isFestivalActive, activeFestivalCampaign, dynamicHeaderBg, campaignTextColor]);
 
   const headerTextColor = isDarkHeader ? 'text-white' : 'text-text-primary';
   const headerSubTextColor = isDarkHeader ? 'text-white/90 hover:text-white' : 'text-text-secondary hover:text-primary';
   const iconColorClass = isDarkHeader ? 'text-white fill-white' : 'text-text-primary fill-text-primary';
 
+  const festivalHeaderBgStyle: React.CSSProperties = isFestivalActive && !isScrolledDown ? {
+    backgroundColor: 'transparent',
+    backgroundImage: 'none',
+    boxShadow: 'none'
+  } : {
+    backgroundColor: dynamicHeaderBg
+  };
+
+  if (isMobile && (isProductDetailPage || isCategoriesPage)) {
+    return null;
+  }
+
   return (
     <>
       <div
         ref={appBarRef}
-        className={`fixed top-0 left-0 right-0 z-[1000] w-full transition-all duration-300 transform translate-y-0 border-none outline-none ${
-          isScrolledDown ? 'shadow-sm' : 'shadow-none'
-        }`}
-        style={{ backgroundColor: dynamicHeaderBg }}
+        className={`fixed top-0 left-0 right-0 z-[1000] w-full transition-all duration-300 transform translate-y-0 border-none outline-none ${isScrolledDown ? 'shadow-sm' : 'shadow-none'
+          }`}
+        style={festivalHeaderBgStyle}
       >
         {/* Desktop & Mobile Header Content */}
         <header
-          className={`flex items-center justify-between w-full px-3 md:px-8 transition-all duration-300 gap-2 md:gap-6 border-none outline-none ${
-            headerHidden
+          className={`flex items-center justify-between w-full max-w-[1280px] mx-auto px-3 md:px-8 transition-all duration-300 gap-2 md:gap-6 border-none outline-none ${headerHidden
               ? 'py-0 sm:py-2.5 max-h-0 sm:max-h-24 opacity-0 sm:opacity-100 overflow-hidden sm:overflow-visible pointer-events-none sm:pointer-events-auto'
               : 'py-2 md:py-2.5 max-h-24 opacity-100'
-          }`}
-          style={{ backgroundColor: dynamicHeaderBg }}
+            }`}
+          style={festivalHeaderBgStyle}
         >
           {/* Desktop Logo & Location */}
           <div className="hidden sm:flex items-center gap-3 sm:gap-4 shrink-0">
@@ -337,9 +398,8 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
           </div>
 
           {/* Mobile Header Row (Compact Delivery & Profile) */}
-          <div className={`flex sm:hidden items-center justify-between w-full gap-2 transition-all duration-300 ease-in-out overflow-hidden ${
-            headerHidden ? 'max-h-0 opacity-0 py-0 pointer-events-none' : 'max-h-16 opacity-100 py-0.5'
-          }`}>
+          <div className={`flex sm:hidden items-center justify-between w-full gap-2 transition-all duration-300 ease-in-out overflow-hidden ${headerHidden ? 'max-h-0 opacity-0 py-0 pointer-events-none' : 'max-h-16 opacity-100 py-0.5'
+            }`}>
             {/* Left: Express delivery badge & location dropdown */}
             <div
               onClick={() => navigate('/account/addresses')}
@@ -372,11 +432,10 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
             {/* Right: Profile Icon Button */}
             <button
               onClick={handleProfileClick}
-              className={`w-8 h-8 rounded-full border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
-                isDarkHeader
+              className={`w-8 h-8 rounded-full border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${isDarkHeader
                   ? 'border-white/40 bg-white/10 text-white hover:bg-white/20'
                   : 'border-divider bg-background text-text-primary hover:border-primary hover:text-primary'
-              }`}
+                }`}
               title={customerUser ? `Logged in as ${customerUser.phone}` : "Customer Login"}
               aria-label={customerUser ? `Account menu — logged in as ${customerUser.phone}` : "Customer login"}
             >
@@ -386,11 +445,11 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
 
           {/* Desktop Search Bar */}
           <div className="flex-1 max-w-xl md:max-w-2xl relative hidden sm:block" ref={searchRef}>
-            <form 
-              onSubmit={handleSearchSubmit} 
+            <form
+              onSubmit={handleSearchSubmit}
               style={{
-                borderColor: isDarkHeader 
-                  ? (campaignAccentColor || 'rgba(255,255,255,0.4)') 
+                borderColor: isDarkHeader
+                  ? (campaignAccentColor || 'rgba(255,255,255,0.4)')
                   : '#CBD5E1'
               }}
               className="flex items-center w-full px-4 py-2 bg-white/95 rounded-full transition-all border focus-within:bg-white focus-within:ring-2 focus-within:ring-primary/20 shadow-2xs"
@@ -437,15 +496,33 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
           </div>
 
           {/* Desktop Right Actions */}
-          <div className="hidden sm:flex items-center gap-3 sm:gap-5 font-medium text-[14px] text-text-primary shrink-0">
+          <div className="hidden sm:flex items-center gap-3 sm:gap-4 font-medium text-[14px] text-text-primary shrink-0">
+            {/* My Cart Button (Disabled when items = 0, Enabled when > 0) */}
+            <button
+              disabled={totalItems === 0}
+              onClick={() => totalItems > 0 && setIsCartOpen(true)}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl font-black text-xs sm:text-sm transition-all duration-200 shadow-2xs ${totalItems > 0
+                  ? 'bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white cursor-pointer ring-2 ring-emerald-500/30'
+                  : 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed opacity-60'
+                }`}
+              title={totalItems > 0 ? `View My Cart (${totalItems} items)` : 'My Cart is empty'}
+            >
+              <ShoppingCart size={17} className="shrink-0" />
+              <span>My Cart</span>
+              {totalItems > 0 && (
+                <span className="bg-white text-emerald-700 font-black text-[11px] px-2 py-0.5 rounded-full shadow-2xs">
+                  {totalItems}
+                </span>
+              )}
+            </button>
+
             <div className="relative">
               <button
                 onClick={handleProfileClick}
-                className={`w-9 h-9 rounded-full border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
-                  isDarkHeader
+                className={`w-9 h-9 rounded-full border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${isDarkHeader
                     ? 'border-white/40 bg-white/10 text-white hover:bg-white/20'
                     : 'border-divider bg-background text-text-primary hover:border-primary hover:text-primary'
-                }`}
+                  }`}
                 title={customerUser ? `Logged in as ${customerUser.phone}` : "Customer Login"}
                 aria-label={customerUser ? `Account menu — logged in as ${customerUser.phone}` : "Customer login"}
               >
@@ -491,164 +568,163 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen }) => {
           </div>
         </header>
 
-        {/* Mobile Search bar row */}
-        <div className="sm:hidden w-full px-3 py-1.5 relative transition-colors duration-300 border-none outline-none" style={{ backgroundColor: dynamicHeaderBg }} ref={searchRef}>
-          <form 
-            onSubmit={handleSearchSubmit} 
-            style={{
-              borderColor: isDarkHeader 
-                ? (campaignAccentColor || 'rgba(255,255,255,0.4)') 
-                : '#CBD5E1'
-            }}
-            className="flex items-center w-full px-3.5 py-1.5 bg-white rounded-full shadow-2xs border"
-          >
-            <Search size={15} className="text-text-tertiary mr-2 shrink-0" />
-            <input
-              type="text"
-              placeholder={currentPlaceholder}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={() => searchQuery.length > 1 && setShowSearchResults(true)}
-              className="w-full text-xs bg-transparent border-none outline-none text-text-primary placeholder:text-text-tertiary font-medium"
-            />
-          </form>
+        {/* Mobile Search bar row (Hidden on Products / Subcategory Page on Mobile) */}
+        {!isProductListingPage && (
+          <div className="sm:hidden w-full px-3 py-1.5 relative transition-colors duration-300 border-none outline-none" style={{ backgroundColor: dynamicHeaderBg }} ref={searchRef}>
+            <form
+              onSubmit={handleSearchSubmit}
+              style={{
+                borderColor: isDarkHeader
+                  ? (campaignAccentColor || 'rgba(255,255,255,0.4)')
+                  : '#CBD5E1'
+              }}
+              className="flex items-center w-full px-3.5 py-1.5 bg-white rounded-full shadow-2xs border"
+            >
+              <Search size={15} className="text-text-tertiary mr-2 shrink-0" />
+              <input
+                type="text"
+                placeholder={currentPlaceholder}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => searchQuery.length > 1 && setShowSearchResults(true)}
+                className="w-full text-xs bg-transparent border-none outline-none text-text-primary placeholder:text-text-tertiary font-medium"
+              />
+            </form>
 
-          {/* Mobile Real-time search results */}
-          <AnimatePresence>
-            {showSearchResults && searchResults.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 5 }}
-                className="absolute top-[calc(100%+4px)] left-3 right-3 bg-white border border-divider rounded-2xl shadow-premium overflow-hidden max-h-[300px] overflow-y-auto z-[1002] flex flex-col"
-              >
-                {searchResults.map((product) => (
-                  <div
-                    key={product.id}
-                    className="flex items-center gap-2.5 p-2.5 border-b border-divider cursor-pointer hover:bg-background transition-colors last:border-b-0"
-                    onClick={() => handleSearchResultClick(product.id)}
-                  >
-                    <img src={getProductImage(product)} alt={product.name} className="w-8 h-8 object-contain rounded-md border border-divider bg-white p-0.5" />
-                    <div className="flex-1 flex flex-col">
-                      <span className="text-xs font-bold text-text-primary line-clamp-1">{product.name}</span>
-                      <span className="text-[10px] text-text-secondary">{product.brand}</span>
+            {/* Mobile Real-time search results */}
+            <AnimatePresence>
+              {showSearchResults && searchResults.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 5 }}
+                  className="absolute top-[calc(100%+4px)] left-3 right-3 bg-white border border-divider rounded-2xl shadow-premium overflow-hidden max-h-[300px] overflow-y-auto z-[1002] flex flex-col"
+                >
+                  {searchResults.map((product) => (
+                    <div
+                      key={product.id}
+                      className="flex items-center gap-2.5 p-2.5 border-b border-divider cursor-pointer hover:bg-background transition-colors last:border-b-0"
+                      onClick={() => handleSearchResultClick(product.id)}
+                    >
+                      <img src={getProductImage(product)} alt={product.name} className="w-8 h-8 object-contain rounded-md border border-divider bg-white p-0.5" />
+                      <div className="flex-1 flex flex-col">
+                        <span className="text-xs font-bold text-text-primary line-clamp-1">{product.name}</span>
+                        <span className="text-[10px] text-text-secondary">{product.brand}</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs font-black text-primary">₹{product.price}</div>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-xs font-black text-primary">₹{product.price}</div>
-                    </div>
-                  </div>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
 
         {/* Compact Horizontal Category Navigation Bar */}
-        <nav
-          className="px-2 md:px-8 py-1 md:py-2 overflow-x-auto scrollbar-none transition-colors duration-300 border-none outline-none ring-0 shadow-none"
-          style={{ backgroundColor: dynamicHeaderBg }}
-        >
-          <div className="flex items-center gap-1 sm:gap-1.5 min-w-max pb-0.5">
-            {/* All Link */}
-            <Link
-              to="/"
-              style={location.pathname === '/' && !location.search.includes('category=') ? {
-                backgroundColor: isDarkHeader ? 'rgba(255, 255, 255, 0.18)' : hexToTintOnWhite('#10B981', 0.16),
-              } : undefined}
-              className={`flex flex-col items-center justify-between p-1 sm:p-1.5 md:p-2 rounded-xl sm:rounded-2xl transition-all shrink-0 w-[60px] sm:w-20 md:w-24 h-[72px] sm:h-[94px] md:h-[104px] border-0 shadow-none ${
-                location.pathname === '/' && !location.search.includes('category=')
-                  ? ''
-                  : (isDarkHeader ? 'bg-transparent hover:bg-white/10' : 'bg-transparent hover:bg-black/5')
-              }`}
-            >
-              <div className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full flex items-center justify-center transition-all ${
-                location.pathname === '/' && !location.search.includes('category=')
-                  ? (isDarkHeader ? 'bg-white text-emerald-700 shadow-2xs' : 'bg-emerald-600 text-white shadow-2xs')
-                  : (isDarkHeader ? 'bg-white/20 text-white' : 'bg-background text-text-secondary border border-divider/40')
-              }`}>
-                <LayoutGrid size={18} className="sm:hidden" />
-                <LayoutGrid size={22} className="hidden sm:block" />
-              </div>
-              <div className="h-[2.2em] flex items-center justify-center text-center w-full px-0.5">
-                <span
-                  style={location.pathname === '/' && !location.search.includes('category=') ? {
-                    color: isDarkHeader ? '#ffffff' : hexToDarkShade('#10B981', 0.4)
-                  } : undefined}
-                  className={`text-[10px] sm:text-xs text-center leading-tight line-clamp-2 ${
-                    location.pathname === '/' && !location.search.includes('category=')
-                      ? 'font-black'
-                      : (isDarkHeader ? 'text-white/90 font-semibold' : 'text-text-primary font-semibold')
+        {!shouldHideCategoryAppbar && (
+          <nav
+            className="w-full max-w-[1280px] mx-auto px-2 md:px-8 py-1 md:py-2 overflow-x-auto scrollbar-none transition-colors duration-300 border-none outline-none ring-0 shadow-none"
+            style={{ backgroundColor: dynamicHeaderBg }}
+          >
+            <div className="flex items-center gap-1 sm:gap-1.5 min-w-max pb-0.5">
+              {/* All Link */}
+              <Link
+                to="/"
+                style={location.pathname === '/' && !location.search.includes('category=') ? {
+                  backgroundColor: isDarkHeader ? 'rgba(255, 255, 255, 0.18)' : hexToTintOnWhite('#10B981', 0.16),
+                } : undefined}
+                className={`flex flex-col items-center justify-between p-1 sm:p-1.5 md:p-2 rounded-xl sm:rounded-2xl transition-all shrink-0 w-[60px] sm:w-20 md:w-24 h-[72px] sm:h-[94px] md:h-[104px] border-0 shadow-none ${location.pathname === '/' && !location.search.includes('category=')
+                    ? ''
+                    : (isDarkHeader ? 'bg-transparent hover:bg-white/10' : 'bg-transparent hover:bg-black/5')
                   }`}
-                >
-                  All
-                </span>
-              </div>
-              {location.pathname === '/' && !location.search.includes('category=') ? (
-                <div
-                  className="w-full h-1 rounded-full mt-0.5"
-                  style={{ backgroundColor: isDarkHeader ? (campaignAccentColor || '#ffffff') : '#10B981' }}
-                />
-              ) : (
-                <div className="w-full h-1 bg-transparent rounded-full mt-0.5" />
-              )}
-            </Link>
-
-            {/* Categories Links */}
-            {categories.map((cat) => {
-              const catSlug = cat.slug || cat.id;
-              const isActive = location.search.includes(`category=${catSlug}`);
-              const label = cat.displayName?.trim() || cat.name;
-              const catColor = cat.color || '#4CAF50';
-
-              const activeBg = isDarkHeader ? 'rgba(255, 255, 255, 0.18)' : hexToTintOnWhite(catColor, 0.16);
-              const activeTextColor = isDarkHeader ? '#ffffff' : hexToDarkShade(catColor, 0.4);
-
-              return (
-                <Link
-                  key={cat.id}
-                  to={`/products?category=${catSlug}`}
-                  style={isActive ? {
-                    backgroundColor: activeBg,
-                  } : undefined}
-                  className={`flex flex-col items-center justify-between p-1 sm:p-1.5 md:p-2 rounded-xl sm:rounded-2xl transition-all shrink-0 w-[60px] sm:w-20 md:w-24 h-[72px] sm:h-[94px] md:h-[104px] border-0 shadow-none ${
-                    isActive
-                      ? ''
-                      : (isDarkHeader ? 'bg-transparent hover:bg-white/10' : 'bg-transparent hover:bg-black/5')
-                  }`}
-                >
-                  <div
-                    style={{
-                      backgroundColor: isActive 
-                        ? (isDarkHeader ? 'rgba(255, 255, 255, 0.25)' : hexToTintOnWhite(catColor, 0.18))
-                        : (isDarkHeader ? 'rgba(255, 255, 255, 0.15)' : hexToTintOnWhite(catColor, 0.08))
-                    }}
-                    className="w-9 h-9 sm:w-11 sm:h-11 rounded-full overflow-hidden border-0 shrink-0 transition-colors"
-                  >
-                    <img src={getCategoryImage(cat)} alt={label} className="w-full h-full object-cover" />
-                  </div>
-                  <div className="h-[2.2em] flex items-center justify-center text-center w-full px-0.5">
-                    <span
-                      style={isActive ? { color: activeTextColor } : undefined}
-                      className={`text-[10px] sm:text-xs text-center leading-tight line-clamp-2 ${
-                        isActive ? 'font-black' : (isDarkHeader ? 'text-white/90 font-semibold' : 'text-text-primary font-semibold')
+              >
+                <div className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full flex items-center justify-center transition-all ${location.pathname === '/' && !location.search.includes('category=')
+                    ? (isDarkHeader ? 'bg-white text-emerald-700 shadow-2xs' : 'bg-emerald-600 text-white shadow-2xs')
+                    : (isDarkHeader ? 'bg-white/20 text-white' : 'bg-background text-text-secondary border border-divider/40')
+                  }`}>
+                  <LayoutGrid size={18} className="sm:hidden" />
+                  <LayoutGrid size={22} className="hidden sm:block" />
+                </div>
+                <div className="h-[2.2em] flex items-center justify-center text-center w-full px-0.5">
+                  <span
+                    style={location.pathname === '/' && !location.search.includes('category=') ? {
+                      color: isDarkHeader ? '#ffffff' : hexToDarkShade('#10B981', 0.4)
+                    } : undefined}
+                    className={`text-[10px] sm:text-xs text-center leading-tight line-clamp-2 ${location.pathname === '/' && !location.search.includes('category=')
+                        ? 'font-black'
+                        : (isDarkHeader ? 'text-white/90 font-semibold' : 'text-text-primary font-semibold')
                       }`}
-                    >
-                      {label}
-                    </span>
-                  </div>
-                  {isActive ? (
+                  >
+                    All
+                  </span>
+                </div>
+                {location.pathname === '/' && !location.search.includes('category=') ? (
+                  <div
+                    className="w-full h-1 rounded-full mt-0.5"
+                    style={{ backgroundColor: isDarkHeader ? (campaignAccentColor || '#ffffff') : '#10B981' }}
+                  />
+                ) : (
+                  <div className="w-full h-1 bg-transparent rounded-full mt-0.5" />
+                )}
+              </Link>
+
+              {/* Categories Links */}
+              {categories.map((cat) => {
+                const catSlug = cat.slug || cat.id;
+                const isActive = location.search.includes(`category=${catSlug}`) || location.pathname === `/category/${catSlug}`;
+                const label = cat.displayName?.trim() || cat.name;
+                const catColor = cat.color || '#4CAF50';
+
+                const activeBg = isDarkHeader ? 'rgba(255, 255, 255, 0.18)' : hexToTintOnWhite(catColor, 0.16);
+                const activeTextColor = isDarkHeader ? '#ffffff' : hexToDarkShade(catColor, 0.4);
+
+                return (
+                  <Link
+                    key={cat.id}
+                    to={`/category/${catSlug}`}
+                    style={isActive ? {
+                      backgroundColor: activeBg,
+                    } : undefined}
+                    className={`flex flex-col items-center justify-between p-1 sm:p-1.5 md:p-2 rounded-xl sm:rounded-2xl transition-all shrink-0 w-[60px] sm:w-20 md:w-24 h-[72px] sm:h-[94px] md:h-[104px] border-0 shadow-none ${isActive
+                        ? ''
+                        : (isDarkHeader ? 'bg-transparent hover:bg-white/10' : 'bg-transparent hover:bg-black/5')
+                      }`}
+                  >
                     <div
-                      style={{ backgroundColor: isDarkHeader ? (campaignAccentColor || '#ffffff') : catColor }}
-                      className="w-full h-1 rounded-full mt-0.5"
-                    />
-                  ) : (
-                    <div className="w-full h-1 bg-transparent rounded-full mt-0.5" />
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-        </nav>
+                      style={{
+                        backgroundColor: isActive
+                          ? (isDarkHeader ? 'rgba(255, 255, 255, 0.25)' : hexToTintOnWhite(catColor, 0.18))
+                          : (isDarkHeader ? 'rgba(255, 255, 255, 0.15)' : hexToTintOnWhite(catColor, 0.08))
+                      }}
+                      className="w-9 h-9 sm:w-11 sm:h-11 rounded-full overflow-hidden border-0 shrink-0 transition-colors"
+                    >
+                      <img src={getCategoryImage(cat)} alt={label} className="w-full h-full object-cover" />
+                    </div>
+                    <div className="h-[2.2em] flex items-center justify-center text-center w-full px-0.5">
+                      <span
+                        style={isActive ? { color: activeTextColor } : undefined}
+                        className={`text-[10px] sm:text-xs text-center leading-tight line-clamp-2 ${isActive ? 'font-black' : (isDarkHeader ? 'text-white/90 font-semibold' : 'text-text-primary font-semibold')
+                          }`}
+                      >
+                        {label}
+                      </span>
+                    </div>
+                    {isActive ? (
+                      <div
+                        style={{ backgroundColor: isDarkHeader ? (campaignAccentColor || '#ffffff') : catColor }}
+                        className="w-full h-1 rounded-full mt-0.5"
+                      />
+                    ) : (
+                      <div className="w-full h-1 bg-transparent rounded-full mt-0.5" />
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </nav>
+        )}
       </div>
 
       {/* Location Selector Modal */}

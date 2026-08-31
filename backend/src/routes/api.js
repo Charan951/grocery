@@ -20,8 +20,10 @@ import {
   uploadController,
   specialGroupController,
   bannerController,
+  promoCardController,
   paymentController
 } from '../controllers/apiController.js';
+import { festivalCampaignController } from '../controllers/festivalCampaignController.js';
 
 const router = express.Router();
 
@@ -42,6 +44,9 @@ router.use((req, res, next) => {
       if (req.path === '/categories') return res.json({ success: true, offlineMode: true, categories: [] });
       if (req.path.startsWith('/special-groups')) return res.json({ success: true, offlineMode: true, groups: [] });
       if (req.path.startsWith('/banners')) return res.json({ success: true, offlineMode: true, banners: [] });
+      if (req.path.startsWith('/promo-cards')) return res.json({ success: true, offlineMode: true, promoCards: [] });
+      if (req.path.startsWith('/festival-campaigns/active')) return res.json({ success: true, offlineMode: true, campaign: null });
+      if (req.path.startsWith('/festival-campaigns')) return res.json({ success: true, offlineMode: true, campaigns: [] });
       if (req.path.startsWith('/customers')) return res.json({ success: true, offlineMode: true, customer: { name: 'Customer', email: '' } });
       if (req.path.startsWith('/orders')) return res.json({ success: true, offlineMode: true, orders: [] });
       if (req.path === '/coupons') return res.json({ success: true, offlineMode: true, coupons: [] });
@@ -56,16 +61,18 @@ router.use((req, res, next) => {
         });
       }
     }
-    if (req.method === 'PUT' || req.method === 'POST' || req.method === 'DELETE') {
+    if (req.method === 'PUT' || req.method === 'POST' || req.method === 'DELETE' || req.method === 'PATCH') {
       if (
-        req.path.startsWith('/special-groups') || 
-        req.path.startsWith('/banners') || 
-        req.path.startsWith('/categories') || 
+        req.path.startsWith('/special-groups') ||
+        req.path.startsWith('/banners') ||
+        req.path.startsWith('/promo-cards') ||
+        req.path.startsWith('/festival-campaigns') ||
+        req.path.startsWith('/categories') ||
         req.path.startsWith('/products') ||
         req.path.startsWith('/customers') ||
         req.path.startsWith('/orders')
       ) {
-        return res.json({ success: true, offlineMode: true, message: 'Saved successfully', customer: req.body });
+        return res.json({ success: true, offlineMode: true, message: 'Saved successfully', campaign: req.body });
       }
     }
   }
@@ -122,6 +129,22 @@ router.get('/banners', bannerController.getBanners);
 router.post('/banners', bannerController.createBanner);
 router.put('/banners/:id', bannerController.updateBanner);
 router.delete('/banners/:id', bannerController.deleteBanner);
+
+// Promo Card routes
+router.get('/promo-cards', promoCardController.getPromoCards);
+router.post('/promo-cards', promoCardController.createPromoCard);
+router.put('/promo-cards/:id', promoCardController.updatePromoCard);
+router.delete('/promo-cards/:id', promoCardController.deletePromoCard);
+
+// Festival Campaign routes
+router.get('/festival-campaigns/active', festivalCampaignController.getActiveCampaign);
+router.get('/festival-campaigns', festivalCampaignController.getCampaigns);
+router.get('/festival-campaigns/:id', festivalCampaignController.getCampaignById);
+router.post('/festival-campaigns', festivalCampaignController.createCampaign);
+router.put('/festival-campaigns/:id', festivalCampaignController.updateCampaign);
+router.delete('/festival-campaigns/:id', festivalCampaignController.deleteCampaign);
+router.patch('/festival-campaigns/:id/status', festivalCampaignController.toggleStatus);
+
 
 // ==========================================
 // 5. ORDER ROUTES
