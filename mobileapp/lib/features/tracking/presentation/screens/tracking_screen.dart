@@ -64,7 +64,7 @@ class TrackingScreen extends ConsumerWidget {
       body: SafeArea(
         child: Column(
           children: [
-            // Map Area (Socket Visualizer)
+            // Live delivery map
             Expanded(
               flex: 4,
               child: Container(
@@ -165,34 +165,39 @@ class TrackingScreen extends ConsumerWidget {
                                     ),
                                   ),
                                   const SizedBox(height: 2),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.star_rounded, color: AppColors.warning, size: 14),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        '4.9 • ${t.riderPhone}',
-                                        style: AppTypography.bodySmall(
-                                          isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                                        ),
-                                      ),
-                                    ],
+                                  Text(
+                                    !t.hasRider
+                                        ? 'Waiting for a delivery partner'
+                                        : t.canContact
+                                            ? t.riderPhone
+                                            : (t.riderPhoneMasked.isNotEmpty
+                                                ? '${t.riderPhoneMasked} • contact opens when out for delivery'
+                                                : 'Contact opens when out for delivery'),
+                                    style: AppTypography.bodySmall(
+                                      isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
-                            Row(
-                              children: [
-                                GestureDetector(
-                                  onTap: () => dialPhone(t.riderPhone),
-                                  child: _buildRoundButton(Icons.call_rounded, isDark),
-                                ),
-                                const SizedBox(width: 8),
-                                GestureDetector(
-                                  onTap: () => context.push('/support'),
-                                  child: _buildRoundButton(Icons.chat_bubble_rounded, isDark),
-                                ),
-                              ],
-                            ),
+                            if (t.canContact)
+                              Row(
+                                children: [
+                                  GestureDetector(
+                                    onTap: () => dialPhone(t.riderPhone),
+                                    child: _buildRoundButton(Icons.call_rounded, isDark),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  GestureDetector(
+                                    onTap: () {
+                                      final digits = t.riderPhone.replaceAll(RegExp(r'[^0-9]'), '');
+                                      final ten = digits.length > 10 ? digits.substring(digits.length - 10) : digits;
+                                      openUrl('https://wa.me/91$ten');
+                                    },
+                                    child: _buildRoundButton(Icons.chat_bubble_rounded, isDark),
+                                  ),
+                                ],
+                              ),
                           ],
                         ),
                       ),
@@ -207,7 +212,7 @@ class TrackingScreen extends ConsumerWidget {
                       const SizedBox(height: 16),
                       _buildTimelineItem('Order Placed', 'Order placed & assigned to Dark Store.', bucket, OrderStatus.placed, isDark, isFirst: true),
                       _buildTimelineItem('Grocery Packing', 'Fresh items packed in insulated bag.', bucket, OrderStatus.processing, isDark),
-                      _buildTimelineItem('Out for Delivery', 'Rider is on the way (Socket Connected).', bucket, OrderStatus.dispatched, isDark),
+                      _buildTimelineItem('Out for Delivery', 'Your delivery partner is on the way.', bucket, OrderStatus.dispatched, isDark),
                       _buildTimelineItem('Delivered', 'Order successfully handed over.', bucket, OrderStatus.delivered, isDark, isLast: true),
                       const SizedBox(height: 24),
                     ],

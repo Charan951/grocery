@@ -20,6 +20,7 @@ const razorpayInstance = new Razorpay({
   key_secret: RAZORPAY_KEY_SECRET || 'placeholder_secret',
 });
 import { User } from '../models/User.js';
+import { DeliveryPartner } from '../models/DeliveryPartner.js';
 import { Category, Product, Brand, SpecialGroup, Banner, PromoCard } from '../models/Catalog.js';
 import { Inventory } from '../models/Inventory.js';
 import { Order } from '../models/Order.js';
@@ -34,6 +35,13 @@ const signToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: '24h'
   });
+};
+
+// "+91 9876543210" -> "98••••10"; keeps first 2 + last 2 of the 10-digit number.
+const maskPhone = (raw) => {
+  const d = String(raw || '').replace(/\D/g, '').slice(-10);
+  if (d.length < 6) return d ? '••' : '';
+  return `${d.slice(0, 2)}••••${d.slice(-2)}`;
 };
 
 // ==========================================
@@ -582,14 +590,46 @@ export const orderController = {
     try {
       const order = await Order.findOne({ orderId: req.params.id });
       if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
-      // If a customer token was supplied, only let them see their own order.
-      if (req.customer && order.customerId !== req.customer.customerId) {
+
+      // Ownership: a customer token may only read its own order.
+      let isOwner = false;
+      if (req.customer) {
         const phone10 = String(req.customer.phone || '').replace(/\D/g, '').slice(-10);
-        if (!phone10 || !String(order.customerPhone || '').endsWith(phone10)) {
-          return res.status(403).json({ success: false, message: 'Not your order' });
-        }
+        isOwner = order.customerId === req.customer.customerId
+          || (!!phone10 && String(order.customerPhone || '').endsWith(phone10));
+        if (!isOwner) return res.status(403).json({ success: false, message: 'Not your order' });
       }
-      res.json({ success: true, order });
+
+      const view = order.toObject();
+
+      // The rider verifies against the customer's OTP — only the authenticated
+      // owner sees it, and only once the order is actually out for delivery.
+      const REVEAL = ['Out For Delivery', 'Arrived'];
+      if (!(isOwner && REVEAL.includes(order.status))) delete view.deliveryOtp;
+      if (!isOwner) view.customerPhone = maskPhone(order.customerPhone);
+
+      // Rider tracking block for the customer map — masked until the reveal window.
+      if (order.deliveryPartnerUserId && !['Delivered', 'Cancelled', 'Returned', 'Refunded'].includes(order.status)) {
+        const partner = await DeliveryPartner.findOne({ userId: order.deliveryPartnerUserId }).lean();
+        const revealed = REVEAL.includes(order.status);
+        const rawPhone = partner?.phone || order.deliveryPartnerPhone || '';
+        view.delivery = {
+          partnerName: String(order.deliveryPartnerName || 'Delivery partner').split(' ')[0],
+          phoneMasked: maskPhone(rawPhone),
+          phone: revealed ? rawPhone : null,
+          canContact: revealed && !!rawPhone,
+          revealed,
+          vehicleType: partner?.vehicleType || null,
+          rating: partner?.rating ?? null,
+          location: revealed && partner?.currentLocation?.coordinates
+            ? { lat: partner.currentLocation.coordinates[1], lng: partner.currentLocation.coordinates[0] }
+            : null,
+          locationUpdatedAt: revealed ? partner?.locationUpdatedAt || null : null,
+        };
+      }
+      view.pickup = view.pickup || null;
+
+      res.json({ success: true, order: view });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
     }
@@ -690,6 +730,87 @@ export const orderController = {
     } catch (err) {
       console.warn('createOrder fallback note:', err.message);
       res.status(201).json({ success: true, order: { orderId: 'PNNHJHTYP' + Date.now(), status: 'In Transit' } });
+    }
+  },
+
+  // POST /api/orders/:id/cancel  { reason, phone? }  (attachCustomerOptional)
+  // Customer self-service cancel — identity from the app's customer token, or
+  // from a { phone } in the body for the token-less web storefront. Allowed
+  // only before the order leaves the store; a prepaid order is refunded to
+  // the wallet.
+  cancelOrder: async (req, res) => {
+    try {
+      const order = await Order.findOne({ orderId: req.params.id });
+      if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+      let cust = req.customer;
+      if (!cust) {
+        const raw = String(req.body.phone || '').replace(/\D/g, '').slice(-10);
+        if (raw) cust = await Customer.findOne({ phone: new RegExp(raw + '$') });
+      }
+      if (!cust) {
+        return res.status(401).json({ success: false, message: 'Sign in to cancel this order' });
+      }
+      const phone10 = String(cust.phone || '').replace(/\D/g, '').slice(-10);
+      const owns = order.customerId === cust.customerId
+        || (phone10 && String(order.customerPhone || '').endsWith(phone10));
+      if (!owns) return res.status(403).json({ success: false, message: 'Not your order' });
+
+      if (order.status === 'Cancelled') {
+        return res.status(409).json({ success: false, message: 'Order is already cancelled' });
+      }
+      const CANCELLABLE = ['Pending', 'In Transit', 'Accepted', 'Packed', 'Ready'];
+      if (!CANCELLABLE.includes(order.status)) {
+        return res.status(409).json({
+          success: false,
+          message: `An order that is ${order.status.toLowerCase()} can no longer be cancelled`,
+        });
+      }
+
+      const reason = String(req.body.reason || '').trim().slice(0, 300) || 'Cancelled by customer';
+      order.status = 'Cancelled';
+      order.failureReason = reason;
+      order.trackingTimeline.push({ status: 'Cancelled', note: reason });
+
+      // Release any rider that was already offered/assigned this order.
+      await cancelForOrder(order.orderId, 'order cancelled').catch(() => {});
+      order.deliveryPartnerUserId = undefined;
+      order.assignmentId = undefined;
+
+      // Refund a prepaid (non-COD) order to the wallet.
+      let walletBalance;
+      const isCod = /cod|cash/i.test(order.paymentMethod || '');
+      const refunded = order.paymentStatus === 'Paid' && Number(order.totalAmount) > 0 && !isCod;
+      if (refunded) {
+        const amt = Number(order.totalAmount);
+        cust.walletBalance = (cust.walletBalance || 0) + amt;
+        await cust.save();
+        walletBalance = cust.walletBalance;
+        order.paymentStatus = 'Refunded';
+        await WalletTransaction.create({
+          customerId: cust.customerId,
+          amount: amt,
+          type: 'Credit',
+          description: `Refund for cancelled order ${order.orderId}`,
+        });
+      }
+
+      await order.save();
+
+      const io = req.app.get('io');
+      if (io) {
+        io.to(order.orderId).emit('order_status_update', {
+          orderId: order.orderId,
+          status: 'Cancelled',
+          note: reason,
+          timeline: order.trackingTimeline,
+          at: new Date().toISOString(),
+        });
+      }
+
+      res.json({ success: true, order, refunded, walletBalance });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
     }
   },
 
@@ -1192,6 +1313,24 @@ export const customerController = {
         description: req.body.orderId ? `Payment for order ${req.body.orderId}` : 'Order payment',
       });
       res.json({ success: true, walletBalance: customer.walletBalance });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // GET /api/customers/me/wallet/transactions?limit=  (protectCustomer)
+  // The signed-in customer's own wallet ledger, newest first.
+  walletTransactions: async (req, res) => {
+    try {
+      const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
+      const list = await WalletTransaction.find({ customerId: req.customer.customerId })
+        .sort({ date: -1 })
+        .limit(limit);
+      res.json({
+        success: true,
+        walletBalance: req.customer.walletBalance || 0,
+        transactions: list,
+      });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
     }

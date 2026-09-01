@@ -20,7 +20,7 @@ All reflected below.
 | Area | Verdict | One-liner |
 |---|---|---|
 | Browse → cart → pay → track | ✓ | Native, real API, all states, 100 widget/unit tests. |
-| Auth (phone → OTP → JWT) | ✓ | Real. Terms/Privacy still plain text (🐛 minor). |
+| Auth (phone → OTP → JWT) | ✓ | Real. Terms/Privacy now tappable links → bundled `/legal` screen. |
 | Address CRUD | ✓ | Real `POST` / `DELETE /customers/me/addresses`. No edit / set-default endpoint (backend gap, parity with web). |
 | Profile edit | ✓ | `ProfileEditScreen` → `PUT /customers/me/profile`. |
 | Wallet | ⚠ | Real balance + referral code. No transaction history / top-up — **no backend route** (web's wallet drawer is a hardcoded `₹0` stub, so mobile is ahead). |
@@ -56,7 +56,7 @@ Mobile routes: `/splash /onboarding /login /otp /location_select` · tabs
 | `/offers` | — (coupons only inside Cart) | ✗ | No offers / coupon browse page. |
 | `/blog`, `/blog/:id` | — | ✗ | `GET /api/blogs` unused. |
 | `/about` | — | ✗ | Not built. |
-| `/legal`, `/s/terms-of-service`, `/s/privacy-policy` | — | 🐛 | Login shows "Terms of Service and Privacy Policy" as **plain text — no link, no screen**. |
+| `/legal`, `/s/terms-of-service`, `/s/privacy-policy` | — | ✓ | Login "Terms of Service" / "Privacy Policy" are tappable spans → `/legal?tab=terms|privacy` (`LegalScreen`, bundled copy mirroring web `Legal.tsx`). |
 | `/help`, `/support` | `SupportScreen` | ⚠ | Socket chat only; no FAQ / help-centre content, no ticket history. |
 | `/careers` | — | ✗ | Not built (low priority). |
 | `/stores` | `StoresScreen` | ⚠ | Hardcoded 3 stores on **both** platforms (no endpoint). Mobile adds Call / Directions. |
@@ -99,7 +99,7 @@ Mobile routes: `/splash /onboarding /login /otp /location_select` · tabs
 | Token secured; Bearer on requests; 401 → logout → `/login` | ✓ | `TokenStore` + Dio interceptor. |
 | Splash routes on real hydrated state | ✓ | |
 | Logout clears token + cart / wishlist / recent-search caches | ✓ | Best-effort. |
-| "Continue = agree to Terms/Privacy" | 🐛 | Plain text; no legal screen (§1). |
+| "Continue = agree to Terms/Privacy" | ✓ | Tappable links → bundled `/legal` screen. |
 | Rate-limit / lockout messaging | ⚠ | Backend enforces; mobile shows the generic error string, no "try again in Ns". |
 | Account deletion | ✗ | Web has it (`DELETE /customers/:id`, open route). Mobile has no UI. |
 | Biometric app-lock | ✗ | Not present. |
@@ -431,7 +431,7 @@ createRazorpayOrder, verifyPayment, walletDebit, fetchMyOrders, fetchOrder`.
 | `go_router` deep-link parsing (product / order / tracking) | ✗ | Routes are internal-only. |
 | Web SEO URLs (`/prn/:slug/prid/:id`, `/s/privacy-policy`) → mobile | ✗ | No equivalents. |
 | Notification payload → screen routing | ✗ | No push. |
-| Share product / order (`share_plus`) | 🐛 | PDP "share" copies a **plain summary string** to the clipboard — no URL, no deep link. `share_plus` not a dependency. |
+| Share product / order (`share_plus`) | ✓ | `share_plus` added; PDP "share" opens the native share sheet with name + price + `https://www.freshcart.com/product/:id`. (Real app-link domain still pending — P2 #12.) |
 | `assetlinks.json` / domain hosting | ✗ | Not set up. |
 
 ---
@@ -448,12 +448,15 @@ createRazorpayOrder, verifyPayment, walletDebit, fetchMyOrders, fetchOrder`.
 
 ---
 
-## 28. Prioritised gap list (for a future fix phase — not started)
+## 28. Prioritised gap list
+
+**Fix log** — Group 1 (Broken functionality) closed 2026-09-01: Legal links + `LegalScreen`, `share_plus` native share on PDP. `flutter test` 103/103, `flutter analyze` clean.
+
 
 ### P0 — user-facing gaps on the core journey
 1. ✗ **Reviews** on PDP (read list + write from a delivered order). **Needs a backend route first** (`GET/POST /products/:id/reviews` — model `Review` exists, only staff moderation is exposed).
 2. ✗ **Order cancel** with reason + wallet refund. **Needs `POST /orders/:id/cancel`** (does not exist).
-3. 🐛 **Legal**: make the login "Terms / Privacy" text real links to a bundled Legal screen.
+3. ✓ **Legal** — DONE (2026-09-01): login "Terms / Privacy" are real links → bundled `LegalScreen` (`/legal?tab=terms|privacy`).
 4. ✗ **Offline resilience**: `connectivity_plus` banner + retry-with-backoff; `GET /api/app/config` for force-update / maintenance.
 
 ### P1 — parity & completeness
@@ -466,7 +469,7 @@ createRazorpayOrder, verifyPayment, walletDebit, fetchMyOrders, fetchOrder`.
 11. ✗ **Content pages**: Offers, Brands, Blog + detail, About, Help-Centre FAQ.
 
 ### P2 — polish & platform
-12. ✗ **Deep links / app links**: `intent-filter` + associated domains + `assetlinks.json`; `share_plus` with real product/order URLs.
+12. ⚠ **Deep links / app links**: `intent-filter` + associated domains + `assetlinks.json` still pending. `share_plus` DONE (2026-09-01) — PDP shares a web product URL; swap to an app-link domain once one exists.
 13. ⚠ **Permissions**: `permission_handler` + rationale + "open settings" for location; iOS `Info.plist` strings.
 14. ✗ **Festival campaign theming** on Home (`GET /festival-campaigns/active`).
 15. ✗ **Analytics + crash reporting** (Firebase Analytics + Crashlytics, or Sentry).

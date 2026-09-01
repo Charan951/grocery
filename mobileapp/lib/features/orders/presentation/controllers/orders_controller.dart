@@ -101,6 +101,29 @@ class OrdersNotifier extends StateNotifier<AsyncValue<List<OrderModel>>> {
     if (orderId.isNotEmpty) _socket.joinOrderRoom(orderId);
     return orderId;
   }
+
+  /// Cancels [orderId] (server enforces the cancellable window + wallet refund).
+  /// Updates the local list on success. Returns `true` when a refund was issued.
+  /// Throws [ApiException] (e.g. 409) when the order can no longer be cancelled.
+  Future<bool> cancelOrder(String orderId, {String? reason}) async {
+    final res = await _api.cancelOrder(orderId, reason: reason);
+    final refunded = res['refunded'] == true;
+    final list = state.asData?.value;
+    if (list != null) {
+      state = AsyncValue.data([
+        for (final o in list)
+          if (o.id == orderId)
+            o.copyWith(
+              status: OrderStatus.cancelled,
+              statusRaw: 'Cancelled',
+              paymentStatus: refunded ? 'Refunded' : o.paymentStatus,
+            )
+          else
+            o,
+      ]);
+    }
+    return refunded;
+  }
 }
 
 final ordersProvider =

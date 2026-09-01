@@ -935,13 +935,26 @@ existing timeline. No fake data anywhere.
 - Verified: backend `npm test` 30 green (+1 perf/deliveries/404); frontend
   `tsc -b && vite build` clean (leaflet CSS bundled).
 
-**P1-D3 · Customer live rider tracking (web + polish mobile)**
-- Web `CustomerOrders.tsx` / `/track/:orderId`: socket room + Leaflet + rider
-  marker (reveal window) + ETA + Call/WhatsApp + polling fallback. Mobile
-  `tracking_screen`: swap schematic painter for a real map, wire Call/WhatsApp,
-  tidy dev copy.
-- `GET /api/orders/:id` returns partner display block (masked) when in window.
-- Tests: reveal-window gating, marker only in window, links.
+**P1-D3 · Customer live rider tracking (web + polish mobile)** — ✅ DONE 2026-09-01
+- Backend `orderController.getOrder`: ownership check refactored (owner flag);
+  adds a `delivery` block for non-terminal assigned orders — `partnerName`
+  (first name), `phoneMasked` always, real `phone` + `canContact` + `location`
+  + `locationUpdatedAt` only in the reveal window (status ∈ {Out For Delivery,
+  Arrived}); `deliveryOtp` stripped for everyone except the authenticated owner
+  in that window; `customerPhone` masked for non-owners. New `maskPhone` helper.
+- Web: `frontend/src/pages/TrackOrder.tsx` at `/track/:orderId` (lazy — leaflet
+  split into its own chunk), imperative Leaflet rider + destination markers,
+  progress stepper, haversine ETA, Call/WhatsApp (only when `canContact`),
+  **polls `GET /api/orders/:id` every 10s**. "Track live" button on in-transit
+  cards in `CustomerOrders.tsx`.
+- Mobile: `TrackingState` +`riderPhoneMasked`/`canContact`; `_refreshFromApi`
+  consumes the new `delivery` block (name / masked+real phone / initial rider
+  location); `tracking_screen` gates Call on `canContact`, adds WhatsApp, shows
+  the masked number + "contact opens when out for delivery" otherwise, dev copy
+  tidied. Schematic map painter kept (real tile-map swap deferred — `mapcn`
+  package risk, out of scope for polish).
+- Verified: backend `npm test` 31 green (+1 reveal-window gating); frontend
+  `vite build` clean; mobile `flutter analyze` clean + `flutter test` 103 green.
 
 **P1-D4 · Push for offers (FCM)**
 - Shared with customer-app **P1-3**: `DeviceToken` register endpoints,

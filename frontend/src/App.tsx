@@ -19,6 +19,7 @@ import { Locations } from './pages/Locations';
 import { Stores } from './pages/Stores';
 import { Legal } from './pages/Legal';
 import { CustomerOrders } from './pages/CustomerOrders';
+const TrackOrder = lazy(() => import('./pages/TrackOrder'));
 import { CustomerProfile } from './pages/CustomerProfile';
 import { CustomerSupport } from './pages/CustomerSupport';
 import { CustomerAddresses } from './pages/CustomerAddresses';
@@ -170,6 +171,7 @@ const AppContent: React.FC = () => {
           <Route path="/legal" element={<Legal />} />
           <Route path="/orders" element={<CustomerOrders />} />
           <Route path="/account/orders" element={<CustomerOrders />} />
+          <Route path="/track/:orderId" element={<Suspense fallback={<div className="min-h-screen flex items-center justify-center text-gray-400 text-sm font-semibold">Loading tracker…</div>}><TrackOrder /></Suspense>} />
           <Route path="/profile" element={<CustomerProfile />} />
           <Route path="/account/profile" element={<CustomerProfile />} />
           <Route path="/s/terms-of-service" element={<Legal defaultTab="terms" />} />

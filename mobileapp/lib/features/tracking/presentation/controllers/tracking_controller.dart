@@ -14,7 +14,9 @@ class TrackingState {
   final int etaMinutes;
   final LatLng riderLocation;
   final String riderName;
-  final String riderPhone;
+  final String riderPhone;       // dialable number, only once the reveal window opens
+  final String riderPhoneMasked; // e.g. "98••••10" — always safe to show
+  final bool canContact;         // reveal window (Out For Delivery / Arrived) + a real number
   final bool hasRider;
   final bool connected;
   final List<OrderTimelineEntry> timeline;
@@ -27,6 +29,8 @@ class TrackingState {
     required this.riderLocation,
     required this.riderName,
     required this.riderPhone,
+    this.riderPhoneMasked = '',
+    this.canContact = false,
     this.hasRider = false,
     this.connected = false,
     this.timeline = const [],
@@ -39,6 +43,8 @@ class TrackingState {
     LatLng? riderLocation,
     String? riderName,
     String? riderPhone,
+    String? riderPhoneMasked,
+    bool? canContact,
     bool? hasRider,
     bool? connected,
     List<OrderTimelineEntry>? timeline,
@@ -51,6 +57,8 @@ class TrackingState {
       riderLocation: riderLocation ?? this.riderLocation,
       riderName: riderName ?? this.riderName,
       riderPhone: riderPhone ?? this.riderPhone,
+      riderPhoneMasked: riderPhoneMasked ?? this.riderPhoneMasked,
+      canContact: canContact ?? this.canContact,
       hasRider: hasRider ?? this.hasRider,
       connected: connected ?? this.connected,
       timeline: timeline ?? this.timeline,
@@ -130,6 +138,25 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
         etaMinutes: _minsFrom(o.eta) ?? state.etaMinutes,
         timeline: o.timeline.isNotEmpty ? o.timeline : state.timeline,
       );
+
+      // Server-side rider block (masked until Out For Delivery / Arrived).
+      final d = raw['delivery'];
+      if (d is Map) {
+        final loc = d['location'];
+        final name = (d['partnerName'] as String?)?.trim() ?? '';
+        final real = (d['phone'] as String?)?.trim() ?? '';
+        final masked = (d['phoneMasked'] as String?)?.trim() ?? '';
+        state = state.copyWith(
+          riderName: name.isNotEmpty ? name : state.riderName,
+          riderPhone: real.isNotEmpty ? real : state.riderPhone,
+          riderPhoneMasked: masked.isNotEmpty ? masked : state.riderPhoneMasked,
+          canContact: d['canContact'] == true && real.isNotEmpty,
+          hasRider: state.hasRider || loc is Map,
+          riderLocation: (loc is Map && loc['lat'] is num && loc['lng'] is num)
+              ? LatLng((loc['lat'] as num).toDouble(), (loc['lng'] as num).toDouble())
+              : state.riderLocation,
+        );
+      }
     } catch (_) {
       // keep last-known state
     }

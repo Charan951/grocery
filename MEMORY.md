@@ -118,6 +118,42 @@
 
 ## 5. Completed Major Work
 
+- **2026-09-01 — Delivery P1-D3 DONE** (customer live rider tracking, web + mobile).
+  Backend `orderController.getOrder`: owner-flag refactor + a computed `delivery`
+  block on non-terminal assigned orders — `partnerName` (first name only),
+  `phoneMasked` always, real `phone`/`canContact`/`location`/`locationUpdatedAt`
+  **only in the reveal window** (status ∈ {Out For Delivery, Arrived});
+  `deliveryOtp` returned only to the authenticated owner in that window;
+  `customerPhone` masked for non-owners. New module-scope `maskPhone(raw)`
+  (`98••••10`). Web: `frontend/src/pages/TrackOrder.tsx` at `/track/:orderId`
+  (React.lazy → leaflet is its own build chunk, not in the storefront bundle),
+  imperative Leaflet rider+destination markers, progress stepper, haversine ETA
+  (~18 km/h), Call/WhatsApp only when `canContact`, **polls `GET /api/orders/:id`
+  every 10s** (no socket.io-client in web). "Track live" button on in-transit
+  cards in `CustomerOrders.tsx`. Mobile: `TrackingState` +`riderPhoneMasked`
+  /`canContact`; `_refreshFromApi` now reads the `delivery` block (name, masked
+  vs real phone, seed rider location); `tracking_screen` gates Call on
+  `canContact`, adds a WhatsApp button, shows masked + "contact opens when out
+  for delivery" otherwise, tidied dev copy; **schematic map painter kept** (real
+  tile-map swap deferred — `mapcn` risk). Verified: backend `npm test` **31
+  tests**, frontend `vite build` clean, mobile `flutter analyze` clean +
+  `flutter test` **103**.
+  Next: **P1-D4** — FCM push for delivery offers (shared with mobile P1-3).
+
+- **2026-09-01 — Mobile audit fix Group 1 (Broken functionality) DONE.**
+  (a) Legal: login "Terms of Service" / "Privacy Policy" are now tappable
+  `Text.rich` spans (`_TermsLine` in `login_screen.dart`, `TapGestureRecognizer`)
+  → `/legal?tab=terms|privacy`. New `LegalScreen`
+  (`lib/features/legal/presentation/screens/legal_screen.dart`, `SegmentedButton`
+  tabs) + bundled copy `lib/features/legal/legal_content.dart` (`kTermsDoc`,
+  `kPrivacyDoc`, `kLegalPreamble` — mirrors web `frontend/src/pages/Legal.tsx`).
+  Route `/legal` added to `app_router.dart` + `_publicRoutes`.
+  (b) Share: added `share_plus: ^7.2.2`; PDP `_share()` now opens the native
+  share sheet (name + ₹price + `https://www.freshcart.com/product/:id`) instead
+  of clipboard copy. Real app-link domain still pending (audit P2 #12).
+  Tests: `flutter test` 103/103 (new `test/legal_screen_test.dart` + a
+  consent-line test in `auth_flow_widget_test.dart`); `flutter analyze` clean.
+
 - **2026-09-01 — Delivery P1-D2 DONE** (admin live fleet map + partner detail).
   Backend `adminDeliveryController`: `GET /api/admin/delivery/partners/:userId/
   deliveries?status=&limit=` (partner's orders, safe projection) and
@@ -932,15 +968,16 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
 
 ## 12. Testing Status
 
-- **Backend: `npm test` → 30 tests, all green**
+- **Backend: `npm test` → 31 tests, all green**
   (`node:test` + `supertest` against `MONGO_URI`). Covers auth/OTP, protectCustomer,
   coupon validate, order placement + `/orders/mine` + ownership, status timeline,
   payment test-mode, delivery partner lifecycle + admin assign/reassign/unassign +
   partner password-reset/activate-deactivate.
-- **Mobile: `flutter test` → 100 tests, all green** — `auth_flow_test`,
+- **Mobile: `flutter test` → 103 tests, all green** — `auth_flow_test`,
   `catalog_models_test`, `pricing_test`, `design_flat_test`, `order_model_test`,
   `foundation_widgets_test` (7), `navigation_test` (5 — nested/back nav),
-  `auth_flow_widget_test` (9 — PhoneField/OtpField + login→OTP→success flow).
+  `auth_flow_widget_test` (10 — PhoneField/OtpField + login→OTP→success flow +
+  Terms/Privacy consent line), `legal_screen_test` (2 — tab default + `?tab=`).
   `flutter analyze` clean. `flutter build apk --debug` succeeds (incl. with
   `--dart-define-from-file=env/staging.json`).
 - **Delivery app: `deliveryapp/` — `flutter analyze` clean, `flutter test` → 5
@@ -987,6 +1024,10 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
 - Frontend: no automated tests; admin `fetchReviews` change not yet run in a browser.
 
 ## 13. Last Updated
+
+2026-09-01 — Delivery P1-D3: customer live rider tracking. Backend getOrder adds a masked `delivery` block (real phone/location only in the Out For Delivery/Arrived reveal window; OTP owner-only). Web /track/:orderId (lazy Leaflet, 10s poll, Call/WhatsApp) + "Track live" on in-transit orders. Mobile tracking_screen consumes the block, gates Call on canContact, adds WhatsApp. Backend 31 tests, mobile 103 tests, builds clean. Next: P1-D4 FCM offer push.
+
+2026-09-01 — Mobile audit fix Group 1 (Broken functionality): login Terms/Privacy now real links → new bundled LegalScreen (/legal?tab=terms|privacy) + legal_content.dart mirroring web Legal.tsx; PDP share uses share_plus native sheet (added dep) instead of clipboard. flutter test 103/103, analyze clean. Next: Group 2 (reviews, order cancel, wallet transactions — need surgical backend routes on existing Review/Order/WalletTransaction models, wired to web + mobile).
 
 2026-09-01 — Delivery P1-D2: admin live fleet map (imperative Leaflet, polls GET /admin/delivery/fleet every 10s) + PartnerDetail page at /admin/delivery/:userId; backend GET /admin/delivery/partners/:userId/deliveries|performance. Backend 30 tests green, frontend build clean. Next: P1-D3 customer live tracking.
 

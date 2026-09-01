@@ -68,6 +68,10 @@ const bucketOf = (raw?: string): StatusBucket => {
   return 'In Transit';
 };
 
+/** Statuses at which a customer may still cancel (before the order leaves the store). */
+const CANCELLABLE_STATUSES = ['pending', 'in transit', 'accepted', 'packed', 'ready'];
+const canCancelOrder = (raw?: string) => CANCELLABLE_STATUSES.includes((raw || '').toLowerCase());
+
 
 export const CustomerOrders: React.FC = () => {
   const customerUser = (() => {
@@ -84,6 +88,7 @@ export const CustomerOrders: React.FC = () => {
   });
   const [selectedOrder, setSelectedOrder] = useState<MockOrder | null>(null);
   const [copied, setCopied] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   // Only show the loading skeleton on a genuine first fetch (no cached
   // orders to render yet) — avoids a jarring "No orders found" flash
   // before the real orders arrive for a customer opening this on a new device.
@@ -120,6 +125,43 @@ export const CustomerOrders: React.FC = () => {
     navigator.clipboard.writeText(id);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCancelOrder = async (order: MockOrder) => {
+    const id = (order as any).orderId || order.orderNumber || order.id;
+    if (!id || cancelling) return;
+    if (!window.confirm(
+      'Cancel this order? If you paid online, the amount is refunded to your FreshCart wallet.'
+    )) return;
+    setCancelling(true);
+    try {
+      const phone = customerUser?.phone ? customerUser.phone.replace(/\D/g, '').slice(-10) : '';
+      const res = await fetch(`/api/orders/${encodeURIComponent(id)}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, reason: 'Cancelled by customer' }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        alert(data?.message || 'Could not cancel this order.');
+        return;
+      }
+      const patch = (o: MockOrder) =>
+        ((o as any).orderId || o.orderNumber || o.id) === id
+          ? { ...o, status: 'Cancelled', paymentStatus: data.refunded ? 'Refunded' : (o as any).paymentStatus }
+          : o;
+      const updated = orders.map(patch);
+      setOrders(updated);
+      localStorage.setItem(`customer_orders_${userPhoneKey}`, JSON.stringify(updated));
+      setSelectedOrder({ ...order, status: 'Cancelled' });
+      alert(data.refunded
+        ? 'Order cancelled — refund added to your FreshCart wallet.'
+        : 'Order cancelled.');
+    } catch {
+      alert('Could not cancel this order. Please try again.');
+    } finally {
+      setCancelling(false);
+    }
   };
 
   const handleReorder = (order: MockOrder) => {
@@ -412,6 +454,22 @@ export const CustomerOrders: React.FC = () => {
               <span className="font-semibold text-gray-900">{selectedOrder.orderArrivedAt}</span>
             </div>
           )}
+
+          {canCancelOrder(selectedOrder.status) && (
+            <div className="pt-2">
+              <button
+                type="button"
+                disabled={cancelling}
+                onClick={() => handleCancelOrder(selectedOrder)}
+                className="border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-60 px-5 py-2.5 rounded-xl text-xs font-extrabold transition-colors cursor-pointer shadow-2xs"
+              >
+                {cancelling ? 'Cancelling…' : 'Cancel Order'}
+              </button>
+              <p className="text-[11px] text-gray-400 font-medium mt-1.5">
+                You can cancel until the order leaves our store. Online payments are refunded to your wallet.
+              </p>
+            </div>
+          )}
         </div>
 
       </motion.div>
@@ -533,9 +591,18 @@ export const CustomerOrders: React.FC = () => {
 
                   {/* Status Badge */}
                   {bucketOf(order.status) === 'In Transit' ? (
-                    <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-1 rounded-full text-xs font-black flex items-center gap-1.5 animate-pulse">
-                      <Zap size={14} className="fill-emerald-600 text-emerald-600" />
-                      <span>Arriving in {order.estimatedDelivery}</span>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        to={`/track/${encodeURIComponent((order as any).orderId || order.id || order.orderNumber)}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="bg-[#2E7D32] text-white px-3 py-1 rounded-full text-xs font-black hover:bg-[#256628]"
+                      >
+                        Track live
+                      </Link>
+                      <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-1 rounded-full text-xs font-black flex items-center gap-1.5 animate-pulse">
+                        <Zap size={14} className="fill-emerald-600 text-emerald-600" />
+                        <span>Arriving in {order.estimatedDelivery}</span>
+                      </div>
                     </div>
                   ) : bucketOf(order.status) === 'Delivered' ? (
                     <div className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-extrabold flex items-center gap-1.5">

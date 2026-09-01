@@ -163,6 +163,7 @@ router.get('/orders/mine', protectCustomer, orderController.getMyOrders); // sig
 router.get('/orders/customer/:phone', orderController.getCustomerOrders);
 router.get('/orders/:id', attachCustomerOptional, orderController.getOrder);
 router.post('/orders', attachCustomerOptional, orderController.createOrder); // client app placements; uses customer token when present
+router.post('/orders/:id/cancel', attachCustomerOptional, orderController.cancelOrder); // customer self-service cancel (token OR body {phone}); wallet refund if prepaid
 router.put('/orders/:id/status', protect, authorize('Admin', 'Manager', 'Delivery'), orderController.updateStatus);
 router.post('/orders/:id/rider-location', protect, authorize('Admin', 'Manager', 'Delivery'), orderController.updateRiderLocation);
 
@@ -206,6 +207,7 @@ router.put('/customers/me/profile', protectCustomer, asMe, customerController.up
 router.post('/customers/me/addresses', protectCustomer, asMe, customerController.addAddress);
 router.delete('/customers/me/addresses/:addressId', protectCustomer, asMe, customerController.deleteAddress);
 router.post('/customers/me/wallet/debit', protectCustomer, customerController.walletDebit);
+router.get('/customers/me/wallet/transactions', protectCustomer, customerController.walletTransactions);
 
 // Legacy phone-keyed customer auth — still used by the web storefront (no token).
 // TODO: migrate web to the OTP flow above, then lock down the :id routes below.

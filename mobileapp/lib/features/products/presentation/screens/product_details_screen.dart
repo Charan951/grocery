@@ -1,6 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
@@ -59,9 +59,12 @@ class _ProductDetailsViewState extends ConsumerState<_ProductDetailsView> {
   late String _weight = _p.defaultWeight;
 
   void _share() {
-    final text = '${_p.name} on FreshCart — ₹${_p.price.toStringAsFixed(0)}';
-    Clipboard.setData(ClipboardData(text: text));
-    AppToast.success('Link copied');
+    // No public deep-link domain yet — share a descriptive line + the web URL.
+    final url = 'https://www.freshcart.com/product/${_p.id}';
+    Share.share(
+      '${_p.name} — ₹${_p.price.toStringAsFixed(0)} on FreshCart\n$url',
+      subject: _p.name,
+    );
   }
 
   @override

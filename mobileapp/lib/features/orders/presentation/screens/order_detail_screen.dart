@@ -4,8 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
 import 'package:freshcart/core/constants/app_radius.dart';
+import 'package:freshcart/core/error/api_exception.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
+import 'package:freshcart/core/widgets/app_modal.dart';
 import 'package:freshcart/core/widgets/app_scaffold.dart';
+import 'package:freshcart/core/widgets/app_toast.dart';
 import 'package:freshcart/core/widgets/buttons.dart';
 import 'package:freshcart/core/widgets/feedback_states.dart';
 import 'package:freshcart/core/widgets/glass_card.dart';
@@ -139,12 +142,22 @@ class OrderDetailScreen extends ConsumerWidget {
                     context.push('/cart');
                   },
                 ),
+              if (_canCancel(order.status)) ...[
+                const SizedBox(height: 12),
+                _CancelOrderButton(
+                  orderId: order.id,
+                  onCancelled: () => ref.invalidate(orderDetailProvider(orderId)),
+                ),
+              ],
             ],
           ),
         ),
       ),
     );
   }
+
+  static bool _canCancel(OrderStatus s) =>
+      s == OrderStatus.placed || s == OrderStatus.processing;
 
   Widget _title(String t, bool isDark) => Text(t, style: AppTypography.title(
         isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
@@ -254,6 +267,65 @@ class _Timeline extends StatelessWidget {
               ],
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _CancelOrderButton extends ConsumerStatefulWidget {
+  final String orderId;
+  final VoidCallback onCancelled;
+  const _CancelOrderButton({required this.orderId, required this.onCancelled});
+
+  @override
+  ConsumerState<_CancelOrderButton> createState() => _CancelOrderButtonState();
+}
+
+class _CancelOrderButtonState extends ConsumerState<_CancelOrderButton> {
+  bool _busy = false;
+
+  Future<void> _run() async {
+    final ok = await AppModal.confirm(
+      context,
+      title: 'Cancel this order?',
+      message: 'If you paid online, the amount is refunded to your FreshCart wallet.',
+      confirmLabel: 'Yes, cancel order',
+      cancelLabel: 'Keep order',
+      destructive: true,
+      icon: Icons.cancel_outlined,
+    );
+    if (!ok || _busy) return;
+    setState(() => _busy = true);
+    try {
+      final refunded = await ref
+          .read(ordersProvider.notifier)
+          .cancelOrder(widget.orderId, reason: 'Cancelled by customer');
+      if (!mounted) return;
+      AppToast.success(refunded
+          ? 'Order cancelled · refund added to your wallet'
+          : 'Order cancelled');
+      widget.onCancelled();
+    } on ApiException catch (e) {
+      if (mounted) AppToast.error(e.message);
+    } catch (_) {
+      if (mounted) AppToast.error('Could not cancel the order. Please try again.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton.icon(
+      onPressed: _busy ? null : _run,
+      icon: _busy
+          ? const SizedBox(
+              width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+          : const Icon(Icons.cancel_outlined, size: 18),
+      label: Text(_busy ? 'Cancelling…' : 'Cancel order'),
+      style: TextButton.styleFrom(
+        foregroundColor: AppColors.error,
+        minimumSize: const Size.fromHeight(44),
       ),
     );
   }

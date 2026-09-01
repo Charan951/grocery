@@ -314,4 +314,33 @@ class ApiService {
       throw ApiException.fromDio(e);
     }
   }
+
+  /// `POST /api/orders/:id/cancel` — customer self-service cancel. A prepaid
+  /// order is refunded to the wallet server-side. Returns the updated order +
+  /// `{ refunded, walletBalance }`. Throws 409 when the order is past the
+  /// cancellable window.
+  Future<Map<String, dynamic>> cancelOrder(String orderId, {String? reason}) async {
+    try {
+      final res = await _dio.post(
+        '/orders/${Uri.encodeComponent(orderId)}/cancel',
+        data: {if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim()},
+      );
+      return Map<String, dynamic>.from(res.data as Map);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  /// `GET /api/customers/me/wallet/transactions` → `{ walletBalance, transactions[] }`.
+  Future<Map<String, dynamic>> fetchWalletTransactions({int limit = 50}) async {
+    try {
+      final res = await _dio.get(
+        '/customers/me/wallet/transactions',
+        queryParameters: {'limit': limit},
+      );
+      return Map<String, dynamic>.from(res.data as Map);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
 }

@@ -66,6 +66,15 @@ class _Api extends ApiService {
   @override
   Future<Map<String, dynamic>> fetchOrder(String id) async =>
       orders.firstWhere((o) => o['orderId'] == id, orElse: () => _orderJson(id: id, status: 'Delivered'));
+
+  String? cancelledId;
+  String? cancelReason;
+  @override
+  Future<Map<String, dynamic>> cancelOrder(String id, {String? reason}) async {
+    cancelledId = id;
+    cancelReason = reason;
+    return {'success': true, 'refunded': true, 'walletBalance': 270};
+  }
 }
 
 Widget _host(Widget home, {required _Api api, List<Override> extra = const []}) => ProviderScope(

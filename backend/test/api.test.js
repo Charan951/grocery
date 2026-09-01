@@ -154,6 +154,61 @@ test('status update appends a trackingTimeline entry (no throw)', async () => {
   assert.equal(upd.body.order.trackingTimeline.at(-1).status, 'Packed');
 });
 
+test('customer can cancel a pre-dispatch order; a prepaid one refunds to the wallet', async () => {
+  const tokenA = await customerToken(PHONE_A);
+  const tokenB = await customerToken(PHONE_B);
+  await Customer.updateOne({ customerId: `cust_${PHONE_A}` }, { $set: { walletBalance: 0 } });
+
+  const place = await api().post('/api/orders').set('Authorization', `Bearer ${tokenA}`).send({
+    items: [{ productId: 'p_c', name: 'C', quantity: 1, price: 100 }],
+    itemTotal: 100, totalAmount: 150, paymentMethod: 'Razorpay UPI/Card',
+    paymentStatus: 'Paid', status: 'In Transit', deliveryAddress: 'A',
+  });
+  const orderId = place.body.order.orderId;
+
+  // Another customer cannot cancel it.
+  const foreign = await api().post(`/api/orders/${orderId}/cancel`)
+    .set('Authorization', `Bearer ${tokenB}`).send({ reason: 'nope' });
+  assert.equal(foreign.status, 403);
+
+  const cancel = await api().post(`/api/orders/${orderId}/cancel`)
+    .set('Authorization', `Bearer ${tokenA}`).send({ reason: 'Ordered by mistake' });
+  assert.equal(cancel.status, 200);
+  assert.equal(cancel.body.order.status, 'Cancelled');
+  assert.equal(cancel.body.order.paymentStatus, 'Refunded');
+  assert.equal(cancel.body.refunded, true);
+  assert.equal(cancel.body.walletBalance, 150);
+  assert.equal(cancel.body.order.trackingTimeline.at(-1).status, 'Cancelled');
+
+  // Cancelling again is a conflict.
+  const again = await api().post(`/api/orders/${orderId}/cancel`)
+    .set('Authorization', `Bearer ${tokenA}`).send({});
+  assert.equal(again.status, 409);
+
+  // The refund shows up in the wallet ledger.
+  const txns = await api().get('/api/customers/me/wallet/transactions')
+    .set('Authorization', `Bearer ${tokenA}`);
+  assert.equal(txns.status, 200);
+  assert.ok(txns.body.transactions.some((t) => t.type === 'Credit' && t.amount === 150));
+});
+
+test('a dispatched order can no longer be cancelled by the customer', async () => {
+  const sToken = await loginAdmin();
+  const tokenA = await customerToken(PHONE_A);
+  const place = await api().post('/api/orders').set('Authorization', `Bearer ${tokenA}`).send({
+    items: [{ productId: 'p_d', name: 'D', quantity: 1, price: 10 }],
+    itemTotal: 10, totalAmount: 15, paymentMethod: 'COD', paymentStatus: 'Pending',
+    status: 'Pending', deliveryAddress: 'A',
+  });
+  const orderId = place.body.order.orderId;
+  await api().put(`/api/orders/${orderId}/status`)
+    .set('Authorization', `Bearer ${sToken}`).send({ status: 'Out For Delivery' });
+
+  const late = await api().post(`/api/orders/${orderId}/cancel`)
+    .set('Authorization', `Bearer ${tokenA}`).send({ reason: 'too late' });
+  assert.equal(late.status, 409);
+});
+
 test('payment verify runs in test mode', async () => {
   const res = await api().post('/api/payment/verify').send({});
   assert.equal(res.body.verified, true);

@@ -151,6 +151,13 @@ void main() {
       expect(find.text('Enter a valid 10-digit mobile number'), findsOneWidget);
     });
 
+    testWidgets('shows the Terms / Privacy consent line', (tester) async {
+      final n = AuthNotifier(_FakeStorage(), _FakeApi(), _FakeTokenStore());
+      await tester.pumpWidget(_app(n));
+      expect(find.textContaining('Terms of Service'), findsOneWidget);
+      expect(find.textContaining('Privacy Policy'), findsOneWidget);
+    });
+
     testWidgets('valid number requests an OTP and routes to the OTP screen',
         (tester) async {
       final api = _FakeApi();

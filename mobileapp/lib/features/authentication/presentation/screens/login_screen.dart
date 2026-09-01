@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -101,15 +102,36 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             onPressed: _submit,
           ),
           const SizedBox(height: 12),
-          Text(
-            'By continuing you agree to our Terms of Service and Privacy Policy.',
-            textAlign: TextAlign.center,
-            style: AppTypography.labelSmall(
-              isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-            ).copyWith(fontWeight: FontWeight.w400, height: 1.4),
-          ),
+          _TermsLine(isDark: isDark),
         ],
       ),
+    );
+  }
+}
+
+class _TermsLine extends StatelessWidget {
+  final bool isDark;
+  const _TermsLine({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final sub = isDark ? AppColors.textSecondaryDark : AppColors.textSecondary;
+    final base = AppTypography.labelSmall(sub).copyWith(fontWeight: FontWeight.w400, height: 1.4);
+    final link = base.copyWith(color: AppColors.primaryText, decoration: TextDecoration.underline);
+    TapGestureRecognizer rec(String tab) => TapGestureRecognizer()
+      ..onTap = () => context.push('/legal?tab=$tab');
+    return Text.rich(
+      TextSpan(
+        style: base,
+        children: [
+          const TextSpan(text: 'By continuing you agree to our '),
+          TextSpan(text: 'Terms of Service', style: link, recognizer: rec('terms')),
+          const TextSpan(text: ' and '),
+          TextSpan(text: 'Privacy Policy', style: link, recognizer: rec('privacy')),
+          const TextSpan(text: '.'),
+        ],
+      ),
+      textAlign: TextAlign.center,
     );
   }
 }

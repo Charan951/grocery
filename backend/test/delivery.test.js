@@ -201,6 +201,36 @@ const makeRemoteOrder = () =>
     status: 'Ready', pickup: TP, deliveryLocation: { lat: TP.lat + 0.01, lng: TP.lng + 0.01 },
   });
 
+test('GET /api/orders/:id exposes a masked rider block, revealed only Out For Delivery/Arrived', async () => {
+  await DeliveryPartner.updateOne(
+    { userId: riderUserId },
+    { $set: { phone: '9876500000', currentLocation: { type: 'Point', coordinates: [78.37, 17.44] }, locationUpdatedAt: new Date() } },
+    { upsert: true }
+  );
+  const order = await makeOrder();
+  await Order.updateOne({ orderId: order.orderId }, {
+    $set: { deliveryPartnerUserId: riderUserId, deliveryPartnerName: 'QA Rider Longname', status: 'Assigned', deliveryOtp: '4321' },
+  });
+
+  // before the reveal window
+  let r = await api().get(`/api/orders/${order.orderId}`);
+  assert.equal(r.status, 200);
+  assert.ok(r.body.order.delivery, 'delivery block present');
+  assert.equal(r.body.order.delivery.partnerName, 'QA'); // first name only
+  assert.equal(r.body.order.delivery.revealed, false);
+  assert.equal(r.body.order.delivery.phone, null);
+  assert.equal(r.body.order.delivery.location, null);
+  assert.match(r.body.order.delivery.phoneMasked, /••/);
+  assert.equal(r.body.order.deliveryOtp, undefined); // never to a non-owner
+
+  // in the reveal window
+  await Order.updateOne({ orderId: order.orderId }, { $set: { status: 'Out For Delivery' } });
+  r = await api().get(`/api/orders/${order.orderId}`);
+  assert.equal(r.body.order.delivery.revealed, true);
+  assert.equal(r.body.order.delivery.phone, '9876500000');
+  assert.ok(r.body.order.delivery.location && r.body.order.delivery.location.lat === 17.44);
+});
+
 test('admin partner performance + deliveries endpoints', async () => {
   const aTok = await adminToken();
   const perf = await api().get(`/api/admin/delivery/partners/${riderUserId}/performance`).set('Authorization', `Bearer ${aTok}`);

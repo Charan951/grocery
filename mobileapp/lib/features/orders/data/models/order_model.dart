@@ -191,12 +191,17 @@ class OrderModel {
         'paymentStatus': paymentStatus,
       };
 
-  OrderModel copyWith({OrderStatus? status, String? eta}) {
+  OrderModel copyWith({
+    OrderStatus? status,
+    String? statusRaw,
+    String? eta,
+    String? paymentStatus,
+  }) {
     return OrderModel(
       id: id,
       date: date,
       status: status ?? this.status,
-      statusRaw: statusRaw,
+      statusRaw: statusRaw ?? this.statusRaw,
       items: items,
       subtotal: subtotal,
       deliveryFee: deliveryFee,
@@ -207,7 +212,7 @@ class OrderModel {
       deliveryAddress: deliveryAddress,
       eta: eta ?? this.eta,
       paymentMethod: paymentMethod,
-      paymentStatus: paymentStatus,
+      paymentStatus: paymentStatus ?? this.paymentStatus,
       timeline: timeline,
     );
   }
