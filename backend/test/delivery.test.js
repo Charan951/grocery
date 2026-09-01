@@ -34,6 +34,26 @@ test.before(async () => {
   process.env.OTP_TEST_MODE = 'true';
   process.env.PAYMENTS_TEST_MODE = 'true';
   await mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 10000 });
+
+  // This suite runs against a real shared Mongo (no mongodb-memory-server —
+  // see MEMORY.md), so a prior run interrupted before test.after() (e.g. the
+  // process killed mid-suite) leaves its QA rider fixtures behind, still
+  // isOnline:true near the fixed test coordinates. Those orphans then win the
+  // "nearest partner" query in later runs and make the auto-assign tests
+  // flaky. Purge any stale qa-rider* fixtures before creating this run's own.
+  const staleRiders = await User.find(
+    { email: { $regex: /^qa-rider2?\+\d+@freshcart\.test$/ } },
+    '_id'
+  );
+  if (staleRiders.length) {
+    const staleIds = staleRiders.map((u) => u._id.toString());
+    await Promise.allSettled([
+      DeliveryPartner.deleteMany({ userId: { $in: staleIds } }),
+      Assignment.deleteMany({ partnerUserId: { $in: staleIds } }),
+      User.deleteMany({ _id: { $in: staleIds } }),
+    ]);
+  }
+
   const rider = await User.create({ name: 'QA Rider', email: RIDER_EMAIL, password: 'delivery123', role: 'Delivery', status: 'Active', phone: '9876500000' });
   riderUserId = rider._id.toString();
   const rider2 = await User.create({ name: 'QA Rider2', email: RIDER2_EMAIL, password: 'delivery123', role: 'Delivery', status: 'Active', phone: '9876500001' });
