@@ -5,6 +5,7 @@ import 'package:freshcart_delivery/features/auth/auth_controller.dart';
 import 'package:freshcart_delivery/features/auth/forgot_screen.dart';
 import 'package:freshcart_delivery/features/auth/login_screen.dart';
 import 'package:freshcart_delivery/features/dashboard/dashboard_screen.dart';
+import 'package:freshcart_delivery/features/earnings/earnings_screen.dart';
 import 'package:freshcart_delivery/features/history/history_screen.dart';
 import 'package:freshcart_delivery/features/offer/offer_controller.dart';
 import 'package:freshcart_delivery/features/offer/offer_sheet.dart';
@@ -46,6 +47,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(path: '/', builder: (c, s) => const DashboardScreen()),
           GoRoute(path: '/history', builder: (c, s) => const HistoryScreen()),
+          GoRoute(path: '/earnings', builder: (c, s) => const EarningsScreen()),
           GoRoute(path: '/notifications', builder: (c, s) => const NotificationsScreen()),
           GoRoute(path: '/profile', builder: (c, s) => const ProfileScreen()),
           GoRoute(

@@ -9,6 +9,7 @@ class PartnerProfile {
   final int completedCount, failedCount;
   final double rating;
   final int ratingCount;
+  final double todayEarnings;
 
   PartnerProfile({
     required this.userId,
@@ -23,6 +24,7 @@ class PartnerProfile {
     required this.failedCount,
     required this.rating,
     this.ratingCount = 0,
+    this.todayEarnings = 0,
   });
 
   factory PartnerProfile.fromJson(Map<String, dynamic> j) => PartnerProfile(
@@ -38,6 +40,7 @@ class PartnerProfile {
         failedCount: _i(j['failedCount']),
         rating: j['rating'] == null ? 5 : _d(j['rating']),
         ratingCount: _i(j['ratingCount']),
+        todayEarnings: _d(j['todayEarnings']),
       );
 }
 

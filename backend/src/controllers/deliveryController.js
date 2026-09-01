@@ -3,7 +3,8 @@ import { User } from '../models/User.js';
 import { DeliveryPartner } from '../models/DeliveryPartner.js';
 import { Order } from '../models/Order.js';
 import { Assignment } from '../models/Assignment.js';
-import { Notification } from '../models/Operations.js';
+import { Notification, Settings } from '../models/Operations.js';
+import { DeliveryEarning } from '../models/DeliveryEarning.js';
 import { uploadToCloudinary } from '../config/cloudinary.js';
 import { acceptOffer, rejectOffer } from '../services/assignmentService.js';
 import { registerDeviceToken, removeDeviceToken, sendToOwner } from '../services/pushService.js';
@@ -74,6 +75,33 @@ const notifyCustomer = async (order, title, body) => {
   } catch (_) {}
 };
 
+// Earnings model: base fee + per-km distance fee (+ tips, not yet collectable).
+// Both rates come from Settings so ops can tune payout without a deploy. Written
+// once per order via upsert, so the idempotent `complete` never double-pays.
+const recordEarning = async (order, partnerUserId) => {
+  try {
+    const s = (await Settings.findOne().lean()) || {};
+    const baseFee = Number(s.deliveryBaseFee ?? 20);
+    const perKm = Number(s.deliveryPerKmFee ?? 6);
+
+    let distanceKm = 0;
+    const p = order.pickup;
+    const d = order.deliveryLocation;
+    if (p?.lat != null && p?.lng != null && d?.lat != null && d?.lng != null) {
+      distanceKm = Math.round((metresBetween([p.lng, p.lat], [d.lng, d.lat]) / 1000) * 10) / 10;
+    }
+    const distanceFee = Math.round(distanceKm * perKm);
+    const tips = 0;
+    const total = baseFee + distanceFee + tips;
+
+    await DeliveryEarning.updateOne(
+      { orderId: order.orderId },
+      { $setOnInsert: { partnerUserId, baseFee, distanceKm, distanceFee, tips, total, status: 'pending', earnedAt: new Date() } },
+      { upsert: true }
+    );
+  } catch (_) { /* earnings must never block a completion */ }
+};
+
 const freePartnerFromOrder = async (userId, orderId) => {
   const p = await DeliveryPartner.findOne({ userId });
   if (!p) return;
@@ -111,7 +139,14 @@ export const deliveryController = {
   getMe: async (req, res) => {
     try {
       const { user, partner } = req;
-      const unreadNotifications = await Notification.countDocuments({ userId: String(user._id), read: false });
+      const IST_OFFSET = 5.5 * 3600000;
+      const nowIst = new Date(Date.now() + IST_OFFSET);
+      const istMidnight = new Date(Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate()) - IST_OFFSET);
+      const [unreadNotifications, todayRows] = await Promise.all([
+        Notification.countDocuments({ userId: String(user._id), read: false }),
+        DeliveryEarning.find({ partnerUserId: user._id, earnedAt: { $gte: istMidnight } }).select('total').lean(),
+      ]);
+      const todayEarnings = todayRows.reduce((s, e) => s + (e.total || 0), 0);
       res.json({
         success: true,
         unreadNotifications,
@@ -130,6 +165,7 @@ export const deliveryController = {
           completedCount: partner.completedCount,
           failedCount: partner.failedCount,
           lastSeenAt: partner.lastSeenAt,
+          todayEarnings,
         },
       });
     } catch (err) {
@@ -354,6 +390,7 @@ export const deliveryController = {
         { $set: { status: 'completed', respondedAt: new Date() } }
       );
       await DeliveryPartner.updateOne({ userId: req.user._id }, { $inc: { completedCount: 1 } });
+      await recordEarning(order, req.user._id);
       await freePartnerFromOrder(req.user._id, order.orderId);
 
       emitOrder(req, order, 'Order delivered');
@@ -403,6 +440,48 @@ export const deliveryController = {
       res.json({ success: true, order });
     } catch (e) {
       res.status(500).json({ success: false, message: e.message });
+    }
+  },
+
+  // GET /api/delivery/earnings?range=today|week|month|all
+  getEarnings: async (req, res) => {
+    try {
+      const uid = req.user._id;
+      const range = String(req.query.range || 'week');
+
+      // IST (UTC+5:30) day boundary for "today".
+      const IST_OFFSET = 5.5 * 3600000;
+      const nowIst = new Date(Date.now() + IST_OFFSET);
+      const istMidnight = new Date(Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate()) - IST_OFFSET);
+      let since = null;
+      if (range === 'today') since = istMidnight;
+      else if (range === 'week') since = new Date(Date.now() - 7 * 86400000);
+      else if (range === 'month') since = new Date(Date.now() - 30 * 86400000);
+
+      const q = { partnerUserId: uid };
+      if (since) q.earnedAt = { $gte: since };
+      const items = await DeliveryEarning.find(q).sort({ earnedAt: -1 }).limit(200).lean();
+
+      const sum = (arr, k) => arr.reduce((s, e) => s + (e[k] || 0), 0);
+      const pending = items.filter((e) => e.status === 'pending');
+      const settled = items.filter((e) => e.status === 'settled');
+
+      res.json({
+        success: true,
+        range,
+        summary: {
+          count: items.length,
+          total: sum(items, 'total'),
+          pending: sum(pending, 'total'),
+          settled: sum(settled, 'total'),
+          base: sum(items, 'baseFee'),
+          distance: sum(items, 'distanceFee'),
+          tips: sum(items, 'tips'),
+        },
+        earnings: items,
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
     }
   },
 

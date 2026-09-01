@@ -14,6 +14,7 @@ import { Assignment } from '../src/models/Assignment.js';
 import { tryAssign, rejectOffer } from '../src/services/assignmentService.js';
 import { DeviceToken } from '../src/models/DeviceToken.js';
 import { Notification } from '../src/models/Operations.js';
+import { DeliveryEarning } from '../src/models/DeliveryEarning.js';
 import { sendToOwner } from '../src/services/pushService.js';
 
 dotenv.config();
@@ -75,6 +76,7 @@ test.after(async () => {
     Customer.deleteMany({ phone: new RegExp(`${CUST_PHONE}$`) }),
     Order.deleteMany({ orderId: new RegExp(`^${ORDER_PREFIX}`) }),
     Assignment.deleteMany({ orderId: new RegExp(`^${ORDER_PREFIX}`) }),
+    DeliveryEarning.deleteMany({ orderId: new RegExp(`^${ORDER_PREFIX}`) }),
     DeviceToken.deleteMany({ ownerId: { $in: [riderUserId, rider2UserId] } }),
     Notification.deleteMany({ userId: { $in: [riderUserId, rider2UserId] } }),
   ]);
@@ -471,6 +473,52 @@ test('full lifecycle: pickup-arrived → picked-up → arrived → complete (OTP
   const dp = await DeliveryPartner.findOne({ userId: riderUserId });
   assert.ok(!dp.activeOrderIds.includes(orderId));
   assert.ok(dp.completedCount >= 1);
+});
+
+test('completing a delivery writes one earning row (base + per-km); admin can settle it', async () => {
+  const rTok = await riderToken();
+  const aTok = await adminToken();
+  const orderId = await assignAndAccept(rTok, aTok);
+  const D = (s, b) => api().post(`/api/delivery/orders/${orderId}/${s}`).set('Authorization', `Bearer ${rTok}`).send(b || {});
+  await D('picked-up');
+  await D('arrived');
+  const otp = (await Order.findOne({ orderId })).deliveryOtp;
+  await D('complete', { otp });
+
+  const earnings = await DeliveryEarning.find({ orderId });
+  assert.equal(earnings.length, 1, 'exactly one earning row');
+  const e = earnings[0];
+  assert.equal(e.status, 'pending');
+  assert.ok(e.baseFee >= 0 && e.total === e.baseFee + e.distanceFee + e.tips);
+  assert.equal(String(e.partnerUserId), riderUserId);
+
+  // a repeat completion must not create a second row
+  await D('complete', { otp });
+  assert.equal((await DeliveryEarning.countDocuments({ orderId })), 1);
+
+  // partner sees it in their earnings feed
+  const feed = await api().get('/api/delivery/earnings?range=month').set('Authorization', `Bearer ${rTok}`);
+  assert.equal(feed.status, 200);
+  assert.ok(feed.body.summary.count >= 1);
+  assert.ok(feed.body.summary.total >= e.total);
+
+  // admin earnings view + settle
+  const adminView = await api().get(`/api/admin/delivery/partners/${riderUserId}/earnings`).set('Authorization', `Bearer ${aTok}`);
+  assert.equal(adminView.status, 200);
+  assert.ok(adminView.body.summary.pendingTotal >= e.total);
+
+  const settle = await api().post(`/api/admin/delivery/partners/${riderUserId}/earnings/settle`)
+    .set('Authorization', `Bearer ${aTok}`).send({});
+  assert.equal(settle.status, 200);
+  assert.ok(settle.body.settled >= 1);
+  assert.equal((await DeliveryEarning.findById(e._id)).status, 'settled');
+
+  // a customer token cannot reach the partner earnings feed
+  const cTok = await custToken();
+  assert.ok([401, 403].includes(
+    (await api().get('/api/delivery/earnings').set('Authorization', `Bearer ${cTok}`)).status));
+
+  await DeliveryPartner.updateOne({ userId: riderUserId }, { $set: { activeOrderIds: [] } });
 });
 
 test('wrong OTP three times locks completion', async () => {

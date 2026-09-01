@@ -133,6 +133,24 @@ class ApiClient {
     }
   }
 
+  /// `GET /api/delivery/earnings?range=today|week|month|all`
+  /// → `{ summary{count,total,pending,settled,base,distance,tips}, earnings[] }`
+  Future<({Map<String, num> summary, List<Map<String, dynamic>> items})> earnings(
+      {String range = 'week'}) async {
+    try {
+      final r = await _dio.get('/delivery/earnings', queryParameters: {'range': range});
+      final m = Map<String, dynamic>.from(r.data as Map);
+      final s = Map<String, dynamic>.from((m['summary'] as Map?) ?? const {});
+      final summary = s.map((k, v) => MapEntry(k, (v is num ? v : num.tryParse('$v') ?? 0)));
+      final items = ((m['earnings'] as List?) ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      return (summary: summary, items: items);
+    } on DioException catch (e) {
+      _rethrow(e);
+    }
+  }
+
   Future<DeliveryOrder> order(String orderId) async {
     try {
       final r = await _dio.get('/delivery/orders/${Uri.encodeComponent(orderId)}');

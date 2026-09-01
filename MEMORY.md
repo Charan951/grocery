@@ -34,8 +34,20 @@
 
 ## 2. Architecture
 
-- **Backend**: single `/api` router (`backend/src/routes/api.js`) → `apiController.js`
-  (1525 lines) + `festivalCampaignController.js`. Models in `backend/src/models/`:
+- **Backend**: `/api` router `backend/src/routes/api.js` = offline-fallback
+  middleware + mounts 8 domain route modules (`misc/catalog/order/commerce/
+  customer/ops/payment/delivery.routes.js`). Controllers split by domain
+  (2026-09-01) from the old `apiController.js` mega-file into
+  `authController` (auth+dashboard), `catalogController` (product/category/brand/
+  inventory/specialGroup/banner/promoCard), `orderController`, `customerController`,
+  `reviewController`, `couponController`, `blogController`, `settingsController`,
+  `supportController`, `employeeController`, `auditLogController`,
+  `uploadController`, `paymentController`; shared helpers (`signToken`,
+  `maskPhone`, `isPaymentsTestMode`, `razorpayInstance`, `logAudit`) in
+  `controllers/_shared.js`. **`apiController.js` is now a re-export barrel** so
+  every existing `import { xController } from './apiController.js'` still works.
+  Plus `festivalCampaignController.js`, `adminDeliveryController.js`,
+  `authCustomerController.js`, `deliveryController.js`. Models in `backend/src/models/`:
   `User`/`Role`, `Customer`/`Address`, `Order`, `Catalog` (Category/Brand/Product/
   SpecialGroup/Banner/PromoCard), `Inventory`, `Finance` (Coupon/Offer/Payment/
   WalletTransaction/Invoice), `Operations` (Review/Notification/CMSPage/Blog/
@@ -117,6 +129,44 @@
   `MOBILE_FUNCTIONALITY_AUDIT.md` as relevant) → update `MEMORY.md`.
 
 ## 5. Completed Major Work
+
+- **2026-09-01 — Delivery P2-D1 DONE (delivery-partner earnings).**
+  Model: `DeliveryEarning {partnerUserId, orderId(unique), baseFee, distanceKm,
+  distanceFee, tips, total, status:'pending'|'settled', earnedAt, settledAt}`
+  + indexes `{partnerUserId, earnedAt}` / `{partnerUserId, status}`. Payout model
+  = **base fee + per-km distance fee (+ tips, no input surface yet → always 0)**,
+  both rates read live from `Settings.deliveryBaseFee`/`deliveryPerKmFee` (₹20/₹6
+  defaults). `deliveryController.completeDelivery` → `recordEarning()` (haversine
+  pickup→drop, upsert by `orderId` → idempotent, the repeat-`complete` path never
+  double-pays). New `GET /api/delivery/earnings?range=today|week|month|all` (IST
+  "today") → `{summary{count,total,pending,settled,base,distance,tips},earnings[]}`;
+  `GET /api/delivery/me` also returns `partner.todayEarnings`. Admin:
+  `GET /api/admin/delivery/partners/:userId/earnings`, `POST .../earnings/settle
+  {ids?}` (Admin only; omit ids = all pending; `logAudit`). Delivery app: new
+  `EarningsScreen` `/earnings` (Today/Week/Month segmented, total + breakdown +
+  per-order list), dashboard wallet AppBar icon + "Today ₹" stat;
+  `PartnerProfile.todayEarnings`, `ApiClient.earnings()`. Admin web
+  `PartnerDetail`: "Earnings" card (total tiles + "Settle pending" + per-order
+  table). No customer surface. Tests: backend `npm test` **48** (+1: written once,
+  idempotent, partner feed, admin view + settle, RBAC); deliveryapp analyze clean
+  + 6 tests + debug APK; frontend `vite build` clean.
+  **⚠ Uncommitted:** built on top of the backend-refactor working tree below;
+  the earnings routes are wired in the still-untracked `routes/delivery.routes.js`.
+
+- **2026-09-01 — Backend refactor: split the mega `apiController.js` + `routes/api.js`.**
+  `apiController.js` (2352 lines, 20 controllers) → one file per domain
+  (`authController`, `catalogController`, `orderController`, `customerController`,
+  `reviewController`, `couponController`, `blogController`, `settingsController`,
+  `supportController`, `employeeController`, `auditLogController`,
+  `uploadController`, `paymentController`) + `controllers/_shared.js`
+  (`signToken`, `maskPhone`, `isPaymentsTestMode`, `razorpayInstance`,
+  `RAZORPAY_KEY_*`, `logAudit`). `apiController.js` kept as a **barrel**
+  re-exporting all of them — zero changes in importers. `routes/api.js` → the
+  offline-fallback middleware + `router.use()` of 8 domain route modules under
+  `routes/` (`misc, catalog, order, commerce, customer, ops, payment,
+  delivery`). Route order preserved. Behaviour byte-identical (files built by
+  `sed` line-range extraction, not retyped). Verified: `npm test` 47/47,
+  `app.js` loads clean.
 
 - **2026-09-01 — Delivery P2-D3 DONE (fleet performance analytics UI).**
   Backend: `DeliveryPartner.distanceTravelledM` odometer — `updateLocation`

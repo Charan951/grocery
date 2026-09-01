@@ -81,6 +81,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               child: const Icon(Icons.notifications_none_rounded),
             ),
           ),
+          IconButton(onPressed: () => context.push('/earnings'), icon: const Icon(Icons.account_balance_wallet_outlined)),
           IconButton(onPressed: () => context.push('/history'), icon: const Icon(Icons.history_rounded)),
           IconButton(onPressed: () => context.push('/profile'), icon: const Icon(Icons.person_outline_rounded)),
         ],
@@ -132,6 +133,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             const SizedBox(height: 14),
             Row(
               children: [
+                _stat("Today", '₹${(p?.todayEarnings ?? 0).toStringAsFixed(0)}', Icons.account_balance_wallet_rounded),
+                const SizedBox(width: 12),
                 _stat('Completed', '${p?.completedCount ?? 0}', Icons.check_circle_rounded),
                 const SizedBox(width: 12),
                 _stat('Failed', '${p?.failedCount ?? 0}', Icons.cancel_rounded),

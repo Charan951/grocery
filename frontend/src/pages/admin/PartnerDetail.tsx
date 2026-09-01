@@ -21,7 +21,16 @@ export const PartnerDetail: React.FC = () => {
   const navigate = useNavigate();
   const [data, setData] = useState<any>(null);
   const [deliveries, setDeliveries] = useState<any[]>([]);
+  const [earnings, setEarnings] = useState<any | null>(null);
+  const [settling, setSettling] = useState(false);
   const [err, setErr] = useState('');
+
+  const loadEarnings = async () => {
+    try {
+      const e = await fetch(`${API_URL}/admin/delivery/partners/${userId}/earnings`, { headers: authHeader() }).then(r => r.json());
+      if (e.success) setEarnings(e);
+    } catch { /* keep last */ }
+  };
 
   useEffect(() => {
     (async () => {
@@ -33,11 +42,28 @@ export const PartnerDetail: React.FC = () => {
         if (!p.success) { setErr(p.message || 'Failed to load partner'); return; }
         setData(p);
         setDeliveries(d.success ? d.deliveries : []);
+        loadEarnings();
       } catch {
         setErr('Network error');
       }
     })();
   }, [userId]);
+
+  const settleAll = async () => {
+    if (!window.confirm('Mark all pending earnings as settled (paid out)?')) return;
+    setSettling(true);
+    try {
+      const r = await fetch(`${API_URL}/admin/delivery/partners/${userId}/earnings/settle`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader() }, body: '{}',
+      }).then(r => r.json());
+      if (!r.success) alert(r.message || 'Settle failed');
+      await loadEarnings();
+    } catch {
+      alert('Settle failed');
+    } finally {
+      setSettling(false);
+    }
+  };
 
   if (err) return <div className="p-6 text-error font-semibold text-sm">{err}</div>;
   if (!data) return <div className="p-6 text-text-secondary text-sm font-semibold">Loading…</div>;
@@ -82,6 +108,52 @@ export const PartnerDetail: React.FC = () => {
           <Stat label="Expired" value={performance.expired} />
         </div>
       </div>
+
+      {earnings && (
+        <div className="bg-surface border border-divider rounded-[28px] shadow-card p-4 sm:p-6 flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-extrabold text-sm text-text-primary">Earnings</h3>
+            <button
+              onClick={settleAll}
+              disabled={settling || (earnings.summary.pendingTotal || 0) <= 0}
+              className="bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[10px] hover:bg-secondary disabled:opacity-40 cursor-pointer"
+            >
+              {settling ? 'Settling…' : 'Settle pending'}
+            </button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Stat label="Lifetime" value={`₹${earnings.summary.lifetimeTotal}`} />
+            <Stat label="Pending payout" value={<span className="text-warning">₹{earnings.summary.pendingTotal}</span>} />
+            <Stat label="Settled" value={`₹${earnings.summary.settledTotal}`} />
+            <Stat label="Deliveries paid" value={earnings.summary.count} />
+          </div>
+          {earnings.earnings.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="text-text-tertiary">
+                    {['Order', 'Base', 'Distance', 'Total', 'Status', 'Earned'].map(h => (
+                      <th key={h} className="p-2 border-b border-divider font-bold uppercase text-[9px] tracking-wide">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {earnings.earnings.slice(0, 30).map((e: any) => (
+                    <tr key={e._id} className="border-b border-divider last:border-0">
+                      <td className="p-2 font-bold text-text-primary">{e.orderId}</td>
+                      <td className="p-2 tabular-nums text-text-secondary">₹{e.baseFee}</td>
+                      <td className="p-2 tabular-nums text-text-secondary">{e.distanceKm} km · ₹{e.distanceFee}</td>
+                      <td className="p-2 tabular-nums font-bold">₹{e.total}</td>
+                      <td className="p-2"><ShelfTag tone={e.status === 'settled' ? 'green' : 'amber'}>{e.status}</ShelfTag></td>
+                      <td className="p-2 text-text-secondary">{e.earnedAt ? new Date(e.earnedAt).toLocaleDateString() : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="bg-surface border border-divider rounded-[28px] shadow-card overflow-hidden">
         <div className="px-4 sm:px-6 py-3 border-b border-divider">

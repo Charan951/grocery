@@ -1015,9 +1015,15 @@ the fleet live; customers track the rider on a map on both web and mobile.
 
 ### PHASE P2 — Earnings, zones, batching, analytics, background location
 
-- **P2-D1 Earnings**: `DeliveryEarning` model + calc (base + per-km from
-  `Settings`, tips, COD flag); partner Earnings screen; admin earnings view +
-  `settled` toggle / payout export.
+- **P2-D1 Earnings** — ✅ DONE 2026-09-01. `DeliveryEarning` model (unique by
+  orderId); payout = base fee + per-km distance fee (+ tips, always 0 for now),
+  rates from `Settings.deliveryBaseFee`/`deliveryPerKmFee`. `completeDelivery` →
+  `recordEarning()` (haversine, idempotent upsert). `GET /api/delivery/earnings
+  ?range=`; `GET /api/delivery/me` → `todayEarnings`. Admin
+  `GET/POST /api/admin/delivery/partners/:id/earnings[/settle]`. Delivery app
+  `EarningsScreen` + dashboard "Today ₹"; admin `PartnerDetail` Earnings card +
+  Settle. Tests: backend 48. **Open**: real tips input, COD cash-collected flag,
+  payout export/statement.
 - **P2-D2 Zones**: `DeliveryZone` (polygon) CRUD in admin; zone-aware candidate
   filter; per-zone SLA.
 - **P2-D3 Batching**: `maxConcurrent` > 1; multi-drop offer; nearest-drop

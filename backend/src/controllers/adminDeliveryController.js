@@ -3,6 +3,7 @@ import { DeliveryPartner } from '../models/DeliveryPartner.js';
 import { Order } from '../models/Order.js';
 import { Assignment } from '../models/Assignment.js';
 import { Settings } from '../models/Operations.js';
+import { DeliveryEarning } from '../models/DeliveryEarning.js';
 import { createOffer, acceptOffer, cancelForOrder } from '../services/assignmentService.js';
 import { logAudit } from './apiController.js';
 import { sendDeliveryCredentials } from '../services/mailService.js';
@@ -259,6 +260,58 @@ export const adminDeliveryController = {
           avgDeliveryMins: avg(deliveryLegs),
         },
       });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // GET /api/admin/delivery/partners/:userId/earnings?status=pending|settled&limit=
+  partnerEarnings: async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const user = await User.findOne({ _id: userId, role: 'Delivery' }).select('name').lean();
+      if (!user) return res.status(404).json({ success: false, message: 'Delivery partner not found' });
+
+      const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 500);
+      const q = { partnerUserId: userId };
+      if (req.query.status === 'pending' || req.query.status === 'settled') q.status = req.query.status;
+
+      const items = await DeliveryEarning.find(q).sort({ earnedAt: -1 }).limit(limit).lean();
+      const all = await DeliveryEarning.find({ partnerUserId: userId }).select('total status').lean();
+      const sum = (arr) => arr.reduce((s, e) => s + (e.total || 0), 0);
+
+      res.json({
+        success: true,
+        partner: { userId, name: user.name },
+        summary: {
+          lifetimeTotal: sum(all),
+          pendingTotal: sum(all.filter((e) => e.status === 'pending')),
+          settledTotal: sum(all.filter((e) => e.status === 'settled')),
+          count: all.length,
+        },
+        earnings: items,
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // POST /api/admin/delivery/partners/:userId/earnings/settle  { ids?: string[] }  (omit = all pending)
+  settlePartnerEarnings: async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const user = await User.findOne({ _id: userId, role: 'Delivery' }).select('name').lean();
+      if (!user) return res.status(404).json({ success: false, message: 'Delivery partner not found' });
+
+      const ids = Array.isArray(req.body?.ids) ? req.body.ids : null;
+      const filter = { partnerUserId: userId, status: 'pending', ...(ids ? { _id: { $in: ids } } : {}) };
+      const r = await DeliveryEarning.updateMany(filter, { $set: { status: 'settled', settledAt: new Date() } });
+      const settled = r.modifiedCount ?? r.nModified ?? 0;
+
+      await logAudit(String(req.user._id), req.user.name, 'Delivery Earnings Settled',
+        `${user.name}: ${settled} payout(s)${ids ? ' (selected)' : ' (all pending)'}`);
+
+      res.json({ success: true, settled });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
     }
