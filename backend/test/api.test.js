@@ -235,6 +235,29 @@ test('customer can cancel a pre-dispatch order; a prepaid one refunds to the wal
   assert.ok(txns.body.transactions.some((t) => t.type === 'Credit' && t.amount === 150));
 });
 
+test('admin bulk review moderation approves/rejects many at once', async () => {
+  const sToken = await loginAdmin();
+  const made = await Review.create([
+    { productId: REVIEW_PRODUCT_ID, customerId: `cust_${PHONE_A}`, customerName: 'B1', rating: 5, comment: 'a', status: 'Pending' },
+    { productId: REVIEW_PRODUCT_ID, customerId: `cust_${PHONE_B}`, customerName: 'B2', rating: 4, comment: 'b', status: 'Pending' },
+  ]);
+  const ids = made.map((r) => String(r._id));
+
+  const bad = await api().put('/api/reviews/bulk-status')
+    .set('Authorization', `Bearer ${sToken}`).send({ ids: [], status: 'Approved' });
+  assert.equal(bad.status, 400);
+
+  const ok = await api().put('/api/reviews/bulk-status')
+    .set('Authorization', `Bearer ${sToken}`).send({ ids, status: 'Approved' });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.updated, 2);
+
+  const rows = await Review.find({ _id: { $in: ids } }).select('status').lean();
+  assert.ok(rows.every((r) => r.status === 'Approved'));
+
+  await Review.deleteMany({ _id: { $in: ids } });
+});
+
 test('wallet top-up: create order then verify credits the balance + ledger (test mode)', async () => {
   const tokenA = await customerToken(PHONE_A);
   await Customer.updateOne({ customerId: `cust_${PHONE_A}` }, { $set: { walletBalance: 0 } });

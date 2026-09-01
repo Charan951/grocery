@@ -245,9 +245,14 @@ web needs a real customer-auth pass first (see WEB-1).
   `PUT/DELETE /api/products/:id`, the phone-keyed `/api/customers/:id/*` block
   (profile / addresses — blocked on WEB-1), `POST /api/orders` (create).
 
-### BE-2 · Reviews moderation UX
-- `[ ]` Admin: surface the customer-submitted `Pending` reviews queue prominently
-  (they now arrive from the storefront). Bulk approve/reject.
+### BE-2 · Reviews moderation UX — `[x]` DONE 2026-09-01
+- `[x]` **Backend:** `PUT /api/reviews/bulk-status { ids[], status }`
+  (Admin/Manager; recomputes each affected product's rating). Test:
+  bulk-approve two Pending reviews.
+- `[x]` **Admin `ReviewsModule` rebuilt:** Pending/Approved/Rejected/All tabs
+  with counts (defaults to **Pending**), select-all + per-row checkboxes,
+  "Approve selected" / "Reject selected" bulk actions, newest-first, refresh,
+  responsive. Per-row approve/reject/delete kept.
 
 ### BE-3 · Order cancel — COD edge — `[x]` DONE 2026-09-01
 - `[x]` `createOrder` now sets `paymentStatus` to `'Pending'` for COD/cash

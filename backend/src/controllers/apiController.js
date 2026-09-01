@@ -1872,6 +1872,22 @@ export const reviewController = {
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
     }
+  },
+
+  // PUT /api/reviews/bulk-status  { ids: [], status: 'Approved' | 'Rejected' | 'Pending' }
+  bulkUpdateReviewStatus: async (req, res) => {
+    try {
+      const { ids, status } = req.body;
+      if (!Array.isArray(ids) || !ids.length || !['Approved', 'Rejected', 'Pending'].includes(status)) {
+        return res.status(400).json({ success: false, message: 'ids[] and a valid status are required' });
+      }
+      const affected = await Review.find({ _id: { $in: ids } }).select('productId').lean();
+      const r = await Review.updateMany({ _id: { $in: ids } }, { $set: { status } });
+      [...new Set(affected.map((a) => a.productId))].forEach(recomputeProductRating);
+      res.json({ success: true, updated: r.modifiedCount ?? r.nModified ?? 0 });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
   }
 };
 

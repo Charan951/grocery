@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   FolderTree, Award, Boxes, Warehouse, Users, Truck, UserCheck, Ticket, 
@@ -2862,8 +2862,13 @@ export const AnalyticsModule: React.FC = () => {
 // ==========================================
 // 13. REVIEWS MODULE
 // ==========================================
+type ReviewStatus = 'Pending' | 'Approved' | 'Rejected';
+
 export const ReviewsModule: React.FC = () => {
   const [reviews, setReviews] = useState<any[]>([]);
+  const [tab, setTab] = useState<ReviewStatus | 'All'>('Pending');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
 
   const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
@@ -2876,92 +2881,160 @@ export const ReviewsModule: React.FC = () => {
       const res = await fetch(`${API_URL}/reviews`, { headers: getAuthHeader() });
       const data = await res.json();
       if (data.success && data.reviews) {
-        setReviews(data.reviews);
+        const sorted = [...data.reviews].sort(
+          (a, b) => new Date(b.createdAt || b.date || 0).getTime() - new Date(a.createdAt || a.date || 0).getTime(),
+        );
+        setReviews(sorted);
       }
-    } catch (e) {
+    } catch {
       console.warn('Failed to fetch reviews');
     }
   };
 
-  useEffect(() => {
-    fetchReviews();
-  }, []);
+  useEffect(() => { fetchReviews(); }, []);
+  useEffect(() => { setSelected(new Set()); }, [tab]);
 
-  const handleStatusUpdate = async (id: string, newStatus: string) => {
+  const counts = useMemo(() => {
+    const c: Record<string, number> = { Pending: 0, Approved: 0, Rejected: 0 };
+    reviews.forEach((r) => { c[r.status as string] = (c[r.status as string] || 0) + 1; });
+    return c;
+  }, [reviews]);
+
+  const visible = tab === 'All' ? reviews : reviews.filter((r) => r.status === tab);
+
+  const setOne = async (id: string, status: ReviewStatus) => {
     try {
       const res = await fetch(`${API_URL}/reviews/${id}/status`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          ...getAuthHeader()
-        },
-        body: JSON.stringify({ status: newStatus })
+        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+        body: JSON.stringify({ status }),
       });
       const data = await res.json();
-      if (data.success) {
-        setReviews(prev => prev.map(r => r._id === id ? { ...r, status: newStatus } : r));
-        alert(`Review ${newStatus.toLowerCase()} successfully!`);
-      }
-    } catch (err) {
+      if (data.success) setReviews((prev) => prev.map((r) => (r._id === id ? { ...r, status } : r)));
+    } catch {
       alert('Failed to update status.');
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this review?')) return;
+  const bulk = async (status: ReviewStatus) => {
+    const ids = [...selected];
+    if (!ids.length) return;
+    setBusy(true);
     try {
-      const res = await fetch(`${API_URL}/reviews/${id}`, {
-        method: 'DELETE',
-        headers: getAuthHeader()
+      const res = await fetch(`${API_URL}/reviews/bulk-status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+        body: JSON.stringify({ ids, status }),
       });
       const data = await res.json();
-      if (data.success) {
-        setReviews(prev => prev.filter(r => r._id !== id));
-        alert('Review deleted.');
-      }
-    } catch (err) {
+      if (!res.ok || !data.success) { alert(data.message || 'Bulk update failed'); return; }
+      setReviews((prev) => prev.map((r) => (selected.has(r._id) ? { ...r, status } : r)));
+      setSelected(new Set());
+    } catch {
+      alert('Bulk update failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Delete this review permanently?')) return;
+    try {
+      const res = await fetch(`${API_URL}/reviews/${id}`, { method: 'DELETE', headers: getAuthHeader() });
+      const data = await res.json();
+      if (data.success) setReviews((prev) => prev.filter((r) => r._id !== id));
+    } catch {
       alert('Delete failed.');
     }
   };
 
+  const toggle = (id: string) =>
+    setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const allShownSelected = visible.length > 0 && visible.every((r) => selected.has(r._id));
+
+  const tone = (s: string) =>
+    s === 'Approved' ? 'text-success bg-success/10' : s === 'Rejected' ? 'text-error bg-error/10' : 'text-warning bg-warning/10';
+
   return (
-    <div className="bg-surface border border-divider p-6 rounded-[28px] shadow-card flex flex-col gap-6">
-      <div className="pb-3 border-b border-divider">
-        <h2 className="font-extrabold text-sm text-text-primary">Customer Review Moderation</h2>
-        <p className="text-[10px] text-text-secondary font-medium">Moderate incoming product reviews and feedback</p>
+    <div className="bg-surface border border-divider p-4 sm:p-6 rounded-[28px] shadow-card flex flex-col gap-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-divider">
+        <div>
+          <h2 className="font-extrabold text-sm text-text-primary">Customer Review Moderation</h2>
+          <p className="text-[10px] text-text-secondary font-medium">
+            {counts.Pending} pending • {counts.Approved} approved • {counts.Rejected} rejected
+          </p>
+        </div>
+        <button onClick={fetchReviews} className="flex items-center gap-1 border border-divider text-text-secondary font-bold py-1.5 px-3 rounded-full text-[10px] hover:bg-background cursor-pointer w-fit">
+          <RefreshCw size={12} /> Refresh
+        </button>
       </div>
 
-      <div className="flex flex-col gap-4">
-        {reviews.map(r => (
-          <div key={r._id} className="p-4 border border-divider rounded-2xl bg-background flex flex-col gap-3 relative shadow-sm group">
-            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
-              <button onClick={() => handleDelete(r._id)} className="p-1.5 rounded-lg bg-surface border border-divider text-text-secondary hover:text-error hover:bg-error/10 cursor-pointer" title="Delete Review"><Trash2 size={11} /></button>
-            </div>
-            <div className="flex justify-between items-start">
-              <div>
-                <span className="font-extrabold text-xs text-text-primary">{r.customerName || 'Anonymous Customer'}</span>
-                <span className="text-[10px] text-text-secondary font-semibold ml-2">item: {r.productId}</span>
+      <div className="flex flex-wrap gap-1.5">
+        {(['Pending', 'Approved', 'Rejected', 'All'] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`px-3 py-1 rounded-full text-[10px] font-bold border transition-colors ${
+              tab === t ? 'bg-admin-ink text-white border-admin-ink' : 'bg-background text-text-secondary border-divider hover:border-primary/40'
+            }`}
+          >
+            {t}{t !== 'All' && counts[t] ? ` (${counts[t]})` : ''}
+          </button>
+        ))}
+      </div>
+
+      {visible.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 bg-background border border-divider rounded-xl px-3 py-2">
+          <label className="flex items-center gap-1.5 text-[11px] font-semibold text-text-secondary cursor-pointer">
+            <input
+              type="checkbox"
+              checked={allShownSelected}
+              onChange={(e) => setSelected(e.target.checked ? new Set(visible.map((r) => r._id)) : new Set())}
+            />
+            Select all ({visible.length})
+          </label>
+          <span className="text-[11px] text-text-tertiary">{selected.size} selected</span>
+          <div className="flex gap-2 ml-auto">
+            <button disabled={!selected.size || busy} onClick={() => bulk('Approved')} className="bg-primary text-white font-bold py-1 px-3 rounded-full text-[10px] cursor-pointer disabled:opacity-40">Approve selected</button>
+            <button disabled={!selected.size || busy} onClick={() => bulk('Rejected')} className="border border-error text-error bg-error/5 font-bold py-1 px-3 rounded-full text-[10px] cursor-pointer disabled:opacity-40">Reject selected</button>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-3">
+        {visible.map((r) => (
+          <div key={r._id} className="p-4 border border-divider rounded-2xl bg-background flex flex-col gap-3 relative shadow-sm">
+            <div className="flex justify-between items-start gap-2">
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input type="checkbox" className="mt-0.5" checked={selected.has(r._id)} onChange={() => toggle(r._id)} />
+                <span>
+                  <span className="font-extrabold text-xs text-text-primary">{r.customerName || 'Anonymous Customer'}</span>
+                  <span className="text-[10px] text-text-secondary font-semibold ml-2">item: {r.productId}</span>
+                </span>
+              </label>
+              <div className="flex items-center gap-2">
+                <span className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full ${tone(r.status)}`}>{r.status}</span>
+                <button onClick={() => handleDelete(r._id)} className="p-1.5 rounded-lg bg-surface border border-divider text-text-secondary hover:text-error hover:bg-error/10 cursor-pointer" title="Delete Review"><Trash2 size={11} /></button>
               </div>
-              <span className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full ${r.status === 'Approved' ? 'text-success bg-success/10' : r.status === 'Rejected' ? 'text-error bg-error/10' : 'text-warning bg-warning/10'}`}>{r.status}</span>
             </div>
             <div className="flex items-center gap-1">
               {[...Array(5)].map((_, i) => (
                 <Star key={i} size={12} className={i < r.rating ? 'fill-warning text-warning' : 'text-divider'} />
               ))}
             </div>
-            <p className="text-xs text-text-secondary font-medium leading-relaxed italic">"{r.comment}"</p>
+            {r.comment && <p className="text-xs text-text-secondary font-medium leading-relaxed italic">"{r.comment}"</p>}
             <div className="flex gap-2">
               {r.status !== 'Approved' && (
-                <button onClick={() => handleStatusUpdate(r._id, 'Approved')} className="bg-primary text-white font-bold py-1 px-4 rounded-full text-[10px] cursor-pointer">Approve Review</button>
+                <button onClick={() => setOne(r._id, 'Approved')} className="bg-primary text-white font-bold py-1 px-4 rounded-full text-[10px] cursor-pointer">Approve</button>
               )}
               {r.status !== 'Rejected' && (
-                <button onClick={() => handleStatusUpdate(r._id, 'Rejected')} className="bg-surface border border-divider text-text-secondary font-bold py-1 px-4 rounded-full text-[10px] cursor-pointer hover:bg-error/10 hover:text-error">Reject Review</button>
+                <button onClick={() => setOne(r._id, 'Rejected')} className="bg-surface border border-divider text-text-secondary font-bold py-1 px-4 rounded-full text-[10px] cursor-pointer hover:bg-error/10 hover:text-error">Reject</button>
               )}
             </div>
           </div>
         ))}
-        {reviews.length === 0 && (
-          <p className="text-xs text-text-secondary italic text-center py-4">No reviews submitted yet.</p>
+        {visible.length === 0 && (
+          <p className="text-xs text-text-secondary italic text-center py-6">No {tab === 'All' ? '' : tab.toLowerCase()} reviews.</p>
         )}
       </div>
     </div>
