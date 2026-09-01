@@ -30,7 +30,7 @@ import { Review, Notification, CMSPage, Blog, Settings, AuditLog, SupportTicket 
 import { uploadToCloudinary } from '../config/cloudinary.js';
 import { cancelForOrder, tryAssign } from '../services/assignmentService.js';
 import { sendDeliveryCredentials } from '../services/mailService.js';
-import { registerDeviceToken, removeDeviceToken } from '../services/pushService.js';
+import { registerDeviceToken, removeDeviceToken, sendToOwner } from '../services/pushService.js';
 
 // Helper to sign JWT
 const signToken = (id) => {
@@ -867,6 +867,21 @@ export const orderController = {
           timeline: order.trackingTimeline,
           at: new Date().toISOString(),
         });
+      }
+
+      // FCM to the customer's devices for the milestones they care about.
+      const PUSHABLE = {
+        'Out For Delivery': 'Your order is on the way',
+        Arrived: 'Your delivery partner has arrived',
+        Delivered: 'Order delivered',
+        Cancelled: 'Order cancelled',
+      };
+      if (PUSHABLE[order.status] && order.customerId) {
+        sendToOwner(order.customerId, {
+          title: PUSHABLE[order.status],
+          body: `Order ${order.orderId} is now ${order.status}.`,
+          data: { type: 'order_update', orderId: order.orderId, status: order.status },
+        }).catch(() => {});
       }
 
       res.json({ success: true, order });

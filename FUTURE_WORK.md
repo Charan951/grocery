@@ -4,7 +4,7 @@ Single source of truth for everything **not yet built**. Updated as items land.
 Completed work lives in `MEMORY.md` §5; the mobile-vs-web gap analysis is in
 `MOBILE_FUNCTIONALITY_AUDIT.md`; the design review is in `MOBILE_UI_UX_AUDIT.md`.
 
-**Last updated:** 2026-09-01 (FW-2 done; FW-1 mostly done)
+**Last updated:** 2026-09-01 (FW-3 DONE — FCM offer + order-status pushes live end to end; iOS APNs key + web-push open. FW-2 done; FW-1 mostly done)
 
 ---
 
@@ -73,19 +73,29 @@ web needs a real customer-auth pass first (see WEB-1).
 
 ## P1 — parity & completeness
 
-### FW-3 · Push notifications (FCM)
-- `[ ]` **Backend:** `POST /api/customers/me/devices` + `DELETE …/devices/:token`
-  (model `DeviceToken` exists). `firebase-admin` send hooked into
-  `orderController.updateStatus` (status change → push) and the delivery
-  assignment events.
-- `[ ]` **Mobile:** `firebase_core` + `firebase_messaging`, `POST_NOTIFICATIONS`
-  permission prompt with rationale, token register/refresh, tap → deep link to
-  the order.
-- `[ ]` **Web:** optional web-push later; at minimum keep the in-app
-  notifications feed in sync.
-- **Depends on:** a Firebase project + `google-services.json` / APNs key.
-  **Acceptance:** moving an order to "Out for Delivery" pushes to the customer's
-  device and the tap opens `/order/:id`.
+### FW-3 · Push notifications (FCM) — `[x]` DONE 2026-09-01 (iOS APNs key + web-push still open)
+- `[x]` **Backend:** `pushService.js` (lazy `firebase-admin`; creds from
+  `FIREBASE_SERVICE_ACCOUNT` = path / raw JSON / base64, or
+  `GOOGLE_APPLICATION_CREDENTIALS`, or `src/config/service_account.json`;
+  silent no-op when unset). `POST/DELETE /api/delivery/devices[/:token]` +
+  `POST/DELETE /api/customers/me/devices[/:token]`. `assignmentService.createOffer`
+  sends a `delivery_offer` data message.
+- `[x]` **Delivery + customer apps:** `firebase_core` + `firebase_messaging`,
+  `google-services.json` / `GoogleService-Info.plist` (Firebase project
+  `grocery-76b84`), `firebase_options.dart`, `PushService` (permission + token
+  register after login / unregister on logout + `onMessageOpenedApp` tap route).
+- `[x]` **Backend:** `sendToOwner` now fires on customer-facing status
+  milestones — `orderController.updateStatus` (Out For Delivery / Arrived /
+  Delivered / Cancelled) and `deliveryController.notifyCustomer` (on-the-way /
+  delivered). Data payload `{ type:'order_update', orderId, status }` → tap
+  routes to the order.
+- `[ ]` **iOS:** upload the APNs auth key to Firebase + add the Push capability
+  in Xcode before an iOS release.
+- `[ ]` **Web:** optional web-push later; keep the in-app notifications feed in
+  sync.
+- **Acceptance:** ✅ moving an order to "Out for Delivery" pushes to the
+  customer's device; tap opens `/order/:id`. (Live once Android is on a device
+  with the app; iOS pending the APNs key.)
 
 ### FW-4 · Wallet top-up (Razorpay) + web wallet parity
 - `[ ]` **Backend:** `POST /api/customers/me/wallet/topup` → creates a Razorpay

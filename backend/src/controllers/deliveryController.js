@@ -6,7 +6,7 @@ import { Assignment } from '../models/Assignment.js';
 import { Notification } from '../models/Operations.js';
 import { uploadToCloudinary } from '../config/cloudinary.js';
 import { acceptOffer, rejectOffer } from '../services/assignmentService.js';
-import { registerDeviceToken, removeDeviceToken } from '../services/pushService.js';
+import { registerDeviceToken, removeDeviceToken, sendToOwner } from '../services/pushService.js';
 
 const RESET_TTL_MS = 15 * 60 * 1000;
 // No mailer wired yet — surface the reset code in the response so ops/support can
@@ -55,7 +55,12 @@ const emitOrder = (req, order, note) => {
 };
 
 const notifyCustomer = async (order, title, body) => {
-  try { await Notification.create({ userId: order.customerId, title, body, type: 'Order' }); } catch (_) {}
+  try {
+    await Notification.create({ userId: order.customerId, title, body, type: 'Order' });
+    await sendToOwner(order.customerId, {
+      title, body, data: { type: 'order_update', orderId: order.orderId, status: order.status },
+    });
+  } catch (_) {}
 };
 
 const freePartnerFromOrder = async (userId, orderId) => {
