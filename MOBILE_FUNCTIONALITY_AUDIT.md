@@ -25,7 +25,7 @@ All reflected below.
 | Profile edit | ✓ | `ProfileEditScreen` → `PUT /customers/me/profile`. |
 | Wallet | ⚠ | Real balance + referral code + **transaction history** (`GET /customers/me/wallet/transactions`, 2026-09-01). Top-up still missing. (Web's wallet drawer is still a hardcoded `₹0` stub.) |
 | Notifications (in-app) | ⚠ | Real activity feed from order timelines + bell entry point. No dedicated endpoint, no push (FCM). Web has nothing. |
-| Reviews (read + write) | ✗ | PDP shows a rating number only. **No customer review endpoint** (staff moderation only). |
+| Reviews (read + write) | ✓ | `GET /products/:id/reviews` (public, approved + summary) + `POST` (verified-purchase: needs a Delivered order with the product; enters moderation as Pending). PDP "Ratings & reviews" section + write sheet on **mobile and web** (2026-09-01). Approve recomputes `Product.rating`/`reviewsCount`. |
 | Order cancel | ✓ | `POST /orders/:id/cancel` added (2026-09-01, dual-auth: app token OR `{phone}` for web). Pre-dispatch only; prepaid orders refunded to wallet. Wired on mobile order detail **and** web `CustomerOrders`. |
 | Content pages (Offers, Brands, Blog, About, Legal, Help/FAQ, Careers) | ✗ | Not built on mobile. Backend has `/blogs`, `/brands`. |
 | Payments (Razorpay / Wallet / COD) | ✓ | Real gateway + HMAC verify + webhook. |

@@ -255,7 +255,7 @@ router.delete('/employees/:id', protect, authorize('Admin'), employeeController.
 // 15. REVIEW ROUTES
 // ==========================================
 router.get('/products/:id/reviews', reviewController.getProductReviews); // public — approved reviews + summary
-router.post('/products/:id/reviews', protectCustomer, reviewController.createProductReview); // verified-purchase only, enters moderation
+router.post('/products/:id/reviews', attachCustomerOptional, reviewController.createProductReview); // verified-purchase only (token or {phone}); enters moderation
 router.get('/reviews', protect, authorize('Admin', 'Manager'), reviewController.getReviews); // staff moderation list
 router.put('/reviews/:id/status', protect, authorize('Admin', 'Manager'), reviewController.updateReviewStatus);
 router.delete('/reviews/:id', protect, authorize('Admin'), reviewController.deleteReview);
@@ -286,6 +286,8 @@ router.post('/delivery/auth/reset', deliveryAuthLimiter, deliveryController.rese
 router.get('/delivery/me', protectDelivery, deliveryController.getMe);
 router.post('/delivery/devices', protectDelivery, deliveryController.registerDevice);
 router.delete('/delivery/devices/:token', protectDelivery, deliveryController.removeDevice);
+router.get('/delivery/notifications', protectDelivery, deliveryController.listNotifications);
+router.post('/delivery/notifications/read', protectDelivery, deliveryController.markNotificationsRead);
 router.put('/delivery/status', protectDelivery, deliveryController.setStatus);
 router.post('/delivery/location', locationLimiter, protectDelivery, deliveryController.updateLocation);
 router.get('/delivery/orders/active', protectDelivery, deliveryController.getActiveOrders);

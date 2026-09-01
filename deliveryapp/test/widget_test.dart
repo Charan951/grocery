@@ -50,6 +50,19 @@ void main() {
     });
   });
 
+  group('AppNotification.fromJson', () {
+    test('parses fields and defaults type', () {
+      final n = AppNotification.fromJson({
+        '_id': 'n1', 'title': 'New delivery offer', 'body': 'Order ORD1', 'read': false,
+        'createdAt': DateTime.now().toIso8601String(),
+      });
+      expect(n.id, 'n1');
+      expect(n.type, 'Order'); // default when absent
+      expect(n.read, false);
+      expect(n.createdAt, isNotNull);
+    });
+  });
+
   group('DeliveryOrder.fromJson', () {
     test('maps items, timeline and COD detection', () {
       final d = DeliveryOrder.fromJson({

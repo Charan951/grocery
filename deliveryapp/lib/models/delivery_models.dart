@@ -84,6 +84,21 @@ class DeliveryOffer {
   }
 }
 
+class AppNotification {
+  final String id, title, body, type;
+  final bool read;
+  final DateTime? createdAt;
+  AppNotification(this.id, this.title, this.body, this.type, this.read, this.createdAt);
+  factory AppNotification.fromJson(Map<String, dynamic> j) => AppNotification(
+        _s(j['_id']),
+        _s(j['title']),
+        _s(j['body']),
+        _s(j['type']).isEmpty ? 'Order' : _s(j['type']),
+        j['read'] == true,
+        DateTime.tryParse(_s(j['createdAt'])),
+      );
+}
+
 class OrderItemLine {
   final String name, weightSpec;
   final int quantity;

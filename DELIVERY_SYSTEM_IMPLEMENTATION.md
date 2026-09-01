@@ -976,7 +976,24 @@ existing timeline. No fake data anywhere.
   login, handle the `delivery_offer` data message → route to `/order/:id` /
   raise the offer sheet, background/killed reconcile via `/delivery/orders/active`.
 
-**P1-D5 · Notifications + audit activation**
+**P1-D5 · Notifications + audit activation** — ✅ DONE 2026-09-01
+- Partner inbox: `GET /api/delivery/notifications?unreadOnly=1&limit=` (returns
+  `{unread, notifications}`) + `POST /api/delivery/notifications/read {ids?}`
+  (omit `ids` = mark all). `GET /api/delivery/me` now also returns
+  `unreadNotifications`. `assignmentService.createOffer` writes a `type:'Offer'`
+  Notification; `cancelForOrder` writes a `type:'Order'` "Delivery cancelled"
+  Notification to each affected partner.
+- Audit: `logAudit()` already fires for every admin delivery override —
+  Order Offered / Force-Assigned / Reassign / Unassigned, Partner Password
+  Reset, Partner Activated / Deactivated (wired in P0-D5, verified here). Visible
+  via the existing `/admin/audit-logs`.
+- deliveryapp: `AppNotification` model, `api.notifications()` /
+  `markNotificationsRead()`, `NotificationsScreen` at `/notifications`, a bell
+  icon + unread `Badge` on the dashboard AppBar.
+- Verified: backend `npm test` 36 green (+1 inbox); deliveryapp `flutter
+  analyze` clean, `flutter test` 6, debug APK builds.
+
+**P1-D5 (original scope note)**
 - Activate `Notification` (offer / assigned / cancelled / delivered / payout) with
   `/delivery/notifications` + read; activate `logAudit()` for all assign
   overrides / deactivations / password resets.

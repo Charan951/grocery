@@ -8,6 +8,7 @@ import 'package:freshcart_delivery/features/dashboard/dashboard_screen.dart';
 import 'package:freshcart_delivery/features/history/history_screen.dart';
 import 'package:freshcart_delivery/features/offer/offer_controller.dart';
 import 'package:freshcart_delivery/features/offer/offer_sheet.dart';
+import 'package:freshcart_delivery/features/notifications/notifications_screen.dart';
 import 'package:freshcart_delivery/features/orders/order_detail_screen.dart';
 import 'package:freshcart_delivery/features/profile/profile_screen.dart';
 import 'package:freshcart_delivery/features/splash/splash_screen.dart';
@@ -45,6 +46,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(path: '/', builder: (c, s) => const DashboardScreen()),
           GoRoute(path: '/history', builder: (c, s) => const HistoryScreen()),
+          GoRoute(path: '/notifications', builder: (c, s) => const NotificationsScreen()),
           GoRoute(path: '/profile', builder: (c, s) => const ProfileScreen()),
           GoRoute(
             path: '/order/:id',

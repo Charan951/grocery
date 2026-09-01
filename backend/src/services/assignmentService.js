@@ -87,7 +87,7 @@ export const createOffer = async ({ order, partnerUser, partner, attempt = 1, ti
     userId: String(partnerUser._id),
     title: 'New delivery offer',
     body: `Order ${order.orderId} — ₹${order.totalAmount}. Respond within ${timeoutSec}s.`,
-    type: 'Order',
+    type: 'Offer',
   });
   // Push wakes the app when the socket isn't live (backgrounded / killed).
   sendToOwner(partnerUser._id, {
@@ -308,6 +308,12 @@ export const cancelForOrder = async (orderId, reason = 'order cancelled') => {
   await Assignment.updateMany({ _id: { $in: live.map((a) => a._id) } }, { $set: { status: 'cancelled', reason } });
   for (const a of live) {
     emit('partner:' + String(a.partnerUserId), 'order_cancelled', { orderId, reason });
+    await Notification.create({
+      userId: String(a.partnerUserId),
+      title: 'Delivery cancelled',
+      body: `Order ${orderId} was cancelled${reason ? ` (${reason})` : ''}.`,
+      type: 'Order',
+    }).catch(() => {});
     if (a.status === 'accepted') {
       const partner = await DeliveryPartner.findOne({ userId: a.partnerUserId });
       if (partner) {

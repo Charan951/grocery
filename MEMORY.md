@@ -118,6 +118,22 @@
 
 ## 5. Completed Major Work
 
+- **2026-09-01 — Delivery P1-D5 DONE** (partner notifications inbox + audit).
+  Backend: `GET /api/delivery/notifications?unreadOnly=1&limit=` → `{unread,
+  notifications}`, `POST /api/delivery/notifications/read {ids?}` (omit = all);
+  `GET /api/delivery/me` +`unreadNotifications`. `assignmentService.createOffer`
+  writes a `type:'Offer'` Notification; `cancelForOrder` writes a "Delivery
+  cancelled" Notification per affected partner. Audit: `logAudit()` already
+  fires for every admin delivery override (Order Offered / Force-Assigned /
+  Reassign / Unassigned, Partner Password Reset, Activated / Deactivated —
+  wired in P0-D5); viewable via existing `/admin/audit-logs`. deliveryapp:
+  `AppNotification` model, `api.notifications()`/`markNotificationsRead()`,
+  `NotificationsScreen` at `/notifications`, dashboard AppBar bell + unread
+  `Badge`. Verified: backend `npm test` **36**, deliveryapp `flutter analyze`
+  clean + `flutter test` **6** + debug APK builds.
+  Next: **P1-D4 client** (needs the user's Firebase project) or **P2**
+  (earnings / zones / batching / analytics / background location / ratings).
+
 - **2026-09-01 — Delivery P1-D4 BACKEND DONE** (FCM push for offers; client blocked
   on the user's Firebase project). `backend/src/services/pushService.js` — lazy
   `firebase-admin` (dep already present) from `FIREBASE_SERVICE_ACCOUNT` (raw
@@ -1013,7 +1029,7 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
 
 ## 12. Testing Status
 
-- **Backend: `npm test` → 35 tests, all green**
+- **Backend: `npm test` → 36 tests, all green**
   (`node:test` + `supertest` against `MONGO_URI`). Covers auth/OTP, protectCustomer,
   coupon validate, order placement + `/orders/mine` + ownership, status timeline,
   **order cancel (owner check, wallet refund, past-window 409) + wallet ledger**,
@@ -1071,6 +1087,8 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
 - Frontend: no automated tests; admin `fetchReviews` change not yet run in a browser.
 
 ## 13. Last Updated
+
+2026-09-01 — Delivery P1-D5: partner notifications inbox (GET/POST /api/delivery/notifications[/read], unread count in /delivery/me) + createOffer/cancelForOrder write partner Notifications; logAudit already covers all admin delivery overrides. deliveryapp NotificationsScreen + dashboard bell badge. Backend 36 tests, deliveryapp analyze/test/APK green.
 
 2026-09-01 — Delivery P1-D4 (backend): FCM push for delivery offers. New pushService.js (lazy firebase-admin, no-op when FIREBASE_SERVICE_ACCOUNT unset), POST/DELETE /api/delivery/devices + /api/customers/me/devices, createOffer sends a delivery_offer data message. Backend 35 tests. Flutter FCM client still needs the user's Firebase project.
 

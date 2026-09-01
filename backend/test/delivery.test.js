@@ -13,6 +13,7 @@ import { Order } from '../src/models/Order.js';
 import { Assignment } from '../src/models/Assignment.js';
 import { tryAssign, rejectOffer } from '../src/services/assignmentService.js';
 import { DeviceToken } from '../src/models/DeviceToken.js';
+import { Notification } from '../src/models/Operations.js';
 import { isPushConfigured } from '../src/services/pushService.js';
 
 dotenv.config();
@@ -55,6 +56,7 @@ test.after(async () => {
     Order.deleteMany({ orderId: new RegExp(`^${ORDER_PREFIX}`) }),
     Assignment.deleteMany({ orderId: new RegExp(`^${ORDER_PREFIX}`) }),
     DeviceToken.deleteMany({ ownerId: { $in: [riderUserId, rider2UserId] } }),
+    Notification.deleteMany({ userId: { $in: [riderUserId, rider2UserId] } }),
   ]);
   await new Promise((r) => httpServer.close(r));
   await mongoose.disconnect();
@@ -232,6 +234,33 @@ test('GET /api/orders/:id exposes a masked rider block, revealed only Out For De
   assert.equal(r.body.order.delivery.revealed, true);
   assert.equal(r.body.order.delivery.phone, '9876500000');
   assert.ok(r.body.order.delivery.location && r.body.order.delivery.location.lat === 17.44);
+});
+
+test('partner notifications inbox: offer creates an unread entry; mark-read clears it', async () => {
+  const rTok = await riderToken();
+  const aTok = await adminToken();
+  await Notification.deleteMany({ userId: riderUserId });
+
+  const order = await makeOrder();
+  const offer = await api().post(`/api/admin/orders/${order.orderId}/assign`)
+    .set('Authorization', `Bearer ${aTok}`).send({ partnerUserId: riderUserId });
+  assert.equal(offer.status, 200);
+
+  const list = await api().get('/api/delivery/notifications?unreadOnly=1').set('Authorization', `Bearer ${rTok}`);
+  assert.equal(list.status, 200);
+  assert.ok(list.body.unread >= 1);
+  assert.ok(list.body.notifications.some((n) => n.type === 'Offer' && n.body.includes(order.orderId)));
+
+  const me = await api().get('/api/delivery/me').set('Authorization', `Bearer ${rTok}`);
+  assert.ok(me.body.unreadNotifications >= 1);
+
+  const read = await api().post('/api/delivery/notifications/read').set('Authorization', `Bearer ${rTok}`).send({});
+  assert.equal(read.status, 200);
+  const after = await api().get('/api/delivery/notifications?unreadOnly=1').set('Authorization', `Bearer ${rTok}`);
+  assert.equal(after.body.unread, 0);
+  assert.equal(after.body.notifications.length, 0);
+
+  await Assignment.updateMany({ orderId: order.orderId }, { $set: { status: 'cancelled' } });
 });
 
 test('partner FCM device token register is idempotent + unregister; push stays optional', async () => {

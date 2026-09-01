@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useCMS, Product } from '../context/CMSContext';
 import { useCartWishlist, getProductStockQuantity } from '../context/CartWishlistContext';
 import { ProductCard } from '../components/ProductCard';
+import { ProductReviews } from '../components/ProductReviews';
 import { SEO } from '../components/SEO';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getProductImage } from '../utils/imageUtils';
@@ -439,6 +440,13 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ onQuickView }) =
           </div>
         </div>
 
+        {/* RATINGS & REVIEWS (mobile) */}
+        {product && (
+          <div className="mx-3.5">
+            <ProductReviews productId={product.id || product._id || id || ''} />
+          </div>
+        )}
+
         {/* STICKY BOTTOM ADD TO CART PURCHASE BAR */}
         <div className="fixed bottom-0 left-0 right-0 z-[999] bg-white border-t border-gray-200 px-4 py-2.5 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] flex items-center justify-between">
           {/* Left: Unit & Price */}
@@ -853,6 +861,9 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ onQuickView }) =
                 </button>
               </div>
             </div>
+
+            {/* RATINGS & REVIEWS */}
+            {product && <ProductReviews productId={product.id || product._id || id || ''} />}
 
             {/* SIMILAR PRODUCTS SECTION */}
             {relatedProducts.length > 0 && (

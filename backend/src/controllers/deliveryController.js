@@ -95,8 +95,10 @@ export const deliveryController = {
   getMe: async (req, res) => {
     try {
       const { user, partner } = req;
+      const unreadNotifications = await Notification.countDocuments({ userId: String(user._id), read: false });
       res.json({
         success: true,
+        unreadNotifications,
         partner: {
           userId: user._id,
           name: user.name,
@@ -113,6 +115,36 @@ export const deliveryController = {
           lastSeenAt: partner.lastSeenAt,
         },
       });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // GET /api/delivery/notifications?unreadOnly=1&limit=50
+  listNotifications: async (req, res) => {
+    try {
+      const uid = String(req.user._id);
+      const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
+      const q = { userId: uid };
+      if (req.query.unreadOnly === '1' || req.query.unreadOnly === 'true') q.read = false;
+      const [notifications, unread] = await Promise.all([
+        Notification.find(q).sort({ createdAt: -1 }).limit(limit).lean(),
+        Notification.countDocuments({ userId: uid, read: false }),
+      ]);
+      res.json({ success: true, unread, notifications });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // POST /api/delivery/notifications/read  { ids?: string[] }  (omit ids = mark all)
+  markNotificationsRead: async (req, res) => {
+    try {
+      const uid = String(req.user._id);
+      const ids = Array.isArray(req.body?.ids) ? req.body.ids : null;
+      const filter = ids ? { userId: uid, _id: { $in: ids } } : { userId: uid, read: false };
+      const r = await Notification.updateMany(filter, { $set: { read: true } });
+      res.json({ success: true, updated: r.modifiedCount ?? r.nModified ?? 0 });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
     }

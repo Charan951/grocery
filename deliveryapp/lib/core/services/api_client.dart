@@ -162,4 +162,27 @@ class ApiClient {
   }
 
   Future<DeliveryOrder> fail(String o, String reason) => _step(o, 'fail', {'reason': reason});
+
+  Future<({int unread, List<AppNotification> items})> notifications({bool unreadOnly = false}) async {
+    try {
+      final r = await _dio.get('/delivery/notifications',
+          queryParameters: unreadOnly ? {'unreadOnly': '1'} : null);
+      final m = r.data as Map;
+      final list = (m['notifications'] as List?) ?? const [];
+      return (
+        unread: (m['unread'] as num?)?.toInt() ?? 0,
+        items: list.map((e) => AppNotification.fromJson(Map<String, dynamic>.from(e as Map))).toList(),
+      );
+    } on DioException catch (e) {
+      _rethrow(e);
+    }
+  }
+
+  Future<void> markNotificationsRead({List<String>? ids}) async {
+    try {
+      await _dio.post('/delivery/notifications/read', data: ids == null ? {} : {'ids': ids});
+    } on DioException catch (e) {
+      _rethrow(e);
+    }
+  }
 }

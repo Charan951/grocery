@@ -13,6 +13,15 @@ final activeOrdersProvider = FutureProvider.autoDispose<List<DeliveryOrder>>((re
   return ref.read(apiProvider).activeOrders();
 });
 
+final unreadCountProvider = FutureProvider.autoDispose<int>((ref) async {
+  try {
+    final r = await ref.read(apiProvider).notifications(unreadOnly: true);
+    return r.unread;
+  } catch (_) {
+    return 0;
+  }
+});
+
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
   @override
@@ -61,6 +70,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       appBar: AppBar(
         title: const Text('Dashboard'),
         actions: [
+          IconButton(
+            onPressed: () async {
+              await context.push('/notifications');
+              ref.invalidate(unreadCountProvider);
+            },
+            icon: Badge(
+              isLabelVisible: (ref.watch(unreadCountProvider).valueOrNull ?? 0) > 0,
+              label: Text('${ref.watch(unreadCountProvider).valueOrNull ?? 0}'),
+              child: const Icon(Icons.notifications_none_rounded),
+            ),
+          ),
           IconButton(onPressed: () => context.push('/history'), icon: const Icon(Icons.history_rounded)),
           IconButton(onPressed: () => context.push('/profile'), icon: const Icon(Icons.person_outline_rounded)),
         ],

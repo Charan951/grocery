@@ -1591,10 +1591,11 @@ export const reviewController = {
     }
   },
 
-  // POST /api/products/:id/reviews  { rating, comment }  (protectCustomer)
-  // Only a customer who has received this product in a Delivered order may
-  // review it, one review per product (a repeat call edits the existing one).
-  // New/edited reviews enter moderation as 'Pending'.
+  // POST /api/products/:id/reviews  { rating, comment, phone? }  (attachCustomerOptional)
+  // Identity from the app's customer token, or from a { phone } in the body for
+  // the token-less web storefront. Only a customer who has received this product
+  // in a Delivered order may review it, one review per product (a repeat call
+  // edits the existing one). New/edited reviews enter moderation as 'Pending'.
   createProductReview: async (req, res) => {
     try {
       const productId = req.params.id;
@@ -1605,7 +1606,14 @@ export const reviewController = {
       const product = await Product.findOne({ id: productId });
       if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
 
-      const cust = req.customer;
+      let cust = req.customer;
+      if (!cust) {
+        const raw = String(req.body.phone || '').replace(/\D/g, '').slice(-10);
+        if (raw) cust = await Customer.findOne({ phone: new RegExp(raw + '$') });
+      }
+      if (!cust) {
+        return res.status(401).json({ success: false, message: 'Sign in to write a review' });
+      }
       const phone10 = String(cust.phone || '').replace(/\D/g, '').slice(-10);
       const delivered = await Order.findOne({
         status: 'Delivered',
