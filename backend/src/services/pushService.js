@@ -1,18 +1,34 @@
 import fs from 'fs';
+import path from 'path';
 import { fileURLToPath } from 'url';
 import admin from 'firebase-admin';
 import { DeviceToken } from '../models/DeviceToken.js';
 
 // FCM is optional. It activates from (in order): FIREBASE_SERVICE_ACCOUNT
-// (raw JSON or base64), GOOGLE_APPLICATION_CREDENTIALS, or a local
-// src/config/service_account.json|js file (git-ignored). Without any of these
-// every send is a silent no-op so the rest of dispatch keeps working.
+// (a file path, or raw JSON, or base64 JSON), GOOGLE_APPLICATION_CREDENTIALS,
+// or a local src/config/service_account.json|js file (git-ignored). Without any
+// of these every send is a silent no-op so the rest of dispatch keeps working.
 let _app = null;
 let _warned = false;
 
+const configDir = path.dirname(fileURLToPath(new URL('../config/x', import.meta.url)));
+
+// Resolve a FIREBASE_SERVICE_ACCOUNT value that looks like a path to real JSON
+// text. Tries it as-is, relative to CWD, and relative to src/config/.
+const readIfPath = (v) => {
+  const s = v.trim();
+  if (s.startsWith('{')) return null; // inline JSON, not a path
+  for (const p of [s, path.resolve(process.cwd(), s), path.resolve(configDir, s)]) {
+    try {
+      if (fs.existsSync(p) && fs.statSync(p).isFile()) return fs.readFileSync(p, 'utf8');
+    } catch { /* keep trying */ }
+  }
+  return null;
+};
+
 const localKeyPath = () => {
   for (const name of ['service_account.json', 'service_account.js']) {
-    const p = fileURLToPath(new URL(`../config/${name}`, import.meta.url));
+    const p = path.join(configDir, name);
     if (fs.existsSync(p)) return p;
   }
   return null;
@@ -25,9 +41,8 @@ const init = () => {
     const keyFile = localKeyPath();
     let credential;
     if (raw) {
-      const json = raw.trim().startsWith('{')
-        ? raw
-        : Buffer.from(raw, 'base64').toString('utf8');
+      const json = readIfPath(raw)
+        ?? (raw.trim().startsWith('{') ? raw : Buffer.from(raw, 'base64').toString('utf8'));
       credential = admin.credential.cert(JSON.parse(json));
     } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
       credential = admin.credential.applicationDefault();
