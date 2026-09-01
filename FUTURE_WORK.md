@@ -108,14 +108,23 @@ web needs a real customer-auth pass first (see WEB-1).
 - **Acceptance:** top-up reflects in balance + ledger on both clients; web no
   longer shows a fake `₹0`.
 
-### FW-5 · Category filters + pagination
-- `[ ]` **Mobile & Web:** filter sheet — price range (`minPrice/maxPrice` already
-  server-side), brand, in-stock only, discount; sort (price, discount, rating).
-- `[ ]` **Backend:** confirm/extend `GET /products` query params; add
-  `page`/`limit` + return `total`. **Mobile:** infinite scroll on large
-  categories.
-- **Acceptance:** filtering a large category is paginated and fast; filter state
-  survives back-navigation.
+### FW-5 · Category filters + pagination — `[~]` 2026-09-01
+- `[x]` **Backend:** `GET /products` gained `brand` (comma list, exact-ish
+  `$in` regex), `inStock=true` (`stock.quantity > 0`), `onSale=true`
+  (`$expr` price < mrp), and **opt-in pagination** — pass `page`/`limit` →
+  `{ total, page, limit, totalPages, products }`; omit both → unchanged full
+  list. (price range + sort already existed.)
+- `[x]` **Mobile:** catalog filter sheet gains "In stock only" + "On offer"
+  toggles (`CatalogQuery` + `fetchProducts` pass `inStock`/`onSale`/`brands`);
+  active-filter count + Clear-filters updated.
+- `[x]` **Web:** `Products.tsx` filter row gains Organic / In stock / On offer
+  pills (client-side filter over the loaded catalog; it already paginates via
+  `currentPage`/`itemsPerPage`).
+- `[ ]` **Still to do:** brand multi-select UI (needs a brands list per
+  category); **mobile** server-side pagination + infinite scroll on large
+  categories (provider is still a one-shot `FutureProvider`).
+- Tests: backend `api.test` "brand + inStock + onSale + pagination" (`npm test`
+  42). Mobile analyze + `flutter test` 117; web `vite build` clean.
 
 ### FW-6 · Orders — status-filter tabs, active-order banner, invoice — `[~]` 2026-09-01
 - `[x]` **Mobile:** All / In Transit / Delivered / Cancelled `ChoiceChip` tabs on

@@ -37,6 +37,12 @@ test.before(async () => {
   await Product.create({
     id: REVIEW_PRODUCT_ID, name: 'QA Review Product', price: 40, mrp: 50,
     category: 'Grocery', categoryId: 'c1', brand: 'FreshCart',
+    stock: { status: 'In Stock', quantity: 12 },
+  });
+  await Product.create({
+    id: `${REVIEW_PRODUCT_ID}_x`, name: 'QA Filter Product', price: 90, mrp: 90,
+    category: 'Grocery', categoryId: 'c1', brand: 'QA Brand X',
+    stock: { status: 'Out of Stock', quantity: 0 },
   });
 });
 
@@ -47,7 +53,7 @@ test.after(async () => {
     Order.deleteMany({ customerPhone: new RegExp(`(${PHONE_A}|${PHONE_B})$`) }),
     Coupon.deleteMany({ code: COUPON }),
     Otp.deleteMany({ phone: { $in: [PHONE_A, PHONE_B] } }),
-    Product.deleteOne({ id: REVIEW_PRODUCT_ID }),
+    Product.deleteMany({ id: { $in: [REVIEW_PRODUCT_ID, `${REVIEW_PRODUCT_ID}_x`] } }),
     Review.deleteMany({ productId: REVIEW_PRODUCT_ID }),
   ]);
   await mongoose.disconnect();
@@ -76,6 +82,31 @@ test('catalog is public, orders/reviews are staff-only', async () => {
   assert.equal((await api().get('/api/products')).status, 200);
   assert.equal((await api().get('/api/orders')).status, 401);
   assert.equal((await api().get('/api/reviews')).status, 401);
+});
+
+test('GET /products: brand + inStock + onSale filters and opt-in pagination', async () => {
+  const brandHit = await api().get('/api/products?brand=QA%20Brand%20X');
+  assert.equal(brandHit.status, 200);
+  assert.ok(brandHit.body.products.every((p) => /qa brand x/i.test(p.brand)));
+
+  const inStock = await api().get('/api/products?inStock=true&brand=QA%20Brand%20X');
+  assert.equal(inStock.body.products.length, 0); // the QA Brand X product is out of stock
+
+  const onSale = await api().get(`/api/products?onSale=true&categoryId=c1`);
+  assert.ok(onSale.body.products.some((p) => p.id === REVIEW_PRODUCT_ID)); // 40 < 50
+  assert.ok(!onSale.body.products.some((p) => p.id === `${REVIEW_PRODUCT_ID}_x`)); // 90 == 90
+
+  const paged = await api().get('/api/products?page=1&limit=1');
+  assert.equal(paged.status, 200);
+  assert.equal(paged.body.products.length, 1);
+  assert.equal(paged.body.page, 1);
+  assert.equal(paged.body.limit, 1);
+  assert.ok(paged.body.total >= 2);
+  assert.ok(paged.body.totalPages >= 2);
+
+  // no page/limit → unchanged full-list shape
+  const all = await api().get('/api/products');
+  assert.ok(Array.isArray(all.body.products) && all.body.count === all.body.products.length);
 });
 
 test('OTP flow issues a customer JWT and rejects wrong codes', async () => {

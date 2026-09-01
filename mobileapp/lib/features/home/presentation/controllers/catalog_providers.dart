@@ -34,12 +34,16 @@ class CatalogQuery {
   final String categoryId;
   final String subCategory; // 'All' = no filter
   final bool organicOnly;
+  final bool inStockOnly;
+  final bool onSaleOnly;
   final String sort; // 'popular' | 'price-low' | 'price-high' | 'rating'
 
   const CatalogQuery({
     required this.categoryId,
     this.subCategory = 'All',
     this.organicOnly = false,
+    this.inStockOnly = false,
+    this.onSaleOnly = false,
     this.sort = 'popular',
   });
 
@@ -49,10 +53,13 @@ class CatalogQuery {
       other.categoryId == categoryId &&
       other.subCategory == subCategory &&
       other.organicOnly == organicOnly &&
+      other.inStockOnly == inStockOnly &&
+      other.onSaleOnly == onSaleOnly &&
       other.sort == sort;
 
   @override
-  int get hashCode => Object.hash(categoryId, subCategory, organicOnly, sort);
+  int get hashCode =>
+      Object.hash(categoryId, subCategory, organicOnly, inStockOnly, onSaleOnly, sort);
 }
 
 final categoryProductsProvider =
@@ -62,6 +69,8 @@ final categoryProductsProvider =
     categoryId: q.categoryId,
     subCategory: q.subCategory == 'All' ? null : q.subCategory,
     isOrganic: q.organicOnly ? true : null,
+    inStock: q.inStockOnly ? true : null,
+    onSale: q.onSaleOnly ? true : null,
     sort: q.sort == 'popular' ? null : q.sort,
   );
 });

@@ -39,9 +39,15 @@ class _CategoryCatalogScreenState extends ConsumerState<CategoryCatalogScreen> {
       ? widget.initialSubCategory!.trim()
       : 'All';
   bool _organicOnly = false;
+  bool _inStockOnly = false;
+  bool _onSaleOnly = false;
   String _sort = 'popular';
 
-  int get _activeFilterCount => (_organicOnly ? 1 : 0) + (_sort != 'popular' ? 1 : 0);
+  int get _activeFilterCount =>
+      (_organicOnly ? 1 : 0) +
+      (_inStockOnly ? 1 : 0) +
+      (_onSaleOnly ? 1 : 0) +
+      (_sort != 'popular' ? 1 : 0);
 
   Future<void> _openFilters() async {
     await AppBottomSheet.show(
@@ -51,6 +57,20 @@ class _CategoryCatalogScreenState extends ConsumerState<CategoryCatalogScreen> {
       child: StatefulBuilder(
         builder: (context, setSheet) {
           final isDark = Theme.of(context).brightness == Brightness.dark;
+          Widget toggle(String label, IconData icon, bool value, ValueChanged<bool> onSet) =>
+              SwitchListTile(
+                value: value,
+                activeColor: AppColors.primary,
+                contentPadding: EdgeInsets.zero,
+                title: Text(label, style: AppTypography.bodyMedium(
+                  isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                )),
+                secondary: Icon(icon, color: AppColors.primary),
+                onChanged: (v) {
+                  setSheet(() => onSet(v));
+                  setState(() {});
+                },
+              );
           Widget sortTile(String key) => RadioListTile<String>(
                 value: key,
                 groupValue: _sort,
@@ -68,19 +88,9 @@ class _CategoryCatalogScreenState extends ConsumerState<CategoryCatalogScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              SwitchListTile(
-                value: _organicOnly,
-                activeColor: AppColors.primary,
-                contentPadding: EdgeInsets.zero,
-                title: Text('Organic only', style: AppTypography.bodyMedium(
-                  isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                )),
-                secondary: const Icon(Icons.eco_rounded, color: AppColors.primary),
-                onChanged: (v) {
-                  setSheet(() => _organicOnly = v);
-                  setState(() {});
-                },
-              ),
+              toggle('Organic only', Icons.eco_rounded, _organicOnly, (v) => _organicOnly = v),
+              toggle('In stock only', Icons.inventory_2_outlined, _inStockOnly, (v) => _inStockOnly = v),
+              toggle('On offer', Icons.local_offer_outlined, _onSaleOnly, (v) => _onSaleOnly = v),
               const Divider(height: 24),
               Text('Sort by', style: AppTypography.labelMedium(
                 isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
@@ -107,6 +117,8 @@ class _CategoryCatalogScreenState extends ConsumerState<CategoryCatalogScreen> {
       categoryId: widget.categoryId,
       subCategory: _sub,
       organicOnly: _organicOnly,
+      inStockOnly: _inStockOnly,
+      onSaleOnly: _onSaleOnly,
       sort: _sort,
     );
     final productsAsync = ref.watch(categoryProductsProvider(query));
@@ -184,6 +196,8 @@ class _CategoryCatalogScreenState extends ConsumerState<CategoryCatalogScreen> {
                         ? () => setState(() {
                               _sub = 'All';
                               _organicOnly = false;
+                              _inStockOnly = false;
+                              _onSaleOnly = false;
                               _sort = 'popular';
                             })
                         : null,

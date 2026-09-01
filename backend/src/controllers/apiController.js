@@ -218,7 +218,10 @@ export const dashboardController = {
 export const productController = {
   getProducts: async (req, res) => {
     try {
-      const { categoryId, category, subCategory, search, isOrganic, minPrice, maxPrice, sort } = req.query;
+      const {
+        categoryId, category, subCategory, search, isOrganic,
+        minPrice, maxPrice, sort, brand, inStock, onSale, page, limit,
+      } = req.query;
       let query = {};
 
       if (categoryId || category) {
@@ -245,6 +248,17 @@ export const productController = {
         if (maxPrice) query.price.$lte = Number(maxPrice);
       }
 
+      if (brand) {
+        const brands = String(brand).split(',').map((b) => b.trim()).filter(Boolean);
+        if (brands.length) query.brand = { $in: brands.map((b) => new RegExp(`^${b.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')) };
+      }
+
+      if (inStock === 'true') query['stock.quantity'] = { $gt: 0 };
+
+      if (onSale === 'true') {
+        query.$expr = { $and: [{ $gt: ['$mrp', 0] }, { $lt: ['$price', '$mrp'] }] };
+      }
+
       if (search) {
         const searchRegex = new RegExp(search, 'i');
         query.$or = [
@@ -260,8 +274,22 @@ export const productController = {
       else if (sort === 'price-high') sortOptions = { price: -1 };
       else if (sort === 'rating') sortOptions = { rating: -1 };
 
+      // Pagination is opt-in: callers that pass neither page nor limit still get
+      // the full list (unchanged shape) so existing clients keep working.
+      if (page != null || limit != null) {
+        const lim = Math.min(Math.max(Number(limit) || 20, 1), 100);
+        const pg = Math.max(Number(page) || 1, 1);
+        const total = await Product.countDocuments(query);
+        const list = await Product.find(query).sort(sortOptions).skip((pg - 1) * lim).limit(lim);
+        return res.json({
+          success: true, count: list.length, total,
+          page: pg, limit: lim, totalPages: Math.ceil(total / lim),
+          products: list,
+        });
+      }
+
       const list = await Product.find(query).sort(sortOptions);
-      res.json({ success: true, count: list.length, products: list });
+      res.json({ success: true, count: list.length, total: list.length, products: list });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
     }

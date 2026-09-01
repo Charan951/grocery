@@ -93,6 +93,8 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
   // kicking the user back out to the cards view.
   const [inCategoryView, setInCategoryView] = useState<boolean>(false);
   const [onlyOrganic, setOnlyOrganic] = useState(false);
+  const [onlyInStock, setOnlyInStock] = useState(false);
+  const [onlyOnSale, setOnlyOnSale] = useState(false);
   const [sortBy, setSortBy] = useState('default');
 
   // Pagination States
@@ -376,6 +378,20 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
       result = result.filter((p) => p.isOrganic);
     }
 
+    if (onlyInStock) {
+      result = result.filter((p: any) => {
+        const q = p?.stock?.quantity ?? p?.stockQuantity ?? p?.stock;
+        return typeof q === 'number' ? q > 0 : p?.inStock !== false;
+      });
+    }
+
+    if (onlyOnSale) {
+      result = result.filter((p: any) => {
+        const mrp = p.originalPrice || p.mrp || 0;
+        return mrp > 0 && p.price < mrp;
+      });
+    }
+
     if (sortBy === 'price-low') {
       result.sort((a, b) => a.price - b.price);
     } else if (sortBy === 'price-high') {
@@ -387,11 +403,11 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
     }
 
     return result;
-  }, [products, urlSearch, selectedCategory, selectedSubCategory, currentCategoryObj, onlyOrganic, sortBy]);
+  }, [products, urlSearch, selectedCategory, selectedSubCategory, currentCategoryObj, onlyOrganic, onlyInStock, onlyOnSale, sortBy]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedCategory, selectedSubCategory, onlyOrganic, sortBy, urlSearch]);
+  }, [selectedCategory, selectedSubCategory, onlyOrganic, onlyInStock, onlyOnSale, sortBy, urlSearch]);
 
   const paginatedProducts = useMemo(() => {
     const startIdx = (currentPage - 1) * itemsPerPage;
@@ -401,6 +417,8 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
   const handleClearAll = () => {
     setSelectedSubCategory('');
     setOnlyOrganic(false);
+    setOnlyInStock(false);
+    setOnlyOnSale(false);
     setSearchParams({});
   };
 
@@ -599,6 +617,26 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
                         <option value="discount">Max Discount</option>
                       </select>
                     </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    {([
+                      ['Organic', onlyOrganic, setOnlyOrganic],
+                      ['In stock', onlyInStock, setOnlyInStock],
+                      ['On offer', onlyOnSale, setOnlyOnSale],
+                    ] as [string, boolean, (v: boolean) => void][]).map(([label, on, set]) => (
+                      <button
+                        key={label}
+                        onClick={() => set(!on)}
+                        className={`px-3 py-1 rounded-full text-[11px] font-bold border transition-colors ${
+                          on
+                            ? 'bg-emerald-600 text-white border-emerald-600'
+                            : 'bg-background text-text-secondary border-divider hover:border-emerald-400'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
                   </div>
                 </div>
 

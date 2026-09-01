@@ -160,6 +160,9 @@ class ApiService {
     String? search,
     bool? isOrganic,
     String? sort,
+    bool? inStock,
+    bool? onSale,
+    List<String>? brands,
   }) async {
     try {
       final qp = <String, dynamic>{};
@@ -168,6 +171,9 @@ class ApiService {
       if (search != null && search.trim().isNotEmpty) qp['search'] = search.trim();
       if (isOrganic == true) qp['isOrganic'] = 'true';
       if (sort != null && sort.isNotEmpty) qp['sort'] = sort;
+      if (inStock == true) qp['inStock'] = 'true';
+      if (onSale == true) qp['onSale'] = 'true';
+      if (brands != null && brands.isNotEmpty) qp['brand'] = brands.join(',');
 
       final res = await _dio.get('/products', queryParameters: qp);
       final data = res.data;
