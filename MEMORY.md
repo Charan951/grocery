@@ -1278,9 +1278,26 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
   screens yet.
 - Frontend: no automated tests; admin `fetchReviews` change not yet run in a browser.
 
+- **2026-09-01 — `/impeccable audit` findings implemented ("all at once") on Home (web+mobile)**:
+  Web `Home.tsx`: added a visually-hidden `<h1>` (page had no top-level heading — first was `h3`);
+  fixed broken Tailwind class `text-text-[#111827]` → `text-text-primary`; replaced off-brand hex
+  fallbacks (`#10B981`, `#0284c7`/`#06b6d4` gradient) with brand tokens (`#4CAF50`/`#81C784`).
+  `npm run build` clean.
+  Mobile `home_header.dart`: address row, search bar, and all 3 `_CircleIcon` instances
+  (notifications/profile/cart) now wrapped in `Semantics(button:true, label:...)` for TalkBack;
+  `_CircleIcon` touch target bumped from 42×42dp to 48×48dp (Android minimum) via a `SizedBox`;
+  hardcoded "Delivery in 8 mins" copy replaced with "Express delivery" in both `home_header.dart`
+  and PDP's `DeliveryBadge` (`product_details_screen.dart`). Also swapped the iOS-style
+  `Icons.arrow_back_ios_new_rounded` → Material's `Icons.arrow_back_rounded` in the 4 files that
+  had it: `app_scaffold.dart`, `product_details_screen.dart`, `auth_scaffold.dart`,
+  `location_select_screen.dart` (Android conformance — Material back icon, not iOS chevron).
+  `test/foundation_widgets_test.dart` updated to match. `flutter analyze` clean, `flutter test`
+  117/117, `flutter build apk --debug` succeeded.
+
 ## 13. Last Updated
 
 2026-09-01 — Live delivery tracking: real map + OSRM rider→drop route on BOTH clients. Mobile tracking_screen swapped the schematic painter for mapcn_flutter (OSM tiles, rider+drop markers, route polyline); TrackingNotifier fetches an OSRM road path (straight-line fallback) + recenters. Web TrackOrder gained the route polyline, a gliding rider marker (rAF tween), a store marker, follow-cam. flutter test 117 + APK; vite build clean.
+2026-09-01 — `/impeccable audit` findings on Home (web+mobile) implemented: a11y h1 + Semantics labels, broken CSS class, off-brand hex→tokens, Android back-icon conformance (4 files), hardcoded delivery-time copy. See §6 above.
 
 2026-09-01 — Mobile fixes: (1) INTERNET permission was debug-manifest-only → added to main AndroidManifest (release builds had no network → API + product images failed). (2) New LocationPermissionService + post-login location-permission flow (rationale sheet, open-settings for deniedForever, GPS-off dialog, in-screen banner); AuthNotifier.refreshLocationPermission wired after verifyOtp/hydrate; otp_screen + splash route to /location_select until granted. mobile analyze/117 tests/debug APK all green.
 

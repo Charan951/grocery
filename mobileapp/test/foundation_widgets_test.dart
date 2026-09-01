@@ -141,7 +141,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('page2'), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
+    await tester.tap(find.byIcon(Icons.arrow_back_rounded));
     await tester.pumpAndSettle();
     expect(find.text('page2'), findsNothing);
     expect(find.text('go'), findsOneWidget);

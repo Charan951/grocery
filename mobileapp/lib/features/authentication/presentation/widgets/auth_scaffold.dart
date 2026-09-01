@@ -114,7 +114,7 @@ class _CircleBack extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(10),
           child: Icon(
-            Icons.arrow_back_ios_new_rounded,
+            Icons.arrow_back_rounded,
             size: 16,
             color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
           ),

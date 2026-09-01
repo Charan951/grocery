@@ -96,7 +96,7 @@ class _ProductDetailsViewState extends ConsumerState<_ProductDetailsView> {
             backgroundColor: isDark ? AppColors.surfaceDark : AppColors.surface,
             surfaceTintColor: Colors.transparent,
             leading: _RoundBtn(
-              icon: Icons.arrow_back_ios_new_rounded,
+              icon: Icons.arrow_back_rounded,
               tooltip: 'Back',
               onTap: () => context.pop(),
             ),
@@ -129,7 +129,7 @@ class _ProductDetailsViewState extends ConsumerState<_ProductDetailsView> {
                         _Pill(icon: Icons.eco_rounded, label: 'Organic', color: AppColors.primary),
                         const SizedBox(width: 8),
                       ],
-                      const DeliveryBadge(durationText: 'Delivery in 8 mins'),
+                      const DeliveryBadge(durationText: 'Express delivery'),
                       const Spacer(),
                       if (lowStock)
                         Text('Only ${_p.stockQuantity} left',

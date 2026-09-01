@@ -120,7 +120,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
           subImg,
           catSlug,
           catName: cat.name,
-          catColor: cat.color || '#10B981',
+          catColor: cat.color || '#4CAF50',
         });
       });
     });
@@ -239,7 +239,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
       const matchingBanners = activeBanners.filter(b => b.positionIndex === currentSectionIndex && b.positionIndex > 0 && b.positionIndex < 99 && b.position !== 'top');
       const promoImage = typeof entry.sub === 'object' ? (entry.sub.promoImage || '') : '';
 
-      const categoryColor = category.color || '#10B981';
+      const categoryColor = category.color || '#4CAF50';
 
       sections.push({
         id: `${category.id}_sub_${subName.replace(/[^a-zA-Z0-9]/g, '_')}_${currentSectionIndex}`,
@@ -305,6 +305,10 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
       {/* Centered Web Container Layout */}
       <div className="w-full max-w-[1280px] mx-auto px-3 sm:px-6 lg:px-8 pt-0 sm:pt-3 pb-8">
 
+        {/* Page landmark for screen readers / heading navigation — visually
+            hidden, the header logo already carries the brand visually. */}
+        <h1 className="sr-only">FreshCart — fresh groceries delivered in minutes</h1>
+
         {/* Live order strip — tap to track */}
         <ActiveOrderBanner />
 
@@ -335,7 +339,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                     to={targetLink}
                     className="group relative rounded-2xl md:rounded-[20px] overflow-hidden flex flex-col justify-between shadow-xs hover:shadow-md transition-all duration-300 min-h-[150px] sm:min-h-[165px] border border-white/20 bg-cover bg-center"
                     style={{
-                      background: isBgImg ? `url(${card.bgImageUrl}) center/cover no-repeat` : card.bgGradient || 'linear-gradient(135deg, #0284c7, #06b6d4)',
+                      background: isBgImg ? `url(${card.bgImageUrl}) center/cover no-repeat` : card.bgGradient || 'linear-gradient(135deg, #4CAF50, #81C784)',
                       color: card.textColor || '#ffffff'
                     }}
                   >
@@ -617,7 +621,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
         {/* 6. Why Choose FreshCart */}
         <section className="mb-12 md:mb-16">
           <div className="text-center mb-10">
-            <h2 className="text-2xl md:text-3xl font-extrabold text-text-[#111827]">Why Choose FreshCart?</h2>
+            <h2 className="text-2xl md:text-3xl font-extrabold text-text-primary">Why Choose FreshCart?</h2>
             <p className="text-xs md:text-sm text-text-secondary mt-1">Our commitment to quality and express delivery logistics</p>
           </div>
 
