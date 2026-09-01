@@ -216,6 +216,8 @@ router.put('/customers/me/profile', protectCustomer, asMe, customerController.up
 router.post('/customers/me/addresses', protectCustomer, asMe, customerController.addAddress);
 router.delete('/customers/me/addresses/:addressId', protectCustomer, asMe, customerController.deleteAddress);
 router.post('/customers/me/wallet/debit', protectCustomer, customerController.walletDebit);
+router.post('/customers/me/wallet/topup', protectCustomer, customerController.walletTopup);
+router.post('/customers/me/wallet/topup/verify', protectCustomer, customerController.walletTopupVerify);
 router.get('/customers/me/wallet/transactions', protectCustomer, customerController.walletTransactions);
 router.post('/customers/me/devices', protectCustomer, customerController.registerDevice);
 router.delete('/customers/me/devices/:token', protectCustomer, customerController.removeDevice);

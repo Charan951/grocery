@@ -307,6 +307,35 @@ class ApiService {
     }
   }
 
+  /// `POST /api/customers/me/wallet/topup` → `{ orderId, amount, key, testMode }`.
+  Future<Map<String, dynamic>> walletTopupCreate(double amount) async {
+    try {
+      final res = await _dio.post('/customers/me/wallet/topup', data: {'amount': amount});
+      return Map<String, dynamic>.from(res.data as Map);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  /// `POST /api/customers/me/wallet/topup/verify` → `{ walletBalance }`.
+  Future<double> walletTopupVerify({
+    required double amount,
+    String? razorpayOrderId,
+    String? paymentId,
+    String? signature,
+  }) async {
+    try {
+      final body = <String, dynamic>{'amount': amount};
+      if (razorpayOrderId != null) body['razorpay_order_id'] = razorpayOrderId;
+      if (paymentId != null) body['razorpay_payment_id'] = paymentId;
+      if (signature != null) body['razorpay_signature'] = signature;
+      final res = await _dio.post('/customers/me/wallet/topup/verify', data: body);
+      return ((res.data as Map)['walletBalance'] as num).toDouble();
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
   /// `GET /api/orders/mine` — the signed-in customer's orders (needs a token).
   Future<List<Map<String, dynamic>>> fetchMyOrders() async {
     try {

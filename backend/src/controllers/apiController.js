@@ -1432,6 +1432,76 @@ export const customerController = {
     }
   },
 
+  // POST /api/customers/me/wallet/topup  { amount }  (protectCustomer)
+  // Step 1: create a Razorpay order for a wallet top-up. Nothing is credited yet.
+  walletTopup: async (req, res) => {
+    try {
+      const val = Math.round(Number(req.body.amount));
+      if (!val || val < 1 || val > 100000) {
+        return res.status(400).json({ success: false, message: 'Enter an amount between ₹1 and ₹1,00,000' });
+      }
+      const receipt = `wallet_${req.customer.customerId}_${Date.now()}`.slice(0, 40);
+      try {
+        const order = await razorpayInstance.orders.create({ amount: val * 100, currency: 'INR', receipt });
+        return res.json({
+          success: true, testMode: isPaymentsTestMode(),
+          orderId: order.id, amount: order.amount, currency: order.currency,
+          key: process.env.RAZORPAY_KEY_ID || '',
+        });
+      } catch (err) {
+        if (isPaymentsTestMode()) {
+          return res.json({
+            success: true, testMode: true,
+            orderId: `order_test_${Date.now()}`, amount: val * 100, currency: 'INR',
+            key: process.env.RAZORPAY_KEY_ID || '',
+          });
+        }
+        throw err;
+      }
+    } catch (err) {
+      res.status(502).json({ success: false, message: 'Could not start the top-up. Try again.' });
+    }
+  },
+
+  // POST /api/customers/me/wallet/topup/verify
+  //   { razorpay_order_id, razorpay_payment_id, razorpay_signature, amount }
+  // Step 2: verify the payment, then credit the wallet + write a ledger row.
+  walletTopupVerify: async (req, res) => {
+    try {
+      const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+      const val = Math.round(Number(req.body.amount));
+      if (!val || val < 1) return res.status(400).json({ success: false, message: 'Invalid amount' });
+
+      if (!isPaymentsTestMode()) {
+        if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+          return res.status(400).json({ success: false, message: 'Missing Razorpay verification fields' });
+        }
+        const expected = crypto
+          .createHmac('sha256', RAZORPAY_KEY_SECRET)
+          .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+          .digest('hex');
+        const a = Buffer.from(expected, 'utf8');
+        const b = Buffer.from(String(razorpay_signature), 'utf8');
+        if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+          return res.status(400).json({ success: false, verified: false, message: 'Signature verification failed' });
+        }
+      }
+
+      const customer = req.customer;
+      customer.walletBalance = (customer.walletBalance || 0) + val;
+      await customer.save();
+      await WalletTransaction.create({
+        customerId: customer.customerId,
+        amount: val,
+        type: 'Credit',
+        description: `Wallet top-up${razorpay_payment_id ? ` (${razorpay_payment_id})` : ''}`,
+      });
+      res.json({ success: true, verified: true, walletBalance: customer.walletBalance });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
   // GET /api/customers/me/wallet/transactions?limit=  (protectCustomer)
   // The signed-in customer's own wallet ledger, newest first.
   walletTransactions: async (req, res) => {

@@ -97,16 +97,19 @@ web needs a real customer-auth pass first (see WEB-1).
   customer's device; tap opens `/order/:id`. (Live once Android is on a device
   with the app; iOS pending the APNs key.)
 
-### FW-4 · Wallet top-up (Razorpay) + web wallet parity
-- `[ ]` **Backend:** `POST /api/customers/me/wallet/topup` → creates a Razorpay
-  order; on verify, credit `walletBalance` + `WalletTransaction{type:'Credit'}`.
-- `[ ]` **Mobile:** "Add money" on the wallet screen → Razorpay sheet → refresh
-  balance + history.
-- `[ ]` **Web:** `CustomerProfileDrawer` wallet block is a hardcoded `₹0` stub —
-  show the real balance, real "Add Balance" flow, and a transactions list
-  (needs WEB-1 or a phone-keyed read route).
-- **Acceptance:** top-up reflects in balance + ledger on both clients; web no
-  longer shows a fake `₹0`.
+### FW-4 · Wallet top-up (Razorpay) + web wallet parity — `[~]` 2026-09-01
+- `[x]` **Backend:** `POST /api/customers/me/wallet/topup {amount}` → Razorpay
+  order (test-mode stub when no key); `POST …/wallet/topup/verify` → HMAC check
+  (skipped in test mode) → credits `walletBalance` + `WalletTransaction
+  {type:'Credit'}`. `protectCustomer`. Test: create→verify→balance+ledger.
+- `[x]` **Mobile:** "Add money" button on the wallet screen → `_AmountSheet`
+  (₹100/250/500/1000/2000 chips + custom) → `walletTopupCreate` →
+  `RazorpayGateway` (or `SimulatedGateway` in test mode) → `walletTopupVerify`
+  → `auth.setWalletBalance` + refresh ledger.
+- `[ ]` **Web:** still blocked on WEB-1 (no customer JWT). `CustomerProfileDrawer`
+  wallet block is a hardcoded `₹0` stub — needs real balance + Add-Balance flow
+  + ledger once web has a customer token (or a phone-keyed read route).
+- **Acceptance:** ✅ mobile; ⬜ web.
 
 ### FW-5 · Category filters + pagination — `[~]` 2026-09-01
 - `[x]` **Backend:** `GET /products` gained `brand` (comma list, exact-ish

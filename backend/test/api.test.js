@@ -235,6 +235,31 @@ test('customer can cancel a pre-dispatch order; a prepaid one refunds to the wal
   assert.ok(txns.body.transactions.some((t) => t.type === 'Credit' && t.amount === 150));
 });
 
+test('wallet top-up: create order then verify credits the balance + ledger (test mode)', async () => {
+  const tokenA = await customerToken(PHONE_A);
+  await Customer.updateOne({ customerId: `cust_${PHONE_A}` }, { $set: { walletBalance: 0 } });
+
+  const bad = await api().post('/api/customers/me/wallet/topup')
+    .set('Authorization', `Bearer ${tokenA}`).send({ amount: 0 });
+  assert.equal(bad.status, 400);
+
+  const create = await api().post('/api/customers/me/wallet/topup')
+    .set('Authorization', `Bearer ${tokenA}`).send({ amount: 250 });
+  assert.equal(create.status, 200);
+  assert.ok(create.body.orderId);
+  assert.equal(create.body.amount, 25000);
+
+  const verify = await api().post('/api/customers/me/wallet/topup/verify')
+    .set('Authorization', `Bearer ${tokenA}`)
+    .send({ amount: 250, razorpay_order_id: create.body.orderId, razorpay_payment_id: 'pay_test', razorpay_signature: 'sig' });
+  assert.equal(verify.status, 200);
+  assert.equal(verify.body.walletBalance, 250);
+
+  const txns = await api().get('/api/customers/me/wallet/transactions')
+    .set('Authorization', `Bearer ${tokenA}`);
+  assert.ok(txns.body.transactions.some((t) => t.type === 'Credit' && t.amount === 250));
+});
+
 test('COD orders are created Pending (never Paid on creation)', async () => {
   const tokenA = await customerToken(PHONE_A);
   const cod = await api().post('/api/orders').set('Authorization', `Bearer ${tokenA}`).send({

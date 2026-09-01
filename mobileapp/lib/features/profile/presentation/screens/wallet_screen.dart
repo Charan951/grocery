@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
 import 'package:freshcart/core/constants/app_radius.dart';
+import 'package:freshcart/core/error/api_exception.dart';
+import 'package:freshcart/core/services/payment_service.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
 import 'package:freshcart/core/widgets/app_scaffold.dart';
 import 'package:freshcart/core/widgets/app_toast.dart';
@@ -77,6 +79,19 @@ class WalletScreen extends ConsumerWidget {
                 const SizedBox(height: 8),
                 Text('Spendable at checkout via the Wallet payment option.',
                     style: AppTypography.bodySmall(subColor)),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () => _addMoney(context, ref),
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('Add money'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      shape: RoundedRectangleBorder(borderRadius: AppRadius.brSm),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -144,6 +159,129 @@ class WalletScreen extends ConsumerWidget {
           ),
         ],
       ),
+      ),
+    );
+  }
+
+  Future<void> _addMoney(BuildContext context, WidgetRef ref) async {
+    final amount = await showModalBottomSheet<double>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => const _AmountSheet(),
+    );
+    if (amount == null || amount <= 0) return;
+    if (!context.mounted) return;
+
+    final api = ref.read(apiServiceProvider);
+    final auth = ref.read(authProvider.notifier);
+    final user = ref.read(authProvider).user;
+    try {
+      final order = await api.walletTopupCreate(amount);
+      final key = (order['key'] ?? '').toString();
+      final testMode = order['testMode'] == true || key.isEmpty;
+      final PaymentGateway gateway = testMode ? SimulatedGateway() : RazorpayGateway();
+
+      final result = await gateway.pay(PaymentRequest(
+        keyId: key,
+        razorpayOrderId: (order['orderId'] ?? '').toString(),
+        amountPaise: (order['amount'] as num?)?.toInt() ?? (amount * 100).round(),
+        name: 'FreshCart Wallet',
+        description: 'Wallet top-up',
+        contact: user?.phone ?? '',
+        email: user?.email ?? '',
+      ));
+
+      switch (result) {
+        case PaymentSuccess s:
+          final bal = await api.walletTopupVerify(
+            amount: amount,
+            razorpayOrderId: s.razorpayOrderId,
+            paymentId: s.paymentId,
+            signature: s.signature,
+          );
+          auth.setWalletBalance(bal);
+          ref.invalidate(walletTransactionsProvider);
+          AppToast.success('₹${amount.toStringAsFixed(0)} added to your wallet');
+        case PaymentFailure f:
+          if (!f.cancelled) AppToast.error(f.message);
+      }
+    } on ApiException catch (e) {
+      AppToast.error(e.message);
+    }
+  }
+}
+
+class _AmountSheet extends StatefulWidget {
+  const _AmountSheet();
+  @override
+  State<_AmountSheet> createState() => _AmountSheetState();
+}
+
+class _AmountSheetState extends State<_AmountSheet> {
+  final _ctrl = TextEditingController();
+  static const _presets = [100, 250, 500, 1000, 2000];
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimary;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 4, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Add money to wallet', style: AppTypography.title(textColor)),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final p in _presets)
+                ActionChip(
+                  label: Text('₹$p'),
+                  onPressed: () => Navigator.pop(context, p.toDouble()),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _ctrl,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: const InputDecoration(
+              prefixText: '₹ ',
+              labelText: 'Or enter an amount',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () {
+                final v = double.tryParse(_ctrl.text.trim()) ?? 0;
+                if (v < 1) {
+                  AppToast.error('Enter an amount of ₹1 or more');
+                  return;
+                }
+                Navigator.pop(context, v);
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(borderRadius: AppRadius.brSm),
+              ),
+              child: const Text('Continue to pay'),
+            ),
+          ),
+        ],
       ),
     );
   }
