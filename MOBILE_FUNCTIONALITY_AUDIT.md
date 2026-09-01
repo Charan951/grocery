@@ -1,493 +1,384 @@
 # FreshCart — Mobile Functionality Audit
 
-> Web (`frontend/`, React SPA storefront) **vs** Mobile (`mobileapp/`, Flutter).
-> Date: **2026-09-01** (refresh — supersedes the 2026-08-31 audit).
-> Scope: customer-facing storefront only. Admin (`/admin/*`) is web-only by design — out of scope.
-> Legend: ✓ Complete · ⚠ Partial · ✗ Missing · 🐛 Broken / fake data
+> **Web** (`frontend/`, React SPA storefront) **vs Mobile** (`mobileapp/`, Flutter customer app).
+> Date: **2026-09-01** (full refresh — supersedes the earlier 2026-09-01 snapshot; reflects
+> FW-3/FW-4/FW-5/FW-6/FW-11/FW-13/FW-16 + the P1-D3 web tracker).
+> Scope: **customer-facing storefront only.** Admin (`/admin/*`) is web-only by design — out of scope.
+> The delivery-partner app (`deliveryapp/`) is a separate product — out of scope.
 
-This audit is a snapshot of gaps. **Nothing here is being fixed in this pass.**
+Legend: **✓** Complete · **⚠** Partial · **✗** Missing · **🐛** Broken / fake data
 
-Since the last audit, mobile got: real address CRUD, a profile-edit screen, a real
-wallet screen (fake data removed), a real notifications feed, `url_launcher`
-dial/maps, banner tap-target mapping, orphaned-route cleanup, and a full
-design-system pass. Web got the order **status timeline** (ported from mobile).
-All reflected below.
+**This is an audit only. Nothing here is being fixed in this pass.**
 
 ---
 
 ## 0. Executive summary
 
-| Area | Verdict | One-liner |
-|---|---|---|
-| Browse → cart → pay → track | ✓ | Native, real API, all states, 100 widget/unit tests. |
-| Auth (phone → OTP → JWT) | ✓ | Real. Terms/Privacy now tappable links → bundled `/legal` screen. |
-| Address CRUD | ✓ | Real `POST` / `DELETE /customers/me/addresses`. No edit / set-default endpoint (backend gap, parity with web). |
-| Profile edit | ✓ | `ProfileEditScreen` → `PUT /customers/me/profile`. |
-| Wallet | ⚠ | Real balance + referral code + **transaction history** (`GET /customers/me/wallet/transactions`, 2026-09-01). Top-up still missing. (Web's wallet drawer is still a hardcoded `₹0` stub.) |
-| Notifications (in-app) | ⚠ | Real activity feed from order timelines + bell entry point. No dedicated endpoint, no push (FCM). Web has nothing. |
-| Reviews (read + write) | ✓ | `GET /products/:id/reviews` (public, approved + summary) + `POST` (verified-purchase: needs a Delivered order with the product; enters moderation as Pending). PDP "Ratings & reviews" section + write sheet on **mobile and web** (2026-09-01). Approve recomputes `Product.rating`/`reviewsCount`. |
-| Order cancel | ✓ | `POST /orders/:id/cancel` added (2026-09-01, dual-auth: app token OR `{phone}` for web). Pre-dispatch only; prepaid orders refunded to wallet. Wired on mobile order detail **and** web `CustomerOrders`. |
-| Content pages (Offers, Brands, Blog, About, Legal, Help/FAQ, Careers) | ✗ | Not built on mobile. Backend has `/blogs`, `/brands`. |
-| Payments (Razorpay / Wallet / COD) | ✓ | Real gateway + HMAC verify + webhook. |
-| Push notifications (FCM) | ✗ | No `firebase_*` deps, no `POST_NOTIFICATIONS`, no token routes. |
-| Deep links / app links | ✗ | No `intent-filter` host, no `go_router` deep-link config, no `share_plus`. |
-| Offline / force-update / maintenance | ✗ | No `connectivity_plus`, no `GET /app/config`. |
-| Filters / sorting | ⚠ | Organic + 4 sorts. No price-range, brand, in-stock, discount-sort, pagination. |
-| Permissions | ⚠ | Location handled ad-hoc via `geolocator`; no `permission_handler`, no rationale, no "open settings". |
-| Stores | ⚠ | Hardcoded list on **both** platforms (no endpoint). Mobile now has Call + Directions. |
-| WhatsApp / Bookings / Enquiries / Quotes | n/a | Not in web either (grocery quick-commerce). |
+| Capability | Web | Mobile | Verdict | Note |
+|---|---|---|---|---|
+| Browse → cart → checkout → pay → track | ✓ | ✓ | **✓ parity** | Native, real API, all 4 states, ~117 mobile tests. |
+| Customer auth | 🐛 fake OTP `1234` + phone-keyed `/customers/auth`, **no JWT** | ✓ real OTP → JWT (`protectCustomer`) | **mobile ahead** | Web's missing real auth (**WEB-1**) is what blocks web wallet/membership. |
+| Home | ✓ | ✓ | ✓ | Mobile adds a festival hero (FW-11) + live-order banner (FW-6). |
+| Product listing / filters | ✓ organic + sort + In-stock/On-offer pills; client-side pagination | ⚠ organic + sort + In-stock/On-offer; **no pagination / infinite scroll**, no brand picker | **⚠** | Backend `GET /products` now supports `brand`/`inStock`/`onSale`/`page`/`limit` (FW-5). Mobile provider is still one-shot. |
+| Product detail + reviews | ✓ | ✓ | ✓ | PDP ratings & reviews section + write sheet on both. |
+| Search | ✓ text + suggestions | ⚠ text + recents; **no trending/suggestions**, mic removed (FW-16) | **⚠** | |
+| Cart + coupons | ✓ | ✓ | ✓ | Coupon validate server-side both. |
+| Checkout (Razorpay / Wallet / COD) | ✓ | ✓ | ✓ | Real gateway + HMAC verify + webhook. COD now created `Pending` (BE-3). |
+| Orders list | ✓ tabs (All/In Transit/Delivered/Cancelled) | ✓ same tabs (FW-6) | **✓ parity** | |
+| Order detail + timeline | ✓ | ✓ | ✓ | |
+| Order cancel (pre-dispatch, wallet refund) | ✓ | ✓ | ✓ | `POST /orders/:id/cancel`. |
+| Live order tracking (map, rider, ETA, call/WA) | ✓ `/track/:orderId` (Leaflet, 10s poll) | ⚠ `tracking_screen` — **schematic painter, not a real map**; call/WhatsApp wired | **⚠** | Backend `delivery` block (masked → revealed) consumed by both. |
+| Invoice / credit note | 🐛 `alert()` stub | 🐛 `alert()` stub | **🐛 both** | `Invoice` model exists, no endpoint. |
+| Wallet | 🐛 hardcoded `₹0` in profile drawer | ✓ balance + history + **top-up** (FW-4) | **mobile ahead** | Web blocked on WEB-1. |
+| Address book | ✓ add / **edit** / delete / map / geocode | ⚠ add / delete only — **no edit, no set-default** | **⚠** | Backend has no edit/set-default route (parity gap on both). |
+| Profile edit (name/phone) | ✓ | ✓ | ✓ | No avatar upload on either. |
+| Membership (join / upgrade VIP) | ✗ benefits page only | ✗ benefits page only | **✗ both** | No backend endpoint (FW-7). |
+| Notifications — in-app feed | ✗ nothing | ⚠ derived from order timelines (no dedicated endpoint) | **mobile ahead / ⚠** | |
+| Notifications — push (FCM) | ✗ | ✓ device token + order-status + delivery-offer pushes (FW-3) | **mobile ahead** | iOS APNs key still owed. |
+| Content pages (About / Blog / Brands / Offers / Careers / Stores) | ✓ all | ✗ none (Legal only) | **✗ mobile** | See §1. |
+| Legal (Terms / Privacy) | ✓ | ✓ bundled `LegalScreen` | ✓ | |
+| Help / Support | ✓ FAQ + `tel:` + chat | ⚠ socket chat only — no FAQ, no `tel:`, no ticket history | **⚠** | |
+| Stores | ⚠ hardcoded list + fake map | ⚠ hardcoded list + Call + Directions | **⚠ both** | No `/api/stores`. |
+| Offline / maintenance / force-update | ✗ | ✓ banner + `/app/config` gate (FW-1) | **mobile ahead** | Retry-with-backoff still open. |
+| Deep links / app links | ✗ | ✗ | **✗ both** | No `assetlinks`/AASA, no `intent-filter` host. |
+| Permissions UX | n/a (browser) | ⚠ location ad-hoc via `geolocator`; FCM permission prompt (FW-3); **no `permission_handler` rationale / "open settings"** | **⚠** | |
+| Analytics / crash reporting | ✗ | ✗ | **✗ both** | FW-12. |
+| Deep back-navigation / state restore | n/a | ⚠ `go_router` + hardware back; filter state survives but **no scroll restore, no tab-state persistence** | **⚠** | |
+| Bookings / Enquiries / Quotes / RFQ | n/a | n/a | **n/a** | Not part of this grocery quick-commerce product on either side. |
 
 ---
 
-## 1. Pages
+## 1. Pages & routes
 
-Mobile routes: `/splash /onboarding /login /otp /location_select` · tabs
-`/ /categories /search /orders /account` · pushed `/category/:id /product/:id
-/cart /checkout /order-placed/:id /order/:id /tracking/:id /wishlist /wallet
-/membership /support /addresses /stores /notifications /account/edit /search_detail`.
+**Mobile routes:** `/splash /maintenance /force_update /onboarding /login /otp /location_select`
+· tabs `/ /categories /search /orders /account`
+· pushed `/category/:id /product/:id /cart /checkout /order-placed/:id /order/:id /tracking/:orderId
+/wishlist /wallet /membership /support /addresses /stores /notifications /account/edit /search_detail /legal`.
 
-| Web page / route | Mobile equivalent | Status | Notes |
+| Web route | Mobile equivalent | Status | Notes |
 |---|---|---|---|
-| `/` Home | `HomeScreen` | ✓ | Real banners / categories / special-groups / products; curated + per-category rails. |
-| `/categories` | `CategoriesScreen` (tab) | ✓ | Per-category sections + subcategory tiles + trending cloud. |
-| `/products`, `/category/:slug` (listing) | `CategoryCatalogScreen` (`/category/:id`) | ⚠ | No all-products `/products` view; no pagination; fewer filters (§8). |
-| `/product/:id`, `/prn/:slug/prid/:id` | `ProductDetailsScreen` | ⚠ | Full PDP with a Ratings & reviews section (2026-09-01). No SEO slug route. |
+| `/` Home | `HomeScreen` | ✓ | Banners / categories / special-groups / curated + per-category rails. Mobile-only: festival hero (FW-11), live-order banner (FW-6). |
+| `/categories` | `CategoriesScreen` (tab) | ✓ | Sections + subcategory tiles + trending cloud. |
+| `/products` (all products) | — | ✗ | Mobile has no "browse everything" list; only per-category. |
+| `/category/:slug` | `CategoryCatalogScreen` (`/category/:id`) | ⚠ | No pagination / infinite scroll; no brand filter UI (§6). |
+| `/product/:id`, `/prn/:slug/prid/:id` | `ProductDetailsScreen` | ⚠ | Full PDP + reviews + `share_plus`. No SEO-slug route (n/a on mobile). |
 | `/brands` | — | ✗ | `GET /api/brands` unused on mobile. |
-| `/offers` | — (coupons only inside Cart) | ✗ | No offers / coupon browse page. |
+| `/offers` | — (coupons only inside cart) | ✗ | No offers / coupon-browse / referral page. |
 | `/blog`, `/blog/:id` | — | ✗ | `GET /api/blogs` unused. |
-| `/about` | — | ✗ | Not built. |
-| `/legal`, `/s/terms-of-service`, `/s/privacy-policy` | — | ✓ | Login "Terms of Service" / "Privacy Policy" are tappable spans → `/legal?tab=terms|privacy` (`LegalScreen`, bundled copy mirroring web `Legal.tsx`). |
-| `/help`, `/support` | `SupportScreen` | ⚠ | Socket chat only; no FAQ / help-centre content, no ticket history. |
-| `/careers` | — | ✗ | Not built (low priority). |
-| `/stores` | `StoresScreen` | ⚠ | Hardcoded 3 stores on **both** platforms (no endpoint). Mobile adds Call / Directions. |
-| `/locations`, `/saved-addresses`, `/account/addresses` | `AddressesScreen` | ✓ | Real add / delete / select. |
-| `/orders`, `/account/orders` | `OrdersListScreen` (tab) | ✓ | Both real now; mobile has Active/Past split + reorder + thumbnails. |
-| `/profile`, `/account/profile` | `ProfileScreen` (tab) + `ProfileEditScreen` | ✓ | Menu + Edit → `PUT /customers/me/profile`. Web also has delete-account (mobile ✗). |
-| — (web `CustomerProfileDrawer` shows a wallet stub) | `WalletScreen` (`/wallet`) | ⚠ | Real balance + funding note + referral copy. No txns / top-up (no endpoint). |
-| — | `NotificationsScreen` (`/notifications`) | ⚠ | Real feed from order `trackingTimeline`s; bell in Home header + Profile row. |
-| — | `MembershipScreen` (`/membership`) | ⚠ | Static benefits; **no join / upgrade action**. |
-| — | `WishlistScreen` (`/wishlist`) | ✓ | Reachable from a Profile menu row; grid + remove-× + "Add all". |
-| Quick-view modal (from cards) | — | ⚠ | Mobile taps straight through to PDP. |
-| Festival campaign themed Home (mobile-web) | — | ✗ | `FestivalCampaignWrapper` not ported. `GET /festival-campaigns/active` unused. |
+| `/about` | — | ✗ | Not built (web content is mostly hardcoded anyway). |
+| `/careers` | — | ✗ | Web form itself is a 🐛 `alert()` stub (resume upload not wired). |
+| `/legal` + `/s/terms-of-service` + `/s/privacy-policy` | `LegalScreen` (`/legal?tab=`) | ✓ | Login Terms/Privacy are tappable spans → bundled screen. |
+| `/help` `/support` | `SupportScreen` | ⚠ | Socket chat only. No FAQ content, no `tel:` shortcut, no ticket history (`SupportTicket` model exists). |
+| `/stores` `/locations` | `StoresScreen` | ⚠ | Hardcoded list on both. Mobile adds Call + Directions. |
+| `/orders` `/account/orders` | `OrdersListScreen` (tab) | ✓ | Status tabs on both now (FW-6). |
+| `/track/:orderId` | `TrackingScreen` (`/tracking/:orderId`) | ⚠ | Web = real Leaflet map; mobile = schematic `CustomPainter`. Both: status stepper, ETA, call/WhatsApp, reveal-window gating. |
+| `/profile` `/account/profile` | `ProfileScreen` (tab) + `/account/edit` | ✓ | |
+| — | `/wishlist` | ✓ | Web wishlist is a header drawer; mobile has a full screen. Parity+. |
+| — | `/wallet` | ✓ (mobile ahead) | Real balance + history + top-up. Web drawer shows fake `₹0`. |
+| — | `/notifications` | ⚠ (mobile ahead) | Order-timeline activity feed. Web has none. |
+| — | `/onboarding`, `/maintenance`, `/force_update` | ✓ (mobile-only) | No web equivalent needed. |
 
 ---
 
-## 2. Navigation
+## 2. Navigation & back navigation
 
-| Item | Status | Notes |
-|---|---|---|
-| Bottom nav (5 tabs, all labels, persistent) | ✓ | Rebuilt — full-width flat bar, never hides. |
-| Full-screen routes above the tab shell | ✓ | cart, checkout, PDP, tracking, wallet, etc. |
-| Auth redirect guard (unauth → `/login`) | ✓ | `redirect` in `routerProvider`. |
-| Re-tap active tab → pop to root | ✓ | |
-| Hardware back: non-home tab → Home; Home root → exit-confirm | ✓ | `MainScaffold` `PopScope`. |
-| Orphaned routes | ✓ | `/location` + `/map_selection` deleted; `/wishlist` + `/notifications` now have entry points. |
-| Banner / promo tap targets | ✓ | `resolveAppRoute()` maps CMS links; unmappable → non-tappable. |
-| "See all" / category / subcategory links | ✓ | Resolve to `/category/:id(?sub=)`. |
-| Profile → wallet / addresses / stores / support / membership / wishlist / notifications / edit | ✓ | All wired. |
-| Deep-linked route while signed out | ⚠ | Bounces to `/login`; **no return-to-intended-route** after sign-in. |
-| Deep links from outside the app | ✗ | See §26. |
+| Item | Web | Mobile | Status |
+|---|---|---|---|
+| Primary nav | Header + hamburger drawer (Home, Catalog, Offers, Blog, About, Help, Locations, Stores, Careers, Admin) | 5-tab bottom bar (Home, Categories, Search, Orders, Account) | ⚠ mobile bottom-bar omits all content pages; they're simply absent. |
+| Back navigation | Browser back | `go_router` + Android hardware back; `_smartBack` fallbacks | ✓ |
+| Deep-return after login | ✓ | ⚠ `redirect` guard sends to `/` or `/login`; **no "return to intended route"** after auth. |
+| Scroll position restore | browser-native | ✗ no `PageStorageKey` / restoration on lists | ⚠ |
+| Tab state persistence | n/a | ⚠ tab branches keep state via `StatefulShellRoute`, but catalog filter/scroll reset on deep pop | ⚠ |
+| Promo-card / banner → route mapping | ✓ `resolveAppRoute` | ⚠ mobile maps banner taps; **promo-cards not consumed at all** on mobile | ⚠ |
 
 ---
 
 ## 3. Authentication
 
-| Item | Status | Notes |
-|---|---|---|
-| Phone → OTP → verify → customer JWT | ✓ | Real `/customers/otp/send` + `/otp/verify`, 30-day token. |
-| `OtpField` (6-box, paste, backspace, auto-submit, resend timer, test-mode banner) | ✓ | |
-| Token secured; Bearer on requests; 401 → logout → `/login` | ✓ | `TokenStore` + Dio interceptor. |
-| Splash routes on real hydrated state | ✓ | |
-| Logout clears token + cart / wishlist / recent-search caches | ✓ | Best-effort. |
-| "Continue = agree to Terms/Privacy" | ✓ | Tappable links → bundled `/legal` screen. |
-| Rate-limit / lockout messaging | ⚠ | Backend enforces; mobile shows the generic error string, no "try again in Ns". |
-| Account deletion | ✓ | `DELETE /customers/me` (2026-09-01, cascade: profile + wallet ledger + reviews; orders scrubbed). Mobile profile screen + web `CustomerProfile`. Legacy `DELETE /customers/:id` now staff-only. |
-| Biometric app-lock | ✗ | Not present. |
+| Item | Web | Mobile | Status |
+|---|---|---|---|
+| Method | Phone → **fake OTP (`1234`)** → `POST /customers/auth` by phone, **no token stored** | Phone → real `POST /customers/otp/send` + `/verify` → 30-day JWT in `flutter_secure_storage` | **mobile ✓ / web 🐛** |
+| Session hydrate | re-reads `customer_user` from `localStorage` | `GET /customers/me` on boot, 401 → auto-logout | mobile ✓ |
+| Logout | clears `localStorage` | clears token + caches + FCM unregister | ✓ |
+| Terms / Privacy links at sign-in | ✓ | ✓ (tappable → `/legal`) | ✓ |
+| Delete account | ✓ `DELETE /customers/me?phone=` | ✓ `AuthNotifier.deleteAccount()` → `/login` | ✓ |
+| Guest browsing | ✓ | ✓ | ✓ |
+| **Consequence** | Web cannot use any `protectCustomer` route → wallet, membership, real order ownership all fall back to `{phone}`-in-body or stubs. | — | **WEB-1 is the single biggest web gap.** |
 
 ---
 
 ## 4. Forms
 
-| Form | Status | Notes |
-|---|---|---|
-| Phone field (`+91`, grouping, 10-digit) | ✓ | `PhoneField`. |
-| OTP input | ✓ | `OtpField`. |
-| Coupon code entry (Cart) | ✓ | `AppTextField` + Apply → server `validateCoupon`. |
-| Add-address form (label / house / area / city / pincode) | ✓ | `AppBottomSheet` + `AppTextField`, validated → real `POST`. |
-| Profile edit (name / email) | ✓ | `ProfileEditScreen`, validated → real `PUT`. |
-| Location-select address fields (house / landmark) | ⚠ | Still raw `TextField` inside `location_select` (not `AppTextField`). |
-| Support chat input | ⚠ | Bare `TextField` in a pill container (not `AppTextField`). |
-| Search field | ✓ | Debounced, recents, clear, `textInputAction: search`. |
-| Field-level validation + inline errors | ✓ (auth / address / profile) / ⚠ (elsewhere) | `AppTextField` supports `errorText`. |
+| Form | Web | Mobile | Status |
+|---|---|---|---|
+| OTP entry | ✓ | ✓ (`OtpField`, resend, dev-code in test mode) | ✓ |
+| Address add | ✓ (map + geocode + label + house/landmark) | ✓ (`POST /customers/me/addresses`) | ✓ |
+| Address **edit** | ✓ `PUT /customers/:phone/addresses` | ✗ no edit UI or route | ✗ |
+| Address set-default | ⚠ client-only flag | ✗ | ✗ both weak (no backend route) |
+| Profile edit (name / phone) | ✓ | ✓ `PUT /customers/me/profile` | ✓ |
+| Wallet top-up amount | ✗ | ✓ `_AmountSheet` (chips + custom, validated) | mobile ahead |
+| Checkout address / slot / payment | ✓ | ✓ | ✓ |
+| Coupon apply | ✓ | ✓ (server validate) | ✓ |
+| Review write | ✓ | ✓ (rating + comment, verified-purchase gated) | ✓ |
+| Careers application | 🐛 `alert()` stub | — | n/a (web stub) |
+| Support message | ✓ | ✓ (socket) | ✓ |
+| Field validation / inline errors | ✓ | ✓ (`AppTextField` on newer forms; `location_select` still raw `TextField`) | ⚠ mobile inconsistent |
 
 ---
 
-## 5. API integration
+## 5. API integration & CRUD
 
-`ApiService` (mobile): `sendOtp, verifyOtp, fetchMe, updateMyProfile, addAddress,
-deleteAddress, fetchBanners, fetchCategories, fetchSpecialGroups, fetchProducts,
-fetchProduct, fetchSettings, fetchCoupons, validateCoupon, createOrder,
-createRazorpayOrder, verifyPayment, walletDebit, fetchMyOrders, fetchOrder`.
+Mobile endpoints in use: `/customers/otp/{send,verify}`, `/customers/me` (GET/PUT),
+`/customers/me/addresses` (POST/DELETE), `/customers/me/devices` (POST/DELETE),
+`/customers/me/wallet/{debit,topup,topup/verify,transactions}`, `/customers/me` (DELETE),
+`/banners`, `/festival-campaigns/active`, `/categories`, `/special-groups`, `/products` (+query),
+`/products/:id`, `/products/:id/reviews` (GET/POST), `/settings`, `/coupons`, `/coupons/validate`,
+`/orders` (POST), `/orders/mine`, `/orders/:id` (GET), `/orders/:id/cancel`, `/orders/:id/rider-location`,
+`/payment/{create-order,verify}`, `/app/config`.
 
-| Endpoint | Mobile | Status |
-|---|---|---|
-| `GET /categories /products /products/:id /banners /special-groups /settings /coupons` | wired | ✓ |
-| `POST /coupons/validate` | wired | ✓ |
-| `POST /orders`, `GET /orders/mine`, `GET /orders/:id` | wired | ✓ |
-| `POST /customers/otp/*`, `GET /customers/me` | wired | ✓ |
-| `PUT /customers/me/profile` | `ProfileEditScreen` | ✓ |
-| `POST` / `DELETE /customers/me/addresses[/:id]` | `AddressesScreen` / `location_select` | ✓ |
-| `POST /customers/me/wallet/debit` | checkout wallet path | ✓ |
-| `POST /payment/create-order` + `/payment/verify` + webhook | wired | ✓ |
-| `GET /brands` | — | ✗ unused |
-| `GET /blogs` | — | ✗ unused |
-| `GET /festival-campaigns/active` | — | ✗ unused |
-| Product reviews (`GET /products/:id/reviews` public, `POST` verified-purchase) | `getProductReviews` / `createProductReview` | ✓ added 2026-09-01 (POST: attachCustomerOptional, token or `{phone}`) |
-| Order cancel (`POST /orders/:id/cancel`) | `cancelOrder` | ✓ added 2026-09-01 (attachCustomerOptional; token or `{phone}`) |
-| Notifications list / mark-read | — | ✗ **route does not exist** |
-| Wallet transactions (`GET /customers/me/wallet/transactions`) | `walletTransactions` | ✓ added 2026-09-01 (protectCustomer) |
-| Wallet top-up (`PUT /customers/:id/wallet`) | — | ✗ exists but `protect` (staff) — not customer-callable |
-| Device tokens (FCM) | — | ✗ **route does not exist** |
-| `GET /api/app/config` (force-update / maintenance) | — | ✗ **route does not exist** |
-| `GET /api/stores` | — | ✗ **route does not exist** (static on both platforms) |
-| Offline degrade | ⚠ | Catalog throws typed `ApiException` (no fake data) ✓; **no offline banner / retry-with-backoff / connectivity awareness**. |
+| Resource | Web | Mobile | Status |
+|---|---|---|---|
+| Products (read) | ✓ (CMS bulk-load, client filter/paginate) | ✓ (per-query fetch) | ✓ — different strategy; mobile ignores new `page`/`limit` (⚠, §6). |
+| Categories / banners / special-groups | ✓ | ✓ | ✓ |
+| **Promo cards** | ✓ `/promo-cards` | ✗ never fetched | ✗ |
+| **Blogs** | ✓ `/blogs` | ✗ | ✗ |
+| **Brands** | ✓ (derived from products) | ✗ | ✗ |
+| **Coupons browse** | ✓ `/coupons` on `/offers` | ⚠ only used for validate inside cart | ⚠ |
+| Orders (create / list / detail / cancel) | ✓ (phone-keyed) | ✓ (token) | ✓ |
+| Reviews (CRUD) | ✓ | ✓ | ✓ |
+| Wallet (debit / topup / ledger) | 🐛 stub | ✓ | mobile ahead |
+| Addresses (CRUD) | C**R**UD + partial U | C**R**–D (no U) | ⚠ |
+| Festival campaign | ✓ (full theme engine) | ⚠ hero only (FW-11) | ⚠ |
 
 ---
 
-## 6. CRUD operations
+## 6. Search · Filters · Sorting
 
-| Entity | Create | Read | Update | Delete | Status |
+| Item | Web | Mobile | Status |
+|---|---|---|---|
+| Text search | ✓ | ✓ (`/search` tab + `/search_detail`) | ✓ |
+| Recent searches | ✓ | ✓ (persisted) | ✓ |
+| Trending / suggestions | ✓ | ✗ (empty state is bare) | ✗ |
+| Voice search | decorative | removed (FW-16) — hook kept | n/a |
+| Sort (price ↑/↓, rating, discount) | ✓ | ✓ (popular / price-low / price-high / rating — **no discount sort**) | ⚠ |
+| Filter: organic | ✓ | ✓ | ✓ |
+| Filter: in-stock / on-offer | ✓ pills | ✓ toggles (FW-5) | ✓ |
+| Filter: price range | ✓ | ✗ (backend supports `minPrice`/`maxPrice`) | ✗ |
+| Filter: brand | ✗ (no UI) | ✗ (backend supports `brand`) | ✗ both |
+| Pagination / infinite scroll | ✓ client-side (`itemsPerPage`) | ✗ one-shot `FutureProvider`, no `page`/`limit` | ✗ |
+| Filter state survives back-nav | ✓ | ✓ (`CatalogQuery` equality) | ✓ |
+
+---
+
+## 7. Images / media / Uploads
+
+| Item | Web | Mobile | Status |
+|---|---|---|---|
+| Product / category / banner images | ✓ | ✓ (`cached_network_image`, error fallbacks) | ✓ |
+| Festival background image | ✓ | ✓ (FW-11, dark scrim) | ✓ |
+| Avatar upload | ✗ | ✗ | ✗ both |
+| Review photo upload | ✗ | ✗ | ✗ both |
+| Resume upload (Careers) | 🐛 stub | — | n/a |
+| POD photo (delivery) | delivery app only | delivery app only | n/a here |
+| `/api/upload` (Cloudinary) | admin only | unused | n/a |
+
+---
+
+## 8. Profile
+
+| Item | Web | Mobile | Status |
+|---|---|---|---|
+| View name / phone / email | ✓ | ✓ | ✓ |
+| Edit name / phone | ✓ | ✓ | ✓ |
+| Wallet entry | 🐛 fake `₹0` | ✓ real screen | mobile ahead |
+| Addresses entry | ✓ | ✓ (add/delete only) | ⚠ |
+| Membership / VIP | benefits page, no join | benefits page, no join | ✗ both |
+| Referral code | ✓ (Offers page) | ✓ (wallet screen, copy) | ✓ |
+| Order history entry | ✓ | ✓ | ✓ |
+| Notifications entry | ✗ | ✓ | mobile ahead |
+| Theme toggle | ✗ | ✓ (dark mode) | mobile ahead |
+| Language / locale | ✗ | ✗ | ✗ both |
+| Help / support entry | ✓ | ✓ | ✓ |
+| Legal entry | ✓ | ✓ | ✓ |
+| Delete account | ✓ | ✓ | ✓ |
+| Logout | ✓ | ✓ | ✓ |
+
+---
+
+## 9. Orders
+
+| Item | Web | Mobile | Status |
+|---|---|---|---|
+| List with status tabs (All / In Transit / Delivered / Cancelled) | ✓ | ✓ (FW-6) | ✓ |
+| Detail: items, totals, address, payment | ✓ | ✓ | ✓ |
+| Status timeline | ✓ | ✓ | ✓ |
+| Live tracking link | ✓ `/track/:id` | ✓ `/tracking/:id` | ⚠ mobile map is schematic |
+| Active-order banner on Home | ✓ (FW-6) | ✓ (FW-6) | ✓ |
+| Reorder | ✓ | ✓ | ✓ |
+| Cancel (pre-dispatch) + wallet refund | ✓ | ✓ | ✓ |
+| Invoice / receipt | 🐛 `alert()` | 🐛 `alert()` | 🐛 both |
+| Rate delivered order | ✓ (PDP review, verified) | ✓ | ✓ |
+| Real-time status via socket | ✓ | ✓ (`order_status_update` + 15s poll fallback) | ✓ |
+
+---
+
+## 10. Bookings · Enquiries · Quotes · RFQ
+
+**n/a on both platforms.** This is a grocery quick-commerce product; there are no
+booking, enquiry, quotation, or RFQ flows in the web app to port. If these are
+expected, they are a **net-new product decision**, not a mobile parity gap.
+
+---
+
+## 11. Call · WhatsApp
+
+| Item | Web | Mobile | Status |
+|---|---|---|---|
+| Call support | ✓ `tel:+91…` on `/help` | ✗ Support screen has no `tel:` shortcut | ✗ mobile |
+| Call delivery rider (tracking) | ✓ (reveal window) | ✓ `dialPhone` (reveal window) | ✓ |
+| WhatsApp rider (tracking) | ✓ `wa.me` | ✓ `wa.me/91…` | ✓ |
+| Call store (Stores page) | ✗ | ✓ `dialPhone` | mobile ahead |
+| Directions to store | ✓ (map link) | ✓ `openMaps` | ✓ |
+| Share product | ✓ `navigator.share` | ✓ `share_plus` native sheet | ✓ |
+| Share payload URL | placeholder `freshcart.com` | placeholder `freshcart.com` | ⚠ both (FW-9) |
+
+---
+
+## 12. Notifications
+
+| Item | Web | Mobile | Status |
+|---|---|---|---|
+| In-app activity feed | ✗ | ⚠ order-timeline-derived (`/notifications`), no dedicated endpoint, no unread state | mobile ahead / ⚠ |
+| Push — Android FCM | ✗ | ✓ token register + `onMessage`/`onMessageOpenedApp`, order-status + delivery-offer pushes (FW-3) | mobile ahead |
+| Push — iOS | ✗ | ⚠ code wired; **APNs auth key not uploaded to Firebase**, Push capability not added in Xcode | ⚠ |
+| Web push | ✗ | n/a | ✗ (FW-3 leaves web push explicitly optional) |
+| Permission prompt + rationale | n/a | ⚠ `requestPermission()` on init, no rationale sheet / settings deep-link | ⚠ |
+| Tap → deep link to order | n/a | ✓ (routes to the order / dashboard) | ✓ |
+
+---
+
+## 13. Payments
+
+| Item | Web | Mobile | Status |
+|---|---|---|---|
+| Razorpay checkout | ✓ (`/payment/verify`) | ✓ native sheet (`razorpay_flutter`) + Simulated fallback in test mode | ✓ |
+| HMAC signature verify (server) | ✓ | ✓ | ✓ |
+| Webhook reconciliation | ✓ `/payment/webhook` | n/a (server) | ✓ |
+| Wallet payment at checkout | ✓ (if balance) | ✓ `walletDebit` (balance-checked) | ✓ |
+| Wallet **top-up** | 🐛 stub | ✓ `topup` + `topup/verify` (FW-4) | mobile ahead |
+| COD | ✓ | ✓ — now created `paymentStatus: Pending`, flips to Paid on Delivered (BE-3) | ✓ |
+| Failed / cancelled payment → no order placed | ✓ | ✓ (`CheckoutController` state machine) | ✓ |
+| Membership purchase | ✗ | ✗ | ✗ both (FW-7) |
+
+---
+
+## 14. Settings
+
+| Item | Web | Mobile | Status |
+|---|---|---|---|
+| Dedicated settings screen | ✗ (spread across profile) | ✗ (spread across profile) | ⚠ both |
+| Theme (light / dark) | ✗ | ✓ toggle in profile | mobile ahead |
+| Notification preferences | ✗ | ✗ | ✗ both |
+| Language / region | ✗ | ✗ | ✗ both |
+| Default address / payment | ⚠ client-only | ✗ | ⚠ |
+| App version / build info | n/a | ✓ (`package_info_plus`, shown on gate screens) | ✓ |
+| Clear cache / data | n/a | ⚠ only via logout | ⚠ |
+
+---
+
+## 15. States — Loading / Empty / Error / Success
+
+| Screen | Loading | Empty | Error | Success | Notes |
 |---|---|---|---|---|---|
-| Cart items | ✓ | ✓ | ✓ qty ± | ✓ swipe / clear | ✓ (local Hive, matches web localStorage) |
-| Wishlist | ✓ heart | ✓ | — | ✓ heart / ×-overlay | ✓ (local only; web is also local) |
-| Coupon on cart | ✓ apply | ✓ list | — | ✓ remove | ✓ |
-| Addresses | ✓ real `POST` | ✓ list + select | ✗ (no PUT endpoint; parity w/ web) | ✓ real `DELETE` | ✓ |
-| Profile (name / email) | — | ✓ | ✓ `PUT /me/profile` | ✗ delete-account | ⚠ (no delete on mobile) |
-| Orders | ✓ place | ✓ list + detail + cancel | ✓ cancel (web + mobile) | — | ✓ |
-| Reviews | ✓ read+write | ✓ PDP section + sheet | ✓ PDP section + form | — | ✓ (moderated) |
-| Support tickets | ⚠ chat send | ⚠ live only | — | — | ⚠ no persisted ticket list |
+| Home | ✓ skeleton | ✓ "store being stocked" | ✓ retry | — | ✓ |
+| Category catalog | ✓ skeleton | ✓ per-filter empty + "clear filters" | ✓ retry | — | ✓ |
+| Product detail | ✓ | ✓ (not found) | ✓ retry | ✓ toast add-to-cart | ✓ |
+| Search | ✓ | ✓ no-results | ✓ | — | ⚠ empty state has no suggestions |
+| Cart | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Checkout | ✓ processing overlay w/ stage | n/a | ✓ inline + toast | ✓ → `/order-placed` | ✓ |
+| Orders list | ✓ skeleton | ✓ per-tab | ✓ retry | — | ✓ |
+| Order detail | ✓ | n/a | ✓ | ✓ (cancel toast) | ✓ |
+| Tracking | ✓ | n/a | ✓ | — | ⚠ "Reconnecting" pill; schematic map |
+| Wallet | ✓ skeleton | ✓ no-txns | ✓ retry | ✓ (top-up toast) | ✓ |
+| Addresses | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Notifications | ✓ skeleton | ✓ | ✓ retry | — | ✓ |
+| Location select | ⚠ spinner | n/a | ✓ **now toasts geocode failure** (FW-13) | ✓ | ⚠ raw `TextField`s, hardcoded colours |
+| Support | ⚠ | ⚠ | ⚠ socket errors swallowed | ⚠ | ⚠ thin |
+
+Overall: **states are consistently handled on the core commerce path.** Weak spots:
+`location_select` (design), `support` (error handling), tracking (map fidelity),
+search empty state.
 
 ---
 
-## 7. Search
+## 16. Deep links / app links
 
-| Item | Status | Notes |
-|---|---|---|
-| Server-side search (`?search=`) | ✓ | `searchProductsProvider`. |
-| Debounce (350 ms) | ✓ | |
-| Recent searches (persisted, cap 8) | ✓ | `StorageService` + `recentSearchesProvider`. |
-| Trending terms from live catalog | ✓ | Category + subcategory names. |
-| Clear button | ✓ | |
-| Autofocus when opened from the Home pill | ✓ | `/search_detail`. |
-| Result grid + count + empty state | ✓ | |
-| Voice search | ✗ | Mic icon in `CustomSearchBar` is decorative. |
-| Suggestions endpoint | ✗ | Not present (web doesn't have it either). |
-
----
-
-## 8. Filters
-
-| Filter | Web | Mobile | Status |
+| Item | Web | Mobile | Status |
 |---|---|---|---|
-| Organic only | ✓ | ✓ (bottom sheet) | ✓ |
-| Subcategory | ✓ | ✓ (chip strip) | ✓ |
-| Category | ✓ | ✓ (route) | ✓ |
-| Price range (min/max) | server supports `minPrice/maxPrice` | ✗ | ✗ |
-| Brand | ✓ (text match) | ✗ | ✗ |
-| In-stock only | ⚠ | ✗ | ✗ |
-| Active-filter indicator | — | ✓ (dot on tune icon) | ✓ |
-| Clear-filters affordance | — | ✓ (in empty state) | ✓ |
+| `https://<domain>/product/:id` opens app | n/a | ✗ no `intent-filter` host / iOS associated domains | ✗ |
+| `assetlinks.json` / AASA served | ✗ | ✗ | ✗ |
+| `go_router` deep-link parsing | — | ⚠ routes exist but no external-link entry, no `uni_links`/`app_links` | ✗ |
+| Share URLs point at real app-link domain | ✗ placeholder | ✗ placeholder | ✗ (FW-9) |
+| Push tap → in-app route | n/a | ✓ (FW-3) | ✓ |
 
 ---
 
-## 9. Sorting
+## 17. Permissions
 
-| Sort | Web | Mobile | Status |
+| Permission | Web | Mobile | Status |
 |---|---|---|---|
-| Popular / default | ✓ | ✓ | ✓ |
-| Price low→high / high→low | ✓ | ✓ | ✓ |
-| Rating | ✓ | ✓ | ✓ |
-| Discount (biggest saving) | ✓ | ✗ | ✗ |
-| Applied-sort shown in count line | — | ✓ | ✓ |
+| Location (checkout / "locate me") | browser prompt | `geolocator` ad-hoc request; failure now toasts (FW-13) | ⚠ no rationale sheet, no "open settings" fallback |
+| Notifications (FCM) | n/a | `FirebaseMessaging.requestPermission()` on init | ⚠ no pre-prompt rationale; Android 13 `POST_NOTIFICATIONS` relies on plugin default |
+| Camera / photos | n/a | not requested (no avatar/review photo) | n/a |
+| `permission_handler` package | n/a | ✗ not used | ✗ |
+| iOS `Info.plist` usage strings | n/a | ⚠ location strings present; notification/APNs setup incomplete | ⚠ |
 
 ---
 
-## 10. Images
+## 18. Prioritized gap list (mobile, unless noted)
 
-| Item | Status | Notes |
-|---|---|---|
-| Product cards / PDP gallery / cart rows / order thumbs / banners / special groups / onboarding | ✓ | `CachedNetworkImage` + `errorWidget` fallbacks; grey-box placeholder. |
-| PDP multi-image gallery (`ProductModel.gallery`) | ✓ | PageView + dots + Hero. |
-| Category tiles | ⚠ | Icon glyphs, not photos. **No subcategory image field from the API.** |
-| Fallback icon selection | ⚠ | `_getProductIcon(imageUrl)` / `iconFor()` string heuristics → generic basket common. |
-| Broken-image handling | ✓ | Everywhere. |
+**P0 — real functional gaps**
+1. **🐛 Invoice / receipt** is an `alert()` stub on **both** platforms. `Invoice` model exists; no endpoint. (FW-6)
+2. **✗ Live tracking map is schematic** on mobile (`CustomPainter`), not a real map. Web has real Leaflet. (FW-6 / P1-D3)
+3. **✗ Product listing has no pagination / infinite scroll** on mobile; backend supports `page`/`limit` (FW-5). Large categories load everything.
+4. **✗ Address edit + set-default** missing on mobile (and no backend route — parity gap both).
 
----
+**P1 — parity / completeness**
+5. **✗ Content pages** — Offers, Brands, Blog(+detail), About, Help/FAQ — none on mobile. Backend has `/blogs`, `/brands`, `/coupons`. (FW-8)
+6. **✗ Membership join/upgrade** — benefits-only on both; no `POST …/membership` endpoint. (FW-7)
+7. **✗ Filters** — price-range + brand picker missing on mobile; discount-sort missing. Brand picker missing on web too.
+8. **⚠ Web has no real customer auth** (fake OTP, no JWT) → blocks web wallet, membership, proper order ownership. (**WEB-1** — web-side, but it's why several "mobile ahead" rows exist.)
+9. **✗ Search** — no trending/suggested queries; bare empty state.
+10. **✗ Deep links / app links** — neither platform; share URLs are placeholders. (FW-9)
+11. **⚠ Support** — mobile has chat only: no FAQ content, no `tel:` shortcut, no ticket history (`SupportTicket` model exists).
+12. **✗ Promo cards** never consumed on mobile (banners + special-groups are).
 
-## 11. Uploads
+**P2 — polish / platform**
+13. **⚠ `permission_handler`** rationale sheets + "open settings" fallback (location, notifications). (FW-10)
+14. **✗ Analytics + crash reporting** (Firebase Analytics / Crashlytics / Sentry) on mobile. (FW-12)
+15. **⚠ `location_select`** — raw `TextField`s → `AppTextField`; replace hardcoded colours with tokens. (FW-13 half-done)
+16. **⚠ Navigation** — no scroll-position restore, no "return to intended route" after login.
+17. **⚠ Stores** — hardcoded on both; no `/api/stores`.
+18. **⚠ Settings** — no dedicated screen, no notification prefs, no language.
+19. **⚠ iOS push** — APNs key + Xcode Push capability not set up (FW-3 remainder).
+20. **✗ Avatar / review-photo upload** — neither platform.
 
-| Item | Status | Notes |
-|---|---|---|
-| Any customer-facing upload (profile photo, review photo, complaint attachment) | n/a | Neither web nor mobile has customer uploads. Nothing to port. |
-
----
-
-## 12. Profile / Account
-
-| Item | Status | Notes |
-|---|---|---|
-| View name / phone / VIP badge | ✓ | |
-| Edit name / email | ✓ | `ProfileEditScreen`. |
-| Wallet balance | ✓ | Real (`user.walletBalance`). |
-| Wallet transaction history | ✓ | Real `GET /customers/me/wallet/transactions` — credit/debit rows with date, pull-to-refresh, skeleton + empty + error states (2026-09-01). |
-| Wallet top-up | ✗ | No customer endpoint. |
-| Membership / VIP | ⚠ | Static benefits page; no join / renew. |
-| Saved addresses | ✓ | Real CRUD. |
-| Store locations | ⚠ | Static list; Call + Directions actionable. |
-| Support | ⚠ | Socket chat only. |
-| Notifications centre | ⚠ | Real feed (order timelines); bell + menu entry points. |
-| Wishlist | ✓ | Menu row. |
-| Dark-mode toggle | ✓ | Persisted via `StorageService`. |
-| Language / units / other settings | ✗ | India-English only. |
-| Logout | ✓ | Confirm modal; clears token + local caches. |
-| Delete account | ✓ | Profile screen → confirm modal → `DELETE /customers/me` → `/login` (2026-09-01). |
-| Referral code | ✓ | Wallet screen shows the real `referralCode` with copy. |
+**Where mobile is *ahead* of web (web parity gaps):**
+- Real customer auth (OTP → JWT).
+- Wallet: real balance + history + top-up (web = fake `₹0`).
+- In-app notifications feed.
+- Push notifications (FCM).
+- Offline banner + maintenance / force-update gate.
+- Dark-mode toggle.
+- App-version awareness.
 
 ---
 
-## 13. Orders
+## 19. Test coverage snapshot
 
-| Item | Status | Notes |
-|---|---|---|
-| List real customer orders | ✓ | `GET /orders/mine`. |
-| Active / Past split | ✓ | |
-| Status filter tabs | ✗ (mobile) / ✓ (web) | Mobile has the 2-way split only; no dedicated Cancelled view. |
-| Order card: status, date, thumbnails, total, address | ✓ | |
-| Order detail: status header, timeline, items, bill, delivery/payment | ✓ | |
-| Reorder (re-add to cart) | ✓ | List + detail. |
-| Track order | ✓ | → `/tracking/:id`. |
-| Cancel order | ✓ | Order-detail "Cancel order" (pre-dispatch only) → confirm modal → `POST /orders/:id/cancel`; wallet refund toast (2026-09-01). |
-| Download / view invoice | ✗ | Web has a stub "Download Invoice"; mobile none. |
-| Rate / review a delivered order | ✗ | No entry point; no endpoint. |
-| Empty / loading / error states | ✓ | `SkeletonList` / `ErrorState` / `EmptyState`. |
-| Pull-to-refresh | ✓ | |
-| Active-order banner on Home | ⚠ | `OrdersNotifier.activeOrder` exists; not surfaced on Home. |
-
----
-
-## 14. Bookings
-
-| Item | Status | Notes |
-|---|---|---|
-| Delivery-slot / time selection | ✓ | Cart "Delivery speed" radio (Instant / Evening) → carried into checkout. |
-| Any other "booking" concept | n/a | Grocery quick-commerce — none in web either. |
-
----
-
-## 15. Enquiries
-
-| Item | Status | Notes |
-|---|---|---|
-| Enquiry / contact form | n/a | Not in web. Closest is the Support chat (⚠). |
-
----
-
-## 16. Quotes
-
-| Item | Status | Notes |
-|---|---|---|
-| Quote request / RFQ | n/a | Not applicable to this product. |
-
----
-
-## 17. Call
-
-| Item | Status | Notes |
-|---|---|---|
-| `url_launcher` / dialer intent | ✓ | `url_launcher: ^6.2.5` + `core/utils/launch.dart` + manifest `<queries>` for `tel:` / `https`. |
-| Store phone numbers | ✓ | **Call** button → `dialPhone`. |
-| Store directions | ✓ | **Directions** → `openMaps` (Google Maps web URL). |
-| Rider "call" on tracking | ✓ | Wired to `dialPhone(riderPhone)`. |
-| Support phone (`tel:` on web) | ✗ | Not surfaced on mobile (chat only). |
-
----
-
-## 18. WhatsApp
-
-| Item | Status | Notes |
-|---|---|---|
-| `wa.me` / WhatsApp deep link | n/a | Not in web; no requirement identified. |
-
----
-
-## 19. Notifications
-
-| Item | Status | Notes |
-|---|---|---|
-| In-app notification list | ⚠ | Real activity feed derived from order `trackingTimeline`s (newest first, tap → `/order/:id`). **No dedicated `/notifications` endpoint** exists. Web has no notifications feature at all. |
-| Entry point | ✓ | Home-header bell + Profile menu row. |
-| Read / unread state | ✗ | Feed is derived, not stored. |
-| Push notifications (FCM) | ✗ | No `firebase_core` / `firebase_messaging`; no `POST_NOTIFICATIONS` permission; no `DeviceToken` route; no permission prompt. |
-| Notification tap → deep link | ✗ | No deep-link handling. |
-| Toast / transient feedback | ✓ | `AppToast` (success / error / info / warning) app-wide. |
-| Order-status push on transitions | ✗ | Server emits socket `order_status_update`; no push. |
-
----
-
-## 20. Payments
-
-| Item | Status | Notes |
-|---|---|---|
-| Razorpay native checkout (UPI / Card / Netbanking) | ✓ | `razorpay_flutter`, `PaymentGateway` + `RazorpayGateway`. |
-| Wallet payment (balance gate + server debit) | ✓ | `walletDebit`; tile disabled + "Low balance" when short. |
-| COD | ✓ | Places order with `paid:false`. |
-| Payment failure / cancel → no order created | ✓ | `CheckoutController` state machine. |
-| Processing overlay with stage text | ✓ | `LoadingOverlay`. |
-| Server-side HMAC signature verification + webhook | ✓ | Real. |
-| Retry after failure | ⚠ | Toast + reset to idle; user re-taps "Place order". No explicit retry CTA. |
-| Saved cards / UPI IDs | ⚠ | Static tiles; Razorpay sheet handles instruments. |
-| Wallet top-up via Razorpay | ✗ | Not built (no customer endpoint). |
-| Order status reflects verified payment | ✓ | Backend gates on verification. |
-
----
-
-## 21. Settings
-
-| Item | Status | Notes |
-|---|---|---|
-| Dark mode | ✓ | Toggle in Profile, persisted. |
-| Notification preferences | ✗ | No push, so nothing to configure. |
-| Delivery-address default | ⚠ | No set-default endpoint; `selectedAddress` (client) is the checkout source of truth. |
-| Environment config (`API_BASE_URL`, `ENV`) | ✓ | `AppConfig` via `--dart-define`. |
-| Force-update / maintenance gate | ✗ | No `GET /api/app/config`; no `ForceUpdateDialog` / `MaintenanceScreen`. |
-| Language / region | ✗ | Hardcoded India-English; not structured for l10n. |
-| Clear cache / data | ⚠ | `StorageService.clearAll()` exists; no UI (logout uses it). |
-
----
-
-## 22. Error handling
-
-| Item | Status | Notes |
-|---|---|---|
-| Typed `ApiException` + Dio interceptor (401 → logout) | ✓ | |
-| `ErrorState` (icon + message + `PrimaryButton` retry) on data screens | ✓ | Home, Categories, Catalog, PDP, Search, Orders, Order detail, Wishlist, Notifications. |
-| Retry re-invokes provider / `refresh()` | ✓ | |
-| Toast on action failure (cart cap, coupon invalid, checkout fail, address save, dial fail) | ✓ | `AppToast`. |
-| Retry-with-backoff for idempotent GETs | ✗ | Not implemented. |
-| Offline banner / connectivity awareness | ✗ | `connectivity_plus` absent. |
-| Global crash reporting (Crashlytics / Sentry) | ✗ | Not present. |
-| `location_select` reverse-geocode / GPS failures | ⚠ | Swallowed silently (`catch (_) {}`); falls back to a hardcoded Hyderabad address string. |
-| Account sub-screens with no network (membership / stores) | n/a | Static content. |
-
----
-
-## 23. Loading states
-
-| Screen | Status | Notes |
-|---|---|---|
-| Home / Categories / Catalog / PDP / Search / Wishlist / Orders / Order detail / Notifications | ✓ | Skeleton family (`SkeletonList` / `SkeletonGrid` / `ProductRailSkeleton` / `_*Skeleton`). |
-| Checkout processing | ✓ | `LoadingOverlay` + stage text. |
-| Coupon apply / address save / profile save | ✓ | Inline spinner / `LoadingOverlay`. |
-| Splash hydration | ✓ | Awaits `ensureHydrated()`; hardcoded 2.2 s floor (P2). |
-| Wallet / Membership / Stores | n/a | Static — no fetch. |
-| Support chat send | ⚠ | No pending/sent indicator on the bubble. |
-| Image placeholders | ✓ | Calm grey box (was a spinner). |
-
----
-
-## 24. Empty states
-
-| Screen | Status | Notes |
-|---|---|---|
-| Cart / Wishlist / Orders / Search / Category catalog / Categories / Home / Addresses / Notifications | ✓ | `EmptyState` (icon-in-circle, h3, body, `PrimaryButton` action). |
-| `location_select` (no saved addresses) | ⚠ | Plain grey sentence, not the `EmptyState` component. |
-| Support chat | ⚠ | Seeded with one hardcoded agent greeting (never truly empty). |
-| Wallet transactions | n/a | No history section (no endpoint). |
-
----
-
-## 25. Back navigation
-
-| Item | Status | Notes |
-|---|---|---|
-| `AppScaffold` back (pop), icon size 20, left title | ✓ | Consistent across pushed routes. |
-| Login back → pop-or-`/onboarding` | ✓ | |
-| OTP back → pop to login | ✓ | |
-| `location_select` `_leave()` = pop-or-`/` | ✓ | Works whether reached via `go` (sign-in) or `push` (in-app). |
-| Order-placed hardware back → `/` (no dead-end) | ✓ | `PopScope`. |
-| Tracking back → pop-or-`/orders` | ✓ | |
-| Tab hardware-back rules | ✓ | Non-home → Home; Home → exit-confirm. Verified by `navigation_test.dart`. |
-| Nested push/pop within a tab survives a tab switch | ✓ | |
-| Post-login "return to intended deep link" | ✗ | Always lands on `/`. |
-
----
-
-## 26. Deep links
-
-| Item | Status | Notes |
-|---|---|---|
-| Android `intent-filter` for `https://` app links / custom scheme | ✗ | Manifest has only `MAIN`/`LAUNCHER` + a `<queries>` block for `url_launcher`. No `android:host` / `autoVerify`. |
-| iOS associated domains / `apple-app-site-association` | ✗ | Not configured. |
-| `go_router` deep-link parsing (product / order / tracking) | ✗ | Routes are internal-only. |
-| Web SEO URLs (`/prn/:slug/prid/:id`, `/s/privacy-policy`) → mobile | ✗ | No equivalents. |
-| Notification payload → screen routing | ✗ | No push. |
-| Share product / order (`share_plus`) | ✓ | `share_plus` added; PDP "share" opens the native share sheet with name + price + `https://www.freshcart.com/product/:id`. (Real app-link domain still pending — P2 #12.) |
-| `assetlinks.json` / domain hosting | ✗ | Not set up. |
-
----
-
-## 27. Permissions
-
-| Permission | Status | Notes |
-|---|---|---|
-| Location (`ACCESS_FINE/COARSE_LOCATION`) | ⚠ | Declared. Requested ad-hoc via `geolocator` in `location_select`; **no `permission_handler`**, no rationale sheet, no "open settings" when permanently denied. |
-| Notifications (`POST_NOTIFICATIONS`, Android 13+) | ✗ | Not declared; no runtime prompt (no push feature). |
-| Camera / storage / contacts / microphone | n/a | No feature needs them. |
-| iOS `Info.plist` usage strings | ⚠ | Not audited; at minimum a location string is required for the App Store. |
-| Permission-denial handled gracefully | ⚠ | `location_select` shows a SnackBar "enable GPS"; no route to app settings. |
-
----
-
-## 28. Prioritised gap list
-
-**Fix log**
-- Group 1 (Broken functionality) closed 2026-09-01: Legal links + `LegalScreen`, `share_plus` native share on PDP. `flutter test` 103/103, `flutter analyze` clean.
-- Group 2 (Missing core) — **CLOSED 2026-09-01**: **order cancel** (`POST /orders/:id/cancel`, dual-auth, wallet refund; mobile + web), **wallet transaction history** (`GET /customers/me/wallet/transactions`; mobile), **product reviews** (`GET` public + `POST` verified-purchase/moderated; PDP section + write flow on mobile + web; approve recomputes product aggregate). Backend `npm test` 36/36, `flutter test` 108/108, frontend `tsc -b && vite build` clean, debug APK built.
-
-
-### P0 — user-facing gaps on the core journey
-1. ✓ **Reviews** on PDP — DONE 2026-09-01. `GET /products/:id/reviews` (public, Approved + summary) + `POST` (attachCustomerOptional; must have a Delivered order with the product; one per product; enters moderation). Mobile `ProductReviewsSection` + write sheet; web `ProductReviews` component in both PDP layouts. `updateReviewStatus`/`deleteReview` now recompute `Product.rating`/`reviewsCount`.
-2. ✓ **Order cancel** with reason + wallet refund — DONE 2026-09-01. `POST /orders/:id/cancel` (attachCustomerOptional; app token or `{phone}`), pre-dispatch statuses only, prepaid → wallet Credit + `paymentStatus: Refunded`, releases any assigned rider, emits `order_status_update`. Wired: mobile order detail + web `CustomerOrders`. Backend tests 33/33.
-3. ✓ **Legal** — DONE (2026-09-01): login "Terms / Privacy" are real links → bundled `LegalScreen` (`/legal?tab=terms|privacy`).
-4. ✗ **Offline resilience**: `connectivity_plus` banner + retry-with-backoff; `GET /api/app/config` for force-update / maintenance.
-
-### P1 — parity & completeness
-5. ✗ **Push notifications** (FCM): `firebase_core` + `firebase_messaging`, `POST_NOTIFICATIONS`, `DeviceToken` route + `firebase-admin` send hooked into `orderController.updateStatus`, permission prompt, tap → deep link.
-6. ⚠ **Wallet**: transaction history DONE 2026-09-01 (`GET /customers/me/wallet/transactions`, wired to the mobile wallet screen). Customer-scoped **top-up (Razorpay)** still needs a backend route + UI. Web wallet drawer still a `₹0` stub.
-7. ⚠ **Filters**: price-range (`minPrice/maxPrice` already server-side), brand, in-stock, discount-sort; pagination for large categories.
-8. ⚠ **Orders**: status-filter tabs (All / In Transit / Delivered / Cancelled), active-order banner on Home, invoice.
-9. ✓ **Account deletion** — DONE 2026-09-01. `DELETE /customers/me` (attachCustomerOptional: token or `?phone=`), cascade delete + orders scrubbed; legacy `:id` route locked to Admin/Manager. Mobile + web wired.
-10. ⚠ **Membership**: a real join / upgrade action.
-11. ✗ **Content pages**: Offers, Brands, Blog + detail, About, Help-Centre FAQ.
-
-### P2 — polish & platform
-12. ⚠ **Deep links / app links**: `intent-filter` + associated domains + `assetlinks.json` still pending. `share_plus` DONE (2026-09-01) — PDP shares a web product URL; swap to an app-link domain once one exists.
-13. ⚠ **Permissions**: `permission_handler` + rationale + "open settings" for location; iOS `Info.plist` strings.
-14. ✗ **Festival campaign theming** on Home (`GET /festival-campaigns/active`).
-15. ✗ **Analytics + crash reporting** (Firebase Analytics + Crashlytics, or Sentry).
-16. ⚠ **`location_select`** address fields → `AppTextField`; reverse-geocode failures surfaced, not swallowed.
-17. ⚠ **Category imagery**: no subcategory image field from the API → tiles stay icon-only until the backend adds one.
-18. ⚠ **Support**: FAQ / help content + persisted ticket history (`SupportTicket` model exists); pending/sent indicators on chat bubbles.
-19. ⚠ **Search**: wire or remove the decorative mic; delete the now-dead `quantity_selector.dart`.
-
----
-
-## 29. What is solid (no action needed)
-
-- Auth (phone → OTP → JWT), splash routing, onboarding.
-- Browse: Home, Categories, Category catalog, PDP, Search, Wishlist — real data, 5 states each, native layouts.
-- Cart → Checkout → Payment (Razorpay / Wallet / COD) → Order placed → Orders list → Order detail → Tracking.
-- Address CRUD, Profile edit, Wallet (balance + referral), Notifications feed, Stores (Call / Directions) — on real APIs where the backend supports it, no fabricated data.
-- Design-system consistency (flat, one bottom nav, one stepper, `AppScaffold` / `AppToast` / `AppModal` / `AppBottomSheet` / skeletons / `LoadingOverlay`, contrast-safe tokens).
-- Back-navigation correctness (tabs, nested stacks, funnel exits).
-- 100 passing widget/unit tests; `flutter analyze` clean; debug APK builds.
+- **Mobile:** `flutter test` **117** passing (auth, catalog models, pricing, design,
+  order model, foundation widgets, navigation, auth-flow widget, checkout controller,
+  home, orders flow, product details, search/wishlist, account screens, category screens,
+  legal, product reviews, app-config). `flutter analyze` clean. `flutter build apk --debug` OK.
+- **Web:** **no automated tests** (`frontend/`). `tsc -b && vite build` clean. (BE-4)
+- **Backend:** `npm test` **45** passing (integration, against Atlas).
