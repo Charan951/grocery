@@ -17,7 +17,7 @@ class PrimaryButton extends StatelessWidget {
     required this.onPressed,
     this.isLoading = false,
     this.height = 56.0,
-    this.borderRadius = 20.0,
+    this.borderRadius = 100.0, // full pill (DESIGN.md)
     this.icon,
   });
 
@@ -38,9 +38,9 @@ class PrimaryButton extends StatelessWidget {
             ? []
             : [
                 BoxShadow(
-                  color: AppColors.primary.withOpacity(0.3),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
+                  color: AppColors.primary.withOpacity(0.22),
+                  blurRadius: 14,
+                  offset: const Offset(0, 5),
                 ),
               ],
       ),
@@ -59,22 +59,29 @@ class PrimaryButton extends StatelessWidget {
                       strokeWidth: 2.5,
                     ),
                   )
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (icon != null) ...[
-                        icon!,
-                        const SizedBox(width: 8),
-                      ],
-                      Text(
-                        text,
-                        style: AppTypography.labelLarge(Colors.white).copyWith(
-                          fontSize: 16,
-                          letterSpacing: 0.5,
+                : Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (icon != null) ...[
+                          icon!,
+                          const SizedBox(width: 8),
+                        ],
+                        Flexible(
+                          child: Text(
+                            text,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.labelLarge(Colors.white).copyWith(
+                              fontSize: 16,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
           ),
         ),
@@ -97,7 +104,7 @@ class SecondaryButton extends StatelessWidget {
     required this.onPressed,
     this.isLoading = false,
     this.height = 56.0,
-    this.borderRadius = 20.0,
+    this.borderRadius = 100.0, // full pill (DESIGN.md)
     this.icon,
   });
 
@@ -163,7 +170,7 @@ class GlassButton extends StatelessWidget {
     required this.onPressed,
     this.isLoading = false,
     this.height = 56.0,
-    this.borderRadius = 20.0,
+    this.borderRadius = 100.0, // full pill (DESIGN.md)
     this.icon,
   });
 

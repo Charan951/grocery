@@ -1,9 +1,46 @@
-/image copy 2.png
-/image copy.png
-/image.png
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+*.swp
 
-# Environment files
+# ---- Env / secrets ----
 .env
 .env.local
 .env.*.local
 *.env
+!*.env.example
+
+# ---- Node (backend / frontend) ----
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+coverage/
+*.log
+
+# ---- Frontend build ----
+frontend/dist/
+frontend/.vite/
+
+# ---- Flutter / Dart (mobileapp) ----
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+mobileapp/build/
+mobileapp/.dart_tool/
+mobileapp/.flutter-plugins
+mobileapp/.flutter-plugins-dependencies
+mobileapp/ios/Pods/
+mobileapp/**/GeneratedPluginRegistrant.*
+mobileapp/android/.gradle/
+mobileapp/android/local.properties
+
+# ---- Mobile build-time secrets ----
+mobileapp/env/prod.json
+mobileapp/env/*.local.json
+
+# ---- Stray artifacts ----
+/image copy 2.png
+/image copy.png
+/image.png
+/package-lock.json

@@ -1,74 +1,65 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freshcart/core/di/injection.dart';
+import 'package:freshcart/core/services/pricing.dart';
 import 'package:freshcart/core/services/storage_service.dart';
 import 'package:freshcart/features/cart/data/models/cart_item_model.dart';
+import 'package:freshcart/features/cart/presentation/controllers/commerce_providers.dart';
 import 'package:freshcart/features/products/data/models/product_model.dart';
+
+/// Seller limit — one customer may buy at most this many of a single item
+/// (parity with the web storefront's MAX_CUSTOMER_QTY_LIMIT).
+const int kMaxQtyPerItem = 3;
 
 class CartState {
   final List<CartItemModel> items;
+
+  /// Server-validated coupon: `{ code, discount }` or null.
   final Map<String, dynamic>? appliedCoupon;
   final String selectedDeliverySlot;
-  final double platformFee;
-  final double taxRate;
+  final PricingConfig pricing;
 
   CartState({
     required this.items,
     this.appliedCoupon,
     this.selectedDeliverySlot = 'Instant (10-15 mins)',
-    this.platformFee = 5.0,
-    this.taxRate = 0.05, // 5% GST
+    this.pricing = const PricingConfig(),
   });
 
-  int get totalItemsCount => items.fold(0, (sum, item) => sum + item.quantity);
-  
-  double get subtotal => items.fold(0.0, (sum, item) => sum + item.totalPrice);
-  
-  double get totalMrp => items.fold(0.0, (sum, item) => sum + (item.product.mrp * item.quantity));
+  double get _couponDiscount => (appliedCoupon?['discount'] as num?)?.toDouble() ?? 0.0;
 
-  double get itemSavings => totalMrp - subtotal;
+  PriceBreakdown get breakdown => PricingService.compute(
+        lines: items
+            .map((i) => PriceLine(i.product.price, i.product.mrp, i.quantity))
+            .toList(),
+        config: pricing,
+        couponDiscount: _couponDiscount,
+      );
 
-  double get couponDiscount {
-    if (appliedCoupon == null) return 0.0;
-    final val = appliedCoupon!['value'] as double;
-    final min = appliedCoupon!['minOrder'] as double;
-    
-    if (subtotal < min) return 0.0;
-    
-    if (val < 1.0) {
-      // Percentage coupon
-      double discount = subtotal * val;
-      return discount > 100.0 ? 100.0 : discount; // Cap at 100
-    } else {
-      // Fixed value coupon
-      return val;
-    }
-  }
+  int get totalItemsCount => items.fold(0, (sum, i) => sum + i.quantity);
 
-  double get deliveryFee {
-    if (subtotal >= 400.0 || subtotal == 0.0) return 0.0;
-    return 29.0;
-  }
-
-  double get taxAmount => (subtotal - couponDiscount) * taxRate;
-
-  double get totalPayableAmount {
-    if (subtotal == 0.0) return 0.0;
-    final val = (subtotal - couponDiscount) + deliveryFee + platformFee + taxAmount;
-    return val < 0.0 ? 0.0 : val;
-  }
-
-  double get totalSavings => itemSavings + couponDiscount;
+  // Names kept stable for existing screens.
+  double get subtotal => breakdown.subtotal;
+  double get totalMrp => breakdown.itemTotalMrp;
+  double get itemSavings => breakdown.itemSavings;
+  double get couponDiscount => breakdown.couponDiscount;
+  double get platformFee => breakdown.platformFee;
+  double get deliveryFee => breakdown.deliveryFee;
+  double get taxAmount => breakdown.tax;
+  double get totalPayableAmount => breakdown.total;
+  double get totalSavings => breakdown.totalSavings;
 
   CartState copyWith({
     List<CartItemModel>? items,
     Map<String, dynamic>? appliedCoupon,
     bool clearCoupon = false,
     String? selectedDeliverySlot,
+    PricingConfig? pricing,
   }) {
     return CartState(
       items: items ?? this.items,
       appliedCoupon: clearCoupon ? null : (appliedCoupon ?? this.appliedCoupon),
       selectedDeliverySlot: selectedDeliverySlot ?? this.selectedDeliverySlot,
+      pricing: pricing ?? this.pricing,
     );
   }
 }
@@ -76,97 +67,94 @@ class CartState {
 class CartNotifier extends StateNotifier<CartState> {
   final StorageService _storage;
 
-  CartNotifier(this._storage) : super(CartState(items: [])) {
+  CartNotifier(this._storage, Ref ref) : super(CartState(items: [])) {
     _loadCart();
+    // Keep pricing in sync with backend settings.
+    state = state.copyWith(pricing: ref.read(pricingConfigProvider));
+    ref.listen<PricingConfig>(pricingConfigProvider, (_, config) {
+      setPricingConfig(config);
+    });
   }
 
   void _loadCart() {
-    final list = _storage.getCartItems();
-    final List<CartItemModel> loadedItems = [];
-    for (final raw in list) {
+    final loaded = <CartItemModel>[];
+    for (final raw in _storage.getCartItems()) {
       try {
-        final item = CartItemModel.fromJson(Map<String, dynamic>.from(raw as Map));
-        loadedItems.add(item);
+        loaded.add(CartItemModel.fromJson(Map<String, dynamic>.from(raw as Map)));
       } catch (_) {}
     }
-    state = state.copyWith(items: loadedItems);
+    state = state.copyWith(items: loaded);
   }
 
   void _persistCart() {
-    final rawList = state.items.map((item) => item.toJson()).toList();
-    _storage.saveCartItems(rawList);
+    _storage.saveCartItems(state.items.map((i) => i.toJson()).toList());
   }
 
-  void addToCart(ProductModel product, {String? weight}) {
-    final selectedW = weight ?? product.defaultWeight;
+  void setPricingConfig(PricingConfig config) {
+    state = state.copyWith(pricing: config);
+  }
+
+  /// Adds one unit. Returns false (and does nothing) if the per-item cap is hit.
+  bool addToCart(ProductModel product, {String? weight}) {
+    final w = weight ?? product.defaultWeight;
     final index = state.items.indexWhere(
-      (item) => item.product.id == product.id && item.selectedWeight == selectedW,
+      (i) => i.product.id == product.id && i.selectedWeight == w,
     );
 
-    List<CartItemModel> newList;
+    List<CartItemModel> next;
     if (index >= 0) {
       final existing = state.items[index];
-      final updated = existing.copyWith(quantity: existing.quantity + 1);
-      newList = List<CartItemModel>.from(state.items)..[index] = updated;
+      if (existing.quantity >= kMaxQtyPerItem) return false;
+      next = List.of(state.items)..[index] = existing.copyWith(quantity: existing.quantity + 1);
     } else {
-      newList = List<CartItemModel>.from(state.items)
-        ..add(CartItemModel(product: product, quantity: 1, selectedWeight: selectedW));
+      next = List.of(state.items)
+        ..add(CartItemModel(product: product, quantity: 1, selectedWeight: w));
     }
-
-    state = state.copyWith(items: newList);
+    state = state.copyWith(items: next);
     _persistCart();
+    return true;
   }
 
   void removeFromCart(ProductModel product, {String? weight}) {
-    final selectedW = weight ?? product.defaultWeight;
+    final w = weight ?? product.defaultWeight;
     final index = state.items.indexWhere(
-      (item) => item.product.id == product.id && item.selectedWeight == selectedW,
+      (i) => i.product.id == product.id && i.selectedWeight == w,
     );
-
     if (index < 0) return;
 
     final existing = state.items[index];
-    List<CartItemModel> newList = List<CartItemModel>.from(state.items);
-
+    final next = List.of(state.items);
     if (existing.quantity > 1) {
-      newList[index] = existing.copyWith(quantity: existing.quantity - 1);
+      next[index] = existing.copyWith(quantity: existing.quantity - 1);
     } else {
-      newList.removeAt(index);
+      next.removeAt(index);
     }
-
-    state = state.copyWith(items: newList);
+    state = state.copyWith(items: next, clearCoupon: next.isEmpty);
     _persistCart();
   }
 
   void deleteItem(CartItemModel item) {
-    final newList = List<CartItemModel>.from(state.items)
+    final next = List.of(state.items)
       ..removeWhere((i) => i.product.id == item.product.id && i.selectedWeight == item.selectedWeight);
-    state = state.copyWith(items: newList);
+    state = state.copyWith(items: next, clearCoupon: next.isEmpty);
     _persistCart();
   }
 
-  bool applyCoupon(Map<String, dynamic> coupon) {
-    if (state.subtotal >= (coupon['minOrder'] as double)) {
-      state = state.copyWith(appliedCoupon: coupon);
-      return true;
-    }
-    return false;
+  /// Applies a discount that has already been validated by the backend.
+  void applyValidatedCoupon(String code, double discount) {
+    state = state.copyWith(appliedCoupon: {'code': code, 'discount': discount});
   }
 
-  void removeCoupon() {
-    state = state.copyWith(clearCoupon: true);
-  }
+  void removeCoupon() => state = state.copyWith(clearCoupon: true);
 
-  void setDeliverySlot(String slot) {
-    state = state.copyWith(selectedDeliverySlot: slot);
-  }
+  void setDeliverySlot(String slot) => state = state.copyWith(selectedDeliverySlot: slot);
 
   void clearCart() {
-    state = CartState(items: []);
+    state = state.copyWith(items: [], clearCoupon: true);
     _persistCart();
   }
 }
 
 final cartProvider = StateNotifierProvider<CartNotifier, CartState>((ref) {
-  return CartNotifier(getIt<StorageService>());
+  return CartNotifier(getIt<StorageService>(), ref);
 });

@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
+import 'package:freshcart/core/constants/app_radius.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
-import 'package:freshcart/core/widgets/glass_card.dart';
-import 'package:freshcart/core/widgets/buttons.dart';
-import 'package:freshcart/features/cart/presentation/controllers/cart_controller.dart';
+import 'package:freshcart/core/widgets/app_scaffold.dart';
+import 'package:freshcart/core/widgets/app_toast.dart';
+import 'package:freshcart/core/widgets/loading_overlay.dart';
 import 'package:freshcart/features/authentication/presentation/controllers/auth_controller.dart';
-import 'package:freshcart/features/orders/presentation/controllers/orders_controller.dart';
+import 'package:freshcart/features/cart/presentation/controllers/cart_controller.dart';
+import 'package:freshcart/features/cart/presentation/widgets/billing_summary.dart';
+import 'package:freshcart/features/cart/presentation/widgets/checkout_bar.dart';
+import 'package:freshcart/features/checkout/presentation/controllers/checkout_controller.dart';
 
 class CheckoutScreen extends ConsumerStatefulWidget {
   const CheckoutScreen({super.key});
@@ -17,365 +21,250 @@ class CheckoutScreen extends ConsumerStatefulWidget {
 }
 
 class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
-  String _selectedPaymentMethod = 'UPI'; // UPI, Wallet, Card, COD
-  bool _isPlacingOrder = false;
+  String _method = 'UPI'; // UPI | Card | Wallet | COD
 
-  void _onPlaceOrder(CartState cartState, AuthState authState) async {
-    setState(() {
-      _isPlacingOrder = true;
-    });
+  PaymentMethod get _paymentMethod => switch (_method) {
+        'Wallet' => PaymentMethod.wallet,
+        'COD' => PaymentMethod.cod,
+        _ => PaymentMethod.razorpay,
+      };
 
-    // Simulate payment processing
-    await Future.delayed(const Duration(milliseconds: 2000));
-
-    final selectedAddr = authState.user?.selectedAddress?['addressLine'] ?? 'Flat 402, Apple Heights';
-    
-    // Deduct wallet if selected
-    if (_selectedPaymentMethod == 'Wallet') {
-      final balance = authState.user?.walletBalance ?? 0.0;
-      if (balance >= cartState.totalPayableAmount) {
-        ref.read(authProvider.notifier).deductWallet(cartState.totalPayableAmount);
-      } else {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Insufficient wallet balance. Please pick another payment method.')),
-        );
-        setState(() {
-          _isPlacingOrder = false;
-        });
-        return;
-      }
+  void _placeOrder() {
+    final address = (ref.read(authProvider).user?.selectedAddress?['addressLine'] ??
+            ref.read(authProvider).user?.selectedAddress?['fullAddress'] ??
+            '')
+        .toString();
+    if (address.isEmpty) {
+      AppToast.error('Add a delivery address to continue');
+      return;
     }
-
-    final orderId = await ref.read(ordersProvider.notifier).placeOrder(
-          items: cartState.items,
-          subtotal: cartState.subtotal,
-          deliveryFee: cartState.deliveryFee,
-          platformFee: cartState.platformFee,
-          discount: cartState.couponDiscount,
-          tax: cartState.taxAmount,
-          total: cartState.totalPayableAmount,
-          address: selectedAddr,
-        );
-
-    // Clear cart
-    ref.read(cartProvider.notifier).clearCart();
-
-    setState(() {
-      _isPlacingOrder = false;
-    });
-
-    if (mounted) {
-      context.go('/tracking/$orderId');
-    }
+    ref.read(checkoutControllerProvider.notifier).submit(method: _paymentMethod, address: address);
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cart = ref.watch(cartProvider);
+    final auth = ref.watch(authProvider);
+    final checkout = ref.watch(checkoutControllerProvider);
 
-    final cartState = ref.watch(cartProvider);
-    final authState = ref.watch(authProvider);
+    ref.listen(checkoutControllerProvider, (prev, next) {
+      if (next.status == CheckoutStatus.success && next.placedOrderId != null) {
+        ref.read(checkoutControllerProvider.notifier).reset();
+        context.go('/order-placed/${next.placedOrderId}');
+      } else if (next.status == CheckoutStatus.failed && next.error != null) {
+        AppToast.error(next.error!);
+        ref.read(checkoutControllerProvider.notifier).reset();
+      }
+    });
 
-    final selectedAddress = authState.user?.selectedAddress;
-    final walletBalance = authState.user?.walletBalance ?? 0.0;
+    final addr = auth.user?.selectedAddress;
+    final wallet = auth.user?.walletBalance ?? 0.0;
+    final walletShort = wallet < cart.totalPayableAmount;
 
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
-      appBar: AppBar(
-        title: const Text('Checkout Details'),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-          onPressed: () => context.pop(),
+    return LoadingOverlay(
+      isLoading: checkout.isProcessing,
+      message: checkout.stage.isEmpty ? 'Processing…' : checkout.stage,
+      child: AppScaffold(
+        title: 'Checkout',
+        bottomNavigationBar: CheckoutBar(
+          label: 'Paying',
+          amount: cart.totalPayableAmount,
+          cta: 'Place order',
+          isLoading: checkout.isProcessing,
+          onPressed: cart.items.isEmpty ? null : _placeOrder,
         ),
-      ),
-      body: SafeArea(
-        child: Column(
+        body: ListView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 12),
-                      
-                      // Delivery Address Section
-                      Text(
-                        'Delivery Address',
-                        style: AppTypography.title(
-                          isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      if (selectedAddress != null)
-                        GlassCard(
-                          padding: const EdgeInsets.all(16),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withOpacity(0.1),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.location_on_rounded, color: AppColors.primary),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      selectedAddress['tag'] as String,
-                                      style: AppTypography.labelLarge(
-                                        isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      selectedAddress['addressLine'] as String,
-                                      style: AppTypography.bodySmall(
-                                        isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              TextButton(
-                                onPressed: () {
-                                  context.push('/addresses');
-                                },
-                                child: const Text('Change'),
-                              ),
-                            ],
-                          ),
-                        )
-                      else
-                        ElevatedButton(
-                          onPressed: () => context.push('/addresses'),
-                          child: const Text('Add Address'),
-                        ),
-                      const SizedBox(height: 24),
+            _sectionTitle('Delivery address', isDark),
+            const SizedBox(height: 10),
+            _AddressCard(address: addr, isDark: isDark, onChange: () => context.push('/addresses')),
+            const SizedBox(height: 24),
 
-                      // Delivery Speed Section
-                      Text(
-                        'Delivery Mode',
-                        style: AppTypography.title(
-                          isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      GlassCard(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.electric_bolt_rounded, color: AppColors.primary),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    cartState.selectedDeliverySlot,
-                                    style: AppTypography.labelLarge(
-                                      isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                                    ),
-                                  ),
-                                  Text(
-                                    'Delivery partner will drop it off at your door.',
-                                    style: AppTypography.bodySmall(
-                                      isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Payment Method Section
-                      Text(
-                        'Payment Method',
-                        style: AppTypography.title(
-                          isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      _buildPaymentTile('UPI / Google Pay', 'UPI', Icons.account_balance_wallet_rounded, isDark),
-                      const SizedBox(height: 8),
-                      _buildPaymentTile('Wallet (Balance: ₹$walletBalance)', 'Wallet', Icons.wallet_rounded, isDark, disabled: walletBalance < cartState.totalPayableAmount),
-                      const SizedBox(height: 8),
-                      _buildPaymentTile('Credit / Debit Card', 'Card', Icons.credit_card_rounded, isDark),
-                      const SizedBox(height: 8),
-                      _buildPaymentTile('Cash on Delivery', 'COD', Icons.handshake_rounded, isDark),
-                      const SizedBox(height: 24),
-
-                      // Final Billing Summary
-                      Text(
-                        'Billing Summary',
-                        style: AppTypography.title(
-                          isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      GlassCard(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          children: [
-                            _buildSummaryRow('Item Total (MRP)', '₹${cartState.totalMrp.toStringAsFixed(2)}', isDark),
-                            _buildSummaryRow('Product Discount', '- ₹${cartState.itemSavings.toStringAsFixed(2)}', isDark, isGreen: true),
-                            if (cartState.couponDiscount > 0)
-                              _buildSummaryRow('Coupon Discount', '- ₹${cartState.couponDiscount.toStringAsFixed(2)}', isDark, isGreen: true),
-                            _buildSummaryRow('Platform Fee', '₹${cartState.platformFee.toStringAsFixed(2)}', isDark),
-                            _buildSummaryRow('Delivery Charges', cartState.deliveryFee == 0.0 ? 'FREE' : '₹${cartState.deliveryFee.toStringAsFixed(2)}', isDark, isGreen: cartState.deliveryFee == 0.0),
-                            _buildSummaryRow('Taxes & GST (5%)', '₹${cartState.taxAmount.toStringAsFixed(2)}', isDark),
-                            const Divider(height: 24),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Total Payable',
-                                  style: AppTypography.labelLarge(
-                                    isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                                  ).copyWith(fontSize: 16),
-                                ),
-                                Text(
-                                  '₹${cartState.totalPayableAmount.toStringAsFixed(2)}',
-                                  style: AppTypography.h2(
-                                    isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                                  ).copyWith(fontSize: 18),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 120), // bottom spacer
-                    ],
-                  ),
-                ),
-              ),
+            _sectionTitle('Delivery', isDark),
+            const SizedBox(height: 10),
+            _tile(
+              isDark,
+              icon: Icons.bolt_rounded,
+              title: cart.selectedDeliverySlot,
+              subtitle: 'Dropped at your door by our rider',
             ),
-            
-            // Place Order Sticky Bar
-            Positioned(
-              child: GlassCard(
-                borderRadius: 32,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                color: isDark ? const Color(0xE01C1C1E) : const Color(0xE6FFFFFF),
-                borderColor: isDark ? Colors.white12 : Colors.black.withOpacity(0.04),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Paying',
-                          style: AppTypography.bodySmall(
-                            isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                          ),
-                        ),
-                        Text(
-                          '₹${cartState.totalPayableAmount.toStringAsFixed(0)}',
-                          style: AppTypography.h1(
-                            isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                          ).copyWith(fontSize: 22),
-                        ),
-                      ],
-                    ),
-                    SizedBox(
-                      width: 170,
-                      child: PrimaryButton(
-                        text: 'Place Order',
-                        isLoading: _isPlacingOrder,
-                        onPressed: () => _onPlaceOrder(cartState, authState),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            const SizedBox(height: 24),
+
+            _sectionTitle('Payment method', isDark),
+            const SizedBox(height: 10),
+            _PayTile(label: 'UPI / Google Pay', value: 'UPI', icon: Icons.qr_code_rounded, group: _method, onTap: _set),
+            _PayTile(label: 'Credit / Debit card', value: 'Card', icon: Icons.credit_card_rounded, group: _method, onTap: _set),
+            _PayTile(
+              label: 'Wallet · ₹${wallet.toStringAsFixed(0)}',
+              value: 'Wallet',
+              icon: Icons.account_balance_wallet_rounded,
+              group: _method,
+              onTap: _set,
+              disabled: walletShort,
+              disabledNote: 'Low balance',
             ),
+            _PayTile(label: 'Cash on delivery', value: 'COD', icon: Icons.payments_outlined, group: _method, onTap: _set),
+            const SizedBox(height: 24),
+
+            _sectionTitle('Bill details', isDark),
+            const SizedBox(height: 10),
+            BillingSummary(cart: cart),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPaymentTile(String name, String key, IconData icon, bool isDark, {bool disabled = false}) {
-    final isSelected = _selectedPaymentMethod == key;
+  void _set(String v) => setState(() => _method = v);
 
-    return GestureDetector(
-      onTap: disabled ? null : () {
-        setState(() {
-          _selectedPaymentMethod = key;
-        });
-      },
-      child: Opacity(
-        opacity: disabled ? 0.4 : 1.0,
-        child: GlassCard(
-          padding: const EdgeInsets.all(16),
-          color: isSelected
-              ? AppColors.primary.withOpacity(0.08)
-              : (isDark ? Colors.white.withOpacity(0.02) : Colors.white),
-          borderColor: isSelected
-              ? AppColors.primary
-              : (isDark ? Colors.white12 : Colors.black.withOpacity(0.04)),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(icon, color: isSelected ? AppColors.primary : (isDark ? Colors.white70 : AppColors.textPrimary)),
-                  const SizedBox(width: 16),
-                  Text(
-                    name,
-                    style: AppTypography.labelLarge(
-                      isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                    ).copyWith(fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500),
-                  ),
-                ],
-              ),
-              Icon(
-                isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
-                color: isSelected ? AppColors.primary : (isDark ? Colors.white30 : Colors.black26),
-              ),
-            ],
-          ),
-        ),
+  Widget _sectionTitle(String t, bool isDark) => Text(t, style: AppTypography.title(
+        isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+      ));
+
+  Widget _tile(bool isDark, {required IconData icon, required String title, required String subtitle}) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : AppColors.surface,
+        borderRadius: AppRadius.brMd,
+        border: Border.all(color: isDark ? AppColors.dividerDark : AppColors.divider),
       ),
-    );
-  }
-
-  Widget _buildSummaryRow(String title, String val, bool isDark, {bool isGreen = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            title,
-            style: AppTypography.bodyMedium(
-              isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-            ),
-          ),
-          Text(
-            val,
-            style: AppTypography.labelMedium(
-              isGreen
-                  ? AppColors.primary
-                  : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimary),
+          Icon(icon, color: AppColors.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: AppTypography.labelLarge(
+                  isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                )),
+                Text(subtitle, style: AppTypography.bodySmall(
+                  isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                )),
+              ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AddressCard extends StatelessWidget {
+  final Map<String, dynamic>? address;
+  final bool isDark;
+  final VoidCallback onChange;
+  const _AddressCard({required this.address, required this.isDark, required this.onChange});
+
+  @override
+  Widget build(BuildContext context) {
+    if (address == null) {
+      return OutlinedButton.icon(
+        onPressed: onChange,
+        icon: const Icon(Icons.add_location_alt_outlined),
+        label: const Text('Add a delivery address'),
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size.fromHeight(52),
+          shape: RoundedRectangleBorder(borderRadius: AppRadius.brMd),
+        ),
+      );
+    }
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : AppColors.surface,
+        borderRadius: AppRadius.brMd,
+        border: Border.all(color: isDark ? AppColors.dividerDark : AppColors.divider),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.location_on_rounded, color: AppColors.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text((address!['name'] ?? address!['label'] ?? 'Address').toString(),
+                    style: AppTypography.labelLarge(
+                      isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                    )),
+                const SizedBox(height: 2),
+                Text((address!['addressLine'] ?? '').toString(),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.bodySmall(
+                      isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                    )),
+              ],
+            ),
+          ),
+          TextButton(onPressed: onChange, child: const Text('Change')),
+        ],
+      ),
+    );
+  }
+}
+
+class _PayTile extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final String group;
+  final ValueChanged<String> onTap;
+  final bool disabled;
+  final String? disabledNote;
+
+  const _PayTile({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.group,
+    required this.onTap,
+    this.disabled = false,
+    this.disabledNote,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final selected = group == value;
+    return Opacity(
+      opacity: disabled ? 0.45 : 1,
+      child: GestureDetector(
+        onTap: disabled ? null : () => onTap(value),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.primary.withOpacity(0.08) : (isDark ? AppColors.surfaceDark : AppColors.surface),
+            borderRadius: AppRadius.brMd,
+            border: Border.all(color: selected ? AppColors.primary : (isDark ? AppColors.dividerDark : AppColors.divider)),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: selected ? AppColors.primary : AppColors.textSecondary),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(label, style: AppTypography.labelLarge(
+                  isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                )),
+              ),
+              if (disabled && disabledNote != null)
+                Text(disabledNote!, style: AppTypography.labelSmall(AppColors.error))
+              else
+                Icon(
+                  selected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+                  color: selected ? AppColors.primary : AppColors.textSecondary,
+                  size: 20,
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }

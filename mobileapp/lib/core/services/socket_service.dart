@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:socket_io_client/socket_io_client.dart' as io;
+import 'package:freshcart/core/config/app_config.dart';
 
 class SocketService {
   static final SocketService _instance = SocketService._internal();
@@ -9,22 +9,21 @@ class SocketService {
   SocketService._internal();
 
   io.Socket? _socket;
+  final Set<String> _joinedRooms = {};
 
-  static String get socketUrl {
-    if (!kIsWeb && Platform.isAndroid) {
-      return 'http://10.0.2.2:5000';
-    }
-    return 'http://localhost:5000';
-  }
+  static String get socketUrl => AppConfig.socketUrl;
 
-  final StreamController<Map<String, dynamic>> _orderStatusController = StreamController.broadcast();
-  final StreamController<Map<String, dynamic>> _riderLocationController = StreamController.broadcast();
-  final StreamController<Map<String, dynamic>> _supportMessageController = StreamController.broadcast();
+  final _orderStatusController = StreamController<Map<String, dynamic>>.broadcast();
+  final _riderLocationController = StreamController<Map<String, dynamic>>.broadcast();
+  final _supportMessageController = StreamController<Map<String, dynamic>>.broadcast();
+  final _connectionController = StreamController<bool>.broadcast();
 
   Stream<Map<String, dynamic>> get orderStatusStream => _orderStatusController.stream;
   Stream<Map<String, dynamic>> get riderLocationStream => _riderLocationController.stream;
   Stream<Map<String, dynamic>> get supportMessageStream => _supportMessageController.stream;
 
+  /// Emits `true`/`false` as the socket connects / drops.
+  Stream<bool> get connectionStream => _connectionController.stream;
   bool get isConnected => _socket?.connected ?? false;
 
   void initSocket() {
@@ -36,36 +35,39 @@ class SocketService {
         io.OptionBuilder()
             .setTransports(['websocket', 'polling'])
             .disableAutoConnect()
-            .setReconnectionAttempts(5)
+            .enableReconnection()
+            .setReconnectionAttempts(20)
+            .setReconnectionDelay(1000)
+            .setReconnectionDelayMax(8000)
             .build(),
       );
 
       _socket!.connect();
 
       _socket!.onConnect((_) {
-        if (kDebugMode) print('⚡ Socket.io connected successfully to $socketUrl');
+        if (kDebugMode) print('⚡ Socket connected → $socketUrl');
+        _connectionController.add(true);
+        // Re-join every room after a reconnect.
+        for (final r in _joinedRooms) {
+          _socket!.emit('join_order_room', r);
+        }
       });
 
       _socket!.onDisconnect((_) {
-        if (kDebugMode) print('⚡ Socket.io disconnected');
+        if (kDebugMode) print('⚡ Socket disconnected');
+        _connectionController.add(false);
       });
+      _socket!.onReconnect((_) => _connectionController.add(true));
+      _socket!.onConnectError((_) => _connectionController.add(false));
 
-      _socket!.on('order_status_update', (data) {
-        if (data is Map) {
-          _orderStatusController.add(Map<String, dynamic>.from(data));
-        }
+      _socket!.on('order_status_update', (d) {
+        if (d is Map) _orderStatusController.add(Map<String, dynamic>.from(d));
       });
-
-      _socket!.on('rider_location_update', (data) {
-        if (data is Map) {
-          _riderLocationController.add(Map<String, dynamic>.from(data));
-        }
+      _socket!.on('rider_location_update', (d) {
+        if (d is Map) _riderLocationController.add(Map<String, dynamic>.from(d));
       });
-
-      _socket!.on('support_message_received', (data) {
-        if (data is Map) {
-          _supportMessageController.add(Map<String, dynamic>.from(data));
-        }
+      _socket!.on('support_message_received', (d) {
+        if (d is Map) _supportMessageController.add(Map<String, dynamic>.from(d));
       });
     } catch (e) {
       if (kDebugMode) print('SocketService.initSocket exception: $e');
@@ -73,9 +75,15 @@ class SocketService {
   }
 
   void joinOrderRoom(String orderId) {
+    if (orderId.isEmpty) return;
     initSocket();
+    _joinedRooms.add(orderId);
     _socket?.emit('join_order_room', orderId);
-    if (kDebugMode) print('⚡ Joined Socket order room: $orderId');
+  }
+
+  void leaveOrderRoom(String orderId) {
+    _joinedRooms.remove(orderId);
+    _socket?.emit('leave_order_room', orderId);
   }
 
   void sendSupportMessage(Map<String, dynamic> data) {
@@ -87,5 +95,6 @@ class SocketService {
     _socket?.disconnect();
     _socket?.dispose();
     _socket = null;
+    _joinedRooms.clear();
   }
 }

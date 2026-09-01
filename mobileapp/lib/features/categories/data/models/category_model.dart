@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:freshcart/core/utils/parse.dart';
 
 class CategoryModel {
   final String id;
@@ -6,6 +7,7 @@ class CategoryModel {
   final String icon; // Icon asset or keyword for drawing
   final Color color;
   final int productCount;
+  final List<String> subCategories;
 
   const CategoryModel({
     required this.id,
@@ -13,25 +15,38 @@ class CategoryModel {
     required this.icon,
     required this.color,
     required this.productCount,
+    this.subCategories = const [],
   });
 
   factory CategoryModel.fromJson(Map<String, dynamic> json) {
+    final subs = (json['subCategories'] as List?)
+            ?.whereType<Map>()
+            .map((s) => asString(s['name']))
+            .where((s) => s.isNotEmpty)
+            .toList() ??
+        const <String>[];
+
+    final id = asString(json['id'], fallback: asString(json['slug'], fallback: asString(json['_id'])));
+    final display = asString(json['displayName']).isNotEmpty
+        ? asString(json['displayName'])
+        : asString(json['name'], fallback: id.isNotEmpty ? id : 'Category');
+
     return CategoryModel(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      icon: json['icon'] as String,
-      color: Color(json['color'] as int),
-      productCount: json['productCount'] as int? ?? 0,
+      id: id,
+      name: display,
+      icon: asString(json['icon'], fallback: 'basket'),
+      color: asColor(json['color']),
+      productCount: asInt(json['productCount']),
+      subCategories: subs,
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'name': name,
-      'icon': icon,
-      'color': color.value,
-      'productCount': productCount,
-    };
-  }
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'icon': icon,
+        'color': '#${(color.value & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}',
+        'productCount': productCount,
+        'subCategories': subCategories,
+      };
 }

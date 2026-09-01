@@ -38,7 +38,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
   }
 
   Future<void> _navigateToNext() async {
-    await Future.delayed(const Duration(milliseconds: 2500));
+    // Run the branding animation and the token -> profile hydration in parallel.
+    await Future.wait([
+      Future.delayed(const Duration(milliseconds: 2200)),
+      ref.read(authProvider.notifier).ensureHydrated(),
+    ]);
     if (!mounted) return;
 
     final authState = ref.read(authProvider);

@@ -10,7 +10,9 @@ class CustomSearchBar extends StatelessWidget {
   final VoidCallback? onVoicePressed;
   final VoidCallback? onTap;
   final bool readOnly;
+  final bool autofocus;
   final TextEditingController? controller;
+  final Widget? trailing;
 
   const CustomSearchBar({
     super.key,
@@ -20,7 +22,9 @@ class CustomSearchBar extends StatelessWidget {
     this.onVoicePressed,
     this.onTap,
     this.readOnly = false,
+    this.autofocus = false,
     this.controller,
+    this.trailing,
   });
 
   @override
@@ -39,6 +43,8 @@ class CustomSearchBar extends StatelessWidget {
         child: TextField(
           controller: controller,
           readOnly: readOnly,
+          autofocus: autofocus,
+          textInputAction: TextInputAction.search,
           onTap: onTap,
           onChanged: onChanged,
           onSubmitted: onSubmitted,
@@ -55,14 +61,15 @@ class CustomSearchBar extends StatelessWidget {
               color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
               size: 22,
             ),
-            suffixIcon: GestureDetector(
-              onTap: onVoicePressed ?? () {},
-              child: Icon(
-                Icons.mic_none_rounded,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                size: 22,
-              ),
-            ),
+            suffixIcon: trailing ??
+                GestureDetector(
+                  onTap: onVoicePressed ?? () {},
+                  child: Icon(
+                    Icons.mic_none_rounded,
+                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                    size: 22,
+                  ),
+                ),
             border: InputBorder.none,
             isDense: true,
           ),

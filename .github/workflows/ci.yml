@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+        working-directory: backend
+      - name: Backend integration tests
+        working-directory: backend
+        env:
+          # CI must provide a throwaway Mongo (Atlas test cluster or a service container).
+          MONGO_URI: ${{ secrets.TEST_MONGO_URI }}
+          JWT_SECRET: ci-test-secret
+          OTP_TEST_MODE: 'true'
+          PAYMENTS_TEST_MODE: 'true'
+        run: npm test
+
+  mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+        working-directory: mobileapp
+      - run: flutter analyze
+        working-directory: mobileapp
+      - run: flutter test
+        working-directory: mobileapp

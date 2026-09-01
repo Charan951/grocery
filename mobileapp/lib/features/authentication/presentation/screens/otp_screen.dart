@@ -1,206 +1,193 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
+import 'package:freshcart/core/widgets/app_toast.dart';
 import 'package:freshcart/core/widgets/buttons.dart';
-import 'package:freshcart/core/widgets/glass_card.dart';
+import 'package:freshcart/core/widgets/otp_field.dart';
 import 'package:freshcart/features/authentication/presentation/controllers/auth_controller.dart';
+import 'package:freshcart/features/authentication/presentation/widgets/auth_scaffold.dart';
 
+/// Step 2 of sign-in: verify the 6-digit code. Auto-submits on the last digit;
+/// on success routes to location selection.
 class OtpScreen extends ConsumerStatefulWidget {
   final String phone;
-
-  const OtpScreen({
-    super.key,
-    required this.phone,
-  });
+  const OtpScreen({super.key, required this.phone});
 
   @override
   ConsumerState<OtpScreen> createState() => _OtpScreenState();
 }
 
 class _OtpScreenState extends ConsumerState<OtpScreen> {
-  final List<TextEditingController> _controllers = List.generate(6, (_) => TextEditingController());
-  final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
-  String _errorMessage = '';
+  final _otpKey = GlobalKey<OtpFieldState>();
+  String _code = '';
+  String? _error;
+  bool _submitting = false;
+
+  Timer? _timer;
+  int _secondsLeft = 45;
+
+  @override
+  void initState() {
+    super.initState();
+    _startCountdown();
+  }
 
   @override
   void dispose() {
-    for (var controller in _controllers) {
-      controller.dispose();
-    }
-    for (var node in _focusNodes) {
-      node.dispose();
-    }
+    _timer?.cancel();
     super.dispose();
   }
 
-  void _onOtpInput(String value, int index) {
-    if (value.isNotEmpty) {
-      if (index < 5) {
-        _focusNodes[index + 1].requestFocus();
+  void _startCountdown() {
+    _timer?.cancel();
+    setState(() => _secondsLeft = 45);
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return t.cancel();
+      if (_secondsLeft <= 1) {
+        t.cancel();
+        setState(() => _secondsLeft = 0);
       } else {
-        _focusNodes[index].unfocus();
-        _verifyOtp();
+        setState(() => _secondsLeft--);
       }
+    });
+  }
+
+  Future<void> _verify() async {
+    if (_submitting) return;
+    FocusScope.of(context).unfocus();
+    if (_code.length < 6) {
+      setState(() => _error = 'Enter all 6 digits');
+      return;
+    }
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+
+    final ok = await ref.read(authProvider.notifier).verifyOtp(widget.phone, _code);
+    if (!mounted) return;
+    setState(() => _submitting = false);
+
+    if (ok) {
+      AppToast.success('Signed in successfully');
+      // Returning customer with a saved address skips location setup.
+      final hasAddress = ref.read(authProvider).user?.selectedAddress != null;
+      context.go(hasAddress ? '/' : '/location_select');
     } else {
-      if (index > 0) {
-        _focusNodes[index - 1].requestFocus();
-      }
+      setState(() => _error = ref.read(authProvider).error ?? 'Invalid code. Please try again.');
+      _otpKey.currentState?.reset();
     }
   }
 
-  void _verifyOtp() async {
-    final code = _controllers.map((c) => c.text).join();
-    if (code.length < 6) return;
-
-    final success = await ref.read(authProvider.notifier).verifyOtp(widget.phone, code);
-    if (success) {
-      if (mounted) {
-        context.go('/location');
-      }
+  Future<void> _resend() async {
+    if (_secondsLeft > 0 || _submitting) return;
+    setState(() => _error = null);
+    final ok = await ref.read(authProvider.notifier).resendOtp(widget.phone);
+    if (!mounted) return;
+    if (ok) {
+      _otpKey.currentState?.reset();
+      _startCountdown();
+      AppToast.success('A new code is on its way');
     } else {
-      setState(() {
-        _errorMessage = 'Invalid OTP code. Please try again.';
-      });
+      final msg = ref.read(authProvider).error ?? 'Could not resend the code';
+      setState(() => _error = msg);
+      AppToast.error(msg);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authProvider);
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final auth = ref.watch(authProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final busy = _submitting || auth.isLoading;
 
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return AuthScaffold(
+      title: 'Verify your number',
+      subtitle: 'Enter the code sent to +91 ${_pretty(widget.phone)}.',
+      belowTitle: auth.otpTestMode
+          ? _TestModeBanner(code: auth.otpDevCode ?? '000000')
+          : null,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          OtpField(
+            key: _otpKey,
+            enabled: !busy,
+            errorText: _error,
+            onChanged: (v) {
+              _code = v;
+              if (_error != null) setState(() => _error = null);
+            },
+            onCompleted: (v) {
+              _code = v;
+              _verify();
+            },
+          ),
+          const SizedBox(height: 20),
+          Row(
             children: [
-              const SizedBox(height: 40),
-              
-              // Back Button
-              GestureDetector(
-                onTap: () => context.pop(),
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.white10 : Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 15,
-                      )
-                    ],
-                  ),
-                  child: Icon(
-                    Icons.arrow_back_ios_new_rounded,
-                    size: 16,
-                    color: isDark ? Colors.white : AppColors.textPrimary,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 32),
-              
-              // Headers
               Text(
-                'Verify Number',
-                style: AppTypography.display(
-                  isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                ).copyWith(
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -1.0,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'We have sent a 6-digit OTP code to +91 ${widget.phone}. Enter it below to verify.',
-                style: AppTypography.bodyMedium(
+                "Didn't get it? ",
+                style: AppTypography.bodySmall(
                   isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                ).copyWith(height: 1.45),
-              ),
-              const SizedBox(height: 40),
-              
-              // OTP Cards
-              GlassCard(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: List.generate(
-                        6,
-                        (index) => SizedBox(
-                          width: 44,
-                          height: 54,
-                          child: TextField(
-                            controller: _controllers[index],
-                            focusNode: _focusNodes[index],
-                            keyboardType: TextInputType.number,
-                            maxLength: 1,
-                            textAlign: TextAlign.center,
-                            style: AppTypography.h2(
-                              isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                            ).copyWith(fontWeight: FontWeight.bold),
-                            decoration: InputDecoration(
-                              counterText: '',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: isDark ? Colors.white24 : AppColors.divider,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
-                                  color: AppColors.primary,
-                                  width: 1.5,
-                                ),
-                              ),
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                            onChanged: (val) => _onOtpInput(val, index),
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (_errorMessage.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      Text(
-                        _errorMessage,
-                        style: AppTypography.bodySmall(AppColors.error),
-                      ),
-                    ],
-                  ],
                 ),
               ),
-              const SizedBox(height: 24),
-              
-              // Resend text
-              Center(
-                child: TextButton(
-                  onPressed: authState.isLoading ? null : () {},
-                  child: Text(
-                    'Resend code in 45s',
-                    style: AppTypography.labelMedium(AppColors.primary),
+              GestureDetector(
+                onTap: _secondsLeft == 0 ? _resend : null,
+                child: Text(
+                  _secondsLeft > 0 ? 'Resend in ${_secondsLeft}s' : 'Resend code',
+                  style: AppTypography.labelMedium(
+                    _secondsLeft > 0 ? AppColors.textSecondary : AppColors.primaryText,
                   ),
                 ),
               ),
-              const Spacer(),
-              
-              PrimaryButton(
-                text: 'Verify & Proceed',
-                isLoading: authState.isLoading,
-                onPressed: _verifyOtp,
-              ),
-              const SizedBox(height: 24),
             ],
           ),
-        ),
+        ],
+      ),
+      cta: PrimaryButton(
+        text: 'Verify & continue',
+        isLoading: busy,
+        onPressed: _verify,
+      ),
+    );
+  }
+
+  String _pretty(String p) {
+    final d = p.replaceAll(RegExp(r'\D'), '');
+    return d.length == 10 ? '${d.substring(0, 5)} ${d.substring(5)}' : p;
+  }
+}
+
+class _TestModeBanner extends StatelessWidget {
+  final String code;
+  const _TestModeBanner({required this.code});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.warning.withOpacity(0.35)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.science_rounded, size: 16, color: AppColors.warningText),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Test mode — use code $code',
+              style: AppTypography.bodySmall(AppColors.warningText).copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
       ),
     );
   }

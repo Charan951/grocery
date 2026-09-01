@@ -60,7 +60,18 @@ const settingsSchema = new mongoose.Schema({
     razorpayId: { type: String, default: 'mock_key_id' },
     razorpaySecret: { type: String, default: 'mock_key_secret' }
   },
-  notificationsEnabled: { type: Boolean, default: true }
+  notificationsEnabled: { type: Boolean, default: true },
+  // --- Delivery / dispatch config ---
+  storeOrigin: {
+    name: { type: String, default: 'FreshCart Dark Store' },
+    lat: { type: Number, default: 17.4474 },
+    lng: { type: Number, default: 78.3762 }
+  },
+  offerTimeoutSec: { type: Number, default: 25 },
+  maxOfferAttempts: { type: Number, default: 5 },
+  assignRadiusKm: { type: Number, default: 6 },
+  deliveryBaseFee: { type: Number, default: 20 },   // partner earning base (P2)
+  deliveryPerKmFee: { type: Number, default: 6 }
 }, { timestamps: true });
 
 // Audit Log Schema

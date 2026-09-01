@@ -4,12 +4,20 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 
-const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_STX1H1R9XvVjSZ';
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'iMtdlSgzu1h9vQgytwxSOiJI';
+// Credentials come from the environment only — no hardcoded key fallbacks in source.
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || '';
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || '';
+
+// Evaluated per-call (not at import) so tests can toggle the env var.
+// Test mode = explicitly forced, or no real key configured (missing / "mock_*").
+const isPaymentsTestMode = () =>
+  process.env.PAYMENTS_TEST_MODE === 'true' ||
+  !process.env.RAZORPAY_KEY_SECRET ||
+  (process.env.RAZORPAY_KEY_ID || '').startsWith('mock');
 
 const razorpayInstance = new Razorpay({
-  key_id: RAZORPAY_KEY_ID,
-  key_secret: RAZORPAY_KEY_SECRET,
+  key_id: RAZORPAY_KEY_ID || 'rzp_test_placeholder',
+  key_secret: RAZORPAY_KEY_SECRET || 'placeholder_secret',
 });
 import { User } from '../models/User.js';
 import { Category, Product, Brand, SpecialGroup, Banner, PromoCard } from '../models/Catalog.js';
@@ -19,10 +27,11 @@ import { Customer } from '../models/Customer.js';
 import { Coupon, Offer, Payment, WalletTransaction } from '../models/Finance.js';
 import { Review, Notification, CMSPage, Blog, Settings, AuditLog, SupportTicket } from '../models/Operations.js';
 import { uploadToCloudinary } from '../config/cloudinary.js';
+import { cancelForOrder } from '../services/assignmentService.js';
 
 // Helper to sign JWT
 const signToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET || 'supersecretjwtkey_987654321', {
+  return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: '24h'
   });
 };
@@ -108,7 +117,7 @@ export const dashboardController = {
       const productsCount = await Product.countDocuments();
       const categoriesCount = await Category.countDocuments();
       const customersCount = await Customer.countDocuments();
-      const lowStockProducts = await Product.find({ stock: { $lt: 15 } });
+      const lowStockProducts = await Product.find({ 'stock.quantity': { $lt: 15 } });
 
       let totalRevenue = 0;
       let todayRevenue = 0;
@@ -118,10 +127,13 @@ export const dashboardController = {
       const today = new Date().toDateString();
 
       orders.forEach(o => {
+        // Schema field is `totalAmount` — `grandTotal` never existed, which made
+        // every revenue figure NaN once real orders were present.
+        const orderValue = Number(o.totalAmount) || 0;
         if (o.status !== 'Cancelled') {
-          totalRevenue += o.grandTotal;
+          totalRevenue += orderValue;
           if (new Date(o.createdAt).toDateString() === today) {
-            todayRevenue += o.grandTotal;
+            todayRevenue += orderValue;
             todayOrders++;
           }
         }
@@ -549,10 +561,34 @@ export const orderController = {
     }
   },
 
+  // GET /api/orders/mine  (protectCustomer)
+  getMyOrders: async (req, res) => {
+    try {
+      const cid = req.customer.customerId;
+      const phone10 = String(req.customer.phone || '').replace(/\D/g, '').slice(-10);
+      const list = await Order.find({
+        $or: [
+          { customerId: cid },
+          ...(phone10 ? [{ customerPhone: new RegExp(phone10 + '$') }] : [])
+        ]
+      }).sort({ createdAt: -1 });
+      res.json({ success: true, orders: list });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
   getOrder: async (req, res) => {
     try {
       const order = await Order.findOne({ orderId: req.params.id });
       if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+      // If a customer token was supplied, only let them see their own order.
+      if (req.customer && order.customerId !== req.customer.customerId) {
+        const phone10 = String(req.customer.phone || '').replace(/\D/g, '').slice(-10);
+        if (!phone10 || !String(order.customerPhone || '').endsWith(phone10)) {
+          return res.status(403).json({ success: false, message: 'Not your order' });
+        }
+      }
       res.json({ success: true, order });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
@@ -562,12 +598,17 @@ export const orderController = {
   createOrder: async (req, res) => {
     try {
       const orderData = req.body || {};
-      const cleanPhone = (orderData.customerPhone || orderData.phone || '9626626626').replace(/\D/g, '').slice(-10);
+      // When the request carries a valid customer token (attachCustomerOptional),
+      // trust the server-side identity over anything in the body.
+      const authedCustomer = req.customer || null;
+      const cleanPhone = (
+        authedCustomer?.phone || orderData.customerPhone || orderData.phone || '9626626626'
+      ).replace(/\D/g, '').slice(-10);
 
       const normalizedOrder = {
         orderId: orderData.orderId || orderData.orderNumber || 'PNNHJHTYP' + Math.floor(100000 + Math.random() * 900000),
-        customerId: orderData.customerId || 'cust_' + cleanPhone,
-        customerName: orderData.customerName || 'Customer',
+        customerId: authedCustomer?.customerId || orderData.customerId || 'cust_' + cleanPhone,
+        customerName: authedCustomer?.name || orderData.customerName || 'Customer',
         customerPhone: `+91 ${cleanPhone}`,
         items: Array.isArray(orderData.items) ? orderData.items.map((it) => ({
           id: it.id || it.productId || 'p_1',
@@ -581,27 +622,68 @@ export const orderController = {
         })) : [],
         itemTotal: Number(orderData.itemTotal || orderData.totalAmount || 100),
         totalAmount: Number(orderData.totalAmount || orderData.itemTotal || 100),
+        discount: Number(orderData.discount || 0),
+        deliveryFee: Number(orderData.deliveryFee || 0),
+        handlingFee: Number(orderData.handlingFee || 0),
         paymentStatus: orderData.paymentStatus || 'Paid',
         paymentMethod: orderData.paymentMethod || 'Razorpay UPI/Card',
+        paymentId: orderData.paymentId || undefined,
+        paymentRef: orderData.paymentRef || orderData.razorpayOrderId || undefined,
         status: orderData.status || 'In Transit',
         deliveryAddress: typeof orderData.deliveryAddress === 'string'
           ? orderData.deliveryAddress
           : orderData.address?.fullAddress || 'Selected Delivery Address'
       };
 
+      // Resolve drop coordinates (for dispatch / ETA) + dark-store pickup origin.
+      const dropLat = Number(orderData.deliveryLat ?? orderData.address?.lat ?? orderData.lat);
+      const dropLng = Number(orderData.deliveryLng ?? orderData.address?.lng ?? orderData.lng);
+      if (Number.isFinite(dropLat) && Number.isFinite(dropLng)) {
+        normalizedOrder.deliveryLocation = { lat: dropLat, lng: dropLng };
+      }
+      try {
+        const s = await Settings.findOne();
+        if (s?.storeOrigin) normalizedOrder.pickup = { name: s.storeOrigin.name, lat: s.storeOrigin.lat, lng: s.storeOrigin.lng };
+      } catch (_) {}
+
       let order;
       try {
         order = await Order.create(normalizedOrder);
+        // Reconciliation record (best-effort).
+        Payment.create({
+          transactionId: normalizedOrder.paymentId || `txn_${normalizedOrder.orderId}`,
+          orderId: normalizedOrder.orderId,
+          customerId: normalizedOrder.customerId,
+          amount: normalizedOrder.totalAmount,
+          status: normalizedOrder.paymentStatus === 'Paid' ? 'Success' : 'Pending',
+          gateway: normalizedOrder.paymentMethod?.toLowerCase().includes('wallet') ? 'Wallet' : 'Razorpay',
+        }).catch(() => {});
         if (normalizedOrder.items && Array.isArray(normalizedOrder.items)) {
           for (const item of normalizedOrder.items) {
             if (item.productId) {
-              await Product.updateOne({ id: item.productId }, { $inc: { stock: -item.quantity } }).catch(() => { });
+              // Product.stock is an object { status, quantity } — decrement the
+              // nested quantity, not the object itself.
+              await Product.updateOne(
+                { id: item.productId },
+                { $inc: { 'stock.quantity': -Number(item.quantity || 0) } }
+              ).catch(() => { });
             }
           }
         }
       } catch (dbErr) {
         console.warn('Order DB create note:', dbErr.message);
         order = { ...normalizedOrder, _id: 'ord_mock_' + Date.now() };
+      }
+
+      const io = req.app.get('io');
+      if (io) {
+        io.to(normalizedOrder.orderId).emit('order_status_update', {
+          orderId: normalizedOrder.orderId,
+          status: order.status || normalizedOrder.status,
+          note: 'Order placed',
+          eta: order.estimatedDelivery,
+          at: new Date().toISOString(),
+        });
       }
 
       res.status(201).json({ success: true, order });
@@ -629,10 +711,54 @@ export const orderController = {
 
       if (status === 'Delivered') {
         order.paymentStatus = 'Paid';
+        order.deliveredAt = order.deliveredAt || new Date();
+      }
+
+      // If an assigned order gets cancelled here, release the partner + revoke.
+      if (['Cancelled', 'Returned', 'Refunded'].includes(status)) {
+        await cancelForOrder(order.orderId, `order ${status.toLowerCase()}`).catch(() => {});
+        order.deliveryPartnerUserId = undefined;
+        order.assignmentId = undefined;
       }
 
       await order.save();
+
+      // Push the change to anyone watching this order's room.
+      const io = req.app.get('io');
+      if (io) {
+        io.to(order.orderId).emit('order_status_update', {
+          orderId: order.orderId,
+          status: order.status,
+          note: order.trackingTimeline.at(-1)?.note || '',
+          eta: order.estimatedDelivery,
+          timeline: order.trackingTimeline,
+          at: new Date().toISOString(),
+        });
+      }
+
       res.json({ success: true, order });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // POST /api/orders/:id/rider-location  { lat, lng, etaMinutes }  (staff/delivery)
+  // A rider/dispatch producer for the tracking map. Emits to the order room.
+  updateRiderLocation: async (req, res) => {
+    try {
+      const { lat, lng, etaMinutes, riderName, riderPhone } = req.body;
+      const io = req.app.get('io');
+      if (io) {
+        io.to(req.params.id).emit('rider_location_update', {
+          orderId: req.params.id,
+          lat: Number(lat),
+          lng: Number(lng),
+          etaMinutes: etaMinutes != null ? Number(etaMinutes) : undefined,
+          riderName,
+          riderPhone,
+        });
+      }
+      res.json({ success: true });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
     }
@@ -649,6 +775,49 @@ export const couponController = {
       res.json({ success: true, coupons: list });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // POST /api/coupons/validate  { code, subtotal }
+  // Server-side discount calc so the client can't fabricate one.
+  validateCoupon: async (req, res) => {
+    try {
+      const code = String(req.body.code || '').trim().toUpperCase();
+      const subtotal = Number(req.body.subtotal) || 0;
+      if (!code) {
+        return res.status(400).json({ success: false, valid: false, message: 'Coupon code is required' });
+      }
+
+      const coupon = await Coupon.findOne({ code: new RegExp(`^${code}$`, 'i') });
+      if (!coupon || coupon.active === false) {
+        return res.json({ success: true, valid: false, discount: 0, message: 'This coupon is not valid' });
+      }
+      if (subtotal < (coupon.minOrder || 0)) {
+        return res.json({
+          success: true,
+          valid: false,
+          discount: 0,
+          message: `Add items worth ₹${(coupon.minOrder - subtotal).toFixed(0)} more to use ${coupon.code}`
+        });
+      }
+
+      let discount = coupon.isPercent
+        ? Math.round((subtotal * Number(coupon.value)) / 100)
+        : Number(coupon.value);
+      // Percentage coupons are capped at ₹100 (matches the web storefront).
+      if (coupon.isPercent) discount = Math.min(discount, 100);
+      discount = Math.max(0, Math.min(discount, subtotal));
+
+      res.json({
+        success: true,
+        valid: true,
+        code: coupon.code,
+        discount,
+        description: coupon.description || coupon.discount,
+        message: `${coupon.code} applied — you saved ₹${discount}`
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, valid: false, message: err.message });
     }
   },
 
@@ -990,6 +1159,32 @@ export const customerController = {
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
     }
+  },
+
+  // POST /api/customers/me/wallet/debit  { amount, orderId }  (protectCustomer)
+  // Server-side wallet payment for checkout. Rejects if the balance is short.
+  walletDebit: async (req, res) => {
+    try {
+      const customer = req.customer;
+      const val = Number(req.body.amount);
+      if (!val || val <= 0) {
+        return res.status(400).json({ success: false, message: 'Invalid amount' });
+      }
+      if ((customer.walletBalance || 0) < val) {
+        return res.status(400).json({ success: false, message: 'Insufficient wallet balance' });
+      }
+      customer.walletBalance -= val;
+      await customer.save();
+      await WalletTransaction.create({
+        customerId: customer.customerId,
+        amount: val,
+        type: 'Debit',
+        description: req.body.orderId ? `Payment for order ${req.body.orderId}` : 'Order payment',
+      });
+      res.json({ success: true, walletBalance: customer.walletBalance });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
   }
 };
 
@@ -1118,8 +1313,17 @@ export const inventoryController = {
         await item.save();
       }
 
-      // Sync product main stock level
-      await Product.updateOne({ id: productId }, { stock: newQty });
+      // Sync product main stock level. Product.stock is { status, quantity } —
+      // write the nested fields instead of clobbering the object with a number.
+      await Product.updateOne(
+        { id: productId },
+        {
+          $set: {
+            'stock.quantity': newQty,
+            'stock.status': newQty <= 0 ? 'Out of Stock' : (newQty < 15 ? 'Low Stock' : 'In Stock')
+          }
+        }
+      );
 
       res.json({ success: true, inventory: item });
     } catch (err) {
@@ -1468,31 +1672,38 @@ export const promoCardController = {
 
 export const paymentController = {
   createRazorpayOrder: async (req, res) => {
+    const keyId = process.env.RAZORPAY_KEY_ID || '';
     try {
       const { amount, currency = 'INR', receipt } = req.body;
       const options = {
         amount: Math.round(Number(amount) * 100),
         currency,
-        receipt: receipt || `receipt_${Date.now()}`,
+        receipt: receipt || `rcpt_${Date.now()}`,
       };
 
       const order = await razorpayInstance.orders.create(options);
       res.json({
         success: true,
+        testMode: isPaymentsTestMode(),
         orderId: order.id,
         amount: order.amount,
         currency: order.currency,
-        key: RAZORPAY_KEY_ID,
+        key: keyId,
       });
     } catch (err) {
       console.warn('Razorpay order creation fallback:', err.message);
-      res.json({
-        success: true,
-        orderId: `order_test_${Date.now()}`,
-        amount: Math.round(Number(req.body.amount || 100) * 100),
-        currency: 'INR',
-        key: RAZORPAY_KEY_ID,
-      });
+      // Only fall back to a fake order id when we're intentionally in test mode.
+      if (isPaymentsTestMode()) {
+        return res.json({
+          success: true,
+          testMode: true,
+          orderId: `order_test_${Date.now()}`,
+          amount: Math.round(Number(req.body.amount || 100) * 100),
+          currency: 'INR',
+          key: keyId,
+        });
+      }
+      res.status(502).json({ success: false, message: 'Could not create a payment order. Try again.' });
     }
   },
 
@@ -1500,25 +1711,89 @@ export const paymentController = {
     try {
       const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
 
-      if (!razorpay_order_id || !razorpay_payment_id) {
-        return res.json({ success: true, verified: true, message: 'Mock payment verified' });
+      // Dev/demo path: no real Razorpay secret configured. Report verified but
+      // flag it clearly so the client can gate real order confirmation on env.
+      if (isPaymentsTestMode()) {
+        return res.json({
+          success: true,
+          verified: true,
+          testMode: true,
+          message: 'Payment accepted in test mode (no signature check performed)',
+        });
       }
 
-      const body = razorpay_order_id + '|' + razorpay_payment_id;
+      if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+        return res.status(400).json({
+          success: false,
+          verified: false,
+          message: 'Missing razorpay_order_id, razorpay_payment_id or razorpay_signature',
+        });
+      }
+
+      const body = `${razorpay_order_id}|${razorpay_payment_id}`;
       const expectedSignature = crypto
         .createHmac('sha256', RAZORPAY_KEY_SECRET)
-        .update(body.toString())
+        .update(body)
         .digest('hex');
 
-      const isValid = expectedSignature === razorpay_signature;
+      // Constant-time comparison to avoid timing leaks.
+      const a = Buffer.from(expectedSignature, 'utf8');
+      const b = Buffer.from(String(razorpay_signature), 'utf8');
+      const isValid = a.length === b.length && crypto.timingSafeEqual(a, b);
+
+      if (!isValid) {
+        return res.status(400).json({
+          success: false,
+          verified: false,
+          message: 'Payment signature verification failed',
+        });
+      }
 
       res.json({
         success: true,
-        verified: isValid || true,
-        message: isValid ? 'Payment verified successfully' : 'Payment signature verified',
+        verified: true,
+        testMode: false,
+        message: 'Payment verified successfully',
       });
     } catch (err) {
-      res.json({ success: true, verified: true, message: 'Payment verified' });
+      res.status(500).json({ success: false, verified: false, message: err.message });
+    }
+  },
+
+  // POST /api/payment/webhook — Razorpay server-to-server events.
+  // Body is a raw Buffer (see app.js). Verifies X-Razorpay-Signature and marks
+  // the matching order Paid on payment.captured / order.paid.
+  webhook: async (req, res) => {
+    try {
+      const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+      const signature = req.headers['x-razorpay-signature'];
+      const raw = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body || {}));
+
+      if (!secret || !signature) {
+        return res.status(400).json({ success: false, message: 'Missing webhook secret or signature' });
+      }
+      const expected = crypto.createHmac('sha256', secret).update(raw).digest('hex');
+      const a = Buffer.from(expected, 'utf8');
+      const b = Buffer.from(String(signature), 'utf8');
+      if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+        return res.status(400).json({ success: false, message: 'Invalid webhook signature' });
+      }
+
+      const event = JSON.parse(raw.toString('utf8'));
+      const entity = event?.payload?.payment?.entity || event?.payload?.order?.entity || {};
+      const rzpOrderId = entity.order_id || entity.id;
+      const paymentId = entity.id;
+
+      if ((event.event === 'payment.captured' || event.event === 'order.paid') && rzpOrderId) {
+        await Order.updateOne(
+          { paymentRef: rzpOrderId },
+          { $set: { paymentStatus: 'Paid', ...(paymentId ? { paymentId } : {}) } }
+        );
+      }
+      res.json({ success: true });
+    } catch (err) {
+      console.warn('Razorpay webhook error:', err.message);
+      res.status(200).json({ success: false }); // 200 so Razorpay doesn't spam retries on parse errors
     }
   },
 };

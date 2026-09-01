@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:dio/dio.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
+import 'package:freshcart/core/widgets/buttons.dart';
 import 'package:freshcart/features/authentication/presentation/controllers/auth_controller.dart';
 
 final List<Map<String, dynamic>> popularLocations = [
@@ -116,41 +117,67 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
     } catch (_) {}
   }
 
-  void _confirmAndDeliver() {
+  bool _saving = false;
+
+  Future<void> _confirmAndDeliver() async {
+    if (_saving) return;
     final houseNo = _houseNoController.text.trim();
     final landmark = _landmarkController.text.trim();
+    final finalFullAddress =
+        '${houseNo.isNotEmpty ? '$houseNo, ' : ''}${landmark.isNotEmpty ? '$landmark, ' : ''}$_fullAddressText';
 
-    final finalFullAddress = '${houseNo.isNotEmpty ? '$houseNo, ' : ''}${landmark.isNotEmpty ? '$landmark, ' : ''}$_fullAddressText';
+    final auth = ref.read(authProvider.notifier);
+    auth.grantLocationPermission();
 
-    final auth = ref.read(authProvider);
-    final id = 'addr_${DateTime.now().millisecondsSinceEpoch}';
-
-    final newAddr = {
-      'id': id,
-      'tag': _selectedLabel,
-      'receiverName': auth.user?.name ?? 'Customer',
-      'addressLine': finalFullAddress,
+    final body = {
+      'label': _selectedLabel,
+      'name': _selectedLabel,
       'houseNo': houseNo,
       'landmark': landmark,
-      'city': _areaName,
+      'area': _areaName,
+      'fullAddress': finalFullAddress,
       'pincode': _pincode,
-      'phone': auth.user?.phone ?? '+91 6305804155',
-      'isDefault': true,
+      'lat': _currentCenter.latitude,
+      'lng': _currentCenter.longitude,
     };
 
-    ref.read(authProvider.notifier).grantLocationPermission();
-    ref.read(authProvider.notifier).addAddress(newAddr);
-    ref.read(authProvider.notifier).selectAddress(id);
+    setState(() => _saving = true);
+    try {
+      // Persist via the real API (POST /customers/me/addresses).
+      await auth.addAddressRemote(body);
+    } catch (_) {
+      // First-run must not be blocked by a transient network error — keep it
+      // locally and let the next profile refresh reconcile.
+      auth.addAddress({
+        'id': 'addr_${DateTime.now().millisecondsSinceEpoch}',
+        ...body,
+        'addressLine': finalFullAddress,
+        'isDefault': true,
+      });
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
 
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Delivery location updated: $finalFullAddress'),
+        content: Text('Delivering to $finalFullAddress'),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: const Color(0xFF00A86B),
+        backgroundColor: AppColors.primary,
       ),
     );
+    _leave();
+  }
 
-    context.pop();
+  /// This screen is opened both as a step in the sign-in flow (via `go`, no
+  /// back stack) and later from inside the app (via `push`). Pop when we can,
+  /// otherwise land on Home.
+  void _leave() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/');
+    }
   }
 
   @override
@@ -161,42 +188,39 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
     final savedAddresses = authState.user?.addresses ?? [];
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : const Color(0xFFF9FAFB),
+      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
       appBar: AppBar(
-        backgroundColor: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-        elevation: 0.5,
+        backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        elevation: 0,
+        titleSpacing: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close_rounded, size: 22),
-          onPressed: () => context.pop(),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+          onPressed: _leave,
         ),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF00A86B).withOpacity(0.12),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.location_on_rounded, color: Color(0xFF00A86B), size: 20),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Select Delivery Location',
-                  style: AppTypography.labelLarge(isDark ? Colors.white : AppColors.textPrimary).copyWith(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 16,
-                  ),
-                ),
-                Text(
-                  'Pin exact location on OpenStreetMap',
-                  style: AppTypography.bodySmall(isDark ? Colors.white54 : Colors.black45).copyWith(fontSize: 11),
-                ),
-              ],
-            ),
-          ],
+        title: Text(
+          'Select delivery location',
+          style: AppTypography.h3(isDark ? AppColors.textPrimaryDark : AppColors.textPrimary),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: isDark ? AppColors.dividerDark : AppColors.divider),
+        ),
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDark : AppColors.surface,
+          border: Border(top: BorderSide(color: isDark ? AppColors.dividerDark : AppColors.divider)),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+        child: SafeArea(
+          top: false,
+          child: PrimaryButton(
+            text: _saving ? 'Saving…' : 'Confirm & deliver here',
+            isLoading: _saving,
+            onPressed: _saving ? null : _confirmAndDeliver,
+          ),
         ),
       ),
       body: SafeArea(
@@ -243,7 +267,7 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
                       icon: const Icon(Icons.navigation_rounded, size: 16, color: Colors.white),
                       label: const Text('Locate Me', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00A86B),
+                        backgroundColor: AppColors.primaryText,
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         elevation: 0,
@@ -258,7 +282,7 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
                   physics: const BouncingScrollPhysics(),
                   child: Row(
                     children: [
-                      Text('POPULAR:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: isDark ? Colors.white38 : Colors.grey)),
+                      Text('POPULAR:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: isDark ? Colors.white38 : Colors.grey)),
                       const SizedBox(width: 8),
                       ...popularLocations.map((loc) {
                         return Padding(
@@ -300,7 +324,7 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
                           initialCenter: _currentCenter,
                           initialZoom: 15,
                           style: isDark ? MapcnStyle.dark : MapcnStyle.normal,
-                          accentColor: const Color(0xFF00A86B),
+                          accentColor: AppColors.primaryText,
                           onCameraMove: (camera, hasGesture) {
                             if (hasGesture) {
                               setState(() {
@@ -342,7 +366,7 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
                   decoration: BoxDecoration(
                     color: const Color(0xFFE8F5E9).withOpacity(isDark ? 0.1 : 0.6),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFF00A86B).withOpacity(0.3)),
+                    border: Border.all(color: AppColors.primary.withOpacity(0.3)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -352,11 +376,11 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.location_on_rounded, color: Color(0xFF00A86B), size: 18),
+                              const Icon(Icons.location_on_rounded, color: AppColors.primaryText, size: 18),
                               const SizedBox(width: 6),
                               Text(
                                 _areaName,
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFF00A86B), letterSpacing: 0.5),
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primaryText, letterSpacing: 0.5),
                               ),
                             ],
                           ),
@@ -417,7 +441,7 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
 
                       Row(
                         children: [
-                          const Text('SAVE AS:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.grey)),
+                          const Text('SAVE AS:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.grey)),
                           const SizedBox(width: 8),
                           ...['Home', 'Work', 'Other'].map((lbl) {
                             final isSelected = _selectedLabel == lbl;
@@ -427,7 +451,7 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
                               child: ChoiceChip(
                                 label: Text('$iconStr $lbl', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isSelected ? Colors.white : Colors.black87)),
                                 selected: isSelected,
-                                selectedColor: const Color(0xFF00A86B),
+                                selectedColor: AppColors.primaryText,
                                 backgroundColor: Colors.white,
                                 onSelected: (_) => setState(() => _selectedLabel = lbl),
                               ),
@@ -441,7 +465,7 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
                 const SizedBox(height: 16),
 
                 if (savedAddresses.isNotEmpty) ...[
-                  Text('SAVED ADDRESSES', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: isDark ? Colors.white38 : Colors.grey, letterSpacing: 0.8)),
+                  Text('SAVED ADDRESSES', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isDark ? Colors.white38 : Colors.grey, letterSpacing: 0.8)),
                   const SizedBox(height: 8),
                   ...savedAddresses.map((addr) {
                     final tag = addr['tag'] ?? 'Home';
@@ -454,7 +478,7 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
                       child: InkWell(
                         onTap: () {
                           ref.read(authProvider.notifier).selectAddress(addr['id'] as String);
-                          context.pop();
+                          _leave();
                         },
                         borderRadius: BorderRadius.circular(16),
                         child: Container(
@@ -462,7 +486,7 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
                           decoration: BoxDecoration(
                             color: isDark ? Colors.white.withOpacity(0.04) : Colors.white,
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: isSelected ? const Color(0xFF00A86B) : (isDark ? Colors.white10 : Colors.black.withOpacity(0.06))),
+                            border: Border.all(color: isSelected ? AppColors.primaryText : (isDark ? Colors.white10 : Colors.black.withOpacity(0.06))),
                           ),
                           child: Row(
                             children: [
@@ -488,7 +512,7 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
                                 ),
                               ),
                               if (isSelected)
-                                const Icon(Icons.check_circle_rounded, color: Color(0xFF00A86B), size: 20),
+                                const Icon(Icons.check_circle_rounded, color: AppColors.primaryText, size: 20),
                             ],
                           ),
                         ),
@@ -498,21 +522,7 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
                   const SizedBox(height: 16),
                 ],
 
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _confirmAndDeliver,
-                    icon: const Icon(Icons.check_rounded, color: Colors.white, size: 20),
-                    label: const Text('Confirm & Deliver Here', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.white)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00A86B),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      elevation: 2,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 8),
               ],
             ),
           ),

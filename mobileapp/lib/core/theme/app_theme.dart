@@ -50,11 +50,11 @@ class AppTheme {
         ),
       ),
       cardTheme: const CardThemeData(
-        color: AppColors.card,
+        color: AppColors.surface,
         elevation: 0.0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(28.0)),
-          side: BorderSide(color: Color(0x1FFFFFFF), width: 1.0),
+          borderRadius: BorderRadius.all(Radius.circular(16.0)),
+          side: BorderSide(color: AppColors.divider, width: 1.0),
         ),
       ),
     );
@@ -105,11 +105,11 @@ class AppTheme {
         ),
       ),
       cardTheme: const CardThemeData(
-        color: AppColors.cardDark,
+        color: AppColors.surfaceDark,
         elevation: 0.0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(28.0)),
-          side: BorderSide(color: Color(0x1F000000), width: 1.0),
+          borderRadius: BorderRadius.all(Radius.circular(16.0)),
+          side: BorderSide(color: AppColors.dividerDark, width: 1.0),
         ),
       ),
     );

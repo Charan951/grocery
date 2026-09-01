@@ -32,12 +32,18 @@ interface OrderItem {
   image: string;
 }
 
+interface TimelineEntry {
+  status?: string;
+  note?: string;
+  at?: string;
+}
+
 interface MockOrder {
   id: string;
   orderNumber: string;
   date: string;
   time: string;
-  status: 'In Transit' | 'Delivered' | 'Cancelled';
+  status: string; // raw backend status (Pending / Packed / Out For Delivery / …)
   estimatedDelivery?: string;
   orderPlacedAt: string;
   orderArrivedAt?: string;
@@ -49,145 +55,19 @@ interface MockOrder {
   totalAmount: number;
   deliveryAddress: string;
   paymentMethod: string;
+  trackingTimeline?: TimelineEntry[];
+  createdAt?: string;
 }
 
-const initialCustomerOrders: MockOrder[] = [
-  {
-    id: 'PNNHJHTYP81116',
-    orderNumber: 'PNNHJHTYP81116',
-    date: '19 May 2026',
-    time: '09:20 PM',
-    status: 'Delivered',
-    orderPlacedAt: '19 May 2026, 9:20 PM',
-    orderArrivedAt: '19 May 2026, 9:49 PM',
-    itemTotal: 182,
-    itemTotalMrp: 286,
-    deliveryFee: 0,
-    handlingFee: 0,
-    totalAmount: 182,
-    paymentMethod: 'UPI (GPay)',
-    deliveryAddress: '501,sai asha residency,, 15/21/150/116, New Balaji Nagar, APHB Colony, Kukatpally, Hyderabad, Telangana 500072, India',
-    items: [
-      {
-        id: 'p101',
-        name: 'Yoga Bar Chocolate Chunk Multigrain Energy Bar, With Millets, Chocolate, Almonds, High Dietary Fibre',
-        weightSpec: '1 pc (35 g)',
-        price: 33,
-        mrp: 45,
-        qty: 4,
-        image: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=200&auto=format&fit=crop',
-      },
-      {
-        id: 'p102',
-        name: 'Yoga Bar Breakfast Protein Bar Apricot Fig, 6g Protein, Fiber Rich , Omega - 3, Millets, Almonds',
-        weightSpec: '1 pc (45 g)',
-        price: 25,
-        mrp: 53,
-        qty: 2,
-        image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=200&auto=format&fit=crop',
-      },
-    ],
-  },
-  {
-    id: 'FC-984210',
-    orderNumber: 'FC-984210',
-    date: 'Today',
-    time: '10:15 AM',
-    status: 'In Transit',
-    estimatedDelivery: '8 minutes',
-    orderPlacedAt: 'Today, 10:15 AM',
-    itemTotal: 349,
-    itemTotalMrp: 410,
-    deliveryFee: 0,
-    handlingFee: 0,
-    totalAmount: 349,
-    paymentMethod: 'UPI (GPay)',
-    deliveryAddress: 'Flat 402, Balaji Heights, KPHB Phase 3, Hyderabad, Telangana 500072, India',
-    items: [
-      {
-        id: 'p1',
-        name: 'Fresh Organic Bananas (6 pcs)',
-        weightSpec: '6 pcs (approx. 800g)',
-        price: 49,
-        mrp: 60,
-        qty: 1,
-        image: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=200&auto=format&fit=crop',
-      },
-      {
-        id: 'p2',
-        name: 'Amul Taaza Toned Milk (1 Litre)',
-        weightSpec: '1 Litre',
-        price: 72,
-        mrp: 76,
-        qty: 2,
-        image: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=200&auto=format&fit=crop',
-      },
-      {
-        id: 'p3',
-        name: 'Whole Wheat Bread (400g)',
-        weightSpec: '1 pack (400g)',
-        price: 45,
-        mrp: 50,
-        qty: 1,
-        image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=200&auto=format&fit=crop',
-      },
-      {
-        id: 'p4',
-        name: 'Fresh Alphonso Mangoes (1kg)',
-        weightSpec: '1 kg',
-        price: 111,
-        mrp: 148,
-        qty: 1,
-        image: 'https://images.unsplash.com/photo-1553279768-865429fa0078?w=200&auto=format&fit=crop',
-      },
-    ],
-  },
-  {
-    id: 'FC-973142',
-    orderNumber: 'FC-973142',
-    date: '31 Jul 2026',
-    time: '08:40 PM',
-    status: 'Delivered',
-    orderPlacedAt: '31 Jul 2026, 8:40 PM',
-    orderArrivedAt: '31 Jul 2026, 8:52 PM',
-    itemTotal: 685,
-    itemTotalMrp: 790,
-    deliveryFee: 0,
-    handlingFee: 0,
-    totalAmount: 685,
-    paymentMethod: 'Credit Card',
-    deliveryAddress: 'Flat 402, Balaji Heights, KPHB Phase 3, Hyderabad, Telangana 500072, India',
-    items: [
-      {
-        id: 'p5',
-        name: 'Daawat Rozana Basmati Rice (5kg)',
-        weightSpec: '5 kg',
-        price: 480,
-        mrp: 550,
-        qty: 1,
-        image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=200&auto=format&fit=crop',
-      },
-      {
-        id: 'p6',
-        name: 'Fortune Sunlite Sunflower Oil (1L)',
-        weightSpec: '1 Litre',
-        price: 155,
-        mrp: 180,
-        qty: 1,
-        image: 'https://images.unsplash.com/photo-1597481499750-3e6b22637e12?w=200&auto=format&fit=crop',
-      },
-      {
-        id: 'p7',
-        name: 'Tata Salt Vaccum Evaporated (1kg)',
-        weightSpec: '1 kg',
-        price: 50,
-        mrp: 60,
-        qty: 1,
-        image: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=200&auto=format&fit=crop',
-      },
-    ],
-  },
-];
+/** Collapse the backend's 11-value status enum onto the 3 UI buckets. */
+type StatusBucket = 'In Transit' | 'Delivered' | 'Cancelled';
+const bucketOf = (raw?: string): StatusBucket => {
+  const s = (raw || '').toLowerCase();
+  if (s === 'delivered') return 'Delivered';
+  if (['cancelled', 'canceled', 'returned', 'refunded'].includes(s)) return 'Cancelled';
+  return 'In Transit';
+};
+
 
 export const CustomerOrders: React.FC = () => {
   const customerUser = (() => {
@@ -233,7 +113,7 @@ export const CustomerOrders: React.FC = () => {
   }, [userPhoneKey]);
 
   const filteredOrders = orders.filter(
-    (o) => filter === 'All' || o.status === filter
+    (o) => filter === 'All' || bucketOf(o.status) === filter
   );
 
   const handleCopyOrderId = (id: string) => {
@@ -319,28 +199,58 @@ export const CustomerOrders: React.FC = () => {
 
         {/* Status Banner */}
         <div className="px-4 md:px-12 py-5 bg-white border-b border-gray-100">
-          {selectedOrder.status === 'Delivered' ? (
+          {bucketOf(selectedOrder.status) === 'Delivered' ? (
             <div className="bg-emerald-50 border border-emerald-200/80 text-emerald-900 p-4 rounded-2xl flex items-center gap-3 font-extrabold text-lg shadow-2xs">
               <div className="w-8 h-8 rounded-xl bg-[#00E676]/20 text-[#00E676] flex items-center justify-center shrink-0">
                 <CheckCircle2 size={24} className="text-emerald-600" />
               </div>
               <span className="font-display tracking-tight text-emerald-950">Delivered</span>
             </div>
-          ) : selectedOrder.status === 'In Transit' ? (
+          ) : bucketOf(selectedOrder.status) === 'In Transit' ? (
             <div className="bg-emerald-50 border border-emerald-200/80 text-emerald-900 p-4 rounded-2xl flex items-center gap-3 font-extrabold text-lg shadow-2xs animate-pulse">
               <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0">
                 <Zap size={20} className="fill-white" />
               </div>
               <span className="font-display tracking-tight text-emerald-950">
-                Arriving in {selectedOrder.estimatedDelivery || '8 minutes'}
+                {selectedOrder.status === 'Out For Delivery'
+                  ? `Arriving in ${selectedOrder.estimatedDelivery || '8 minutes'}`
+                  : selectedOrder.status}
               </span>
             </div>
           ) : (
             <div className="bg-rose-50 border border-rose-200 text-rose-800 p-4 rounded-2xl flex items-center gap-3 font-extrabold text-lg">
-              <span>Cancelled</span>
+              <span>{selectedOrder.status || 'Cancelled'}</span>
             </div>
           )}
         </div>
+
+        {/* Status Timeline (real trackingTimeline from the order document) */}
+        {Array.isArray(selectedOrder.trackingTimeline) && selectedOrder.trackingTimeline.length > 0 && (
+          <div className="px-4 md:px-12 py-6 border-b border-gray-100">
+            <h2 className="text-sm font-extrabold text-gray-900 mb-4">Order progress</h2>
+            <ol className="flex flex-col">
+              {selectedOrder.trackingTimeline.map((t, i, arr) => (
+                <li key={i} className="flex gap-3">
+                  <div className="flex flex-col items-center">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#4CAF50] shrink-0 mt-1" />
+                    {i !== arr.length - 1 && <span className="w-0.5 flex-1 min-h-[28px] bg-gray-200" />}
+                  </div>
+                  <div className="pb-4 min-w-0">
+                    <p className="text-xs sm:text-sm font-bold text-gray-900">{t.status || '—'}</p>
+                    {t.note && <p className="text-[11px] sm:text-xs text-gray-500 leading-relaxed">{t.note}</p>}
+                    {t.at && (
+                      <p className="text-[10px] sm:text-[11px] text-gray-400 mt-0.5">
+                        {new Date(t.at).toLocaleString('en-IN', {
+                          day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+                        })}
+                      </p>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
 
         {/* Items Section */}
         <div className="px-4 md:px-12 py-6 border-b border-gray-100">
@@ -622,12 +532,12 @@ export const CustomerOrders: React.FC = () => {
                   </div>
 
                   {/* Status Badge */}
-                  {order.status === 'In Transit' ? (
+                  {bucketOf(order.status) === 'In Transit' ? (
                     <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-1 rounded-full text-xs font-black flex items-center gap-1.5 animate-pulse">
                       <Zap size={14} className="fill-emerald-600 text-emerald-600" />
                       <span>Arriving in {order.estimatedDelivery}</span>
                     </div>
-                  ) : order.status === 'Delivered' ? (
+                  ) : bucketOf(order.status) === 'Delivered' ? (
                     <div className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-extrabold flex items-center gap-1.5">
                       <CheckCircle2 size={14} className="text-emerald-600" />
                       <span>Delivered</span>

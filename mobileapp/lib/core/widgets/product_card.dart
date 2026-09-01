@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
@@ -51,36 +52,22 @@ class ProductCard extends StatelessWidget {
                     child: Hero(
                       tag: 'product_image_${product.id}',
                       child: product.imageUrl.startsWith('http')
-                          ? Image.network(
-                              product.imageUrl,
+                          ? CachedNetworkImage(
+                              imageUrl: product.imageUrl,
                               fit: BoxFit.cover,
                               width: double.infinity,
                               height: 100,
-                              loadingBuilder:
-                                  (context, child, loadingProgress) {
-                                    if (loadingProgress == null) return child;
-                                    return const Center(
-                                      child: SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: AppColors.primary,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                              errorBuilder: (context, error, stackTrace) {
-                                return Center(
-                                  child: Icon(
-                                    _getProductIcon(product.imageUrl),
-                                    size: 40,
-                                    color: product.isOrganic
-                                        ? AppColors.primary
-                                        : AppColors.accent,
-                                  ),
-                                );
-                              },
+                              fadeInDuration: const Duration(milliseconds: 200),
+                              placeholder: (context, _) => Container(
+                                color: isDark ? Colors.white10 : Colors.black.withOpacity(0.04),
+                              ),
+                              errorWidget: (context, _, _) => Center(
+                                child: Icon(
+                                  _getProductIcon(product.imageUrl),
+                                  size: 40,
+                                  color: product.isOrganic ? AppColors.primary : AppColors.accent,
+                                ),
+                              ),
                             )
                           : Center(
                               child: Icon(

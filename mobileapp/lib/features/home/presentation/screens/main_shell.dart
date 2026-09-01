@@ -1,102 +1,73 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:freshcart/core/widgets/bottom_nav.dart';
 import 'package:freshcart/core/widgets/floating_cart.dart';
 import 'package:freshcart/features/cart/presentation/controllers/cart_controller.dart';
-import 'package:freshcart/features/home/presentation/screens/home_screen.dart';
-import 'package:freshcart/features/categories/presentation/screens/categories_screen.dart';
-import 'package:freshcart/features/search/presentation/screens/search_screen.dart';
-import 'package:freshcart/features/profile/presentation/screens/profile_screen.dart';
 
-class MainNavigationShell extends ConsumerStatefulWidget {
-  const MainNavigationShell({super.key});
+/// Hosts the five bottom-nav branches ([StatefulNavigationShell]). The bottom
+/// nav is always visible (a persistent full-width bar). The cart bar, when the
+/// cart is non-empty, sits directly above it.
+class MainScaffold extends ConsumerStatefulWidget {
+  final StatefulNavigationShell navigationShell;
+  const MainScaffold({super.key, required this.navigationShell});
 
   @override
-  ConsumerState<MainNavigationShell> createState() => _MainNavigationShellState();
+  ConsumerState<MainScaffold> createState() => _MainScaffoldState();
 }
 
-class _MainNavigationShellState extends ConsumerState<MainNavigationShell> {
-  int _currentIndex = 0;
-  bool _isNavbarVisible = true;
+class _MainScaffoldState extends ConsumerState<MainScaffold> {
+  DateTime? _lastBackPress;
 
-  final List<Widget> _tabs = [
-    const HomeScreen(),
-    const CategoriesScreen(),
-    const SearchScreen(),
-    const ProfileScreen(),
-  ];
+  void _onTabTap(int index) {
+    // Tapping the active tab again pops it to its root.
+    widget.navigationShell.goBranch(
+      index,
+      initialLocation: index == widget.navigationShell.currentIndex,
+    );
+  }
+
+  /// Returns true when the app should actually be allowed to exit.
+  bool _handleBack() {
+    if (widget.navigationShell.currentIndex != 0) {
+      widget.navigationShell.goBranch(0);
+      return false;
+    }
+    final now = DateTime.now();
+    if (_lastBackPress == null || now.difference(_lastBackPress!) > const Duration(seconds: 2)) {
+      _lastBackPress = now;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Press back again to exit')));
+      return false;
+    }
+    return true;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final cartState = ref.watch(cartProvider);
+    final cartCount = ref.watch(cartProvider.select((c) => c.totalItemsCount));
 
-    return Scaffold(
-      body: Stack(
-        children: [
-          // Content Shell wrapped with Scroll Notification listener
-          NotificationListener<UserScrollNotification>(
-            onNotification: (notification) {
-              if (notification.direction == ScrollDirection.forward) {
-                if (!_isNavbarVisible) {
-                  setState(() {
-                    _isNavbarVisible = true;
-                  });
-                }
-              } else if (notification.direction == ScrollDirection.reverse) {
-                if (_isNavbarVisible) {
-                  setState(() {
-                    _isNavbarVisible = false;
-                  });
-                }
-              }
-              return true;
-            },
-            child: IndexedStack(
-              index: _currentIndex,
-              children: _tabs,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (_handleBack()) {
+          Navigator.of(context).maybePop();
+        }
+      },
+      child: Scaffold(
+        body: widget.navigationShell,
+        bottomNavigationBar: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (cartCount > 0) FloatingCart(onTap: () => context.push('/cart')),
+            CustomBottomNavBar(
+              currentIndex: widget.navigationShell.currentIndex,
+              onTap: _onTabTap,
             ),
-          ),
-          
-          // Floating Cart (displayed if items in cart)
-          if (cartState.totalItemsCount > 0)
-            AnimatedPositioned(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeOutCubic,
-              left: 0,
-              right: 0,
-              bottom: _isNavbarVisible ? 84.0 : 0.0,
-              child: FloatingCart(
-                itemCount: cartState.totalItemsCount,
-                totalPrice: cartState.totalPayableAmount,
-                applySafeAreaBottom: !_isNavbarVisible,
-                onTap: () {
-                  context.push('/cart');
-                },
-              ),
-            ),
-
-          // Floating Bottom Navbar wrapped with slide animation
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: AnimatedSlide(
-              offset: _isNavbarVisible ? Offset.zero : const Offset(0, 1.2),
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeOutCubic,
-              child: CustomBottomNavBar(
-                currentIndex: _currentIndex,
-                onTap: (index) {
-                  setState(() {
-                    _currentIndex = index;
-                  });
-                },
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

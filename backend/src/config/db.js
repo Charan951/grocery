@@ -9,7 +9,12 @@ try {
 }
 
 export const connectDB = async () => {
-  const uri = process.env.MONGO_URI || 'mongodb+srv://gro:123@cluster0.tkm7c0j.mongodb.net/grocery_enterprise?appName=Cluster0';
+  const uri = process.env.MONGO_URI;
+  if (!uri) {
+    console.error('❌ MONGO_URI is not set — cannot connect to the database.');
+    mongoose.set('bufferCommands', false);
+    return null;
+  }
   try {
     const conn = await mongoose.connect(uri, {
       serverSelectionTimeoutMS: 5000,

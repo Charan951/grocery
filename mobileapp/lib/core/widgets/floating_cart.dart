@@ -1,154 +1,79 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:freshcart/core/constants/app_colors.dart';
+import 'package:freshcart/core/theme/app_typography.dart';
 import 'package:freshcart/features/cart/presentation/controllers/cart_controller.dart';
+import 'package:freshcart/features/cart/presentation/controllers/commerce_providers.dart';
 
+/// Slim cart bar shown above the bottom nav when the cart has items. Flat,
+/// tokenised, full-width. The free-delivery hint reads the real threshold from
+/// `PricingConfig` (was a hardcoded ₹400).
 class FloatingCart extends ConsumerWidget {
-  final int itemCount;
-  final double totalPrice;
   final VoidCallback onTap;
-  final bool applySafeAreaBottom;
-
-  const FloatingCart({
-    super.key,
-    required this.itemCount,
-    required this.totalPrice,
-    required this.onTap,
-    this.applySafeAreaBottom = true,
-  });
+  const FloatingCart({super.key, required this.onTap});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cartState = ref.watch(cartProvider);
-    final subtotal = cartState.subtotal;
-    final totalCount = cartState.totalItemsCount;
+    final cart = ref.watch(cartProvider);
+    final count = cart.totalItemsCount;
+    if (count == 0) return const SizedBox.shrink();
 
-    if (totalCount == 0) return const SizedBox.shrink();
+    final config = ref.watch(pricingConfigProvider);
+    final remaining = config.freeDeliveryThreshold - cart.subtotal;
+    final freeUnlocked = remaining <= 0;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Threshold for free delivery is 400.0
-    const threshold = 400.0;
-    final remainingForFree = threshold - subtotal;
-    final hasFreeDelivery = remainingForFree <= 0;
-
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return SafeArea(
-      bottom: applySafeAreaBottom,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-        child: GestureDetector(
-          onTap: onTap,
-          child: Container(
-            height: 60,
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1B2E24) : const Color(0xFFE8F6EE),
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(isDark ? 0.4 : 0.08),
-                  blurRadius: 15,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-              border: Border.all(
-                color: isDark ? Colors.white10 : const Color(0xFFC8E6C9),
-                width: 1.2,
+    return Material(
+      color: isDark ? AppColors.surfaceDark : AppColors.surface,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border(top: BorderSide(color: isDark ? AppColors.dividerDark : AppColors.divider)),
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                child: const Icon(Icons.shopping_bag_rounded, color: Colors.white, size: 18),
               ),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            child: Row(
-              children: [
-                // Delivery Icon inside white circle with border
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: const Color(0xFF2E7D32),
-                      width: 1.5,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$count ${count == 1 ? 'item' : 'items'} · ₹${cart.totalPayableAmount.toStringAsFixed(0)}',
+                      style: AppTypography.labelLarge(
+                        isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                      ),
                     ),
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.motorcycle_rounded,
-                      color: Color(0xFF2E7D32),
-                      size: 20,
+                    Text(
+                      freeUnlocked
+                          ? 'Free delivery unlocked'
+                          : 'Add ₹${remaining.toStringAsFixed(0)} more for free delivery',
+                      style: AppTypography.bodySmall(
+                        freeUnlocked
+                            ? AppColors.primaryText
+                            : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondary),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                
-                // Delivery texts
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Unlock FREE Delivery',
-                        style: TextStyle(
-                          color: Color(0xFF1B5E20),
-                          fontWeight: FontWeight.w900,
-                          fontSize: 12,
-                          letterSpacing: -0.1,
-                        ),
-                      ),
-                      const SizedBox(height: 1),
-                      Text(
-                        hasFreeDelivery
-                            ? 'Free delivery unlocked!'
-                            : 'Shop for ₹${remainingForFree.toStringAsFixed(0)} more',
-                        style: TextStyle(
-                          color: const Color(0xFF2E7D32).withOpacity(0.85),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 10.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                
-                // Right Pill Button: Shopping Bag icon + Count + Arrow
-                Container(
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0F3E21), // Dark green pill background
-                    borderRadius: BorderRadius.circular(22),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Shopping bag icon (colored light green)
-                      const Icon(
-                        Icons.shopping_bag_rounded,
-                        color: Color(0xFFC0FF00), // Lime green/yellow color
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      // Cart count
-                      Text(
-                        '$totalCount',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 15,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Arrow
-                      const Icon(
-                        Icons.arrow_forward_rounded,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('View cart', style: AppTypography.labelLarge(AppColors.primaryText)),
+                  const Icon(Icons.chevron_right_rounded, color: AppColors.primaryText, size: 20),
+                ],
+              ),
+            ],
           ),
         ),
       ),

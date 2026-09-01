@@ -1,127 +1,134 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
+import 'package:freshcart/core/constants/app_radius.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
-import 'package:freshcart/core/widgets/glass_card.dart';
+import 'package:freshcart/core/widgets/app_scaffold.dart';
+import 'package:freshcart/core/widgets/feedback_states.dart';
+import 'package:freshcart/core/widgets/skeletons.dart';
+import 'package:freshcart/features/orders/data/models/order_model.dart';
+import 'package:freshcart/features/orders/presentation/controllers/orders_controller.dart';
 
-class NotificationsScreen extends StatelessWidget {
+/// Activity feed. The backend has no dedicated notifications endpoint yet, so
+/// this is derived from the real order timelines (`GET /orders/mine` →
+/// `trackingTimeline`) — every status transition the customer's orders have
+/// been through, newest first. No fabricated data.
+class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ordersAsync = ref.watch(ordersProvider);
 
-    final List<Map<String, String>> notifications = [
-      {
-        'title': 'Order Dispatched!',
-        'body': 'Your order has been dispatched from the local hub. ETA: 10 mins.',
-        'time': '10 mins ago',
-        'type': 'delivery',
-      },
-      {
-        'title': 'VIP Cashback Credited',
-        'body': '₹25.00 cash back added to wallet for your last grocery purchase.',
-        'time': '2 hours ago',
-        'type': 'wallet',
-      },
-      {
-        'title': 'Weekend Organic Sale Live',
-        'body': 'Get up to 30% discount on farm fresh organic spinach, avocados, berries.',
-        'time': '1 day ago',
-        'type': 'offer',
-      }
-    ];
-
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
-      appBar: AppBar(
-        title: const Text('Notifications'),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-          onPressed: () => context.pop(),
-        ),
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0),
-          child: Column(
-            children: [
-              const SizedBox(height: 12),
-              Expanded(
-                child: ListView.builder(
-                  physics: const BouncingScrollPhysics(),
-                  itemCount: notifications.length,
-                  itemBuilder: (context, index) {
-                    final item = notifications[index];
-                    IconData icon;
-                    if (item['type'] == 'delivery') {
-                      icon = Icons.local_shipping_rounded;
-                    } else if (item['type'] == 'wallet') {
-                      icon = Icons.wallet_rounded;
-                    } else {
-                      icon = Icons.discount_rounded;
-                    }
-
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: GlassCard(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.08),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(icon, color: AppColors.primary, size: 20),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        item['title']!,
-                                        style: AppTypography.labelLarge(
-                                          isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                                        ),
-                                      ),
-                                      Text(
-                                        item['time']!,
-                                        style: AppTypography.bodySmall(
-                                          isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                                        ).copyWith(fontSize: 11),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    item['body']!,
-                                    style: AppTypography.bodySmall(
-                                      isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                                    ).copyWith(height: 1.3),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+    return AppScaffold(
+      title: 'Notifications',
+      body: ordersAsync.when(
+        loading: () => const SkeletonList(itemCount: 5, itemHeight: 72),
+        error: (e, _) => ErrorState(onRetry: () => ref.read(ordersProvider.notifier).refresh()),
+        data: (orders) {
+          final items = _feed(orders);
+          if (items.isEmpty) {
+            return const EmptyState(
+              icon: Icons.notifications_none_rounded,
+              title: 'Nothing here yet',
+              description: 'Updates about your orders will appear here.',
+            );
+          }
+          return RefreshIndicator(
+            color: AppColors.primary,
+            onRefresh: () => ref.read(ordersProvider.notifier).refresh(),
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              itemCount: items.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
+              itemBuilder: (context, i) {
+                final n = items[i];
+                return GestureDetector(
+                  onTap: () => context.push('/order/${n.orderId}'),
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppColors.surfaceDark : AppColors.surface,
+                      borderRadius: AppRadius.brMd,
+                      border: Border.all(color: isDark ? AppColors.dividerDark : AppColors.divider),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.local_shipping_outlined, size: 18, color: AppColors.primary),
                         ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Order #${n.orderId} · ${n.status}',
+                                  style: AppTypography.labelLarge(
+                                    isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                                  )),
+                              if (n.note.isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Text(n.note, style: AppTypography.bodySmall(
+                                  isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                                )),
+                              ],
+                              if (n.at != null) ...[
+                                const SizedBox(height: 4),
+                                Text(_ago(n.at!), style: AppTypography.labelSmall(
+                                  isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                                ).copyWith(fontWeight: FontWeight.w400)),
+                              ],
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textSecondary),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          );
+        },
       ),
     );
   }
+
+  List<_Item> _feed(List<OrderModel> orders) {
+    final out = <_Item>[];
+    for (final o in orders) {
+      for (final t in o.timeline) {
+        out.add(_Item(orderId: o.id, status: t.status, note: t.note, at: t.at ?? o.date));
+      }
+      if (o.timeline.isEmpty) {
+        out.add(_Item(orderId: o.id, status: o.statusText, note: '', at: o.date));
+      }
+    }
+    out.sort((a, b) => (b.at ?? DateTime(0)).compareTo(a.at ?? DateTime(0)));
+    return out;
+  }
+
+  String _ago(DateTime t) {
+    final d = DateTime.now().difference(t);
+    if (d.inMinutes < 1) return 'Just now';
+    if (d.inMinutes < 60) return '${d.inMinutes} min ago';
+    if (d.inHours < 24) return '${d.inHours} h ago';
+    if (d.inDays < 7) return '${d.inDays} d ago';
+    return '${t.day}/${t.month}/${t.year}';
+  }
+}
+
+class _Item {
+  final String orderId;
+  final String status;
+  final String note;
+  final DateTime? at;
+  _Item({required this.orderId, required this.status, required this.note, this.at});
 }

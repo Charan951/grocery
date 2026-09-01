@@ -1,117 +1,74 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
+/// Two registers, matching the web design system (DESIGN.md):
+///   - Display / headings  -> Plus Jakarta Sans (strong weight)
+///   - Body / titles / labels -> Inter
 class AppTypography {
   AppTypography._();
 
-  static const String fontName = 'SF Pro Display';
-  static const String fallbackFontName = 'Inter';
-
-  static TextStyle getTextStyle({
+  static TextStyle _display({
     required double fontSize,
     required FontWeight fontWeight,
     required double height,
     required double letterSpacing,
     required Color color,
-  }) {
-    return TextStyle(
-      fontFamily: fontName,
-      fontFamilyFallback: const [fallbackFontName],
-      fontSize: fontSize,
-      fontWeight: fontWeight,
-      height: height,
-      letterSpacing: letterSpacing,
-      color: color,
-    );
-  }
-
-  // Headings
-  static TextStyle display(Color color) => getTextStyle(
-        fontSize: 34.0,
-        fontWeight: FontWeight.bold,
-        height: 1.2,
-        letterSpacing: -0.5,
+  }) =>
+      GoogleFonts.plusJakartaSans(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        height: height,
+        letterSpacing: letterSpacing,
         color: color,
       );
 
-  static TextStyle h1(Color color) => getTextStyle(
-        fontSize: 28.0,
-        fontWeight: FontWeight.bold,
-        height: 1.25,
-        letterSpacing: -0.4,
+  static TextStyle _body({
+    required double fontSize,
+    required FontWeight fontWeight,
+    required double height,
+    required double letterSpacing,
+    required Color color,
+  }) =>
+      GoogleFonts.inter(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        height: height,
+        letterSpacing: letterSpacing,
         color: color,
       );
 
-  static TextStyle h2(Color color) => getTextStyle(
-        fontSize: 22.0,
-        fontWeight: FontWeight.bold,
-        height: 1.3,
-        letterSpacing: -0.2,
-        color: color,
-      );
+  // Headings — Plus Jakarta Sans
+  static TextStyle display(Color color) => _display(
+        fontSize: 32.0, fontWeight: FontWeight.w800, height: 1.15, letterSpacing: -0.5, color: color);
 
-  static TextStyle h3(Color color) => getTextStyle(
-        fontSize: 20.0,
-        fontWeight: FontWeight.w600,
-        height: 1.35,
-        letterSpacing: -0.1,
-        color: color,
-      );
+  static TextStyle h1(Color color) => _display(
+        fontSize: 26.0, fontWeight: FontWeight.w800, height: 1.2, letterSpacing: -0.4, color: color);
 
-  static TextStyle title(Color color) => getTextStyle(
-        fontSize: 17.0,
-        fontWeight: FontWeight.w600,
-        height: 1.4,
-        letterSpacing: 0.0,
-        color: color,
-      );
+  static TextStyle h2(Color color) => _display(
+        fontSize: 21.0, fontWeight: FontWeight.w700, height: 1.3, letterSpacing: -0.2, color: color);
 
-  // Body & Subtitles
-  static TextStyle bodyLarge(Color color) => getTextStyle(
-        fontSize: 17.0,
-        fontWeight: FontWeight.normal,
-        height: 1.4,
-        letterSpacing: -0.2,
-        color: color,
-      );
+  static TextStyle h3(Color color) => _display(
+        fontSize: 18.0, fontWeight: FontWeight.w700, height: 1.35, letterSpacing: -0.1, color: color);
 
-  static TextStyle bodyMedium(Color color) => getTextStyle(
-        fontSize: 15.0,
-        fontWeight: FontWeight.normal,
-        height: 1.45,
-        letterSpacing: -0.1,
-        color: color,
-      );
+  // Titles / body / labels — Inter
+  static TextStyle title(Color color) => _body(
+        fontSize: 16.0, fontWeight: FontWeight.w600, height: 1.4, letterSpacing: 0.0, color: color);
 
-  static TextStyle bodySmall(Color color) => getTextStyle(
-        fontSize: 13.0,
-        fontWeight: FontWeight.normal,
-        height: 1.5,
-        letterSpacing: 0.0,
-        color: color,
-      );
+  static TextStyle bodyLarge(Color color) => _body(
+        fontSize: 16.0, fontWeight: FontWeight.w400, height: 1.45, letterSpacing: -0.1, color: color);
 
-  // Buttons & Badges
-  static TextStyle labelLarge(Color color) => getTextStyle(
-        fontSize: 15.0,
-        fontWeight: FontWeight.w600,
-        height: 1.2,
-        letterSpacing: 0.1,
-        color: color,
-      );
+  static TextStyle bodyMedium(Color color) => _body(
+        fontSize: 14.0, fontWeight: FontWeight.w400, height: 1.5, letterSpacing: 0.0, color: color);
 
-  static TextStyle labelMedium(Color color) => getTextStyle(
-        fontSize: 13.0,
-        fontWeight: FontWeight.w600,
-        height: 1.2,
-        letterSpacing: 0.2,
-        color: color,
-      );
+  static TextStyle bodySmall(Color color) => _body(
+        fontSize: 12.5, fontWeight: FontWeight.w400, height: 1.5, letterSpacing: 0.0, color: color);
 
-  static TextStyle labelSmall(Color color) => getTextStyle(
-        fontSize: 11.0,
-        fontWeight: FontWeight.w600,
-        height: 1.2,
-        letterSpacing: 0.3,
-        color: color,
-      );
+  static TextStyle labelLarge(Color color) => _body(
+        fontSize: 14.0, fontWeight: FontWeight.w600, height: 1.2, letterSpacing: 0.1, color: color);
+
+  static TextStyle labelMedium(Color color) => _body(
+        fontSize: 13.0, fontWeight: FontWeight.w600, height: 1.2, letterSpacing: 0.15, color: color);
+
+  static TextStyle labelSmall(Color color) => _body(
+        fontSize: 11.0, fontWeight: FontWeight.w600, height: 1.2, letterSpacing: 0.3, color: color);
 }

@@ -1,0 +1,5 @@
+{
+  "ENV": "staging",
+  "API_BASE_URL": "https://staging.freshcart.example/api",
+  "SOCKET_URL": "https://staging.freshcart.example"
+}

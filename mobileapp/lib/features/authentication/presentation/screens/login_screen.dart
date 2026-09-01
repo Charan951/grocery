@@ -4,9 +4,12 @@ import 'package:go_router/go_router.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
 import 'package:freshcart/core/widgets/buttons.dart';
-import 'package:freshcart/core/widgets/glass_card.dart';
+import 'package:freshcart/core/widgets/app_toast.dart';
+import 'package:freshcart/core/widgets/phone_field.dart';
 import 'package:freshcart/features/authentication/presentation/controllers/auth_controller.dart';
+import 'package:freshcart/features/authentication/presentation/widgets/auth_scaffold.dart';
 
+/// Step 1 of sign-in: collect the phone number and request an OTP.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -15,237 +18,97 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
-  int _activeTab = 0; // 0 = Phone OTP, 1 = Email
+  final _phone = PhoneFieldController();
+  String? _error;
 
   @override
   void dispose() {
-    _phoneController.dispose();
-    _emailController.dispose();
+    _phone.dispose();
     super.dispose();
   }
 
-  void _onSubmit() async {
-    if (_formKey.currentState!.validate()) {
-      if (_activeTab == 0) {
-        final phone = _phoneController.text;
-        await ref.read(authProvider.notifier).sendOtp(phone);
-        if (mounted) {
-          context.push('/otp?phone=$phone');
-        }
-      } else {
-        final email = _emailController.text;
-        await ref.read(authProvider.notifier).loginWithDemo();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Logged in with $email')),
-          );
-          context.go('/');
-        }
-      }
+  Future<void> _submit() async {
+    FocusScope.of(context).unfocus();
+    if (!_phone.isValid) {
+      setState(() => _error = 'Enter a valid 10-digit mobile number');
+      return;
+    }
+    setState(() => _error = null);
+
+    final ok = await ref.read(authProvider.notifier).sendOtp(_phone.digits);
+    if (!mounted) return;
+    if (ok) {
+      context.push('/otp?phone=${_phone.digits}');
+    } else {
+      final msg = ref.read(authProvider).error ?? 'Could not send the code. Please try again.';
+      setState(() => _error = msg);
+      AppToast.error(msg);
+    }
+  }
+
+  void _back() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/onboarding');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authProvider);
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final loading = ref.watch(authProvider.select((s) => s.isLoading));
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 30),
-                
-                // Back button
-                GestureDetector(
-                  onTap: () => context.go('/onboarding'),
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: isDark ? Colors.white10 : Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
-                          blurRadius: 15,
-                        )
-                      ],
-                    ),
-                    child: Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      size: 16,
-                      color: isDark ? Colors.white : AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                
-                // Headers
-                Text(
-                  'Welcome to FreshCart',
-                  style: AppTypography.display(
-                    isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                  ).copyWith(
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -1.0,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Log in using Phone Number OTP or Email Address.',
-                  style: AppTypography.bodyMedium(
-                    isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                  ).copyWith(height: 1.45),
-                ),
-                const SizedBox(height: 24),
-
-                // Auth Method Tabs (Phone OTP vs Email Login - matching Web CustomerAuthModal)
-                Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.white10 : Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => setState(() => _activeTab = 0),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            decoration: BoxDecoration(
-                              color: _activeTab == 0 ? (isDark ? const Color(0xFF1C1C1E) : Colors.white) : Colors.transparent,
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: _activeTab == 0 ? [const BoxShadow(color: Colors.black12, blurRadius: 4)] : [],
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              '📱 Phone OTP',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: _activeTab == 0 ? AppColors.primary : (isDark ? Colors.white70 : Colors.black87),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => setState(() => _activeTab = 1),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            decoration: BoxDecoration(
-                              color: _activeTab == 1 ? (isDark ? const Color(0xFF1C1C1E) : Colors.white) : Colors.transparent,
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: _activeTab == 1 ? [const BoxShadow(color: Colors.black12, blurRadius: 4)] : [],
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              '✉️ Email Login',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: _activeTab == 1 ? AppColors.primary : (isDark ? Colors.white70 : Colors.black87),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 28),
-                
-                // Form Input Card
-                GlassCard(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    children: [
-                      if (_activeTab == 0)
-                        TextFormField(
-                          controller: _phoneController,
-                          keyboardType: TextInputType.phone,
-                          maxLength: 10,
-                          style: AppTypography.bodyLarge(
-                            isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                          ).copyWith(letterSpacing: 1.5, fontWeight: FontWeight.w600),
-                          decoration: InputDecoration(
-                            hintText: '98765 43210',
-                            hintStyle: AppTypography.bodyLarge(
-                              isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                            ).copyWith(letterSpacing: 1.5),
-                            prefixText: '+91 ',
-                            prefixStyle: AppTypography.bodyLarge(
-                              isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                            ).copyWith(fontWeight: FontWeight.w600),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide(
-                                color: isDark ? Colors.white24 : AppColors.divider,
-                              ),
-                            ),
-                            counterText: '',
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.length < 10) {
-                              return 'Please enter a valid 10-digit phone number';
-                            }
-                            return null;
-                          },
-                        )
-                      else
-                        TextFormField(
-                          controller: _emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          style: AppTypography.bodyLarge(
-                            isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                          ).copyWith(fontWeight: FontWeight.w600),
-                          decoration: InputDecoration(
-                            hintText: 'customer@example.com',
-                            prefixIcon: const Icon(Icons.email_outlined, color: AppColors.primary),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide(
-                                color: isDark ? Colors.white24 : AppColors.divider,
-                              ),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                          ),
-                          validator: (value) {
-                            if (value == null || !value.contains('@')) {
-                              return 'Please enter a valid email address';
-                            }
-                            return null;
-                          },
-                        ),
-                    ],
-                  ),
-                ),
-                const Spacer(),
-                
-                // CTA Action Button
-                PrimaryButton(
-                  text: _activeTab == 0 ? 'Send Verification Code' : 'Log In via Email',
-                  isLoading: authState.isLoading,
-                  onPressed: _onSubmit,
-                ),
-                const SizedBox(height: 24),
-              ],
-            ),
+    return AuthScaffold(
+      onBack: _back,
+      title: 'Enter your number',
+      subtitle: "We'll send a 6-digit verification code to confirm it's you.",
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PhoneField(
+            controller: _phone,
+            autofocus: true,
+            errorText: _error,
+            onChanged: (_) {
+              if (_error != null) setState(() => _error = null);
+            },
+            onSubmitted: _submit,
           ),
-        ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Icon(Icons.lock_outline_rounded,
+                  size: 15, color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Your number stays private and is only used to secure your account.',
+                  style: AppTypography.bodySmall(
+                    isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      cta: Column(
+        children: [
+          PrimaryButton(
+            text: 'Send code',
+            isLoading: loading,
+            onPressed: _submit,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'By continuing you agree to our Terms of Service and Privacy Policy.',
+            textAlign: TextAlign.center,
+            style: AppTypography.labelSmall(
+              isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+            ).copyWith(fontWeight: FontWeight.w400, height: 1.4),
+          ),
+        ],
       ),
     );
   }

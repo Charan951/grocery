@@ -16,7 +16,10 @@ const userSchema = new mongoose.Schema({
   phone: { type: String },
   role: { type: String, default: 'Customer', index: true }, // e.g. Admin, Manager, Employee, Delivery, Customer
   status: { type: String, enum: ['Active', 'Suspended'], default: 'Active' },
-  avatarUrl: { type: String, default: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop' }
+  avatarUrl: { type: String, default: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop' },
+  // Password-reset (delivery partner / staff self-service). Code is hashed.
+  resetCodeHash: { type: String },
+  resetCodeExpires: { type: Date }
 }, { timestamps: true });
 
 // Hash password before saving

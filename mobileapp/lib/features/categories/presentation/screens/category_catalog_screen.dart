@@ -3,18 +3,31 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
+import 'package:freshcart/core/widgets/app_bottom_sheet.dart';
+import 'package:freshcart/core/widgets/app_scaffold.dart';
+import 'package:freshcart/core/widgets/app_toast.dart';
+import 'package:freshcart/core/widgets/feedback_states.dart';
 import 'package:freshcart/core/widgets/product_card.dart';
-import 'package:freshcart/core/widgets/glass_card.dart';
-import 'package:freshcart/core/services/mock_data_service.dart';
-import 'package:freshcart/features/categories/data/models/category_model.dart';
+import 'package:freshcart/core/widgets/skeletons.dart';
 import 'package:freshcart/features/cart/presentation/controllers/cart_controller.dart';
+import 'package:freshcart/features/cart/presentation/widgets/catalog_cart_bar.dart';
+import 'package:freshcart/features/home/presentation/controllers/catalog_providers.dart';
+
+const _sortLabels = {
+  'popular': 'Popular',
+  'price-low': 'Price: low to high',
+  'price-high': 'Price: high to low',
+  'rating': 'Top rated',
+};
 
 class CategoryCatalogScreen extends ConsumerStatefulWidget {
   final String categoryId;
+  final String? initialSubCategory;
 
   const CategoryCatalogScreen({
     super.key,
     required this.categoryId,
+    this.initialSubCategory,
   });
 
   @override
@@ -22,245 +35,213 @@ class CategoryCatalogScreen extends ConsumerStatefulWidget {
 }
 
 class _CategoryCatalogScreenState extends ConsumerState<CategoryCatalogScreen> {
+  late String _sub = widget.initialSubCategory?.trim().isNotEmpty == true
+      ? widget.initialSubCategory!.trim()
+      : 'All';
   bool _organicOnly = false;
-  String _selectedSubCategory = 'All';
-  String _sortBy = 'popular'; // popular, price_low, price_high
+  String _sort = 'popular';
 
-  // Subcategory Tabs mapping for categories
-  final Map<String, List<String>> _categorySubMap = {
-    'fruits-vegetables': ['All', 'Fresh Vegetables', 'Fresh Fruits', 'Exotics & Premium', 'Organics & Hydroponics', 'Mangoes & Melons'],
-    'cat_veg': ['All', 'Fresh Vegetables', 'Exotics & Premium', 'Organics & Hydroponics'],
-    'cat_fruits': ['All', 'Fresh Fruits', 'Exotics & Premium', 'Mangoes & Melons'],
-    'dairy-bread-eggs': ['All', 'Milk', 'Breads & Buns', 'Eggs', 'Curd & Probiotic Drinks', 'Paneer & Cream'],
-    'cat_dairy': ['All', 'Milk', 'Curd & Probiotic Drinks', 'Paneer & Cream', 'Butter', 'Cheese'],
-    'cat_bakery': ['All', 'Breads & Buns', 'Fresh Bakery', 'Indian Breads'],
-    'atta-rice-oil-dals': ['All', 'Atta', 'Rice', 'Edible Oils', 'Dals & Pulses', 'Ghee'],
-    'meats-fish-eggs': ['All', 'Chicken', 'Mutton', 'Fish & Seafood', 'Eggs & Poultry'],
-    'masala-dry-fruits-more': ['All', 'Whole Spices', 'Powdered Spices', 'Almonds & Cashews', 'Raisins & Walnuts'],
-    'packaged-food': ['All', 'Chips & Namkeen', 'Noodles & Pasta', 'Biscuits & Cookies'],
-  };
+  int get _activeFilterCount => (_organicOnly ? 1 : 0) + (_sort != 'popular' ? 1 : 0);
+
+  Future<void> _openFilters() async {
+    await AppBottomSheet.show(
+      context,
+      title: 'Filter & sort',
+      showClose: true,
+      child: StatefulBuilder(
+        builder: (context, setSheet) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          Widget sortTile(String key) => RadioListTile<String>(
+                value: key,
+                groupValue: _sort,
+                activeColor: AppColors.primary,
+                contentPadding: EdgeInsets.zero,
+                title: Text(_sortLabels[key]!, style: AppTypography.bodyMedium(
+                  isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                )),
+                onChanged: (v) {
+                  setSheet(() => _sort = v!);
+                  setState(() {});
+                },
+              );
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SwitchListTile(
+                value: _organicOnly,
+                activeColor: AppColors.primary,
+                contentPadding: EdgeInsets.zero,
+                title: Text('Organic only', style: AppTypography.bodyMedium(
+                  isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                )),
+                secondary: const Icon(Icons.eco_rounded, color: AppColors.primary),
+                onChanged: (v) {
+                  setSheet(() => _organicOnly = v);
+                  setState(() {});
+                },
+              ),
+              const Divider(height: 24),
+              Text('Sort by', style: AppTypography.labelMedium(
+                isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+              )),
+              for (final k in _sortLabels.keys) sortTile(k),
+            ],
+          );
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final CategoryModel category;
-    final standardCategory = MockDataService.categories.firstWhere(
-      (c) => c.id == widget.categoryId,
-      orElse: () => const CategoryModel(id: '', name: '', icon: '', color: Colors.grey, productCount: 0),
+    final categories = ref.watch(categoriesProvider).valueOrNull ?? const [];
+    final matches = categories.where((c) => c.id == widget.categoryId).toList();
+    final category = matches.isNotEmpty ? matches.first : null;
+    final title = category?.name ?? 'Category';
+    final subChips = <String>['All', ...(category?.subCategories ?? const [])];
+
+    final query = CatalogQuery(
+      categoryId: widget.categoryId,
+      subCategory: _sub,
+      organicOnly: _organicOnly,
+      sort: _sort,
     );
+    final productsAsync = ref.watch(categoryProductsProvider(query));
 
-    if (standardCategory.id.isNotEmpty) {
-      category = standardCategory;
-    } else {
-      final String name = widget.categoryId;
-      category = CategoryModel(
-        id: widget.categoryId,
-        name: name,
-        icon: 'custom',
-        color: const Color(0xFF00A86B),
-        productCount: 0,
-      );
-    }
-
-    final availableSubCategories = _categorySubMap[widget.categoryId] ?? ['All', 'Popular Items', 'Fresh Picks', 'Organics'];
-
-    var filteredProducts = MockDataService.products.where((p) {
-      final catId = widget.categoryId.toLowerCase();
-      bool matchCategory = (p.categoryId == widget.categoryId);
-      
-      if (!matchCategory) {
-        if (catId.contains('fresh') || catId.contains('veg') || catId.contains('fruit')) {
-          matchCategory = p.categoryId == 'cat_organic' || p.categoryId == 'cat_veg' || p.categoryId == 'cat_fruits';
-        } else if (catId.contains('grocery') || catId.contains('dairy') || catId.contains('bakery')) {
-          matchCategory = p.categoryId == 'cat_dairy' || p.categoryId == 'cat_bakery' || p.categoryId == 'cat_snacks' || p.categoryId == 'cat_drinks';
-        }
-      }
-
-      if (!matchCategory) return false;
-
-      if (_selectedSubCategory != 'All') {
-        final pSub = (p.subCategory ?? '').toLowerCase();
-        final selSub = _selectedSubCategory.toLowerCase();
-        return pSub.contains(selSub) || selSub.contains(pSub) || p.name.toLowerCase().contains(selSub);
-      }
-
-      return true;
-    }).toList();
-
-    if (_organicOnly) {
-      filteredProducts = filteredProducts.where((p) => p.isOrganic).toList();
-    }
-
-    if (_sortBy == 'price_low') {
-      filteredProducts.sort((a, b) => a.price.compareTo(b.price));
-    } else if (_sortBy == 'price_high') {
-      filteredProducts.sort((a, b) => b.price.compareTo(a.price));
-    }
-
-    final cartNotifier = ref.read(cartProvider.notifier);
-
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : const Color(0xFFF9FAFB),
-      appBar: AppBar(
-        title: Text(category.name),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-          onPressed: () => context.pop(),
-        ),
-      ),
-      body: SafeArea(
-        child: Column(
+    return AppScaffold(
+      title: title,
+      actions: [
+        Stack(
+          clipBehavior: Clip.none,
           children: [
-            // 1. Subcategory Horizontal Tabs Bar (Matching Web Frontend Products.tsx)
-            Container(
-              height: 48,
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-              child: ListView.builder(
+            IconButton(
+              icon: const Icon(Icons.tune_rounded),
+              onPressed: _openFilters,
+            ),
+            if (_activeFilterCount > 0)
+              Positioned(
+                right: 6,
+                top: 6,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                ),
+              ),
+          ],
+        ),
+      ],
+      bottomNavigationBar: const CatalogCartBar(),
+      body: Column(
+        children: [
+          if (subChips.length > 1)
+            SizedBox(
+              height: 44,
+              child: ListView.separated(
                 scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: availableSubCategories.length,
-                itemBuilder: (context, index) {
-                  final sub = availableSubCategories[index];
-                  final isSelected = _selectedSubCategory == sub;
-
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8.0),
-                    child: ChoiceChip(
-                      label: Text(sub, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87))),
-                      selected: isSelected,
-                      selectedColor: const Color(0xFF00A86B),
-                      backgroundColor: isDark ? Colors.white10 : Colors.grey.shade100,
-                      onSelected: (_) => setState(() => _selectedSubCategory = sub),
+                itemCount: subChips.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (context, i) {
+                  final s = subChips[i];
+                  final selected = _sub == s;
+                  return ChoiceChip(
+                    label: Text(s),
+                    selected: selected,
+                    showCheckmark: false,
+                    labelStyle: AppTypography.labelMedium(
+                      selected ? Colors.white : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimary),
                     ),
+                    selectedColor: AppColors.primary,
+                    backgroundColor: isDark ? Colors.white10 : AppColors.surface,
+                    side: BorderSide(color: isDark ? AppColors.dividerDark : AppColors.divider),
+                    shape: const StadiumBorder(),
+                    onSelected: (_) => setState(() => _sub = s),
                   );
                 },
               ),
             ),
-
-            // 2. Filter & Sorting Controls
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _organicOnly = !_organicOnly;
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: _organicOnly ? const Color(0xFF00A86B) : (isDark ? Colors.white10 : Colors.white),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: _organicOnly ? Colors.transparent : (isDark ? Colors.white24 : AppColors.divider),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.eco_rounded,
-                            size: 14,
-                            color: _organicOnly ? Colors.white : const Color(0xFF00A86B),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Organic Only',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: _organicOnly ? Colors.white : (isDark ? Colors.white : AppColors.textPrimary),
+          Expanded(
+            child: productsAsync.when(
+              loading: () => const SkeletonGrid(itemCount: 6),
+              error: (e, _) => ErrorState(
+                onRetry: () => ref.invalidate(categoryProductsProvider(query)),
+              ),
+              data: (products) {
+                if (products.isEmpty) {
+                  return EmptyState(
+                    icon: Icons.inventory_2_outlined,
+                    title: 'Nothing here yet',
+                    description: _sub == 'All'
+                        ? 'No products in this category right now.'
+                        : 'No products under "$_sub". Try a different filter.',
+                    actionText: _activeFilterCount > 0 || _sub != 'All' ? 'Clear filters' : null,
+                    onAction: _activeFilterCount > 0 || _sub != 'All'
+                        ? () => setState(() {
+                              _sub = 'All';
+                              _organicOnly = false;
+                              _sort = 'popular';
+                            })
+                        : null,
+                  );
+                }
+                return RefreshIndicator(
+                  color: AppColors.primary,
+                  onRefresh: () async => ref.invalidate(categoryProductsProvider(query)),
+                  child: CustomScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                          child: Text(
+                            '${products.length} ${products.length == 1 ? 'product' : 'products'}'
+                            '${_sort != 'popular' ? ' · ${_sortLabels[_sort]!.toLowerCase()}' : ''}',
+                            style: AppTypography.bodySmall(
+                              isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
                             ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-
-                  Expanded(
-                    child: GlassCard(
-                      borderRadius: 16,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                      color: isDark ? Colors.white12 : Colors.white,
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _sortBy,
-                          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
-                          style: TextStyle(
-                            color: isDark ? Colors.white : AppColors.textPrimary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                        sliver: SliverGrid(
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                            childAspectRatio: 0.62,
                           ),
-                          onChanged: (String? newValue) {
-                            if (newValue != null) {
-                              setState(() {
-                                _sortBy = newValue;
-                              });
-                            }
-                          },
-                          items: const [
-                            DropdownMenuItem(value: 'popular', child: Text('Sort: Popular')),
-                            DropdownMenuItem(value: 'price_low', child: Text('Price: Low to High')),
-                            DropdownMenuItem(value: 'price_high', child: Text('Price: High to Low')),
-                          ],
+                          delegate: SliverChildBuilderDelegate(
+                            (context, i) {
+                              final p = products[i];
+                              return ProductCard(
+                                product: p,
+                                width: double.infinity,
+                                onTap: () => context.push('/product/${p.id}'),
+                                onAdd: () {
+                                  final ok = ref.read(cartProvider.notifier).addToCart(p);
+                                  ok
+                                      ? AppToast.success('${p.name} added to cart')
+                                      : AppToast.info('You can add up to $kMaxQtyPerItem of an item');
+                                },
+                              );
+                            },
+                            childCount: products.length,
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
-                ],
-              ),
+                );
+              },
             ),
-
-            // 3. Products 2-Column Grid
-            Expanded(
-              child: filteredProducts.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No products found for "$_selectedSubCategory"',
-                        style: AppTypography.bodyMedium(
-                          isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                        ),
-                      ),
-                    )
-                  : GridView.builder(
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        childAspectRatio: 0.64,
-                      ),
-                      itemCount: filteredProducts.length,
-                      itemBuilder: (context, index) {
-                        final prod = filteredProducts[index];
-                        return ProductCard(
-                          product: prod,
-                          onTap: () => context.push('/product/${prod.id}'),
-                          onAdd: () {
-                            cartNotifier.addToCart(prod);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Added ${prod.name} to Cart'),
-                                duration: const Duration(seconds: 1),
-                                behavior: SnackBarBehavior.floating,
-                                backgroundColor: const Color(0xFF00A86B),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

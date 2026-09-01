@@ -2721,7 +2721,7 @@ export const ReviewsModule: React.FC = () => {
 
   const fetchReviews = async () => {
     try {
-      const res = await fetch(`${API_URL}/reviews`);
+      const res = await fetch(`${API_URL}/reviews`, { headers: getAuthHeader() });
       const data = await res.json();
       if (data.success && data.reviews) {
         setReviews(data.reviews);

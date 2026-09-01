@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
+import 'package:freshcart/core/widgets/app_scaffold.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
 import 'package:freshcart/core/widgets/glass_card.dart';
 import 'package:freshcart/core/widgets/buttons.dart';
+import 'package:freshcart/core/utils/launch.dart';
 import 'package:freshcart/features/orders/data/models/order_model.dart';
-import 'package:freshcart/features/orders/presentation/controllers/orders_controller.dart';
 import 'package:freshcart/features/tracking/presentation/controllers/tracking_controller.dart';
 
 class TrackingScreen extends ConsumerWidget {
@@ -22,21 +23,42 @@ class TrackingScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final trackingState = ref.watch(trackingProvider(orderId));
-    final orders = ref.watch(ordersProvider);
-    final order = orders.firstWhere(
-      (o) => o.id == orderId,
-      orElse: () => orders.first,
-    );
+    final t = ref.watch(trackingProvider(orderId));
+    final bucket = t.statusBucket;
 
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
-      appBar: AppBar(
-        title: Text('Live Socket Track: $orderId'),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-          onPressed: () => context.go('/'),
+    return AppScaffold(
+      title: 'Order #$orderId',
+      onBack: () => context.canPop() ? context.pop() : context.go('/orders'),
+      actions: [
+        Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: (t.connected ? AppColors.primary : AppColors.warning).withOpacity(0.12),
+                borderRadius: BorderRadius.circular(100),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(t.connected ? Icons.circle : Icons.sync_rounded,
+                      size: 8, color: t.connected ? AppColors.primaryText : AppColors.warningText),
+                  const SizedBox(width: 5),
+                  Text(t.connected ? 'Live' : 'Reconnecting',
+                      style: AppTypography.labelSmall(
+                          t.connected ? AppColors.primaryText : AppColors.warningText)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        child: SafeArea(
+          top: false,
+          child: SecondaryButton(text: 'Back to home', onPressed: () => context.go('/')),
         ),
       ),
       body: SafeArea(
@@ -48,22 +70,18 @@ class TrackingScreen extends ConsumerWidget {
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(32),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
-                      blurRadius: 30,
-                    )
-                  ],
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                      color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFECECEC)),
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(32),
+                  borderRadius: BorderRadius.circular(24),
                   child: Stack(
                     children: [
                       CustomPaint(
                         painter: TrackingMapPainter(
                           isDark: isDark,
-                          status: order.status,
+                          status: bucket,
                         ),
                         child: Container(),
                       ),
@@ -73,7 +91,6 @@ class TrackingScreen extends ConsumerWidget {
                         right: 20,
                         child: GlassCard(
                           padding: const EdgeInsets.all(16),
-                          color: isDark ? const Color(0xE01C1C1E) : const Color(0xE6FFFFFF),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -81,14 +98,14 @@ class TrackingScreen extends ConsumerWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Live Socket ETA',
+                                    'Estimated arrival',
                                     style: AppTypography.bodySmall(
                                       isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    '${trackingState.etaMinutes} Mins Delivery',
+                                    '${t.etaMinutes} min',
                                     style: AppTypography.h2(
                                       isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
                                     ).copyWith(fontSize: 18),
@@ -142,7 +159,7 @@ class TrackingScreen extends ConsumerWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    trackingState.riderName,
+                                    t.riderName,
                                     style: AppTypography.labelLarge(
                                       isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
                                     ),
@@ -153,7 +170,7 @@ class TrackingScreen extends ConsumerWidget {
                                       const Icon(Icons.star_rounded, color: AppColors.warning, size: 14),
                                       const SizedBox(width: 4),
                                       Text(
-                                        '4.9 • ${trackingState.riderPhone}',
+                                        '4.9 • ${t.riderPhone}',
                                         style: AppTypography.bodySmall(
                                           isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
                                         ),
@@ -165,7 +182,10 @@ class TrackingScreen extends ConsumerWidget {
                             ),
                             Row(
                               children: [
-                                _buildRoundButton(Icons.call_rounded, isDark),
+                                GestureDetector(
+                                  onTap: () => dialPhone(t.riderPhone),
+                                  child: _buildRoundButton(Icons.call_rounded, isDark),
+                                ),
                                 const SizedBox(width: 8),
                                 GestureDetector(
                                   onTap: () => context.push('/support'),
@@ -179,23 +199,17 @@ class TrackingScreen extends ConsumerWidget {
                       const SizedBox(height: 24),
 
                       Text(
-                        'Live Order Timeline',
+                        'Order progress',
                         style: AppTypography.title(
                           isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 16),
-                      _buildTimelineItem('Order Placed', 'Order placed & assigned to Dark Store.', order.status, OrderStatus.placed, isDark, isFirst: true),
-                      _buildTimelineItem('Grocery Packing', 'Fresh items packed in insulated bag.', order.status, OrderStatus.processing, isDark),
-                      _buildTimelineItem('Out for Delivery', 'Rider is on the way (Socket Connected).', order.status, OrderStatus.dispatched, isDark),
-                      _buildTimelineItem('Delivered', 'Order successfully handed over.', order.status, OrderStatus.delivered, isDark, isLast: true),
-
+                      _buildTimelineItem('Order Placed', 'Order placed & assigned to Dark Store.', bucket, OrderStatus.placed, isDark, isFirst: true),
+                      _buildTimelineItem('Grocery Packing', 'Fresh items packed in insulated bag.', bucket, OrderStatus.processing, isDark),
+                      _buildTimelineItem('Out for Delivery', 'Rider is on the way (Socket Connected).', bucket, OrderStatus.dispatched, isDark),
+                      _buildTimelineItem('Delivered', 'Order successfully handed over.', bucket, OrderStatus.delivered, isDark, isLast: true),
                       const SizedBox(height: 24),
-                      PrimaryButton(
-                        text: 'Go to Homepage',
-                        onPressed: () => context.go('/'),
-                      ),
-                      const SizedBox(height: 32),
                     ],
                   ),
                 ),

@@ -1,84 +1,167 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:freshcart/core/di/injection.dart';
+import 'package:freshcart/core/services/api_service.dart';
 import 'package:freshcart/core/services/socket_service.dart';
+import 'package:freshcart/features/home/presentation/controllers/catalog_providers.dart' show apiServiceProvider;
+import 'package:freshcart/features/orders/data/models/order_model.dart';
 
 class TrackingState {
   final String orderId;
-  final String status;
+  final String status; // human label
+  final OrderStatus statusBucket;
   final int etaMinutes;
   final LatLng riderLocation;
   final String riderName;
   final String riderPhone;
+  final bool hasRider;
+  final bool connected;
+  final List<OrderTimelineEntry> timeline;
 
-  TrackingState({
+  const TrackingState({
     required this.orderId,
     required this.status,
+    this.statusBucket = OrderStatus.placed,
     required this.etaMinutes,
     required this.riderLocation,
     required this.riderName,
     required this.riderPhone,
+    this.hasRider = false,
+    this.connected = false,
+    this.timeline = const [],
   });
 
   TrackingState copyWith({
     String? status,
+    OrderStatus? statusBucket,
     int? etaMinutes,
     LatLng? riderLocation,
     String? riderName,
     String? riderPhone,
+    bool? hasRider,
+    bool? connected,
+    List<OrderTimelineEntry>? timeline,
   }) {
     return TrackingState(
       orderId: orderId,
       status: status ?? this.status,
+      statusBucket: statusBucket ?? this.statusBucket,
       etaMinutes: etaMinutes ?? this.etaMinutes,
       riderLocation: riderLocation ?? this.riderLocation,
       riderName: riderName ?? this.riderName,
       riderPhone: riderPhone ?? this.riderPhone,
+      hasRider: hasRider ?? this.hasRider,
+      connected: connected ?? this.connected,
+      timeline: timeline ?? this.timeline,
     );
   }
 }
 
 class TrackingNotifier extends StateNotifier<TrackingState> {
+  final ApiService _api;
   final SocketService _socket;
   final String orderId;
 
-  TrackingNotifier(this._socket, this.orderId)
+  final _subs = <StreamSubscription>[];
+  Timer? _poll;
+
+  TrackingNotifier(this._api, this._socket, this.orderId)
       : super(TrackingState(
           orderId: orderId,
-          status: 'Out for Delivery',
-          etaMinutes: 8,
+          status: 'Fetching status…',
+          etaMinutes: 10,
+          // Store/dark-store location as the map origin until a rider reports in.
           riderLocation: const LatLng(17.4474, 78.3762),
-          riderName: 'Ramesh Kumar (KPHB Express Rider)',
-          riderPhone: '+91 98765 43210',
+          riderName: 'Delivery partner',
+          riderPhone: '',
         )) {
-    _initSocket();
+    _bootstrap();
   }
 
-  void _initSocket() {
+  Future<void> _bootstrap() async {
+    await _refreshFromApi();
+
     _socket.joinOrderRoom(orderId);
+    state = state.copyWith(connected: _socket.isConnected);
 
-    _socket.riderLocationStream.listen((data) {
-      if (data['orderId'] == orderId || data['orderId'] == null) {
-        final lat = (data['lat'] as num?)?.toDouble() ?? state.riderLocation.latitude;
-        final lng = (data['lng'] as num?)?.toDouble() ?? state.riderLocation.longitude;
-        final eta = (data['etaMinutes'] as num?)?.toInt() ?? state.etaMinutes;
+    _subs.add(_socket.connectionStream.listen((up) {
+      state = state.copyWith(connected: up);
+      if (up) _socket.joinOrderRoom(orderId);
+    }));
 
-        state = state.copyWith(
-          riderLocation: LatLng(lat, lng),
-          etaMinutes: eta,
-        );
-      }
+    _subs.add(_socket.orderStatusStream.listen((d) {
+      if (d['orderId'] != null && d['orderId'] != orderId) return;
+      final raw = (d['status'] as String?) ?? state.status;
+      state = state.copyWith(
+        status: raw,
+        statusBucket: orderStatusFrom(raw),
+        etaMinutes: _minsFrom(d['eta']) ?? state.etaMinutes,
+        timeline: _parseTimeline(d['timeline']) ?? state.timeline,
+      );
+    }));
+
+    _subs.add(_socket.riderLocationStream.listen((d) {
+      if (d['orderId'] != null && d['orderId'] != orderId) return;
+      final lat = (d['lat'] as num?)?.toDouble();
+      final lng = (d['lng'] as num?)?.toDouble();
+      state = state.copyWith(
+        riderLocation: (lat != null && lng != null) ? LatLng(lat, lng) : state.riderLocation,
+        hasRider: true,
+        etaMinutes: (d['etaMinutes'] as num?)?.toInt() ?? state.etaMinutes,
+        riderName: (d['riderName'] as String?) ?? state.riderName,
+        riderPhone: (d['riderPhone'] as String?) ?? state.riderPhone,
+      );
+    }));
+
+    // Fallback: while the socket is down, poll the order every 15s.
+    _poll = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (!_socket.isConnected) _refreshFromApi();
     });
+  }
 
-    _socket.orderStatusStream.listen((data) {
-      if (data['orderId'] == orderId || data['orderId'] == null) {
-        final newStatus = data['status'] as String? ?? state.status;
-        state = state.copyWith(status: newStatus);
-      }
-    });
+  Future<void> _refreshFromApi() async {
+    try {
+      final raw = await _api.fetchOrder(orderId);
+      final o = OrderModel.fromServerJson(raw);
+      state = state.copyWith(
+        status: o.statusRaw.isEmpty ? o.statusText : o.statusRaw,
+        statusBucket: o.status,
+        etaMinutes: _minsFrom(o.eta) ?? state.etaMinutes,
+        timeline: o.timeline.isNotEmpty ? o.timeline : state.timeline,
+      );
+    } catch (_) {
+      // keep last-known state
+    }
+  }
+
+  int? _minsFrom(dynamic v) {
+    if (v is num) return v.toInt();
+    final s = v?.toString() ?? '';
+    final m = RegExp(r'\d+').firstMatch(s);
+    return m == null ? null : int.tryParse(m.group(0)!);
+  }
+
+  List<OrderTimelineEntry>? _parseTimeline(dynamic v) {
+    if (v is! List) return null;
+    return v
+        .whereType<Map>()
+        .map((e) => OrderTimelineEntry.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    for (final s in _subs) {
+      s.cancel();
+    }
+    _socket.leaveOrderRoom(orderId);
+    super.dispose();
   }
 }
 
-final trackingProvider = StateNotifierProvider.family<TrackingNotifier, TrackingState, String>((ref, orderId) {
-  return TrackingNotifier(getIt<SocketService>(), orderId);
+final trackingProvider =
+    StateNotifierProvider.family<TrackingNotifier, TrackingState, String>((ref, orderId) {
+  return TrackingNotifier(ref.read(apiServiceProvider), getIt<SocketService>(), orderId);
 });

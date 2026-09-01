@@ -55,6 +55,21 @@ class StorageService {
     await _favoritesBox.put('favorite_ids', list);
   }
 
+  // Recent searches (most-recent first, capped)
+  List<String> getRecentSearches() =>
+      List<String>.from(_settingsBox.get('recent_searches', defaultValue: <String>[]) as List);
+
+  Future<void> addRecentSearch(String term) async {
+    final t = term.trim();
+    if (t.isEmpty) return;
+    final list = getRecentSearches()..removeWhere((e) => e.toLowerCase() == t.toLowerCase());
+    list.insert(0, t);
+    await _settingsBox.put('recent_searches', list.take(8).toList());
+  }
+
+  Future<void> clearRecentSearches() async =>
+      _settingsBox.put('recent_searches', <String>[]);
+
   Future<void> clearAll() async {
     await _cartBox.clear();
     await _favoritesBox.clear();

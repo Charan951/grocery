@@ -4,6 +4,11 @@ import { Category, Product, Brand } from '../models/Catalog.js';
 import { Coupon, Offer } from '../models/Finance.js';
 import { Blog, Settings } from '../models/Operations.js';
 import { Customer } from '../models/Customer.js';
+import { DeliveryPartner } from '../models/DeliveryPartner.js';
+
+// In production we never wipe-and-reseed catalog data on boot — that footgun
+// could destroy a live catalog if counts ever dipped below the thresholds below.
+const ALLOW_DESTRUCTIVE_RESEED = process.env.NODE_ENV !== 'production';
 
 export const seedDatabase = async () => {
   try {
@@ -50,6 +55,16 @@ export const seedDatabase = async () => {
       console.log('✅ Seeded users for all roles successfully!');
     }
 
+    // Every Delivery-role user needs a DeliveryPartner profile (idempotent, self-heals).
+    const deliveryUsers = await User.find({ role: 'Delivery' }).select('_id phone');
+    for (const du of deliveryUsers) {
+      const exists = await DeliveryPartner.findOne({ userId: du._id });
+      if (!exists) {
+        await DeliveryPartner.create({ userId: du._id, phone: du.phone || '' });
+        console.log(`✅ Created DeliveryPartner profile for user ${du._id}`);
+      }
+    }
+
 
     // 2. Seed Settings
     const settingsCount = await Settings.countDocuments();
@@ -60,8 +75,8 @@ export const seedDatabase = async () => {
 
     // 4. Seed Categories & Subcategories
     const categoryCount = await Category.countDocuments();
-    if (categoryCount < 7) {
-      await Category.deleteMany({}); // refresh categories
+    if (categoryCount < 7 && ALLOW_DESTRUCTIVE_RESEED) {
+      await Category.deleteMany({}); // refresh categories (non-production only)
       const initialCategories = [
         {
           id: 'fruits-vegetables',
@@ -156,7 +171,7 @@ export const seedDatabase = async () => {
 
     // 5. Seed Products with Rich Schema (5 products per subcategory)
     const prodCount = await Product.countDocuments();
-    if (prodCount < 40) {
+    if (prodCount < 40 && ALLOW_DESTRUCTIVE_RESEED) {
       await Product.deleteMany({});
       const seedProductsList = [
         // --- MILK (5 Products) ---

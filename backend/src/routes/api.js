@@ -1,6 +1,10 @@
 import express from 'express';
 import mongoose from 'mongoose';
-import { protect, authorize } from '../middleware/auth.js';
+import rateLimit from 'express-rate-limit';
+import { protect, authorize, protectCustomer, attachCustomerOptional, protectDelivery } from '../middleware/auth.js';
+import { customerAuthController } from '../controllers/authCustomerController.js';
+import { deliveryController } from '../controllers/deliveryController.js';
+import { adminDeliveryController } from '../controllers/adminDeliveryController.js';
 import {
   authController,
   dashboardController,
@@ -30,6 +34,11 @@ const router = express.Router();
 // Middleware: Fast fallback when MongoDB is disconnected
 router.use((req, res, next) => {
   if (mongoose.connection.readyState !== 1) {
+    // Never stub the OTP endpoints — a fake "success" with no token would break
+    // real authentication. Let them fall through and fail loudly instead.
+    if (req.path.startsWith('/customers/otp') || req.path.startsWith('/customers/me') || req.path.startsWith('/payment/') || req.path.startsWith('/delivery/') || req.path.startsWith('/admin/delivery')) {
+      return next();
+    }
     if (req.path === '/auth/login' && req.method === 'POST') {
       const email = req.body?.email || 'admin@freshcart.com';
       return res.json({
@@ -149,16 +158,19 @@ router.patch('/festival-campaigns/:id/status', festivalCampaignController.toggle
 // ==========================================
 // 5. ORDER ROUTES
 // ==========================================
-router.get('/orders', orderController.getOrders);
+router.get('/orders', protect, authorize('Admin', 'Manager'), orderController.getOrders); // staff only — returns all customer PII
+router.get('/orders/mine', protectCustomer, orderController.getMyOrders); // signed-in customer's own orders
 router.get('/orders/customer/:phone', orderController.getCustomerOrders);
-router.get('/orders/:id', orderController.getOrder);
-router.post('/orders', orderController.createOrder); // Open for client app placements
+router.get('/orders/:id', attachCustomerOptional, orderController.getOrder);
+router.post('/orders', attachCustomerOptional, orderController.createOrder); // client app placements; uses customer token when present
 router.put('/orders/:id/status', protect, authorize('Admin', 'Manager', 'Delivery'), orderController.updateStatus);
+router.post('/orders/:id/rider-location', protect, authorize('Admin', 'Manager', 'Delivery'), orderController.updateRiderLocation);
 
 // ==========================================
 // 6. COUPON ROUTES
 // ==========================================
 router.get('/coupons', couponController.getCoupons);
+router.post('/coupons/validate', couponController.validateCoupon);
 router.post('/coupons', protect, authorize('Admin', 'Manager'), couponController.createCoupon);
 router.put('/coupons/:code', protect, authorize('Admin', 'Manager'), couponController.updateCoupon);
 router.delete('/coupons/:code', protect, authorize('Admin'), couponController.deleteCoupon);
@@ -181,6 +193,22 @@ router.put('/settings', protect, authorize('Admin'), settingsController.updateSe
 // 9. CUSTOMER ROUTES
 // ==========================================
 router.get('/customers', protect, customerController.getCustomers);
+
+// --- Real customer authentication (OTP -> customer JWT) ---
+router.post('/customers/otp/send', customerAuthController.sendOtp);
+router.post('/customers/otp/verify', customerAuthController.verifyOtp);
+router.get('/customers/me', protectCustomer, customerAuthController.getMe);
+
+// Customer-scoped mutations: identity comes from the token, not the URL.
+// These reuse the existing controller handlers by injecting req.params.id.
+const asMe = (req, res, next) => { req.params.id = req.customer.customerId; next(); };
+router.put('/customers/me/profile', protectCustomer, asMe, customerController.updateProfile);
+router.post('/customers/me/addresses', protectCustomer, asMe, customerController.addAddress);
+router.delete('/customers/me/addresses/:addressId', protectCustomer, asMe, customerController.deleteAddress);
+router.post('/customers/me/wallet/debit', protectCustomer, customerController.walletDebit);
+
+// Legacy phone-keyed customer auth — still used by the web storefront (no token).
+// TODO: migrate web to the OTP flow above, then lock down the :id routes below.
 router.post('/customers/auth', customerController.authCustomer);
 router.get('/customers/:id', customerController.getCustomerProfile);
 router.put('/customers/:id/profile', customerController.updateProfile);
@@ -222,7 +250,7 @@ router.delete('/employees/:id', protect, authorize('Admin'), employeeController.
 // ==========================================
 // 15. REVIEW ROUTES
 // ==========================================
-router.get('/reviews', reviewController.getReviews);
+router.get('/reviews', protect, authorize('Admin', 'Manager'), reviewController.getReviews); // staff moderation list
 router.put('/reviews/:id/status', protect, authorize('Admin', 'Manager'), reviewController.updateReviewStatus);
 router.delete('/reviews/:id', protect, authorize('Admin'), reviewController.deleteReview);
 
@@ -235,7 +263,40 @@ router.delete('/audit-logs', protect, authorize('Admin'), auditLogController.cle
 // ==========================================
 // 17. PAYMENT ROUTES (RAZORPAY)
 // ==========================================
-router.post('/payment/create-order', paymentController.createRazorpayOrder);
-router.post('/payment/verify', paymentController.verifyPayment);
+router.post('/payment/create-order', attachCustomerOptional, paymentController.createRazorpayOrder);
+router.post('/payment/verify', attachCustomerOptional, paymentController.verifyPayment);
+router.post('/payment/webhook', paymentController.webhook); // raw-body parsed in app.js
+
+// ==========================================
+// 18. DELIVERY PARTNER ROUTES  (/api/delivery/*)
+// Auth: protectDelivery = staff JWT + User.role 'Delivery' + status 'Active'
+// ==========================================
+const deliveryAuthLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
+const locationLimiter = rateLimit({ windowMs: 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false });
+
+router.post('/delivery/auth/forgot', deliveryAuthLimiter, deliveryController.forgotPassword);
+router.post('/delivery/auth/reset', deliveryAuthLimiter, deliveryController.resetPassword);
+
+router.get('/delivery/me', protectDelivery, deliveryController.getMe);
+router.put('/delivery/status', protectDelivery, deliveryController.setStatus);
+router.post('/delivery/location', locationLimiter, protectDelivery, deliveryController.updateLocation);
+router.get('/delivery/orders/active', protectDelivery, deliveryController.getActiveOrders);
+router.post('/delivery/assignments/:id/accept', protectDelivery, deliveryController.acceptAssignment);
+router.post('/delivery/assignments/:id/reject', protectDelivery, deliveryController.rejectAssignment);
+router.get('/delivery/orders/:id', protectDelivery, deliveryController.getOrder);
+router.post('/delivery/orders/:id/pickup-arrived', protectDelivery, deliveryController.pickupArrived);
+router.post('/delivery/orders/:id/picked-up', protectDelivery, deliveryController.pickedUp);
+router.post('/delivery/orders/:id/arrived', protectDelivery, deliveryController.arrived);
+router.post('/delivery/orders/:id/complete', protectDelivery, deliveryController.completeDelivery);
+router.post('/delivery/orders/:id/fail', protectDelivery, deliveryController.failDelivery);
+
+// ==========================================
+// 19. ADMIN DELIVERY / DISPATCH  (/api/admin/delivery/*, /api/admin/orders/:id/*)
+// ==========================================
+router.get('/admin/delivery/partners', protect, authorize('Admin', 'Manager'), adminDeliveryController.listPartners);
+router.get('/admin/delivery/fleet', protect, authorize('Admin', 'Manager'), adminDeliveryController.fleet);
+router.post('/admin/orders/:id/assign', protect, authorize('Admin', 'Manager'), adminDeliveryController.assignOrder);
+router.post('/admin/orders/:id/reassign', protect, authorize('Admin', 'Manager'), adminDeliveryController.reassignOrder);
+router.post('/admin/orders/:id/unassign', protect, authorize('Admin', 'Manager'), adminDeliveryController.unassignOrder);
 
 export default router;
