@@ -112,15 +112,22 @@ void main() {
       expect(find.text('No orders yet'), findsOneWidget);
     });
 
-    testWidgets('splits active and past, shows Track vs Reorder', (tester) async {
+    testWidgets('status tabs filter the list; Track vs Reorder per card', (tester) async {
       await _boot(tester, _host(const OrdersListScreen(), api: _Api(orders: [
         _orderJson(id: 'A1', status: 'Out for Delivery'),
         _orderJson(id: 'P1', status: 'Delivered'),
       ])));
-      expect(find.text('Active'), findsOneWidget);
-      expect(find.text('Past orders'), findsOneWidget);
+      // Default "All" tab shows both, with the right per-card CTA.
+      expect(find.text('All'), findsOneWidget);
+      expect(find.text('In Transit'), findsOneWidget);
       expect(find.text('Track order'), findsOneWidget);
       expect(find.text('Reorder'), findsOneWidget);
+
+      // Switching to "In Transit" hides the delivered order.
+      await tester.tap(find.text('In Transit'));
+      await tester.pumpAndSettle();
+      expect(find.text('Track order'), findsOneWidget);
+      expect(find.text('Reorder'), findsNothing);
     });
 
     testWidgets('reorder adds items to the cart and opens it', (tester) async {

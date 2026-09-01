@@ -117,15 +117,18 @@ web needs a real customer-auth pass first (see WEB-1).
 - **Acceptance:** filtering a large category is paginated and fast; filter state
   survives back-navigation.
 
-### FW-6 · Orders — status-filter tabs, active-order banner, invoice
-- `[~]` **Mobile:** add All / In Transit / Delivered / Cancelled tabs on the
-  orders list (web already has them via `bucketOf`). Currently only a 2-way
-  active/past split.
-- `[ ]` **Mobile & Web:** active-order banner on Home (tap → tracking).
+### FW-6 · Orders — status-filter tabs, active-order banner, invoice — `[~]` 2026-09-01
+- `[x]` **Mobile:** All / In Transit / Delivered / Cancelled `ChoiceChip` tabs on
+  the orders list (`_OrdersTab` enum → `OrderStatus` buckets; empty-state per
+  tab). Web already had them via `bucketOf`.
+- `[x]` **Mobile & Web:** active-order banner on Home → tap opens tracking.
+  Mobile: `_ActiveOrderBanner` in `home_screen.dart` (gated on
+  `authProvider.isAuthenticated`, first `o.isActive` order). Web:
+  `components/ActiveOrderBanner.tsx` (phone-keyed `/api/orders/customer/:phone`,
+  30s refresh, first non-terminal order → `/track/:id`).
 - `[ ]` **Backend + both:** real invoice / credit-note (PDF or hosted HTML) —
   today the button is an `alert()` stub. Model `Invoice` exists.
-- **Acceptance:** tabs match the 14-value status enum via buckets; Home shows a
-  live banner while an order is in flight; invoice opens a real document.
+- **Acceptance:** ✅ tabs + banner; ⬜ invoice still a stub.
 
 ### FW-7 · Membership — real join / upgrade
 - `[ ]` **Backend:** endpoint to start/upgrade `membershipType` (Normal → VIP),

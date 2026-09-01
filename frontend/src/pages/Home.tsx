@@ -4,6 +4,7 @@ import { useCMS, getSubCategoryImage, getCategoryImage, hexToRgba, hexToTintOnWh
 import { ProductCard } from '../components/ProductCard';
 import { SubcategoryCardImage } from '../components/SubcategoryCardImage';
 import { SEO } from '../components/SEO';
+import { ActiveOrderBanner } from '../components/ActiveOrderBanner';
 import { BannerCarousel } from '../components/BannerCarousel';
 import { FestivalCampaignWrapper } from '../components/FestivalCampaignWrapper';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -303,6 +304,9 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
 
       {/* Centered Web Container Layout */}
       <div className="w-full max-w-[1280px] mx-auto px-3 sm:px-6 lg:px-8 pt-0 sm:pt-3 pb-8">
+
+        {/* Live order strip — tap to track */}
+        <ActiveOrderBanner />
 
         {/* 1. Top Active Campaign Banners Carousel (Blinkit Aspect Ratio) */}
         {activeBanners.length > 0 && (

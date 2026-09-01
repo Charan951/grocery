@@ -38,11 +38,36 @@ void reorder(WidgetRef ref, OrderModel order) {
   AppToast.success(added == 0 ? 'Items already at cart limit' : 'Added $added items to cart');
 }
 
-class OrdersListScreen extends ConsumerWidget {
+enum _OrdersTab { all, inTransit, delivered, cancelled }
+
+extension _OrdersTabX on _OrdersTab {
+  String get label => switch (this) {
+        _OrdersTab.all => 'All',
+        _OrdersTab.inTransit => 'In Transit',
+        _OrdersTab.delivered => 'Delivered',
+        _OrdersTab.cancelled => 'Cancelled',
+      };
+
+  bool matches(OrderModel o) => switch (this) {
+        _OrdersTab.all => true,
+        _OrdersTab.inTransit => o.isActive,
+        _OrdersTab.delivered => o.status == OrderStatus.delivered,
+        _OrdersTab.cancelled => o.status == OrderStatus.cancelled,
+      };
+}
+
+class OrdersListScreen extends ConsumerStatefulWidget {
   const OrdersListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<OrdersListScreen> createState() => _OrdersListScreenState();
+}
+
+class _OrdersListScreenState extends ConsumerState<OrdersListScreen> {
+  _OrdersTab _tab = _OrdersTab.all;
+
+  @override
+  Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final ordersAsync = ref.watch(ordersProvider);
 
@@ -70,8 +95,7 @@ class OrdersListScreen extends ConsumerWidget {
               onAction: () => context.go('/'),
             );
           }
-          final active = orders.where((o) => o.isActive).toList();
-          final past = orders.where((o) => !o.isActive).toList();
+          final filtered = orders.where(_tab.matches).toList();
 
           return RefreshIndicator(
             color: AppColors.primary,
@@ -80,15 +104,24 @@ class OrdersListScreen extends ConsumerWidget {
               physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
               children: [
-                if (active.isNotEmpty) ...[
-                  _header('Active', isDark),
-                  for (final o in active) _OrderCard(order: o, isDark: isDark),
-                  const SizedBox(height: 8),
-                ],
-                if (past.isNotEmpty) ...[
-                  _header(active.isEmpty ? 'All orders' : 'Past orders', isDark),
-                  for (final o in past) _OrderCard(order: o, isDark: isDark),
-                ],
+                _TabBar(
+                  current: _tab,
+                  isDark: isDark,
+                  onSelect: (t) => setState(() => _tab = t),
+                ),
+                const SizedBox(height: 14),
+                if (filtered.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 48),
+                    child: Center(
+                      child: Text('No ${_tab.label.toLowerCase()} orders',
+                          style: AppTypography.bodyMedium(
+                            isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                          )),
+                    ),
+                  )
+                else
+                  for (final o in filtered) _OrderCard(order: o, isDark: isDark),
               ],
             ),
           );
@@ -96,13 +129,42 @@ class OrdersListScreen extends ConsumerWidget {
       ),
     );
   }
+}
 
-  Widget _header(String t, bool isDark) => Padding(
-        padding: const EdgeInsets.only(bottom: 10, top: 4),
-        child: Text(t, style: AppTypography.labelMedium(
-          isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-        )),
-      );
+class _TabBar extends StatelessWidget {
+  final _OrdersTab current;
+  final bool isDark;
+  final ValueChanged<_OrdersTab> onSelect;
+  const _TabBar({required this.current, required this.isDark, required this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (final t in _OrdersTab.values)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                label: Text(t.label),
+                selected: t == current,
+                onSelected: (_) => onSelect(t),
+                showCheckmark: false,
+                labelStyle: AppTypography.labelMedium(
+                  t == current
+                      ? Colors.white
+                      : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondary),
+                ),
+                selectedColor: AppColors.primary,
+                backgroundColor: isDark ? AppColors.surfaceDark : AppColors.surface,
+                side: BorderSide(color: isDark ? AppColors.dividerDark : AppColors.divider),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _OrderCard extends ConsumerWidget {

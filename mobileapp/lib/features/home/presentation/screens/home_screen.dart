@@ -15,6 +15,8 @@ import 'package:freshcart/features/categories/data/models/category_model.dart';
 import 'package:freshcart/features/home/presentation/controllers/catalog_providers.dart';
 import 'package:freshcart/features/home/presentation/widgets/home_header.dart';
 import 'package:freshcart/features/home/presentation/widgets/product_rail.dart';
+import 'package:freshcart/features/orders/data/models/order_model.dart';
+import 'package:freshcart/features/orders/presentation/controllers/orders_controller.dart';
 import 'package:freshcart/features/products/data/models/product_model.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -121,6 +123,18 @@ class _HomeContent extends ConsumerWidget {
     final banners = ref.watch(bannersProvider).valueOrNull ?? const [];
     final groups = ref.watch(specialGroupsProvider).valueOrNull ?? const [];
 
+    // Only look for a live order once the customer is signed in — keeps Home
+    // free of the orders API (and its getIt dependency) for guests/tests.
+    OrderModel? activeOrder;
+    if (ref.watch(authProvider.select((s) => s.isAuthenticated))) {
+      for (final o in ref.watch(ordersProvider).valueOrNull ?? const <OrderModel>[]) {
+        if (o.isActive) {
+          activeOrder = o;
+          break;
+        }
+      }
+    }
+
     final fresh = products.where((p) => p.isFreshPick).take(10).toList();
     final organic = products.where((p) => p.isOrganic).take(10).toList();
     final bestSellers = products.where((p) => p.isBestSeller).take(10).toList();
@@ -138,6 +152,8 @@ class _HomeContent extends ConsumerWidget {
       physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
       padding: EdgeInsets.zero,
       children: [
+        if (activeOrder != null) _ActiveOrderBanner(order: activeOrder, isDark: isDark),
+
         // Shop by category
         if (categories.isNotEmpty) ...[
           const SizedBox(height: 16),
@@ -187,6 +203,59 @@ class _HomeContent extends ConsumerWidget {
         const _TrustRow(),
         const SizedBox(height: 32),
       ],
+    );
+  }
+}
+
+class _ActiveOrderBanner extends StatelessWidget {
+  final OrderModel order;
+  final bool isDark;
+  const _ActiveOrderBanner({required this.order, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Material(
+        color: AppColors.primary.withValues(alpha: isDark ? 0.16 : 0.08),
+        borderRadius: AppRadius.brLg,
+        child: InkWell(
+          borderRadius: AppRadius.brLg,
+          onTap: () => context.push('/tracking/${order.id}'),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(9),
+                  decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                  child: const Icon(Icons.delivery_dining_rounded, color: Colors.white, size: 18),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(order.statusText,
+                          style: AppTypography.labelLarge(
+                            isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                          )),
+                      const SizedBox(height: 2),
+                      Text('Order #${order.id} · tap to track',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.bodySmall(
+                            isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                          )),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded, color: AppColors.primary),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
