@@ -143,9 +143,12 @@ void main() {
         authProvider.overrideWith((ref) => _auth()),
       ]));
       expect(find.text('Bananas 1'), findsOneWidget);
-      expect(find.text('Bill details'), findsOneWidget);
-      expect(find.text('Checkout'), findsOneWidget);
       expect(find.text('2'), findsWidgets); // stepper qty
+      expect(find.text('Checkout'), findsOneWidget); // bottom bar, always mounted
+      // Bill details sits below the free-delivery bar / savings / coupon block.
+      await tester.scrollUntilVisible(find.text('Bill details'), 300,
+          scrollable: find.byType(Scrollable).first);
+      expect(find.text('Bill details'), findsOneWidget);
     });
 
     testWidgets('stepper + adds a unit', (tester) async {

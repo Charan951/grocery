@@ -18,6 +18,7 @@ import 'package:freshcart/features/cart/presentation/controllers/commerce_provid
 import 'package:freshcart/features/cart/presentation/widgets/billing_summary.dart';
 import 'package:freshcart/features/cart/presentation/widgets/checkout_bar.dart';
 import 'package:freshcart/features/home/presentation/controllers/catalog_providers.dart';
+import 'package:freshcart/features/wishlist/presentation/controllers/wishlist_controller.dart';
 
 class CartScreen extends ConsumerWidget {
   const CartScreen({super.key});
@@ -71,6 +72,16 @@ class CartScreen extends ConsumerWidget {
         physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
+          _FreeDeliveryBar(
+            subtotal: cart.subtotal,
+            threshold: ref.watch(pricingConfigProvider).freeDeliveryThreshold,
+            isDark: isDark,
+          ),
+          if (cart.totalSavings > 0) ...[
+            const SizedBox(height: 10),
+            _SavingsBanner(amount: cart.totalSavings),
+          ],
+          const SizedBox(height: 12),
           for (final item in cart.items)
             _CartRow(
               key: ValueKey('${item.product.id}_${item.selectedWeight}'),
@@ -83,6 +94,13 @@ class CartScreen extends ConsumerWidget {
               },
               onDec: () => notifier.removeFromCart(item.product, weight: item.selectedWeight),
               onDelete: () => notifier.deleteItem(item),
+              onSaveForLater: () {
+                notifier.deleteItem(item);
+                if (!ref.read(wishlistProvider).contains(item.product.id)) {
+                  ref.read(wishlistProvider.notifier).toggleWishlist(item.product.id);
+                }
+                AppToast.success('Moved to wishlist');
+              },
             ),
           const SizedBox(height: 12),
           _DeliverySlot(
@@ -110,6 +128,7 @@ class _CartRow extends StatelessWidget {
   final VoidCallback onInc;
   final VoidCallback onDec;
   final VoidCallback onDelete;
+  final VoidCallback onSaveForLater;
 
   const _CartRow({
     super.key,
@@ -118,11 +137,14 @@ class _CartRow extends StatelessWidget {
     required this.onInc,
     required this.onDec,
     required this.onDelete,
+    required this.onSaveForLater,
   });
 
   @override
   Widget build(BuildContext context) {
     final p = item.product;
+    final hasDiscount = p.mrp > p.price;
+    final off = hasDiscount ? (((p.mrp - p.price) / p.mrp) * 100).round() : 0;
     return Dismissible(
       key: ValueKey('dismiss_${p.id}_${item.selectedWeight}'),
       direction: DismissDirection.endToStart,
@@ -167,17 +189,124 @@ class _CartRow extends StatelessWidget {
                       style: AppTypography.labelLarge(
                         isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
                       )),
-                  const SizedBox(height: 2),
-                  Text('${item.selectedWeight} · ₹${p.price.toStringAsFixed(0)}',
+                  const SizedBox(height: 3),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 2,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text('₹${p.price.toStringAsFixed(0)}',
+                          style: AppTypography.labelMedium(
+                            isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                          )),
+                      if (hasDiscount) ...[
+                        Text('₹${p.mrp.toStringAsFixed(0)}',
+                            style: AppTypography.bodySmall(
+                              isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                            ).copyWith(decoration: TextDecoration.lineThrough)),
+                        Text('$off% OFF', style: AppTypography.labelSmall(AppColors.primaryText)),
+                      ],
+                    ],
+                  ),
+                  Text(item.selectedWeight,
                       style: AppTypography.bodySmall(
                         isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
                       )),
+                  const SizedBox(height: 4),
+                  GestureDetector(
+                    onTap: onSaveForLater,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.favorite_border_rounded, size: 13, color: AppColors.primary),
+                        const SizedBox(width: 4),
+                        Text('Save for later', style: AppTypography.labelSmall(AppColors.primaryText)),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
             QtyStepper(quantity: item.quantity, onIncrement: onInc, onDecrement: onDec),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _FreeDeliveryBar extends StatelessWidget {
+  final double subtotal;
+  final double threshold;
+  final bool isDark;
+  const _FreeDeliveryBar({required this.subtotal, required this.threshold, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final unlocked = threshold <= 0 || subtotal >= threshold;
+    final remaining = (threshold - subtotal).clamp(0, threshold);
+    final progress = threshold <= 0 ? 1.0 : (subtotal / threshold).clamp(0.0, 1.0);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: isDark ? 0.14 : 0.08),
+        borderRadius: AppRadius.brMd,
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(unlocked ? Icons.check_circle_rounded : Icons.local_shipping_outlined,
+                  size: 16, color: AppColors.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  unlocked
+                      ? "You've unlocked FREE delivery 🎉"
+                      : 'Add ₹${remaining.toStringAsFixed(0)} more for FREE delivery',
+                  style: AppTypography.labelMedium(AppColors.primaryText),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 6,
+              backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+              valueColor: const AlwaysStoppedAnimation(AppColors.primary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SavingsBanner extends StatelessWidget {
+  final double amount;
+  const _SavingsBanner({required this.amount});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.success.withValues(alpha: 0.10),
+        borderRadius: AppRadius.brMd,
+        border: Border.all(color: AppColors.success.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.savings_rounded, size: 16, color: AppColors.success),
+          const SizedBox(width: 8),
+          Text("You're saving ₹${amount.toStringAsFixed(0)} on this order",
+              style: AppTypography.labelMedium(AppColors.success)),
+        ],
       ),
     );
   }

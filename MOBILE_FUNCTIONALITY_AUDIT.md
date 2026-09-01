@@ -22,7 +22,8 @@ Legend: **✓** Complete · **⚠** Partial · **✗** Missing · **🐛** Broke
 | Product listing / filters | ✓ organic + sort + In-stock/On-offer pills; client-side pagination | ⚠ organic + sort + In-stock/On-offer; **no pagination / infinite scroll**, no brand picker | **⚠** | Backend `GET /products` now supports `brand`/`inStock`/`onSale`/`page`/`limit` (FW-5). Mobile provider is still one-shot. |
 | Product detail + reviews | ✓ | ✓ | ✓ | PDP ratings & reviews section + write sheet on both. |
 | Search | ✓ text + suggestions | ⚠ text + recents; **no trending/suggestions**, mic removed (FW-16) | **⚠** | |
-| Cart + coupons | ✓ | ✓ | ✓ | Coupon validate server-side both. |
+| Cart + coupons | ✓ | ✓ | ✓ | Coupon validate server-side both. **2026-09-01 UX pass (both):** free-delivery progress bar, "you save ₹X" (MRP savings), per-row MRP strikethrough + %-off, "Save for later" → wishlist. |
+| Wishlist | ✓ drawer (2026-09-01: grid-ish rows w/ MRP/%-off, in-stock badge, disabled Add when OOS, "Move all to cart", value/savings footer) | ✓ full 2-col grid screen (add / remove / add-all, states) | ✓ | |
 | Checkout (Razorpay / Wallet / COD) | ✓ | ✓ | ✓ | Real gateway + HMAC verify + webhook. COD now created `Pending` (BE-3). |
 | Orders list | ✓ tabs (All/In Transit/Delivered/Cancelled) | ✓ same tabs (FW-6) | **✓ parity** | |
 | Order detail + timeline | ✓ | ✓ | ✓ | |

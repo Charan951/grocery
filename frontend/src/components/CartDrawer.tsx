@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useCartWishlist, getProductStockQuantity } from '../context/CartWishlistContext';
 import { useCMS } from '../context/CMSContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ShoppingBag, Plus, Minus, Trash2, Tag, MapPin, AlertCircle } from 'lucide-react';
+import { X, ShoppingBag, Plus, Minus, Trash2, Tag, AlertCircle, Truck, Heart, PiggyBank } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { CheckoutModal } from './CheckoutModal';
 import { getProductImage } from '../utils/imageUtils';
@@ -12,9 +12,19 @@ interface CartDrawerProps {
   onClose: () => void;
 }
 
+const FREE_DELIVERY_THRESHOLD = 499;
+
 export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
-  const { cart, updateCartQuantity, removeFromCart, cartSubtotal, clearCart, showLimitToast } = useCartWishlist();
+  const { cart, updateCartQuantity, removeFromCart, cartSubtotal, clearCart, showLimitToast, toggleWishlist, wishlist } = useCartWishlist();
   const { coupons } = useCMS();
+
+  const mrpTotal = cart.reduce(
+    (s, it) => s + ((it.product as any).mrp || (it.product as any).originalPrice || it.product.price) * it.quantity,
+    0,
+  );
+  const itemSavings = Math.max(mrpTotal - cartSubtotal, 0);
+  const freeDeliveryLeft = Math.max(FREE_DELIVERY_THRESHOLD - cartSubtotal, 0);
+  const freeDeliveryPct = Math.min((cartSubtotal / FREE_DELIVERY_THRESHOLD) * 100, 100);
 
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
@@ -118,15 +128,43 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto flex flex-col gap-4 pr-1">
+            <div className="flex-1 overflow-y-auto flex flex-col gap-3 pr-1">
               {cart.length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-center px-4">
                   <ShoppingBag size={48} className="text-text-tertiary mb-4 animate-pulse" />
                   <div className="text-base font-bold text-text-primary mb-2">Your Basket is Empty</div>
                   <p className="text-sm text-text-secondary mb-6 leading-relaxed">Fill it up with fresh fruits, farm vegetables, sourdough loaves, and dairy milk.</p>
                   <button onClick={onClose} className="bg-primary text-white font-bold py-2.5 px-6 rounded-full text-sm transition-all hover:bg-secondary active:scale-[0.98]">Start Shopping</button>
+                  {wishlist.length > 0 && (
+                    <p className="mt-3 text-xs text-text-tertiary">You have {wishlist.length} saved {wishlist.length === 1 ? 'item' : 'items'} in your wishlist.</p>
+                  )}
                 </div>
               ) : (
+                <>
+                  {/* Free-delivery progress */}
+                  <div className="rounded-xl border border-primary/25 bg-primary/[0.06] p-3">
+                    <div className="flex items-center gap-2 text-xs font-bold text-primary">
+                      {freeDeliveryLeft > 0 ? <Truck size={14} /> : <span>🎉</span>}
+                      <span>
+                        {freeDeliveryLeft > 0
+                          ? `Add ₹${freeDeliveryLeft} more for FREE delivery`
+                          : "You've unlocked FREE delivery"}
+                      </span>
+                    </div>
+                    <div className="mt-2 h-1.5 w-full rounded-full bg-primary/15 overflow-hidden">
+                      <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${freeDeliveryPct}%` }} />
+                    </div>
+                  </div>
+
+                  {itemSavings > 0 && (
+                    <div className="flex items-center gap-2 rounded-xl border border-emerald-300/40 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">
+                      <PiggyBank size={14} />
+                      You're saving ₹{Math.round(itemSavings)} on MRP
+                    </div>
+                  )}
+                </>
+              )}
+              {cart.length > 0 && (
                 cart.map((item, idx) => (
                   <motion.div 
                     layout
@@ -139,11 +177,27 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                     <img src={getProductImage(item.product)} alt={item.product.name} className="w-20 h-20 object-cover rounded-md border border-divider" />
                     <div className="flex-1 flex flex-col">
                       <h4 className="text-sm font-bold text-text-primary mb-0.5 line-clamp-1">{item.product.name}</h4>
-                      <span className="text-xs text-text-secondary font-medium mb-2">{item.selectedWeight}</span>
-                      
-                      <div className="flex justify-between items-center mt-auto">
+                      <span className="text-xs text-text-secondary font-medium">{item.selectedWeight}</span>
+                      {(() => {
+                        const mrp = (item.product as any).mrp || (item.product as any).originalPrice || 0;
+                        const off = mrp > item.product.price ? Math.round(((mrp - item.product.price) / mrp) * 100) : 0;
+                        return off > 0 ? (
+                          <span className="mt-0.5 text-[11px] font-semibold text-text-secondary">
+                            <span className="line-through">₹{mrp}</span>{' '}
+                            <span className="text-emerald-600">{off}% off</span>
+                          </span>
+                        ) : null;
+                      })()}
+                      <button
+                        onClick={() => { toggleWishlist(item.product); removeFromCart(item.product.id, item.selectedWeight); }}
+                        className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline w-fit"
+                      >
+                        <Heart size={11} /> Save for later
+                      </button>
+
+                      <div className="flex justify-between items-center mt-auto pt-2">
                         <span className="text-sm font-extrabold text-text-primary">₹{item.product.price * item.quantity}</span>
-                        
+
                         <div className="flex items-center">
                           <div className="flex items-center border border-divider rounded-full bg-surface overflow-hidden mr-2">
                             <button 
@@ -232,13 +286,19 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                 
                 <div className="flex justify-between text-sm text-text-secondary">
                   <span>Delivery Charges</span>
-                  <span className="text-success font-semibold">FREE</span>
+                  <span className="text-success font-semibold">{freeDeliveryLeft > 0 ? '—' : 'FREE'}</span>
                 </div>
-                
+
                 <div className="flex justify-between text-base font-extrabold text-text-primary border-t border-divider pt-3">
                   <span>Total Amount</span>
                   <span>₹{total}</span>
                 </div>
+
+                {(itemSavings + discount) > 0 && (
+                  <div className="flex items-center justify-center gap-1.5 rounded-lg bg-emerald-50 py-1.5 text-xs font-bold text-emerald-700">
+                    <PiggyBank size={13} /> You save ₹{Math.round(itemSavings + discount)} on this order
+                  </div>
+                )}
 
                 {addressError && (
                   <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold p-3 rounded-xl flex items-center gap-2">

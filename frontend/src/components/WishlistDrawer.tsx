@@ -1,13 +1,15 @@
 import React from 'react';
-import { useCartWishlist } from '../context/CartWishlistContext';
+import { useCartWishlist, getProductStockQuantity } from '../context/CartWishlistContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Heart, ShoppingCart, Trash2 } from 'lucide-react';
+import { X, Heart, ShoppingCart, Trash2, PiggyBank } from 'lucide-react';
 import { getProductImage } from '../utils/imageUtils';
 
 interface WishlistDrawerProps {
   isOpen: boolean;
   onClose: () => void;
 }
+
+const mrpOf = (p: any) => (p?.mrp || p?.originalPrice || p?.price || 0);
 
 export const WishlistDrawer: React.FC<WishlistDrawerProps> = ({ isOpen, onClose }) => {
   const { wishlist, toggleWishlist, addToCart } = useCartWishlist();
@@ -16,6 +18,13 @@ export const WishlistDrawer: React.FC<WishlistDrawerProps> = ({ isOpen, onClose 
     addToCart(product, 1, product.defaultWeight);
     toggleWishlist(product); // Remove from wishlist after moving to cart
   };
+
+  const inStock = (p: any) => getProductStockQuantity(p) > 0;
+  const handleMoveAll = () => {
+    [...wishlist].forEach((p) => { if (inStock(p)) handleMoveToCart(p); });
+  };
+  const totalValue = wishlist.reduce((s, p) => s + (p.price || 0), 0);
+  const totalSavings = wishlist.reduce((s, p) => s + Math.max(mrpOf(p) - (p.price || 0), 0), 0);
 
   return (
     <AnimatePresence>
@@ -40,9 +49,19 @@ export const WishlistDrawer: React.FC<WishlistDrawerProps> = ({ isOpen, onClose 
           >
             <div className="flex justify-between items-center pb-4 border-b border-divider mb-4">
               <h3 className="text-lg font-extrabold text-text-primary">My Wishlist ({wishlist.length})</h3>
-              <button onClick={onClose} className="text-text-secondary hover:text-primary transition-colors" aria-label="Close wishlist">
-                <X size={20} />
-              </button>
+              <div className="flex items-center gap-2">
+                {wishlist.length > 0 && (
+                  <button
+                    onClick={handleMoveAll}
+                    className="text-xs font-bold text-primary hover:underline"
+                  >
+                    Move all to cart
+                  </button>
+                )}
+                <button onClick={onClose} className="text-text-secondary hover:text-primary transition-colors" aria-label="Close wishlist">
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto flex flex-col gap-4">
@@ -62,21 +81,35 @@ export const WishlistDrawer: React.FC<WishlistDrawerProps> = ({ isOpen, onClose 
                     exit={{ opacity: 0, x: 50 }}
                   >
                     <img src={getProductImage(product)} alt={product.name} className="w-20 h-20 object-cover rounded-md border border-divider" />
-                    <div className="flex-1 flex flex-col">
+                    <div className="flex-1 flex flex-col min-w-0">
                       <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-0.5">{product.brand}</span>
-                      <h4 className="text-sm font-bold text-text-primary mb-1 line-clamp-1">{product.name}</h4>
-                      <span className="text-sm font-extrabold text-text-primary mb-2">₹{product.price}</span>
-                      
-                      <div className="flex items-center gap-2 mt-auto">
-                        <button 
+                      <h4 className="text-sm font-bold text-text-primary line-clamp-1">{product.name}</h4>
+                      <div className="flex items-center gap-2 mt-0.5 mb-1">
+                        <span className="text-sm font-extrabold text-text-primary">₹{product.price}</span>
+                        {mrpOf(product) > product.price && (
+                          <>
+                            <span className="text-[11px] text-text-secondary line-through">₹{mrpOf(product)}</span>
+                            <span className="text-[11px] font-bold text-emerald-600">
+                              {Math.round(((mrpOf(product) - product.price) / mrpOf(product)) * 100)}% off
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      <span className={`w-fit text-[10px] font-bold px-1.5 py-0.5 rounded ${inStock(product) ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'}`}>
+                        {inStock(product) ? 'In stock' : 'Out of stock'}
+                      </span>
+
+                      <div className="flex items-center gap-2 mt-auto pt-2">
+                        <button
                           onClick={() => handleMoveToCart(product)}
-                          className="flex items-center gap-1.5 bg-primary/10 text-primary border border-primary/20 px-3 py-1.5 rounded-full text-xs font-semibold hover:bg-primary hover:text-white transition-colors"
+                          disabled={!inStock(product)}
+                          className="flex items-center gap-1.5 bg-primary/10 text-primary border border-primary/20 px-3 py-1.5 rounded-full text-xs font-semibold hover:bg-primary hover:text-white transition-colors disabled:opacity-40 disabled:hover:bg-primary/10 disabled:hover:text-primary"
                         >
                           <ShoppingCart size={12} />
                           <span>Add to Cart</span>
                         </button>
-                        
-                        <button 
+
+                        <button
                           onClick={() => toggleWishlist(product)}
                           className="flex items-center justify-center p-2 rounded-full text-text-secondary hover:text-error hover:bg-error/10 transition-colors"
                           title="Remove item"
@@ -90,6 +123,17 @@ export const WishlistDrawer: React.FC<WishlistDrawerProps> = ({ isOpen, onClose 
                 ))
               )}
             </div>
+
+            {wishlist.length > 0 && (
+              <div className="border-t border-divider pt-3 mt-3 flex items-center justify-between text-xs">
+                <span className="font-semibold text-text-secondary">Total value ₹{Math.round(totalValue)}</span>
+                {totalSavings > 0 && (
+                  <span className="flex items-center gap-1 font-bold text-emerald-700">
+                    <PiggyBank size={12} /> Save ₹{Math.round(totalSavings)}
+                  </span>
+                )}
+              </div>
+            )}
           </motion.div>
         </>
       )}
