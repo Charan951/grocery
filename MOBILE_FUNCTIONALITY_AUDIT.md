@@ -28,7 +28,7 @@ Legend: **✓** Complete · **⚠** Partial · **✗** Missing · **🐛** Broke
 | Orders list | ✓ tabs (All/In Transit/Delivered/Cancelled) | ✓ same tabs (FW-6) | **✓ parity** | |
 | Order detail + timeline | ✓ | ✓ | ✓ | |
 | Order cancel (pre-dispatch, wallet refund) | ✓ | ✓ | ✓ | `POST /orders/:id/cancel`. |
-| Live order tracking (map, rider, ETA, call/WA) | ✓ `/track/:orderId` (Leaflet, 10s poll) | ⚠ `tracking_screen` — **schematic painter, not a real map**; call/WhatsApp wired | **⚠** | Backend `delivery` block (masked → revealed) consumed by both. |
+| Live order tracking (map, rider, ETA, route, call/WA) | ✓ `/track/:orderId` — Leaflet, **rider→drop OSRM road route** + straight-line fallback, gliding rider marker, follow-cam, store+drop markers, 10s poll | ✓ `tracking_screen` — **real map now** (`mapcn_flutter`/`flutter_map`, OSM tiles), rider+drop markers, **OSRM route polyline** + fallback, recenter-on-move, socket + 15s poll | **✓ parity (2026-09-01)** | Backend `delivery` block (masked → revealed) + `deliveryLocation`/`pickup` consumed by both. |
 | Invoice / credit note | 🐛 `alert()` stub | 🐛 `alert()` stub | **🐛 both** | `Invoice` model exists, no endpoint. |
 | Wallet | 🐛 hardcoded `₹0` in profile drawer | ✓ balance + history + **top-up** (FW-4) | **mobile ahead** | Web blocked on WEB-1. |
 | Address book | ✓ add / **edit** / delete / map / geocode | ⚠ add / delete only — **no edit, no set-default** | **⚠** | Backend has no edit/set-default route (parity gap on both). |
@@ -73,7 +73,7 @@ Legend: **✓** Complete · **⚠** Partial · **✗** Missing · **🐛** Broke
 | `/help` `/support` | `SupportScreen` | ⚠ | Socket chat only. No FAQ content, no `tel:` shortcut, no ticket history (`SupportTicket` model exists). |
 | `/stores` `/locations` | `StoresScreen` | ⚠ | Hardcoded list on both. Mobile adds Call + Directions. |
 | `/orders` `/account/orders` | `OrdersListScreen` (tab) | ✓ | Status tabs on both now (FW-6). |
-| `/track/:orderId` | `TrackingScreen` (`/tracking/:orderId`) | ⚠ | Web = real Leaflet map; mobile = schematic `CustomPainter`. Both: status stepper, ETA, call/WhatsApp, reveal-window gating. |
+| `/track/:orderId` | `TrackingScreen` (`/tracking/:orderId`) | ✓ | Both real maps with a live rider→drop route (OSRM). Status stepper, ETA, call/WhatsApp, reveal-window gating. |
 | `/profile` `/account/profile` | `ProfileScreen` (tab) + `/account/edit` | ✓ | |
 | — | `/wishlist` | ✓ | Web wishlist is a header drawer; mobile has a full screen. Parity+. |
 | — | `/wallet` | ✓ (mobile ahead) | Real balance + history + top-up. Web drawer shows fake `₹0`. |
@@ -214,7 +214,7 @@ Mobile endpoints in use: `/customers/otp/{send,verify}`, `/customers/me` (GET/PU
 | List with status tabs (All / In Transit / Delivered / Cancelled) | ✓ | ✓ (FW-6) | ✓ |
 | Detail: items, totals, address, payment | ✓ | ✓ | ✓ |
 | Status timeline | ✓ | ✓ | ✓ |
-| Live tracking link | ✓ `/track/:id` | ✓ `/tracking/:id` | ⚠ mobile map is schematic |
+| Live tracking link | ✓ `/track/:id` | ✓ `/tracking/:id` | ✓ real map both |
 | Active-order banner on Home | ✓ (FW-6) | ✓ (FW-6) | ✓ |
 | Reorder | ✓ | ✓ | ✓ |
 | Cancel (pre-dispatch) + wallet refund | ✓ | ✓ | ✓ |
@@ -300,7 +300,7 @@ expected, they are a **net-new product decision**, not a mobile parity gap.
 | Checkout | ✓ processing overlay w/ stage | n/a | ✓ inline + toast | ✓ → `/order-placed` | ✓ |
 | Orders list | ✓ skeleton | ✓ per-tab | ✓ retry | — | ✓ |
 | Order detail | ✓ | n/a | ✓ | ✓ (cancel toast) | ✓ |
-| Tracking | ✓ | n/a | ✓ | — | ⚠ "Reconnecting" pill; schematic map |
+| Tracking | ✓ | n/a | ✓ | — | ✓ real map + route; "Reconnecting" pill on socket drop |
 | Wallet | ✓ skeleton | ✓ no-txns | ✓ retry | ✓ (top-up toast) | ✓ |
 | Addresses | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Notifications | ✓ skeleton | ✓ | ✓ retry | — | ✓ |
@@ -342,7 +342,7 @@ search empty state.
 
 **P0 — real functional gaps**
 1. **🐛 Invoice / receipt** is an `alert()` stub on **both** platforms. `Invoice` model exists; no endpoint. (FW-6)
-2. **✗ Live tracking map is schematic** on mobile (`CustomPainter`), not a real map. Web has real Leaflet. (FW-6 / P1-D3)
+2. ~~Live tracking map schematic on mobile~~ — **done 2026-09-01**: real `mapcn_flutter` map + OSRM rider→drop route on mobile; web gained the same route line + gliding marker + follow-cam.
 3. **✗ Product listing has no pagination / infinite scroll** on mobile; backend supports `page`/`limit` (FW-5). Large categories load everything.
 4. **✗ Address edit + set-default** missing on mobile (and no backend route — parity gap both).
 

@@ -118,6 +118,25 @@
 
 ## 5. Completed Major Work
 
+- **2026-09-01 — Live delivery tracking = real map + Zepto-style route (web + mobile).**
+  Backend unchanged (`getOrder` already returns `delivery.location` masked→revealed
+  + `deliveryLocation` + `pickup`). **Mobile** `tracking_screen`: deleted the
+  schematic `TrackingMapPainter`; new `_LiveMap` uses **`mapcn_flutter`**
+  (`flutter_map` under it) with OSM tiles, a pulsing rider marker + drop marker,
+  and a **rider→drop route polyline**. `TrackingNotifier` gained `destination`
+  /`storeLocation`/`routePoints`; `_maybeRefreshRoute()` calls **OSRM**
+  (`router.project-osrm.org`, free) for a road-following path (debounced: rider
+  moved >45 m + 8 s cool-off), **straight-line `[rider,drop]` fallback** on any
+  failure; recenters via `MapcnController.flyTo(midpoint, zoomByDistance)`.
+  "Waiting for the partner to head out…" overlay until `hasRider`. **Web**
+  `TrackOrder.tsx`: added the OSRM route polyline (same fallback), a **gliding
+  rider marker** (rAF tween ~1.2 s between polls), a store (pickup) marker, and
+  follow-cam (first-fit, then recenters only if the rider drifts out of view and
+  the user hasn't panned). Orders entry points already in place both sides
+  (list "Track", detail "Track this order", Home active-order banner). Verified:
+  mobile `flutter analyze` clean + `flutter test` 117 + debug APK; web `vite
+  build` clean.
+
 - **2026-09-01 — Mobile bug fixes + location-permission-after-login.**
   - **🐛 INTERNET permission** was only in `mobileapp/android/app/src/debug/
     AndroidManifest.xml` → **release/profile builds had no network at all**
@@ -1260,6 +1279,8 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
 - Frontend: no automated tests; admin `fetchReviews` change not yet run in a browser.
 
 ## 13. Last Updated
+
+2026-09-01 — Live delivery tracking: real map + OSRM rider→drop route on BOTH clients. Mobile tracking_screen swapped the schematic painter for mapcn_flutter (OSM tiles, rider+drop markers, route polyline); TrackingNotifier fetches an OSRM road path (straight-line fallback) + recenters. Web TrackOrder gained the route polyline, a gliding rider marker (rAF tween), a store marker, follow-cam. flutter test 117 + APK; vite build clean.
 
 2026-09-01 — Mobile fixes: (1) INTERNET permission was debug-manifest-only → added to main AndroidManifest (release builds had no network → API + product images failed). (2) New LocationPermissionService + post-login location-permission flow (rationale sheet, open-settings for deniedForever, GPS-off dialog, in-screen banner); AuthNotifier.refreshLocationPermission wired after verifyOtp/hydrate; otp_screen + splash route to /location_select until granted. mobile analyze/117 tests/debug APK all green.
 

@@ -50,6 +50,23 @@ const haversineKm = (a: { lat: number; lng: number }, b: { lat: number; lng: num
   return 2 * R * Math.asin(Math.sqrt(s));
 };
 
+/** Road-following path via OSRM's public server; straight line on failure. */
+async function fetchRoute(
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number },
+): Promise<[number, number][]> {
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=full&geometries=geojson`;
+    const r = await fetch(url);
+    const j = await r.json();
+    const coords: [number, number][] = j?.routes?.[0]?.geometry?.coordinates;
+    if (coords?.length >= 2) return coords.map(([lng, lat]) => [lat, lng]);
+  } catch {
+    /* fall through */
+  }
+  return [[a.lat, a.lng], [b.lat, b.lng]];
+}
+
 export const TrackOrder: React.FC = () => {
   const { orderId = '' } = useParams();
   const [order, setOrder] = useState<TrackedOrder | null>(null);
@@ -60,7 +77,12 @@ export const TrackOrder: React.FC = () => {
   const mapRef = useRef<L.Map | null>(null);
   const riderMk = useRef<L.Marker | null>(null);
   const destMk = useRef<L.Marker | null>(null);
+  const pickupMk = useRef<L.Marker | null>(null);
+  const routeLine = useRef<L.Polyline | null>(null);
   const fitted = useRef(false);
+  const userMoved = useRef(false);
+  const lastRouteFrom = useRef<{ lat: number; lng: number } | null>(null);
+  const animRef = useRef<number | null>(null);
 
   const fetchOrder = async () => {
     try {
@@ -83,6 +105,7 @@ export const TrackOrder: React.FC = () => {
   const terminal = order ? ['Delivered', 'Cancelled', 'Returned', 'Refunded', 'Failed'].includes(order.status) : false;
   const rider = order?.delivery?.location || null;
   const dest = order?.deliveryLocation || null;
+  const pickup = order?.pickup || null;
 
   const etaMins = useMemo(() => {
     if (!rider || !dest) return null;
@@ -95,34 +118,79 @@ export const TrackOrder: React.FC = () => {
     if (!elRef.current || mapRef.current) return;
     const map = L.map(elRef.current, { zoomControl: true, attributionControl: false }).setView([17.4474, 78.3762], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+    map.on('dragstart', () => { userMoved.current = true; });
     mapRef.current = map;
-    return () => { map.remove(); mapRef.current = null; riderMk.current = null; destMk.current = null; };
+    return () => {
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+      map.remove();
+      mapRef.current = null;
+      riderMk.current = destMk.current = pickupMk.current = null;
+      routeLine.current = null;
+    };
   }, []);
 
-  // markers
+  // markers + route + follow
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
+
     if (dest) {
       if (destMk.current) destMk.current.setLatLng([dest.lat, dest.lng]);
       else destMk.current = L.marker([dest.lat, dest.lng], { icon: dot('#EF4444') }).addTo(map).bindPopup('Delivery address');
     }
+    if (pickup) {
+      if (pickupMk.current) pickupMk.current.setLatLng([pickup.lat, pickup.lng]);
+      else pickupMk.current = L.marker([pickup.lat, pickup.lng], { icon: dot('#6B7280') }).addTo(map).bindPopup('Store');
+    }
+
     if (rider) {
-      if (riderMk.current) riderMk.current.setLatLng([rider.lat, rider.lng]);
-      else riderMk.current = L.marker([rider.lat, rider.lng], { icon: dot('#2E7D32') }).addTo(map).bindPopup('Your delivery partner');
+      if (!riderMk.current) {
+        riderMk.current = L.marker([rider.lat, rider.lng], { icon: dot('#2E7D32'), zIndexOffset: 1000 }).addTo(map).bindPopup('Your delivery partner');
+      } else {
+        // glide from the old position to the new one (~1.2s)
+        const from = riderMk.current.getLatLng();
+        const to = L.latLng(rider.lat, rider.lng);
+        if (animRef.current) cancelAnimationFrame(animRef.current);
+        const t0 = performance.now();
+        const step = (now: number) => {
+          const k = Math.min((now - t0) / 1200, 1);
+          riderMk.current?.setLatLng([from.lat + (to.lat - from.lat) * k, from.lng + (to.lng - from.lng) * k]);
+          if (k < 1) animRef.current = requestAnimationFrame(step);
+        };
+        animRef.current = requestAnimationFrame(step);
+      }
     } else if (riderMk.current) {
       riderMk.current.remove();
       riderMk.current = null;
     }
+
+    // (re)compute the road route when the rider has moved enough
+    if (rider && dest) {
+      const moved = !lastRouteFrom.current || haversineKm(lastRouteFrom.current, rider) * 1000 > 40;
+      if (moved) {
+        lastRouteFrom.current = rider;
+        fetchRoute(rider, dest).then((coords) => {
+          const m = mapRef.current;
+          if (!m) return;
+          if (routeLine.current) routeLine.current.setLatLngs(coords);
+          else routeLine.current = L.polyline(coords, { color: '#2E7D32', weight: 4, opacity: 0.85 }).addTo(m);
+        });
+      }
+    }
+
+    // fit once, then only follow the rider if it drifts out of view
     const pts: [number, number][] = [];
     if (rider) pts.push([rider.lat, rider.lng]);
     if (dest) pts.push([dest.lat, dest.lng]);
     if (pts.length && !fitted.current) {
       fitted.current = true;
       if (pts.length === 1) map.setView(pts[0], 15);
-      else map.fitBounds(L.latLngBounds(pts), { padding: [50, 50], maxZoom: 16 });
+      else map.fitBounds(L.latLngBounds(pts), { padding: [55, 55], maxZoom: 16 });
+    } else if (rider && !userMoved.current && !map.getBounds().pad(-0.15).contains([rider.lat, rider.lng])) {
+      if (dest) map.fitBounds(L.latLngBounds([[rider.lat, rider.lng], [dest.lat, dest.lng]]), { padding: [55, 55], maxZoom: 16 });
+      else map.panTo([rider.lat, rider.lng]);
     }
-  }, [rider, dest]);
+  }, [rider, dest, pickup]);
 
   const curStep = order ? stepIndex(order.status) : 0;
 

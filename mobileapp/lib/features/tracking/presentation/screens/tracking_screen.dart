@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:mapcn_flutter/mapcn_flutter.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
 import 'package:freshcart/core/widgets/app_scaffold.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
@@ -78,13 +80,24 @@ class TrackingScreen extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(24),
                   child: Stack(
                     children: [
-                      CustomPaint(
-                        painter: TrackingMapPainter(
-                          isDark: isDark,
-                          status: bucket,
+                      _LiveMap(t: t, isDark: isDark),
+                      if (!t.hasRider)
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: Container(
+                              color: (isDark ? Colors.black : Colors.white).withValues(alpha: 0.35),
+                              alignment: Alignment.center,
+                              child: Text(
+                                bucket == OrderStatus.delivered
+                                    ? 'Delivered'
+                                    : 'Waiting for the partner to head out…',
+                                style: AppTypography.labelMedium(
+                                  isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
-                        child: Container(),
-                      ),
                       Positioned(
                         top: 20,
                         left: 20,
@@ -330,108 +343,96 @@ class TrackingScreen extends ConsumerWidget {
   }
 }
 
-class TrackingMapPainter extends CustomPainter {
-  final bool isDark;
-  final OrderStatus status;
 
-  TrackingMapPainter({
-    required this.isDark,
-    required this.status,
-  });
+/// Real map: OSM tiles + rider marker + drop marker + rider→drop route (OSRM,
+/// straight-line fallback). Recenters as the rider moves.
+class _LiveMap extends ConsumerStatefulWidget {
+  final TrackingState t;
+  final bool isDark;
+  const _LiveMap({required this.t, required this.isDark});
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final linePaint = Paint()
-      ..color = isDark ? const Color(0xFF2C2C2E) : const Color(0xFFECECEC)
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke;
+  ConsumerState<_LiveMap> createState() => _LiveMapState();
+}
 
-    canvas.drawLine(const Offset(30, 0), Offset(30, size.height), linePaint);
-    canvas.drawLine(Offset(size.width - 40, 0), Offset(size.width - 40, size.height), linePaint);
-    canvas.drawLine(const Offset(0, 100), Offset(size.width, 100), linePaint);
-    canvas.drawLine(Offset(0, size.height - 80), Offset(size.width, size.height - 80), linePaint);
+class _LiveMapState extends ConsumerState<_LiveMap> with TickerProviderStateMixin {
+  late final MapcnController _map = MapcnController(vsync: this);
 
-    final startPt = Offset(50, size.height - 120);
-    final endPt = Offset(size.width - 80, 80);
+  LatLng get _dest => widget.t.destination ?? const LatLng(17.4474, 78.3762);
+  LatLng get _focus {
+    final t = widget.t;
+    if (!t.hasRider) return _dest;
+    return LatLng(
+      (t.riderLocation.latitude + _dest.latitude) / 2,
+      (t.riderLocation.longitude + _dest.longitude) / 2,
+    );
+  }
 
-    final routePaint = Paint()
-      ..color = AppColors.primary.withOpacity(0.3)
-      ..strokeWidth = 4.0
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
+  double _zoomFor(double metres) {
+    if (metres < 500) return 15.5;
+    if (metres < 1500) return 14.5;
+    if (metres < 4000) return 13.5;
+    if (metres < 10000) return 12.5;
+    return 11.5;
+  }
 
-    final path = Path();
-    path.moveTo(startPt.dx, startPt.dy);
-    path.lineTo(startPt.dx, endPt.dy);
-    path.lineTo(endPt.dx, endPt.dy);
-    canvas.drawPath(path, routePaint);
-
-    final activeRoutePaint = Paint()
-      ..color = AppColors.primary
-      ..strokeWidth = 4.0
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-
-    double progress = 0.05;
-    if (status == OrderStatus.processing) progress = 0.3;
-    if (status == OrderStatus.dispatched) progress = 0.65;
-    if (status == OrderStatus.delivered) progress = 1.0;
-
-    final totalX = endPt.dx - startPt.dx;
-    final totalY = startPt.dy - endPt.dy;
-    final cornerProgress = totalY / (totalX + totalY);
-
-    Offset riderPos;
-    if (progress <= cornerProgress) {
-      final subProg = progress / cornerProgress;
-      riderPos = Offset(startPt.dx, startPt.dy - (totalY * subProg));
-    } else {
-      final subProg = (progress - cornerProgress) / (1.0 - cornerProgress);
-      riderPos = Offset(startPt.dx + (totalX * subProg), endPt.dy);
-    }
-
-    final activePath = Path();
-    activePath.moveTo(startPt.dx, startPt.dy);
-    if (progress <= cornerProgress) {
-      activePath.lineTo(riderPos.dx, riderPos.dy);
-    } else {
-      activePath.lineTo(startPt.dx, endPt.dy);
-      activePath.lineTo(riderPos.dx, riderPos.dy);
-    }
-    canvas.drawPath(activePath, activeRoutePaint);
-
-    final storePaint = Paint()
-      ..color = isDark ? Colors.white30 : Colors.black26
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(startPt, 8, storePaint);
-
-    final storePoint = Paint()
-      ..color = AppColors.accent
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(startPt, 5, storePoint);
-
-    canvas.drawCircle(endPt, 12, storePaint);
-    final homePoint = Paint()
-      ..color = AppColors.primary
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(endPt, 8, homePoint);
-
-    final riderBg = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-    final shadowPaint = Paint()
-      ..color = Colors.black.withOpacity(0.15)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
-
-    canvas.drawCircle(riderPos + const Offset(0, 3), 14, shadowPaint);
-    canvas.drawCircle(riderPos, 14, riderBg);
-
-    final riderPoint = Paint()
-      ..color = AppColors.primary
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(riderPos, 10, riderPoint);
+  void _recenter() {
+    final t = widget.t;
+    final spread = t.hasRider
+        ? const Distance()(t.riderLocation, _dest)
+        : 2000.0;
+    _map.flyTo(_focus, zoom: _zoomFor(spread));
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _recenter());
+  }
+
+  @override
+  void didUpdateWidget(covariant _LiveMap old) {
+    super.didUpdateWidget(old);
+    if (old.t.riderLocation != widget.t.riderLocation ||
+        old.t.destination != widget.t.destination) {
+      _recenter();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = widget.t;
+    final points = <LatLng>[
+      if (t.hasRider) t.riderLocation,
+      _dest,
+    ];
+    final routePts = t.routePoints.length >= 2
+        ? t.routePoints
+        : (t.hasRider ? <LatLng>[t.riderLocation, _dest] : const <LatLng>[]);
+
+    return Mapcn(
+      controller: _map,
+      initialCenter: _focus,
+      initialZoom: 14,
+      style: widget.isDark ? MapcnStyle.dark : MapcnStyle.normal,
+      accentColor: AppColors.primary,
+      markerConfig: const MarkerConfig(style: MarkerStyle.pulse),
+      points: points,
+      routes: routePts.length >= 2
+          ? [
+              MapcnRoute(
+                points: routePts,
+                config: const RouteConfig(
+                  color: AppColors.primary,
+                  width: 4,
+                  style: RouteStyle.solid,
+                  showGlow: true,
+                  glowIntensity: 0.5,
+                ),
+              ),
+            ]
+          : const [],
+      showAttribution: false,
+    );
+  }
 }

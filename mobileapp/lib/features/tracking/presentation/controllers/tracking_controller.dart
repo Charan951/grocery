@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:freshcart/core/di/injection.dart';
@@ -21,6 +22,14 @@ class TrackingState {
   final bool connected;
   final List<OrderTimelineEntry> timeline;
 
+  /// Customer drop point and the store the order leaves from (for the map).
+  final LatLng? destination;
+  final LatLng? storeLocation;
+
+  /// Road-following path rider → drop (OSRM). Falls back to a straight [rider,
+  /// destination] line when routing is unavailable.
+  final List<LatLng> routePoints;
+
   const TrackingState({
     required this.orderId,
     required this.status,
@@ -34,6 +43,9 @@ class TrackingState {
     this.hasRider = false,
     this.connected = false,
     this.timeline = const [],
+    this.destination,
+    this.storeLocation,
+    this.routePoints = const [],
   });
 
   TrackingState copyWith({
@@ -48,6 +60,9 @@ class TrackingState {
     bool? hasRider,
     bool? connected,
     List<OrderTimelineEntry>? timeline,
+    LatLng? destination,
+    LatLng? storeLocation,
+    List<LatLng>? routePoints,
   }) {
     return TrackingState(
       orderId: orderId,
@@ -62,6 +77,9 @@ class TrackingState {
       hasRider: hasRider ?? this.hasRider,
       connected: connected ?? this.connected,
       timeline: timeline ?? this.timeline,
+      destination: destination ?? this.destination,
+      storeLocation: storeLocation ?? this.storeLocation,
+      routePoints: routePoints ?? this.routePoints,
     );
   }
 }
@@ -73,6 +91,15 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
 
   final _subs = <StreamSubscription>[];
   Timer? _poll;
+
+  final _routeDio = Dio(BaseOptions(
+    connectTimeout: const Duration(seconds: 6),
+    receiveTimeout: const Duration(seconds: 6),
+  ));
+  LatLng? _lastRouteFrom;
+  DateTime _lastRouteAt = DateTime.fromMillisecondsSinceEpoch(0);
+  bool _routing = false;
+  static const _dist = Distance();
 
   TrackingNotifier(this._api, this._socket, this.orderId)
       : super(TrackingState(
@@ -120,6 +147,7 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
         riderName: (d['riderName'] as String?) ?? state.riderName,
         riderPhone: (d['riderPhone'] as String?) ?? state.riderPhone,
       );
+      _maybeRefreshRoute();
     }));
 
     // Fallback: while the socket is down, poll the order every 15s.
@@ -137,6 +165,11 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
         statusBucket: o.status,
         etaMinutes: _minsFrom(o.eta) ?? state.etaMinutes,
         timeline: o.timeline.isNotEmpty ? o.timeline : state.timeline,
+      );
+
+      state = state.copyWith(
+        destination: _latLngFrom(raw['deliveryLocation']) ?? state.destination,
+        storeLocation: _latLngFrom(raw['pickup']) ?? state.storeLocation,
       );
 
       // Server-side rider block (masked until Out For Delivery / Arrived).
@@ -157,9 +190,50 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
               : state.riderLocation,
         );
       }
+      _maybeRefreshRoute();
     } catch (_) {
       // keep last-known state
     }
+  }
+
+  LatLng? _latLngFrom(dynamic v) {
+    if (v is Map && v['lat'] is num && v['lng'] is num) {
+      return LatLng((v['lat'] as num).toDouble(), (v['lng'] as num).toDouble());
+    }
+    return null;
+  }
+
+  /// Re-fetch the rider → drop road path when the rider has moved enough
+  /// (and not more than once every ~8s). Straight line if OSRM is unreachable.
+  Future<void> _maybeRefreshRoute() async {
+    final from = state.hasRider ? state.riderLocation : null;
+    final to = state.destination;
+    if (from == null || to == null || _routing) return;
+
+    final movedFar = _lastRouteFrom == null || _dist(_lastRouteFrom!, from) > 45;
+    final coolOff = DateTime.now().difference(_lastRouteAt) > const Duration(seconds: 8);
+    if (!(movedFar && coolOff)) return;
+
+    _routing = true;
+    _lastRouteFrom = from;
+    _lastRouteAt = DateTime.now();
+    List<LatLng> path = [from, to]; // straight-line fallback
+    try {
+      final res = await _routeDio.get(
+        'https://router.project-osrm.org/route/v1/driving/'
+        '${from.longitude},${from.latitude};${to.longitude},${to.latitude}',
+        queryParameters: {'overview': 'full', 'geometries': 'geojson'},
+      );
+      final coords = (((res.data['routes'] as List?)?.first
+              as Map?)?['geometry'] as Map?)?['coordinates'] as List?;
+      if (coords != null && coords.length >= 2) {
+        path = coords
+            .map((c) => LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()))
+            .toList();
+      }
+    } catch (_) {/* keep straight line */}
+    _routing = false;
+    if (mounted) state = state.copyWith(routePoints: path);
   }
 
   int? _minsFrom(dynamic v) {
