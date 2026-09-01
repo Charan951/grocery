@@ -55,6 +55,7 @@ class AuthController extends StateNotifier<AuthState> {
         final me = await _ref.read(apiProvider).me();
         state = state.copyWith(isAuthenticated: true, isHydrating: false, profile: me);
         _ref.read(socketProvider).connect(_ref.read(tokenStoreProvider).token!);
+        _ref.read(pushServiceProvider).registerCurrentToken();
       } on ApiException catch (e) {
         if (e.isUnauthorized) {
           await _ref.read(tokenStoreProvider).clear();
@@ -75,6 +76,7 @@ class AuthController extends StateNotifier<AuthState> {
       await _ref.read(tokenStoreProvider).save(token);
       final me = await _ref.read(apiProvider).me();
       _ref.read(socketProvider).connect(token);
+      _ref.read(pushServiceProvider).registerCurrentToken();
       state = state.copyWith(isLoading: false, isAuthenticated: true, isHydrating: false, profile: me);
       return true;
     } on ApiException catch (e) {
@@ -92,6 +94,7 @@ class AuthController extends StateNotifier<AuthState> {
   void setProfile(PartnerProfile p) => state = state.copyWith(profile: p);
 
   Future<void> logout() async {
+    await _ref.read(pushServiceProvider).unregister();
     await _ref.read(tokenStoreProvider).clear();
     _ref.read(socketProvider).disconnect();
     state = const AuthState();

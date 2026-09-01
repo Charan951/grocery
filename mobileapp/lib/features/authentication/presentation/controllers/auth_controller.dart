@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freshcart/core/di/injection.dart';
 import 'package:freshcart/core/error/api_exception.dart';
 import 'package:freshcart/core/services/api_service.dart';
+import 'package:freshcart/core/services/push_service.dart';
 import 'package:freshcart/core/services/storage_service.dart';
 import 'package:freshcart/core/services/token_store.dart';
 
@@ -149,6 +150,9 @@ class AuthState {
   }
 }
 
+/// The push service is optional in tests (getIt may not have it registered).
+PushService? get _push => getIt.isRegistered<PushService>() ? getIt<PushService>() : null;
+
 class AuthNotifier extends StateNotifier<AuthState> {
   final StorageService _storage;
   final ApiService _api;
@@ -183,6 +187,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           isHydrating: false,
           user: UserProfile.fromCustomerJson(customer),
         );
+        _push?.registerCurrentToken();
       } on ApiException catch (e) {
         if (e.isUnauthorized) {
           await _tokenStore.clear();
@@ -245,6 +250,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         isHydrating: false,
         user: UserProfile.fromCustomerJson(customer),
       );
+      _push?.registerCurrentToken();
       return true;
     } on ApiException catch (e) {
       state = state.copyWith(isLoading: false, error: e.message);
@@ -329,7 +335,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(user: u.copyWith(walletBalance: balance));
   }
 
+  /// Permanently deletes the signed-in customer's account server-side, then
+  /// clears the local session (same teardown as [logout]). Throws [ApiException]
+  /// if the server call fails — the local session is left intact so the user can
+  /// retry.
+  Future<void> deleteAccount() async {
+    await _api.deleteAccount();
+    await logout();
+  }
+
   Future<void> logout() async {
+    try {
+      await _push?.unregister();
+    } catch (_) {/* best effort */}
     await _tokenStore.clear();
     // Clear per-user local caches so the next sign-in starts clean. Never let a
     // storage hiccup block the logout itself.

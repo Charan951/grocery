@@ -185,4 +185,20 @@ class ApiClient {
       _rethrow(e);
     }
   }
+
+  Future<void> registerDevice(String token, {String platform = 'android'}) async {
+    try {
+      await _dio.post('/delivery/devices', data: {'token': token, 'platform': platform});
+    } on DioException catch (e) {
+      _rethrow(e);
+    }
+  }
+
+  Future<void> removeDevice(String token) async {
+    try {
+      await _dio.delete('/delivery/devices/${Uri.encodeComponent(token)}');
+    } on DioException catch (e) {
+      _rethrow(e);
+    }
+  }
 }

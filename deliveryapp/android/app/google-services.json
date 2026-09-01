@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "1014188060345",
+    "project_id": "grocery-76b84",
+    "storage_bucket": "grocery-76b84.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1014188060345:android:4c2931cf4ce40dc9b77568",
+        "android_client_info": {
+          "package_name": "com.freshcart.app.freshcart"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCvnhc6V6_-O8MScMALYgmukaV66DAtz_s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1014188060345:android:a7e46dfa99818274b77568",
+        "android_client_info": {
+          "package_name": "com.freshcart.freshcart_delivery"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCvnhc6V6_-O8MScMALYgmukaV66DAtz_s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

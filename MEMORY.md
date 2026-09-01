@@ -118,6 +118,80 @@
 
 ## 5. Completed Major Work
 
+- **2026-09-01 — Delivery P1-D4 CLIENT DONE** (FCM offer push end-to-end).
+  Firebase project **`grocery-76b84`** (sender `1014188060345`). Backend:
+  `FIREBASE_SERVICE_ACCOUNT` (base64) now set in `backend/.env` (git-ignored) →
+  `isPushConfigured()` true; unset elsewhere = silent no-op. Both Flutter apps:
+  `firebase_core ^3.6` + `firebase_messaging ^15.1`;
+  `android/app/google-services.json` + `ios/Runner/GoogleService-Info.plist`
+  (committed — client config, not secret); `com.google.gms.google-services`
+  `4.4.2` plugin in `android/settings.gradle.kts` + `android/app/build.gradle.kts`;
+  hand-written `lib/firebase_options.dart` (android/ios). New `PushService`
+  (deliveryapp `core/services/`, mobileapp `core/services/` + registered in
+  `injection.dart` as a getIt lazy singleton; auth_controller calls it via a
+  null-safe `_push` getter so tests without getIt still pass): `init()` asks
+  permission, gets token, listens `onTokenRefresh`/`onMessageOpenedApp`/
+  `getInitialMessage`; token POSTed to `/delivery/devices` or
+  `/customers/me/devices` after login + hydrate, DELETEd on logout. `main()`
+  inits Firebase + `onBackgroundMessage` handler, all wrapped so a broken
+  Firebase build still runs. deliveryapp app IDs: android
+  `1:1014188060345:android:a7e46dfa99818274b77568`, ios `...:ios:f2791f6df9a239efb77568`,
+  bundle `com.freshcart.freshcartDelivery`; mobileapp: android
+  `...:android:4c2931cf4ce40dc9b77568`, ios `...:ios:5673da4a42a58639b77568`,
+  pkg `com.freshcart.app.freshcart`. Verified: backend `npm test` 41;
+  deliveryapp analyze clean + 6 tests + debug APK; mobileapp analyze clean +
+  117 tests + debug APK. Note: a broken/empty `firebase_core-3.15.2` pub-cache
+  dir had to be deleted + re-fetched once.
+  Next: **P2** (earnings / ratings / zones / batching / analytics / bg location).
+
+
+- **2026-09-01 — Email: delivery-partner credentials via SMTP.**
+  `nodemailer` (Gmail SMTP, App Password). New `src/services/mailService.js` —
+  lazy transport, silent no-op when `EMAIL_USER`/`EMAIL_APP_PASSWORD` unset,
+  `MAIL_TEST_MODE=true` captures to an in-memory `outbox` (tests). Exports
+  `sendMail`, `sendDeliveryCredentials({to,name,email,password,mode:'created'|'reset'})`,
+  `isMailConfigured`. Hooks: `apiController.createEmployee` — when `role==='Delivery'`
+  and an email is set, emails the login credentials after `User.create`
+  (non-blocking; also now persists `phone`); `adminDeliveryController.resetPartnerPassword`
+  — emails the new password (`mode:'reset'`). Admin `Modules.tsx` add-partner
+  shows "credentials were emailed to …". Env in `backend/.env` (gitignored):
+  `EMAIL_USER`, `EMAIL_APP_PASSWORD` (spaces stripped), `EMAIL_FROM`,
+  `DELIVERY_APP_LOGIN_URL`, `MAIL_TEST_MODE`; keys documented in `.env.example`.
+  Verified: `transporter.verify()` OK, a real `sendDeliveryCredentials` send
+  returned a messageId, `npm test` 41/41 (mail test-mode outbox asserts).
+
+- **2026-09-01 — FUTURE_WORK FW-1 (mostly) DONE** (offline resilience + app config).
+  Backend: `Settings.appConfig` sub-doc + public `GET /api/app/config` →
+  `{minSupportedVersion, latestVersion, maintenance, maintenanceMessage, updateUrl,
+  supportEmail, supportPhone}`; DB-down middleware returns a permissive default.
+  Mobile: added `connectivity_plus` ^5.0.2 + `package_info_plus` ^9.0.1.
+  `core/services/connectivity.dart` (`connectivityProvider` bool stream),
+  `core/services/app_config.dart` (`appConfigProvider` tolerant→permissive on
+  error, `isVersionBelow` semver cmp, `appVersionProvider`, `appGateProvider` →
+  ok/maintenance/forceUpdate). `core/widgets/connectivity_banner.dart` mounted via
+  `MaterialApp.router` `builder` — offline strip + "Back online" flash.
+  `features/app_gate/.../app_gate_screens.dart` (`MaintenanceScreen`,
+  `ForceUpdateScreen`, both retry-able) + routes `/maintenance` `/force_update`
+  (in `_publicRoutes`). Splash `_navigateToNext` resolves `appGateProvider` in
+  parallel with hydration and redirects. Remaining: per-request
+  retry-with-backoff. Tests: `app_config_test` (7). `npm test` 39/39,
+  `flutter test` 117/117, APK built.
+
+- **2026-09-01 — FUTURE_WORK FW-2 DONE** (self-service account deletion).
+  Backend: new `DELETE /api/customers/me` (`attachCustomerOptional` — app token
+  OR `?phone=` for the token-less web). `customerController.deleteMe` cascades:
+  `Customer.deleteOne` + `Review.deleteMany` + `WalletTransaction.deleteMany` by
+  `customerId`, and `Order.updateMany` sets `customerName:'Deleted user'` (orders
+  kept as records). Legacy `DELETE /api/customers/:id` changed from an OPEN route
+  to `protect, authorize('Admin','Manager')`. Mobile: `ApiService.deleteAccount`
+  → `DELETE /customers/me`; `AuthNotifier.deleteAccount()` (API then `logout()`;
+  keeps the session if the call throws); "Delete account" TextButton under Log
+  out on `profile_screen.dart` (confirm modal → `/login`). Web:
+  `CustomerProfile.tsx` `handleDeleteAccount` → `DELETE /api/customers/me?phone=`.
+  Tests: backend cascade + `me` 401-after-delete + legacy-route-now-401
+  (`npm test` 38/38); mobile `deleteAccount` success + keep-session-on-failure
+  (`flutter test` 110/110). Frontend build clean, debug APK built.
+
 - **2026-09-01 — Delivery P1-D5 DONE** (partner notifications inbox + audit).
   Backend: `GET /api/delivery/notifications?unreadOnly=1&limit=` → `{unread,
   notifications}`, `POST /api/delivery/notifications/read {ids?}` (omit = all);
@@ -175,6 +249,25 @@
   tests**, frontend `vite build` clean, mobile `flutter analyze` clean +
   `flutter test` **103**.
   Next: **P1-D4** — FCM push for delivery offers (shared with mobile P1-3).
+
+- **2026-09-01 — Mobile audit fix Group 2 (Missing core) — CLOSED (order cancel + wallet history + product reviews).**
+  **Product reviews:** `GET /api/products/:id/reviews` (public — Approved reviews
+  + `summary{average,count,distribution}`) and `POST /api/products/:id/reviews`
+  (`attachCustomerOptional` — app token OR `{ phone }`). Write gate: the customer
+  must have a `Delivered` order containing the product; one review per
+  customer+product (a repeat POST edits it); new/edited reviews are `Pending`
+  (existing staff moderation via `PUT /reviews/:id/status`). `updateReviewStatus`
+  + `deleteReview` now call `recomputeProductRating(productId)` →
+  `Product.rating`/`reviewsCount` from Approved reviews. Mobile:
+  `ApiService.fetchProductReviews`/`submitProductReview`,
+  `reviews_controller.dart` (`productReviewsProvider` + models),
+  `product_reviews_section.dart` (`ProductReviewsSection` on the PDP: summary +
+  list + `AppBottomSheet` star/comment form; 403 → "after receiving it" inline).
+  Web: `components/ProductReviews.tsx` mounted in **both** PDP layouts
+  (`block md:hidden` + `hidden md:block`) in `ProductDetails.tsx`; posts
+  `{ phone, rating, comment }`, write form gated on `localStorage.customer_user`.
+  Verified: backend `npm test` 36/36, `flutter test` 108/108 (+`product_reviews_test`),
+  `flutter analyze` clean, frontend `tsc -b && vite build` clean, debug APK built.
 
 - **2026-09-01 — Mobile audit fix Group 2 (Missing core) — order cancel + wallet history DONE.**
   Backend (`apiController` + `routes/api.js`): `POST /api/orders/:id/cancel`
@@ -987,6 +1080,14 @@ Repo hygiene:
   them configurable.
 - Third-party: Cloudinary (images), OSM Nominatim (geocoding, used directly by
   both clients), Razorpay (payments, simulated), Firebase (dep only, no code).
+- **Email** — `nodemailer` via Gmail SMTP (`src/services/mailService.js`).
+  Credentials in `backend/.env` (`EMAIL_USER`/`EMAIL_APP_PASSWORD` App Password /
+  `EMAIL_FROM`). Silent no-op if unset; `MAIL_TEST_MODE=true` → in-memory
+  `outbox`. Only sender so far: delivery-partner login credentials on
+  create-employee (`role:'Delivery'`) and partner password reset.
+- **`GET /api/app/config`** (public) — customer-app version gate + maintenance,
+  from `Settings.appConfig` (`minSupportedVersion`, `latestVersion`,
+  `maintenance`, `maintenanceMessage`, `updateUrl`, `supportEmail/Phone`).
 
 ## 10. API Changes (mobile initiative)
 
@@ -1029,18 +1130,24 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
 
 ## 12. Testing Status
 
-- **Backend: `npm test` → 36 tests, all green**
+- **Backend: `npm test` → 41 tests, all green**
   (`node:test` + `supertest` against `MONGO_URI`). Covers auth/OTP, protectCustomer,
   coupon validate, order placement + `/orders/mine` + ownership, status timeline,
   **order cancel (owner check, wallet refund, past-window 409) + wallet ledger**,
+  **product reviews (verified-purchase gate, moderation, summary, aggregate recompute)**,
+  **account deletion (cascade + orders scrubbed; legacy `:id` route staff-gated)**,
+  **`GET /app/config` shape**, **delivery-partner credential emails (create + reset, MAIL_TEST_MODE outbox)**,
   payment test-mode, delivery partner lifecycle + admin assign/reassign/unassign +
   partner password-reset/activate-deactivate.
-- **Mobile: `flutter test` → 105 tests, all green** — `auth_flow_test`,
+- **Mobile: `flutter test` → 117 tests, all green** — `auth_flow_test`,
   `catalog_models_test`, `pricing_test`, `design_flat_test`, `order_model_test`,
   `foundation_widgets_test` (7), `navigation_test` (5 — nested/back nav),
   `auth_flow_widget_test` (10 — PhoneField/OtpField + login→OTP→success flow +
   Terms/Privacy consent line), `legal_screen_test` (2 — tab default + `?tab=`),
-  `orders_flow_test` (12 — incl. cancel pre-dispatch + no-cancel once dispatched).
+  `orders_flow_test` (12 — incl. cancel pre-dispatch + no-cancel once dispatched),
+  `product_reviews_test` (3 — summary/list, empty state, 403 verified-purchase),
+  `auth_flow_test` deleteAccount (success + keep-session-on-failure),
+  `app_config_test` (7 — semver `isVersionBelow`, `AppConfig.fromJson`, `appGateProvider`).
   `flutter analyze` clean. `flutter build apk --debug` succeeds (incl. with
   `--dart-define-from-file=env/staging.json`).
 - **Delivery app: `deliveryapp/` — `flutter analyze` clean, `flutter test` → 5
@@ -1087,6 +1194,18 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
 - Frontend: no automated tests; admin `fetchReviews` change not yet run in a browser.
 
 ## 13. Last Updated
+
+2026-09-01 — Delivery P1-D4 client: FCM offer push wired end-to-end. Firebase project grocery-76b84; FIREBASE_SERVICE_ACCOUNT (base64) in backend/.env. Both Flutter apps get firebase_core/firebase_messaging + google-services.json/GoogleService-Info.plist + google-services gradle plugin + firebase_options.dart + a PushService (init/permission/token, register after login, unregister on logout, tap→route). Backend 41 tests; deliveryapp 6 tests + APK; mobileapp 117 tests + APK; all analyze clean.
+
+2026-09-01 — Email/SMTP: `nodemailer` + `src/services/mailService.js`. Admin creating a delivery partner (`POST /api/employees` role Delivery) now emails login credentials to the rider; partner password reset emails the new one. Gmail SMTP creds in `backend/.env` (gitignored), `.env.example` documents the keys, `MAIL_TEST_MODE` outbox for tests. SMTP auth verified + a real send succeeded. npm test 41/41, frontend build clean.
+
+2026-09-01 — FUTURE_WORK FW-1 (mostly) DONE: offline resilience + app config. Public `GET /api/app/config` (Settings.appConfig) with permissive DB-down default; mobile `connectivity_plus` offline banner (MaterialApp builder), `package_info_plus`, `appGateProvider` (ok/maintenance/forceUpdate) checked on splash → `/maintenance` `/force_update` screens. Remaining: per-request retry-with-backoff. npm test 39/39, flutter test 117/117, APK built.
+
+2026-09-01 — FUTURE_WORK FW-2 DONE: self-service account deletion. `DELETE /api/customers/me` (attachCustomerOptional — token or ?phone=), cascade delete Customer+Review+WalletTransaction, orders scrubbed to "Deleted user"; legacy `DELETE /api/customers/:id` now Admin/Manager only. Mobile profile "Delete account" + `AuthNotifier.deleteAccount()`; web `CustomerProfile` points at `/customers/me?phone=`. npm test 38/38, flutter test 110/110, frontend build clean, APK built. Next in FUTURE_WORK: FW-1 (offline resilience + `GET /api/app/config`).
+
+2026-09-01 — Added `FUTURE_WORK.md` at repo root: consolidated backlog (P0/P1/P2 feature tasks, web-specific, backend/infra, delivery track, UI/UX open items) with per-item surfaces + dependencies. This is the go-to list for "what's next".
+
+2026-09-01 — Mobile audit fix Group 2 CLOSED: added product reviews (`GET /products/:id/reviews` public + `POST` verified-purchase/moderated; PDP "Ratings & reviews" section + write flow on mobile `ProductReviewsSection` and web `components/ProductReviews.tsx` in both PDP layouts; staff approve/delete recompute `Product.rating`/`reviewsCount`). Group 2 also has order cancel + wallet history from earlier today. Backend npm test 36/36, flutter test 108/108, frontend build clean, debug APK built. Next: MOBILE_FUNCTIONALITY_AUDIT §28 Group 3+ (offline resilience, push/FCM, filters, status-filter tabs, account deletion, membership, content pages).
 
 2026-09-01 — Delivery P1-D5: partner notifications inbox (GET/POST /api/delivery/notifications[/read], unread count in /delivery/me) + createOffer/cancelForOrder write partner Notifications; logAudit already covers all admin delivery overrides. deliveryapp NotificationsScreen + dashboard bell badge. Backend 36 tests, deliveryapp analyze/test/APK green.
 

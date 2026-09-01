@@ -14,7 +14,7 @@ import { Assignment } from '../src/models/Assignment.js';
 import { tryAssign, rejectOffer } from '../src/services/assignmentService.js';
 import { DeviceToken } from '../src/models/DeviceToken.js';
 import { Notification } from '../src/models/Operations.js';
-import { isPushConfigured } from '../src/services/pushService.js';
+import { sendToOwner } from '../src/services/pushService.js';
 
 dotenv.config();
 
@@ -281,8 +281,10 @@ test('partner FCM device token register is idempotent + unregister; push stays o
   assert.equal(del.status, 200);
   assert.equal((await DeviceToken.find({ token: fcm })).length, 0);
 
-  // No service account in CI/dev → sends are a safe no-op, offers still work.
-  assert.equal(isPushConfigured(), false);
+  // A send with no registered devices is always a safe no-op, whether or not
+  // a service account is configured — dispatch never depends on FCM.
+  const r = await sendToOwner(riderUserId, { title: 't', body: 'b', data: {} });
+  assert.equal(r.sent, 0);
 });
 
 test('admin partner performance + deliveries endpoints', async () => {

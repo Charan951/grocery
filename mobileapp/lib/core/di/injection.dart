@@ -2,6 +2,7 @@ import 'package:get_it/get_it.dart';
 import 'package:freshcart/core/services/storage_service.dart';
 import 'package:freshcart/core/services/api_service.dart';
 import 'package:freshcart/core/services/socket_service.dart';
+import 'package:freshcart/core/services/push_service.dart';
 import 'package:freshcart/core/services/token_store.dart';
 
 final getIt = GetIt.instance;
@@ -20,4 +21,5 @@ Future<void> setupInjection() async {
     () => ApiService(tokenStore: getIt<TokenStore>()),
   );
   getIt.registerLazySingleton<SocketService>(() => SocketService());
+  getIt.registerLazySingleton<PushService>(() => PushService(getIt<ApiService>()));
 }

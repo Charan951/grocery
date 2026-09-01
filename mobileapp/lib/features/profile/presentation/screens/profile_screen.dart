@@ -4,8 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
 import 'package:freshcart/core/constants/app_radius.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
+import 'package:freshcart/core/error/api_exception.dart';
 import 'package:freshcart/core/theme/theme_controller.dart';
 import 'package:freshcart/core/widgets/app_modal.dart';
+import 'package:freshcart/core/widgets/app_toast.dart';
 import 'package:freshcart/core/widgets/buttons.dart';
 import 'package:freshcart/features/authentication/presentation/controllers/auth_controller.dart';
 
@@ -158,6 +160,34 @@ class ProfileScreen extends ConsumerWidget {
                 if (context.mounted) context.go('/login');
               }
             },
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () async {
+              final ok = await AppModal.confirm(
+                context,
+                title: 'Delete account?',
+                message: 'This permanently removes your profile, wallet balance '
+                    'and reviews. Past orders are kept as records but no longer '
+                    'linked to you. This cannot be undone.',
+                confirmLabel: 'Delete account',
+                cancelLabel: 'Keep account',
+                destructive: true,
+                icon: Icons.delete_forever_outlined,
+              );
+              if (!ok || !context.mounted) return;
+              try {
+                await ref.read(authProvider.notifier).deleteAccount();
+                if (context.mounted) context.go('/login');
+                AppToast.success('Your account has been deleted');
+              } on ApiException catch (e) {
+                AppToast.error(e.message);
+              } catch (_) {
+                AppToast.error('Could not delete your account. Please try again.');
+              }
+            },
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Delete account'),
           ),
         ],
       ),

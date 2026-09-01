@@ -5,6 +5,7 @@ import { Assignment } from '../models/Assignment.js';
 import { Settings } from '../models/Operations.js';
 import { createOffer, acceptOffer, cancelForOrder } from '../services/assignmentService.js';
 import { logAudit } from './apiController.js';
+import { sendDeliveryCredentials } from '../services/mailService.js';
 
 const TERMINAL = ['Delivered', 'Cancelled', 'Returned', 'Refunded'];
 
@@ -177,6 +178,17 @@ export const adminDeliveryController = {
       user.password = password;
       await user.save();
       await logAudit(String(req.user._id), req.user.name, 'Partner Password Reset', `${user.name} (${user.email})`);
+
+      if (user.email) {
+        sendDeliveryCredentials({
+          to: user.email,
+          name: user.name,
+          email: user.email,
+          password,
+          mode: 'reset',
+        }).catch((e) => console.error('[mail] resetPartnerPassword:', e?.message || e));
+      }
+
       res.json({ success: true, message: 'Password reset' });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });

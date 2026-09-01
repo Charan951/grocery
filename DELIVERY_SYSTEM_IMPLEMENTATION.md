@@ -956,7 +956,7 @@ existing timeline. No fake data anywhere.
 - Verified: backend `npm test` 31 green (+1 reveal-window gating); frontend
   `vite build` clean; mobile `flutter analyze` clean + `flutter test` 103 green.
 
-**P1-D4 · Push for offers (FCM)** — 🟡 BACKEND DONE 2026-09-01 · client blocked on Firebase config
+**P1-D4 · Push for offers (FCM)** — ✅ DONE 2026-09-01 (Firebase project `grocery-76b84`)
 - `backend/src/services/pushService.js`: lazy `firebase-admin` init from
   `FIREBASE_SERVICE_ACCOUNT` (raw JSON or base64) or
   `GOOGLE_APPLICATION_CREDENTIALS`; `isPushConfigured()`, `registerDeviceToken`
@@ -968,13 +968,23 @@ existing timeline. No fake data anywhere.
 - `assignmentService.createOffer` fires `sendToOwner(partner, {type:'delivery_offer',
   assignmentId, orderId})` alongside the socket emit (non-blocking).
 - `.env.example` documents `FIREBASE_SERVICE_ACCOUNT`.
-- Tests: token register idempotent + unregister; `isPushConfigured()===false` in
-  CI so offers still work. Backend `npm test` 35 green.
-- **Remaining (needs the user's Firebase project):** add `firebase_core` +
-  `firebase_messaging` to `deliveryapp/` (and `mobileapp/` for P1-3),
-  `google-services.json` / `GoogleService-Info.plist`, register the token after
-  login, handle the `delivery_offer` data message → route to `/order/:id` /
-  raise the offer sheet, background/killed reconcile via `/delivery/orders/active`.
+- Service account lives in `backend/.env` (`FIREBASE_SERVICE_ACCOUNT`, base64,
+  git-ignored) — set it per environment; without it push silently no-ops.
+- **Clients** (`deliveryapp/` + `mobileapp/`): `firebase_core` +
+  `firebase_messaging` deps; `android/app/google-services.json` +
+  `ios/Runner/GoogleService-Info.plist` (committed — client config, not secret);
+  `com.google.gms.google-services` gradle plugin wired in
+  `android/settings.gradle.kts` + `android/app/build.gradle.kts`;
+  hand-written `lib/firebase_options.dart`. `PushService` (per app): `init()`
+  requests permission, reads the token, listens `onTokenRefresh` /
+  `onMessageOpenedApp` / `getInitialMessage`; token registered after
+  login + on hydrate, unregistered on logout. deliveryapp tap on a
+  `delivery_offer` → dashboard (socket drives the live offer sheet); mobileapp
+  tap → order. `main()` inits Firebase + registers a background handler; all
+  guarded so a missing/broken Firebase build still runs.
+- Tests: backend `npm test` 41 green (token register idempotent + unregister;
+  `sendToOwner` with no devices → `sent:0`). deliveryapp `flutter analyze`/
+  `test` (6) / debug APK; mobileapp `flutter analyze`/`test` (117) / debug APK.
 
 **P1-D5 · Notifications + audit activation** — ✅ DONE 2026-09-01
 - Partner inbox: `GET /api/delivery/notifications?unreadOnly=1&limit=` (returns

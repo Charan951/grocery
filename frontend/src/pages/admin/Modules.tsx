@@ -2053,8 +2053,10 @@ export const DeliveryModule: React.FC = () => {
       });
       const data = await res.json();
       if (data.success) {
+        const sentTo = email.trim();
         setName(''); setEmail(''); setPhone(''); setPassword(''); setShowAdd(false);
         fetchPartners();
+        alert(`Delivery partner created. Login credentials were emailed to ${sentTo}.`);
       } else {
         alert('Failed: ' + (data.message || 'Unknown error'));
       }

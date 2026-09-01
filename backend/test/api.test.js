@@ -8,10 +8,11 @@ import { createApp } from '../app.js';
 import { User } from '../src/models/User.js';
 import { Customer } from '../src/models/Customer.js';
 import { Order } from '../src/models/Order.js';
-import { Coupon } from '../src/models/Finance.js';
+import { Coupon, WalletTransaction } from '../src/models/Finance.js';
 import { Otp } from '../src/models/Otp.js';
 import { Product } from '../src/models/Catalog.js';
 import { Review } from '../src/models/Operations.js';
+import { outbox, clearOutbox } from '../src/services/mailService.js';
 
 dotenv.config();
 
@@ -25,10 +26,12 @@ const PHONE_B = `91111${stamp.slice(-5)}`;
 const COUPON = `TEST${stamp}`;
 const ADMIN_EMAIL = `qa+${stamp}@freshcart.test`;
 const REVIEW_PRODUCT_ID = `qa_prod_${stamp}`;
+const RIDER_EMAIL = `qa.rider+${stamp}@freshcart.test`;
 
 test.before(async () => {
   process.env.PAYMENTS_TEST_MODE = 'true';
   process.env.OTP_TEST_MODE = 'true';
+  process.env.MAIL_TEST_MODE = 'true';
   await mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 10000 });
   await User.create({ name: 'QA Admin', email: ADMIN_EMAIL, password: 'admin123', role: 'Admin', status: 'Active' });
   await Product.create({
@@ -39,7 +42,7 @@ test.before(async () => {
 
 test.after(async () => {
   await Promise.allSettled([
-    User.deleteOne({ email: ADMIN_EMAIL }),
+    User.deleteMany({ email: { $in: [ADMIN_EMAIL, RIDER_EMAIL] } }),
     Customer.deleteMany({ phone: new RegExp(`(${PHONE_A}|${PHONE_B})$`) }),
     Order.deleteMany({ customerPhone: new RegExp(`(${PHONE_A}|${PHONE_B})$`) }),
     Coupon.deleteMany({ code: COUPON }),
@@ -264,6 +267,86 @@ test('product reviews: verified-purchase gate, moderation, and summary', async (
   assert.equal(pub.body.summary.count, 1);
   assert.equal(pub.body.summary.average, 5);
   assert.equal(pub.body.reviews[0].comment, 'Even better second time');
+});
+
+test('customer self-service account deletion cascades and scrubs orders', async () => {
+  const token = await customerToken(PHONE_B);
+  const cid = `cust_${PHONE_B}`;
+  await Customer.updateOne({ customerId: cid }, { $set: { walletBalance: 50 } });
+  await WalletTransaction.create({ customerId: cid, amount: 50, type: 'Credit', description: 'seed' });
+  const place = await api().post('/api/orders').set('Authorization', `Bearer ${token}`).send({
+    items: [{ productId: 'p_del', name: 'X', quantity: 1, price: 10 }],
+    itemTotal: 10, totalAmount: 10, deliveryAddress: 'A',
+  });
+  const orderId = place.body.order.orderId;
+
+  const del = await api().delete('/api/customers/me').set('Authorization', `Bearer ${token}`);
+  assert.equal(del.status, 200);
+
+  assert.equal(await Customer.countDocuments({ customerId: cid }), 0);
+  assert.equal(await WalletTransaction.countDocuments({ customerId: cid }), 0);
+  const order = await Order.findOne({ orderId });
+  assert.equal(order.customerName, 'Deleted user');
+
+  const me = await api().get('/api/customers/me').set('Authorization', `Bearer ${token}`);
+  assert.equal(me.status, 401);
+
+  await WalletTransaction.deleteMany({ customerId: cid });
+});
+
+test('legacy DELETE /customers/:id now requires staff auth', async () => {
+  const anon = await api().delete(`/api/customers/cust_${PHONE_A}`);
+  assert.equal(anon.status, 401);
+});
+
+test('creating a Delivery employee emails their login credentials', async () => {
+  const sToken = await loginAdmin();
+  clearOutbox();
+
+  const res = await api().post('/api/employees')
+    .set('Authorization', `Bearer ${sToken}`)
+    .send({ name: 'QA Rider', email: RIDER_EMAIL, phone: '9998887770', password: 'ride12345', role: 'Delivery' });
+  assert.equal(res.status, 201);
+
+  const mail = outbox.find((m) => m.to === RIDER_EMAIL);
+  assert.ok(mail, 'expected a credentials email in the outbox');
+  assert.match(mail.subject, /credentials/i);
+  assert.ok(mail.text.includes(RIDER_EMAIL));
+  assert.ok(mail.text.includes('ride12345'));
+
+  // A non-Delivery employee does not get one.
+  clearOutbox();
+  await api().post('/api/employees')
+    .set('Authorization', `Bearer ${sToken}`)
+    .send({ name: 'QA Clerk', email: `qa.clerk+${stamp}@freshcart.test`, role: 'Employee' });
+  assert.equal(outbox.length, 0);
+  await User.deleteOne({ email: `qa.clerk+${stamp}@freshcart.test` });
+});
+
+test('resetting a partner password emails the new one', async () => {
+  const sToken = await loginAdmin();
+  const rider = await User.findOne({ email: RIDER_EMAIL });
+  clearOutbox();
+
+  const res = await api().post(`/api/admin/delivery/partners/${rider._id}/reset-password`)
+    .set('Authorization', `Bearer ${sToken}`)
+    .send({ password: 'newpass123' });
+  assert.equal(res.status, 200);
+
+  const mail = outbox.find((m) => m.to === RIDER_EMAIL);
+  assert.ok(mail, 'expected a reset email');
+  assert.match(mail.subject, /reset/i);
+  assert.ok(mail.text.includes('newpass123'));
+});
+
+test('GET /app/config returns a version gate + maintenance shape', async () => {
+  const res = await api().get('/api/app/config');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.success, true);
+  assert.ok(typeof res.body.config.minSupportedVersion === 'string');
+  assert.equal(typeof res.body.config.maintenance, 'boolean');
+  assert.ok('updateUrl' in res.body.config);
+  assert.ok('supportEmail' in res.body.config);
 });
 
 test('payment verify runs in test mode', async () => {

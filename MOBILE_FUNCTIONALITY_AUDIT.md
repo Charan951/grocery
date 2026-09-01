@@ -51,7 +51,7 @@ Mobile routes: `/splash /onboarding /login /otp /location_select` · tabs
 | `/` Home | `HomeScreen` | ✓ | Real banners / categories / special-groups / products; curated + per-category rails. |
 | `/categories` | `CategoriesScreen` (tab) | ✓ | Per-category sections + subcategory tiles + trending cloud. |
 | `/products`, `/category/:slug` (listing) | `CategoryCatalogScreen` (`/category/:id`) | ⚠ | No all-products `/products` view; no pagination; fewer filters (§8). |
-| `/product/:id`, `/prn/:slug/prid/:id` | `ProductDetailsScreen` | ⚠ | Full PDP; **no reviews section**, no SEO slug route. |
+| `/product/:id`, `/prn/:slug/prid/:id` | `ProductDetailsScreen` | ⚠ | Full PDP with a Ratings & reviews section (2026-09-01). No SEO slug route. |
 | `/brands` | — | ✗ | `GET /api/brands` unused on mobile. |
 | `/offers` | — (coupons only inside Cart) | ✗ | No offers / coupon browse page. |
 | `/blog`, `/blog/:id` | — | ✗ | `GET /api/blogs` unused. |
@@ -101,7 +101,7 @@ Mobile routes: `/splash /onboarding /login /otp /location_select` · tabs
 | Logout clears token + cart / wishlist / recent-search caches | ✓ | Best-effort. |
 | "Continue = agree to Terms/Privacy" | ✓ | Tappable links → bundled `/legal` screen. |
 | Rate-limit / lockout messaging | ⚠ | Backend enforces; mobile shows the generic error string, no "try again in Ns". |
-| Account deletion | ✗ | Web has it (`DELETE /customers/:id`, open route). Mobile has no UI. |
+| Account deletion | ✓ | `DELETE /customers/me` (2026-09-01, cascade: profile + wallet ledger + reviews; orders scrubbed). Mobile profile screen + web `CustomerProfile`. Legacy `DELETE /customers/:id` now staff-only. |
 | Biometric app-lock | ✗ | Not present. |
 
 ---
@@ -142,7 +142,7 @@ createRazorpayOrder, verifyPayment, walletDebit, fetchMyOrders, fetchOrder`.
 | `GET /brands` | — | ✗ unused |
 | `GET /blogs` | — | ✗ unused |
 | `GET /festival-campaigns/active` | — | ✗ unused |
-| Product reviews (`GET/POST /products/:id/reviews`) | — | ✗ **route does not exist** |
+| Product reviews (`GET /products/:id/reviews` public, `POST` verified-purchase) | `getProductReviews` / `createProductReview` | ✓ added 2026-09-01 (POST: attachCustomerOptional, token or `{phone}`) |
 | Order cancel (`POST /orders/:id/cancel`) | `cancelOrder` | ✓ added 2026-09-01 (attachCustomerOptional; token or `{phone}`) |
 | Notifications list / mark-read | — | ✗ **route does not exist** |
 | Wallet transactions (`GET /customers/me/wallet/transactions`) | `walletTransactions` | ✓ added 2026-09-01 (protectCustomer) |
@@ -164,7 +164,7 @@ createRazorpayOrder, verifyPayment, walletDebit, fetchMyOrders, fetchOrder`.
 | Addresses | ✓ real `POST` | ✓ list + select | ✗ (no PUT endpoint; parity w/ web) | ✓ real `DELETE` | ✓ |
 | Profile (name / email) | — | ✓ | ✓ `PUT /me/profile` | ✗ delete-account | ⚠ (no delete on mobile) |
 | Orders | ✓ place | ✓ list + detail + cancel | ✓ cancel (web + mobile) | — | ✓ |
-| Reviews | ✗ | ✗ | ✗ | ✗ | ✗ (no endpoint) |
+| Reviews | ✓ read+write | ✓ PDP section + sheet | ✓ PDP section + form | — | ✓ (moderated) |
 | Support tickets | ⚠ chat send | ⚠ live only | — | — | ⚠ no persisted ticket list |
 
 ---
@@ -250,7 +250,7 @@ createRazorpayOrder, verifyPayment, walletDebit, fetchMyOrders, fetchOrder`.
 | Dark-mode toggle | ✓ | Persisted via `StorageService`. |
 | Language / units / other settings | ✗ | India-English only. |
 | Logout | ✓ | Confirm modal; clears token + local caches. |
-| Delete account | ✗ | Web has it; mobile doesn't. |
+| Delete account | ✓ | Profile screen → confirm modal → `DELETE /customers/me` → `/login` (2026-09-01). |
 | Referral code | ✓ | Wallet screen shows the real `referralCode` with copy. |
 
 ---
@@ -452,11 +452,11 @@ createRazorpayOrder, verifyPayment, walletDebit, fetchMyOrders, fetchOrder`.
 
 **Fix log**
 - Group 1 (Broken functionality) closed 2026-09-01: Legal links + `LegalScreen`, `share_plus` native share on PDP. `flutter test` 103/103, `flutter analyze` clean.
-- Group 2 (Missing core) — 2/3 closed 2026-09-01: **order cancel** (`POST /orders/:id/cancel`, dual-auth, wallet refund; mobile + web) and **wallet transaction history** (`GET /customers/me/wallet/transactions`; mobile). Backend `npm test` 33/33, `flutter test` 105/105, frontend `tsc -b && vite build` clean, debug APK built. **Reviews** still open (needs `GET/POST /products/:id/reviews`).
+- Group 2 (Missing core) — **CLOSED 2026-09-01**: **order cancel** (`POST /orders/:id/cancel`, dual-auth, wallet refund; mobile + web), **wallet transaction history** (`GET /customers/me/wallet/transactions`; mobile), **product reviews** (`GET` public + `POST` verified-purchase/moderated; PDP section + write flow on mobile + web; approve recomputes product aggregate). Backend `npm test` 36/36, `flutter test` 108/108, frontend `tsc -b && vite build` clean, debug APK built.
 
 
 ### P0 — user-facing gaps on the core journey
-1. ✗ **Reviews** on PDP (read list + write from a delivered order). **Needs a backend route first** (`GET/POST /products/:id/reviews` — model `Review` exists, only staff moderation is exposed). *(Group 2 — still open.)*
+1. ✓ **Reviews** on PDP — DONE 2026-09-01. `GET /products/:id/reviews` (public, Approved + summary) + `POST` (attachCustomerOptional; must have a Delivered order with the product; one per product; enters moderation). Mobile `ProductReviewsSection` + write sheet; web `ProductReviews` component in both PDP layouts. `updateReviewStatus`/`deleteReview` now recompute `Product.rating`/`reviewsCount`.
 2. ✓ **Order cancel** with reason + wallet refund — DONE 2026-09-01. `POST /orders/:id/cancel` (attachCustomerOptional; app token or `{phone}`), pre-dispatch statuses only, prepaid → wallet Credit + `paymentStatus: Refunded`, releases any assigned rider, emits `order_status_update`. Wired: mobile order detail + web `CustomerOrders`. Backend tests 33/33.
 3. ✓ **Legal** — DONE (2026-09-01): login "Terms / Privacy" are real links → bundled `LegalScreen` (`/legal?tab=terms|privacy`).
 4. ✗ **Offline resilience**: `connectivity_plus` banner + retry-with-backoff; `GET /api/app/config` for force-update / maintenance.
@@ -466,7 +466,7 @@ createRazorpayOrder, verifyPayment, walletDebit, fetchMyOrders, fetchOrder`.
 6. ⚠ **Wallet**: transaction history DONE 2026-09-01 (`GET /customers/me/wallet/transactions`, wired to the mobile wallet screen). Customer-scoped **top-up (Razorpay)** still needs a backend route + UI. Web wallet drawer still a `₹0` stub.
 7. ⚠ **Filters**: price-range (`minPrice/maxPrice` already server-side), brand, in-stock, discount-sort; pagination for large categories.
 8. ⚠ **Orders**: status-filter tabs (All / In Transit / Delivered / Cancelled), active-order banner on Home, invoice.
-9. ✗ **Account deletion** on mobile (`DELETE /customers/:id` exists but is an open route — should be secured to `protectCustomer` first).
+9. ✓ **Account deletion** — DONE 2026-09-01. `DELETE /customers/me` (attachCustomerOptional: token or `?phone=`), cascade delete + orders scrubbed; legacy `:id` route locked to Admin/Manager. Mobile + web wired.
 10. ⚠ **Membership**: a real join / upgrade action.
 11. ✗ **Content pages**: Offers, Brands, Blog + detail, About, Help-Centre FAQ.
 

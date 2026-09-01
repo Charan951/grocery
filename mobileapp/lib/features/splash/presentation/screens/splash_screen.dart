@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
+import 'package:freshcart/core/services/app_config.dart';
 import 'package:freshcart/features/authentication/presentation/controllers/auth_controller.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -38,12 +39,24 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
   }
 
   Future<void> _navigateToNext() async {
-    // Run the branding animation and the token -> profile hydration in parallel.
-    await Future.wait([
+    // Run the branding animation, the token -> profile hydration, and the
+    // app-config gate check in parallel.
+    final results = await Future.wait([
       Future.delayed(const Duration(milliseconds: 2200)),
       ref.read(authProvider.notifier).ensureHydrated(),
+      ref.read(appGateProvider.future),
     ]);
     if (!mounted) return;
+
+    final gate = results[2] as AppGate;
+    if (gate == AppGate.maintenance) {
+      context.go('/maintenance');
+      return;
+    }
+    if (gate == AppGate.forceUpdate) {
+      context.go('/force_update');
+      return;
+    }
 
     final authState = ref.read(authProvider);
 

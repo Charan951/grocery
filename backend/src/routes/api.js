@@ -58,6 +58,14 @@ router.use((req, res, next) => {
       if (req.path.startsWith('/festival-campaigns')) return res.json({ success: true, offlineMode: true, campaigns: [] });
       if (req.path.startsWith('/customers')) return res.json({ success: true, offlineMode: true, customer: { name: 'Customer', email: '' } });
       if (req.path.startsWith('/orders')) return res.json({ success: true, offlineMode: true, orders: [] });
+      if (req.path === '/app/config') {
+        // Permissive default when the DB is down — never hard-block the app on a blip.
+        return res.json({
+          success: true,
+          offlineMode: true,
+          config: { minSupportedVersion: '0.0.0', latestVersion: '0.0.0', maintenance: false, maintenanceMessage: '', updateUrl: '', supportEmail: 'support@freshcart.com', supportPhone: '' },
+        });
+      }
       if (req.path === '/coupons') return res.json({ success: true, offlineMode: true, coupons: [] });
       if (req.path === '/blogs') return res.json({ success: true, offlineMode: true, blogs: [] });
       if (req.path === '/dashboard/status') {
@@ -189,6 +197,7 @@ router.delete('/blogs/:id', protect, authorize('Admin'), blogController.deleteBl
 // ==========================================
 router.get('/settings', settingsController.getSettings);
 router.put('/settings', protect, authorize('Admin'), settingsController.updateSettings);
+router.get('/app/config', settingsController.getAppConfig); // public — customer-app version gate + maintenance
 
 // ==========================================
 // 9. CUSTOMER ROUTES
@@ -210,6 +219,7 @@ router.post('/customers/me/wallet/debit', protectCustomer, customerController.wa
 router.get('/customers/me/wallet/transactions', protectCustomer, customerController.walletTransactions);
 router.post('/customers/me/devices', protectCustomer, customerController.registerDevice);
 router.delete('/customers/me/devices/:token', protectCustomer, customerController.removeDevice);
+router.delete('/customers/me', attachCustomerOptional, customerController.deleteMe); // self-service account deletion (token OR ?phone=)
 
 // Legacy phone-keyed customer auth — still used by the web storefront (no token).
 // TODO: migrate web to the OTP flow above, then lock down the :id routes below.
@@ -218,7 +228,7 @@ router.get('/customers/:id', customerController.getCustomerProfile);
 router.put('/customers/:id/profile', customerController.updateProfile);
 router.post('/customers/:id/addresses', customerController.addAddress);
 router.delete('/customers/:id/addresses/:addressId', customerController.deleteAddress);
-router.delete('/customers/:id', customerController.deleteAccount);
+router.delete('/customers/:id', protect, authorize('Admin', 'Manager'), customerController.deleteAccount); // staff-only; customers use DELETE /customers/me
 router.put('/customers/:id/wallet', protect, customerController.updateWallet);
 
 // ==========================================

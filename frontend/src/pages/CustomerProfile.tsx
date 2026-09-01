@@ -77,7 +77,7 @@ export const CustomerProfile: React.FC = () => {
   const handleDeleteAccount = async () => {
     if (window.confirm('Are you sure you want to delete your account? All orders and wallet history will be removed.')) {
       try {
-        await fetch(`/api/customers/${encodeURIComponent(phone)}`, { method: 'DELETE' });
+        await fetch(`/api/customers/me?phone=${encodeURIComponent(phone)}`, { method: 'DELETE' });
       } catch (err) {
         console.warn('Offline account deletion fallback');
       }

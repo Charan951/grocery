@@ -72,7 +72,18 @@ const settingsSchema = new mongoose.Schema({
   maxOfferAttempts: { type: Number, default: 5 },
   assignRadiusKm: { type: Number, default: 6 },
   deliveryBaseFee: { type: Number, default: 20 },   // partner earning base (P2)
-  deliveryPerKmFee: { type: Number, default: 6 }
+  deliveryPerKmFee: { type: Number, default: 6 },
+  // --- Customer app runtime config (served by GET /api/app/config) ---
+  appConfig: {
+    minSupportedVersion: { type: String, default: '1.0.0' }, // app blocks below this
+    latestVersion: { type: String, default: '1.0.0' },
+    maintenance: { type: Boolean, default: false },
+    maintenanceMessage: {
+      type: String,
+      default: 'FreshCart is briefly down for maintenance. Please try again shortly.',
+    },
+    updateUrl: { type: String, default: '' } // store listing link
+  }
 }, { timestamps: true });
 
 // Audit Log Schema

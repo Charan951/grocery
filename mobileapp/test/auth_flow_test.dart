@@ -49,6 +49,14 @@ class _FakeApi extends ApiService {
   @override
   Future<Map<String, dynamic>> fetchMe() async =>
       onMe?.call() ?? (throw ApiException('unauthorized', statusCode: 401));
+
+  int deleteAccountCalls = 0;
+  Object? deleteAccountError;
+  @override
+  Future<void> deleteAccount() async {
+    deleteAccountCalls++;
+    if (deleteAccountError != null) throw deleteAccountError!;
+  }
 }
 
 void main() {
@@ -130,6 +138,30 @@ void main() {
       await n.logout();
       expect(store.token, isNull);
       expect(n.state.isAuthenticated, isFalse);
+    });
+
+    test('deleteAccount calls the API then clears the session', () async {
+      final store = _FakeTokenStore('existing.jwt');
+      final api = _FakeApi(onMe: () => {'name': 'X', 'phone': '+91 9', 'walletBalance': 0});
+      final n = AuthNotifier(_FakeStorage(), api, store);
+      await n.ensureHydrated();
+
+      await n.deleteAccount();
+      expect(api.deleteAccountCalls, 1);
+      expect(store.token, isNull);
+      expect(n.state.isAuthenticated, isFalse);
+    });
+
+    test('deleteAccount keeps the session if the API fails', () async {
+      final store = _FakeTokenStore('existing.jwt');
+      final api = _FakeApi(onMe: () => {'name': 'X', 'phone': '+91 9', 'walletBalance': 0})
+        ..deleteAccountError = ApiException('server down', statusCode: 500);
+      final n = AuthNotifier(_FakeStorage(), api, store);
+      await n.ensureHydrated();
+
+      await expectLater(n.deleteAccount(), throwsA(isA<ApiException>()));
+      expect(store.token, 'existing.jwt');
+      expect(n.state.isAuthenticated, isTrue);
     });
   });
 }

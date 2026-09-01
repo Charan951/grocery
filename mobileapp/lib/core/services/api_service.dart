@@ -344,6 +344,49 @@ class ApiService {
     }
   }
 
+  /// `GET /api/app/config` → `{ minSupportedVersion, latestVersion, maintenance,
+  /// maintenanceMessage, updateUrl, supportEmail, supportPhone }`.
+  Future<Map<String, dynamic>> fetchAppConfig() async {
+    try {
+      final res = await _dio.get('/app/config');
+      final data = res.data;
+      if (data is Map && data['config'] is Map) {
+        return Map<String, dynamic>.from(data['config'] as Map);
+      }
+      return const {};
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  /// `POST /api/customers/me/devices` — register this device's FCM token.
+  Future<void> registerDevice(String token, {String platform = 'android'}) async {
+    try {
+      await _dio.post('/customers/me/devices', data: {'token': token, 'platform': platform});
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  /// `DELETE /api/customers/me/devices/:token` — unregister on logout.
+  Future<void> removeDevice(String token) async {
+    try {
+      await _dio.delete('/customers/me/devices/${Uri.encodeComponent(token)}');
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  /// `DELETE /api/customers/me` — permanent account deletion for the signed-in
+  /// customer (token attached by the interceptor). Throws on failure.
+  Future<void> deleteAccount() async {
+    try {
+      await _dio.delete('/customers/me');
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
   /// `GET /api/products/:id/reviews` → `{ summary: {average, count, distribution}, reviews[] }`.
   Future<Map<String, dynamic>> fetchProductReviews(String productId) async {
     try {

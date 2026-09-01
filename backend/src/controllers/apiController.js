@@ -29,6 +29,7 @@ import { Coupon, Offer, Payment, WalletTransaction } from '../models/Finance.js'
 import { Review, Notification, CMSPage, Blog, Settings, AuditLog, SupportTicket } from '../models/Operations.js';
 import { uploadToCloudinary } from '../config/cloudinary.js';
 import { cancelForOrder, tryAssign } from '../services/assignmentService.js';
+import { sendDeliveryCredentials } from '../services/mailService.js';
 import { registerDeviceToken, removeDeviceToken } from '../services/pushService.js';
 
 // Helper to sign JWT
@@ -1054,6 +1055,31 @@ export const settingsController = {
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
     }
+  },
+
+  // GET /api/app/config  (public) — customer-app runtime config: version gate,
+  // maintenance flag, support contacts. Kept small and cache-friendly.
+  getAppConfig: async (req, res) => {
+    try {
+      const s = await Settings.findOne();
+      const c = (s && s.appConfig) || {};
+      res.json({
+        success: true,
+        config: {
+          minSupportedVersion: c.minSupportedVersion || '1.0.0',
+          latestVersion: c.latestVersion || c.minSupportedVersion || '1.0.0',
+          maintenance: !!c.maintenance,
+          maintenanceMessage:
+            c.maintenanceMessage ||
+            'FreshCart is briefly down for maintenance. Please try again shortly.',
+          updateUrl: c.updateUrl || '',
+          supportEmail: (s && s.supportEmail) || 'support@freshcart.com',
+          supportPhone: (s && s.supportPhone) || '',
+        },
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
   }
 };
 
@@ -1261,11 +1287,51 @@ export const customerController = {
     }
   },
 
+  // DELETE /api/customers/:id  (staff only) — admin removal of a customer record.
   deleteAccount: async (req, res) => {
     try {
       const customer = await Customer.findOneAndDelete({ $or: [{ customerId: req.params.id }, { phone: req.params.id }] });
       if (!customer) return res.status(404).json({ success: false, message: 'Customer not found' });
       res.json({ success: true, message: 'Account deleted successfully' });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // DELETE /api/customers/me  (attachCustomerOptional — app token OR ?phone= for
+  // the token-less web storefront). Customer self-service account deletion:
+  // removes the profile + wallet ledger + their reviews, and scrubs the name
+  // from past orders (kept as financial/delivery records).
+  deleteMe: async (req, res) => {
+    try {
+      let customer = req.customer;
+      if (!customer) {
+        const raw = String(req.query.phone || req.body.phone || '').replace(/\D/g, '').slice(-10);
+        if (raw) customer = await Customer.findOne({ phone: new RegExp(raw + '$') });
+      }
+      if (!customer) {
+        return res.status(401).json({ success: false, message: 'Sign in to delete your account' });
+      }
+
+      const cid = customer.customerId;
+      const phone10 = String(customer.phone || '').replace(/\D/g, '').slice(-10);
+
+      await Promise.allSettled([
+        Customer.deleteOne({ customerId: cid }),
+        Review.deleteMany({ customerId: cid }),
+        WalletTransaction.deleteMany({ customerId: cid }),
+        Order.updateMany(
+          {
+            $or: [
+              { customerId: cid },
+              ...(phone10 ? [{ customerPhone: new RegExp(phone10 + '$') }] : []),
+            ],
+          },
+          { $set: { customerName: 'Deleted user' } },
+        ),
+      ]);
+
+      res.json({ success: true, message: 'Account deleted' });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
     }
@@ -1515,14 +1581,29 @@ export const employeeController = {
   },
   createEmployee: async (req, res) => {
     try {
-      const { name, email, password, role } = req.body;
+      const { name, email, phone, role } = req.body;
+      const plainPassword = req.body.password || (role === 'Delivery' ? 'delivery123' : 'staff123');
       const employee = await User.create({
         name,
         email,
-        password: password || 'staff123',
+        phone,
+        password: plainPassword,
         role: role || 'Employee',
         status: 'Active'
       });
+
+      // Email the login credentials to a newly-created delivery partner.
+      // Non-blocking — a mail hiccup must not fail account creation.
+      if ((role || '') === 'Delivery' && email) {
+        sendDeliveryCredentials({
+          to: email,
+          name,
+          email,
+          password: plainPassword,
+          mode: 'created',
+        }).catch((e) => console.error('[mail] createEmployee credentials:', e?.message || e));
+      }
+
       res.status(201).json({ success: true, employee });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });

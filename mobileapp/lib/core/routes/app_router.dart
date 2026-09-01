@@ -29,6 +29,7 @@ import 'package:freshcart/features/profile/presentation/screens/profile_edit_scr
 import 'package:freshcart/features/search/presentation/screens/search_screen.dart';
 import 'package:freshcart/features/wishlist/presentation/screens/wishlist_screen.dart';
 import 'package:freshcart/features/legal/presentation/screens/legal_screen.dart';
+import 'package:freshcart/features/app_gate/presentation/screens/app_gate_screens.dart';
 
 /// Bridges Riverpod auth changes to go_router's [GoRouter.refreshListenable].
 class _AuthRouterRefresh extends ChangeNotifier {
@@ -38,7 +39,10 @@ class _AuthRouterRefresh extends ChangeNotifier {
 }
 
 /// Routes reachable while signed out.
-const _publicRoutes = {'/splash', '/onboarding', '/login', '/otp', '/legal'};
+const _publicRoutes = {
+  '/splash', '/onboarding', '/login', '/otp', '/legal',
+  '/maintenance', '/force_update',
+};
 
 final routerProvider = Provider<GoRouter>((ref) {
   final refresh = _AuthRouterRefresh(ref);
@@ -63,6 +67,8 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       // ---- Full-screen routes (above the tab shell, no bottom nav) ----
       GoRoute(path: '/splash', builder: (c, s) => const SplashScreen()),
+      GoRoute(path: '/maintenance', builder: (c, s) => const MaintenanceScreen()),
+      GoRoute(path: '/force_update', builder: (c, s) => const ForceUpdateScreen()),
       GoRoute(path: '/onboarding', builder: (c, s) => const OnboardingScreen()),
       GoRoute(path: '/login', builder: (c, s) => const LoginScreen()),
       GoRoute(
