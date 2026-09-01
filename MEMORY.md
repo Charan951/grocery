@@ -118,6 +118,34 @@
 
 ## 5. Completed Major Work
 
+- **2026-09-01 — Delivery P0-D5 DONE** (admin web delivery management + responsive).
+  Backend (2 new endpoints, `adminDeliveryController`):
+  `POST /api/admin/delivery/partners/:userId/reset-password {password}` (Admin
+  only; goes through `user.save()` so the pre-save bcrypt hook runs — `PUT
+  /employees/:id` does **not** and would store plaintext; min 6 chars; `logAudit`),
+  `POST /api/admin/delivery/partners/:userId/account {active}` (Admin only;
+  `active:false` → `User.status='Suspended'` [enum is `Active|Suspended`, not
+  Inactive] + forces `DeliveryPartner.isOnline=false, availability='offline'` +
+  emits `fleet_update`; **409 if the partner still has `activeOrderIds`**;
+  `logAudit`). Suspended blocks both `/api/auth/login` (403) and `protectDelivery`.
+  Frontend: **`DeliveryModule`** in `Modules.tsx` fully rebuilt — consumes
+  `GET /api/admin/delivery/partners` (real online/availability/activeOrders/
+  completed/failed/rating/last-seen), 15s auto-refresh, Add partner (`POST
+  /employees` role Delivery), per-row Reset-password (prompt) + Activate/
+  Deactivate; responsive (`hidden md:block` table + `md:hidden` card list).
+  **`Orders.tsx`** assign flow rewired off the fake hardcoded-name `PUT
+  /status` call → real `POST /api/admin/orders/:id/{assign,reassign,unassign}`
+  with a real `partnerUserId` from a partner `<select>` (online-first sorted),
+  a **Force-assign** checkbox (`force:true` skips the offer), offered-vs-forced
+  result message, `assignmentStalled` "offer declined" badge in the Rider column
+  + drawer. No mock fallbacks in the new code paths.
+  Verified: backend `npm test` → **27 tests** (+2: password-reset-through-hash
+  + deactivate-blocks-login/reactivate), `tsc --noEmit` clean, `npm run build`
+  (vite) OK.
+  Next: **P1-D1** — automatic assignment on `Order.status → Ready`
+  (`assignmentService.tryAssign`, `$near` candidate query, ranking, radius
+  expand, stall alert).
+
 - **2026-09-01 — Delivery P0-D4 DONE** (new `deliveryapp/` Flutter package, MVP).
   `flutter create --org com.freshcart --project-name freshcart_delivery
   --platforms android,ios`. Same architecture as `mobileapp/`: Riverpod
@@ -858,10 +886,11 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
 
 ## 12. Testing Status
 
-- **Backend: `npm test` → 25 tests, all green**
+- **Backend: `npm test` → 27 tests, all green**
   (`node:test` + `supertest` against `MONGO_URI`). Covers auth/OTP, protectCustomer,
   coupon validate, order placement + `/orders/mine` + ownership, status timeline,
-  payment test-mode.
+  payment test-mode, delivery partner lifecycle + admin assign/reassign/unassign +
+  partner password-reset/activate-deactivate.
 - **Mobile: `flutter test` → 100 tests, all green** — `auth_flow_test`,
   `catalog_models_test`, `pricing_test`, `design_flat_test`, `order_model_test`,
   `foundation_widgets_test` (7), `navigation_test` (5 — nested/back nav),
@@ -912,5 +941,7 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
 - Frontend: no automated tests; admin `fetchReviews` change not yet run in a browser.
 
 ## 13. Last Updated
+
+2026-09-01 — Delivery P0-D5: admin web delivery management — DeliveryModule rebuilt on GET /admin/delivery/partners (live status, add, reset-pw, activate/deactivate, responsive table+cards); Orders.tsx assign flow rewired to real POST /admin/orders/:id/assign|reassign|unassign with partner select + force option. 2 new backend endpoints (reset-password through hash, account suspend/activate). Backend 27 tests green, frontend build clean. Next: P1-D1 auto-assign on Ready.
 
 2026-09-01 — Delivery P0-D4: new `deliveryapp/` Flutter package (MVP) — splash/login/forgot/dashboard(online toggle + location heartbeat)/order-detail(lifecycle + OTP/photo proof)/history/profile, socket `partner:<id>` offer overlay with countdown Accept/Reject. No backend changes. `flutter analyze` clean, 5 tests green, debug APK builds. Next: P0-D5 admin web delivery management + responsive.

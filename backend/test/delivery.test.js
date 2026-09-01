@@ -141,6 +141,41 @@ test('admin lists partners', async () => {
   assert.ok(res.body.partners.some((p) => p.userId === riderUserId));
 });
 
+test('admin resets a partner password (goes through the hash) and can re-login', async () => {
+  const aTok = await adminToken();
+  const short = await api().post(`/api/admin/delivery/partners/${riderUserId}/reset-password`)
+    .set('Authorization', `Bearer ${aTok}`).send({ password: 'x' });
+  assert.equal(short.status, 400);
+
+  const ok = await api().post(`/api/admin/delivery/partners/${riderUserId}/reset-password`)
+    .set('Authorization', `Bearer ${aTok}`).send({ password: 'reset-me-123' });
+  assert.equal(ok.status, 200);
+  await riderToken('reset-me-123'); // throws if the hash was not applied
+  // restore
+  await api().post(`/api/admin/delivery/partners/${riderUserId}/reset-password`)
+    .set('Authorization', `Bearer ${aTok}`).send({ password: 'delivery123' });
+});
+
+test('admin deactivate blocks partner login; reactivate restores it', async () => {
+  const aTok = await adminToken();
+  await DeliveryPartner.updateOne({ userId: riderUserId }, { $set: { activeOrderIds: [], isOnline: true } });
+
+  const off = await api().post(`/api/admin/delivery/partners/${riderUserId}/account`)
+    .set('Authorization', `Bearer ${aTok}`).send({ active: false });
+  assert.equal(off.status, 200);
+  assert.equal(off.body.accountStatus, 'Suspended');
+  const dp = await DeliveryPartner.findOne({ userId: riderUserId });
+  assert.equal(dp.isOnline, false);
+
+  const blockedLogin = await api().post('/api/auth/login').send({ email: RIDER_EMAIL, password: 'delivery123' });
+  assert.equal(blockedLogin.status, 403);
+
+  const on = await api().post(`/api/admin/delivery/partners/${riderUserId}/account`)
+    .set('Authorization', `Bearer ${aTok}`).send({ active: true });
+  assert.equal(on.status, 200);
+  assert.equal((await api().get('/api/delivery/me').set('Authorization', `Bearer ${await riderToken()}`)).status, 200);
+});
+
 test('manual offer → partner accepts → order Assigned + partner queue updated', async () => {
   const rTok = await riderToken();
   const aTok = await adminToken();

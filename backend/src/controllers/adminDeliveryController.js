@@ -163,6 +163,57 @@ export const adminDeliveryController = {
       res.status(500).json({ success: false, message: err.message });
     }
   },
+
+  // POST /api/admin/delivery/partners/:userId/reset-password  { password }
+  // Goes through user.save() so the model's pre-save bcrypt hook runs.
+  resetPartnerPassword: async (req, res) => {
+    try {
+      const password = String(req.body.password || '');
+      if (password.length < 6) {
+        return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+      }
+      const user = await User.findOne({ _id: req.params.userId, role: 'Delivery' });
+      if (!user) return res.status(404).json({ success: false, message: 'Delivery partner not found' });
+      user.password = password;
+      await user.save();
+      await logAudit(String(req.user._id), req.user.name, 'Partner Password Reset', `${user.name} (${user.email})`);
+      res.json({ success: true, message: 'Password reset' });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // POST /api/admin/delivery/partners/:userId/account  { active: boolean }
+  setPartnerAccount: async (req, res) => {
+    try {
+      const active = req.body.active === true || req.body.active === 'true';
+      const user = await User.findOne({ _id: req.params.userId, role: 'Delivery' });
+      if (!user) return res.status(404).json({ success: false, message: 'Delivery partner not found' });
+      const partner = await DeliveryPartner.findOne({ userId: user._id });
+
+      if (!active && partner && (partner.activeOrderIds || []).length > 0) {
+        return res.status(409).json({ success: false, message: 'Partner has active deliveries — reassign them first' });
+      }
+
+      user.status = active ? 'Active' : 'Suspended';
+      await user.save();
+
+      if (!active && partner) {
+        partner.isOnline = false;
+        partner.availability = 'offline';
+        await partner.save();
+        req.app.get('io')?.to('admin_fleet').emit('fleet_update', {
+          userId: String(user._id), name: user.name, isOnline: false, availability: 'offline',
+        });
+      }
+
+      await logAudit(String(req.user._id), req.user.name,
+        active ? 'Partner Activated' : 'Partner Deactivated', `${user.name} (${user.email})`);
+      res.json({ success: true, accountStatus: user.status });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
 };
 
 // re-export for the partner-side accept/reject (used by deliveryController)

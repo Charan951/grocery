@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  ShoppingBag, Eye, Printer, UserPlus, Clock, ArrowRight, CheckCircle2,
+  ShoppingBag, Eye, Printer, UserPlus, UserMinus, Clock, ArrowRight, CheckCircle2,
   XCircle, Truck, FileText, ChevronRight, X, AlertCircle
 } from 'lucide-react';
 import { PageHeader } from '../../components/admin/PageHeader';
@@ -26,8 +26,10 @@ interface Order {
   grandTotal: number;
   paymentStatus: 'Pending' | 'Paid' | 'Failed' | 'Refunded';
   paymentMethod: 'COD' | 'UPI' | 'Card' | 'Wallet';
-  status: 'Pending' | 'Accepted' | 'Packed' | 'Ready' | 'Assigned' | 'Out For Delivery' | 'Delivered' | 'Cancelled' | 'Returned' | 'Refunded' | 'Exchange';
+  status: 'Pending' | 'Accepted' | 'Packed' | 'Ready' | 'Assigned' | 'Arrived At Store' | 'Out For Delivery' | 'Arrived' | 'Delivered' | 'Failed' | 'Cancelled' | 'Returned' | 'Refunded' | 'Exchange';
   deliveryPartnerName?: string;
+  deliveryPartnerUserId?: string;
+  assignmentStalled?: boolean;
   createdAt: string;
   deliveryAddress: {
     type: string;
@@ -47,7 +49,12 @@ export const Orders: React.FC = () => {
   // Selection / Modal States
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showRiderModal, setShowRiderModal] = useState(false);
-  const [selectedRider, setSelectedRider] = useState('');
+  const [reassignMode, setReassignMode] = useState(false);
+  const [partners, setPartners] = useState<any[]>([]);
+  const [selectedPartnerId, setSelectedPartnerId] = useState('');
+  const [forceAssign, setForceAssign] = useState(false);
+  const [assignBusy, setAssignBusy] = useState(false);
+  const [assignMsg, setAssignMsg] = useState('');
   
   // MERN API Connection
   const API_URL = '/api';
@@ -140,9 +147,94 @@ export const Orders: React.FC = () => {
     }
   };
 
+  const fetchPartners = async () => {
+    try {
+      const res = await fetch(`${API_URL}/admin/delivery/partners`, { headers: getAuthHeader() });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.partners)) {
+        // online + active first, then by fewest active orders
+        const sorted = [...data.partners].sort((a, b) => {
+          const rank = (p: any) => (p.accountStatus === 'Suspended' ? 3 : !p.isOnline ? 2 : p.availability === 'busy' ? 1 : 0);
+          return rank(a) - rank(b) || a.activeOrderIds.length - b.activeOrderIds.length;
+        });
+        setPartners(sorted);
+      }
+    } catch {
+      /* modal will show empty list */
+    }
+  };
+
   useEffect(() => {
     fetchOrders();
+    fetchPartners();
   }, []);
+
+  const openAssign = (reassign: boolean) => {
+    setReassignMode(reassign);
+    setForceAssign(false);
+    setSelectedPartnerId('');
+    setAssignMsg('');
+    fetchPartners();
+    setShowRiderModal(true);
+  };
+
+  const handleAssign = async () => {
+    if (!selectedOrder || !selectedPartnerId) return;
+    setAssignBusy(true);
+    setAssignMsg('');
+    try {
+      const path = reassignMode ? 'reassign' : 'assign';
+      const res = await fetch(`${API_URL}/admin/orders/${selectedOrder.orderId}/${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+        body: JSON.stringify({ partnerUserId: selectedPartnerId, force: forceAssign }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setAssignMsg(data.message || 'Assignment failed');
+        return;
+      }
+      if (data.mode === 'offered') {
+        setAssignMsg('Offer sent — waiting for the partner to accept.');
+      } else {
+        setAssignMsg('Partner assigned.');
+      }
+      if (data.order) {
+        setOrders(prev => prev.map(o => o.orderId === selectedOrder.orderId ? { ...o, ...data.order } : o));
+        setSelectedOrder(prev => prev ? { ...prev, ...data.order } : prev);
+      }
+      fetchOrders();
+      setTimeout(() => setShowRiderModal(false), 900);
+    } catch {
+      setAssignMsg('Assignment failed — network error');
+    } finally {
+      setAssignBusy(false);
+    }
+  };
+
+  const handleUnassign = async () => {
+    if (!selectedOrder) return;
+    const reason = window.prompt('Reason for unassigning (optional):') || '';
+    try {
+      const res = await fetch(`${API_URL}/admin/orders/${selectedOrder.orderId}/unassign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+        body: JSON.stringify({ reason }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        alert(data.message || 'Unassign failed');
+        return;
+      }
+      if (data.order) {
+        setOrders(prev => prev.map(o => o.orderId === selectedOrder.orderId ? { ...o, ...data.order } : o));
+        setSelectedOrder(prev => prev ? { ...prev, ...data.order } : prev);
+      }
+      fetchOrders();
+    } catch {
+      alert('Unassign failed');
+    }
+  };
 
   const handleUpdateStatus = async (orderId: string, newStatus: string) => {
     try {
@@ -180,43 +272,6 @@ export const Orders: React.FC = () => {
     alert(`Order ORD status updated to ${newStatus}!`);
   };
 
-  const handleAssignRider = async () => {
-    if (!selectedOrder || !selectedRider) return;
-    try {
-      const res = await fetch(`${API_URL}/orders/${selectedOrder.orderId}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
-        body: JSON.stringify({ 
-          status: 'Assigned', 
-          deliveryPartnerId: 'dr_' + selectedRider.toLowerCase(),
-          deliveryPartnerName: selectedRider,
-          note: `Assigned order to delivery rider: ${selectedRider}.` 
-        })
-      });
-      const data = await res.json();
-      if (data.success && data.order) {
-        setOrders(prev => prev.map(o => o.orderId === selectedOrder.orderId ? { ...o, ...data.order } : o));
-        setSelectedOrder({ ...selectedOrder, ...data.order });
-      }
-    } catch (e) {
-      setOrders(prev => prev.map(o => {
-        if (o.orderId === selectedOrder.orderId) {
-          const updatedTimeline = [...o.trackingTimeline, { status: 'Assigned', note: `Assigned to rider ${selectedRider}`, timestamp: new Date().toISOString() }];
-          const updated: Order = { 
-            ...o, 
-            status: 'Assigned',
-            deliveryPartnerName: selectedRider,
-            trackingTimeline: updatedTimeline 
-          };
-          setSelectedOrder(updated);
-          return updated;
-        }
-        return o;
-      }));
-    }
-    setShowRiderModal(false);
-    alert(`Delivery rider '${selectedRider}' assigned to order!`);
-  };
 
   const printInvoice = () => {
     window.print();
@@ -292,6 +347,9 @@ export const Orders: React.FC = () => {
                     </td>
                     <td className="p-3.5 text-admin-text-muted font-medium">
                       {o.deliveryPartnerName || 'Unassigned'}
+                      {o.assignmentStalled && (
+                        <span className="ml-1 text-[9px] font-bold uppercase text-error">• offer declined</span>
+                      )}
                     </td>
                     <td className="p-3.5">
                       <ShelfTag tone={statusTone(o.status)}>{o.status}</ShelfTag>
@@ -406,6 +464,12 @@ export const Orders: React.FC = () => {
               {/* ACTION: Shift Status / Assign Rider */}
               <div className="flex flex-col gap-3 dont-print">
                 <span className="text-[10px] font-bold text-text-secondary uppercase">Dispatch Action Panel</span>
+                {selectedOrder.deliveryPartnerName && (
+                  <div className={`text-[11px] font-semibold rounded-lg px-3 py-2 ${selectedOrder.assignmentStalled ? 'bg-error/10 text-error' : 'bg-background text-text-secondary'}`}>
+                    Partner: <b className="text-text-primary">{selectedOrder.deliveryPartnerName}</b>
+                    {selectedOrder.assignmentStalled && ' — last offer was declined/expired. Reassign.'}
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-2">
                   {selectedOrder.status === 'Pending' && (
                     <button 
@@ -431,24 +495,29 @@ export const Orders: React.FC = () => {
                       Ready for Dispatch
                     </button>
                   )}
-                  {selectedOrder.status === 'Ready' && (
-                    <button 
-                      onClick={() => {
-                        setSelectedRider('Ramesh Kumar');
-                        setShowRiderModal(true);
-                      }}
+                  {(selectedOrder.status === 'Ready' || selectedOrder.status === 'Packed') && !selectedOrder.deliveryPartnerUserId && (
+                    <button
+                      onClick={() => openAssign(false)}
                       className="bg-primary text-white font-bold py-2 rounded-xl text-xs hover:bg-secondary cursor-pointer flex items-center justify-center gap-1.5"
                     >
-                      <UserPlus size={14} /> Assign Rider
+                      <UserPlus size={14} /> Assign Partner
                     </button>
                   )}
-                  {selectedOrder.status === 'Assigned' && (
-                    <button 
-                      onClick={() => handleUpdateStatus(selectedOrder.orderId, 'Out For Delivery')}
-                      className="bg-primary text-white font-bold py-2 rounded-xl text-xs hover:bg-secondary cursor-pointer flex items-center justify-center gap-1.5"
-                    >
-                      <Truck size={14} /> Send Out For Delivery
-                    </button>
+                  {selectedOrder.deliveryPartnerUserId && !['Delivered', 'Cancelled', 'Returned', 'Refunded'].includes(selectedOrder.status) && (
+                    <>
+                      <button
+                        onClick={() => openAssign(true)}
+                        className="border border-primary text-primary bg-primary/5 font-bold py-2 rounded-xl text-xs hover:bg-primary/10 cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <UserPlus size={14} /> Reassign
+                      </button>
+                      <button
+                        onClick={handleUnassign}
+                        className="border border-error text-error bg-error/5 font-bold py-2 rounded-xl text-xs hover:bg-error/10 cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <UserMinus size={14} /> Unassign
+                      </button>
+                    </>
                   )}
                   {selectedOrder.status === 'Out For Delivery' && (
                     <button 
@@ -489,39 +558,62 @@ export const Orders: React.FC = () => {
         </div>
       )}
 
-      {/* RIDER ASSIGNMENT MODAL OVERLAY */}
-      {showRiderModal && (
+      {/* PARTNER ASSIGNMENT MODAL OVERLAY */}
+      {showRiderModal && selectedOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-xs" onClick={() => setShowRiderModal(false)} />
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-xs" onClick={() => !assignBusy && setShowRiderModal(false)} />
           <div className="bg-surface rounded-[28px] border border-divider p-6 max-w-sm w-full relative z-10 shadow-premium flex flex-col gap-4">
-            <h3 className="font-extrabold text-sm text-text-primary uppercase">Assign Delivery Partner</h3>
-            <p className="text-[11px] text-text-secondary leading-normal">Choose an active rider to dispatch ORD-74912 from the South Bengaluru store location.</p>
-            
+            <h3 className="font-extrabold text-sm text-text-primary uppercase">
+              {reassignMode ? 'Reassign' : 'Assign'} delivery partner
+            </h3>
+            <p className="text-[11px] text-text-secondary leading-normal">
+              Order <b>{selectedOrder.orderId}</b>. An offer is sent to the partner's app; they must accept it.
+              Force-assign skips the offer.
+            </p>
+
             <div className="flex flex-col gap-2">
-              <label className="text-[10px] font-bold text-text-secondary uppercase">Select Partner</label>
-              <select 
-                value={selectedRider} 
-                onChange={(e) => setSelectedRider(e.target.value)}
+              <label className="text-[10px] font-bold text-text-secondary uppercase">Select partner (online first)</label>
+              <select
+                value={selectedPartnerId}
+                onChange={(e) => setSelectedPartnerId(e.target.value)}
                 className="px-3 py-2 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary"
               >
-                <option value="">-- Choose Rider --</option>
-                <option value="Ramesh Kumar">🚴 Ramesh Kumar (Active • 0.8 km away)</option>
-                <option value="Sumit Sharma">🚴 Sumit Sharma (Active • 1.2 km away)</option>
-                <option value="Vijay Singh">🚴 Vijay Singh (Active • 2.5 km away)</option>
+                <option value="">-- Choose partner --</option>
+                {partners.map((p) => {
+                  const state = p.accountStatus === 'Suspended' ? 'suspended'
+                    : !p.isOnline ? 'offline'
+                    : p.availability === 'busy' ? 'on delivery' : 'available';
+                  return (
+                    <option key={p.userId} value={p.userId} disabled={p.accountStatus === 'Suspended'}>
+                      {p.name} — {state} • {p.activeOrderIds.length}/{p.maxConcurrent} active • ★{Number(p.rating || 0).toFixed(1)}
+                    </option>
+                  );
+                })}
               </select>
+              {partners.length === 0 && (
+                <span className="text-[10px] text-error font-semibold">No delivery partners found. Add one in Modules → Delivery.</span>
+              )}
             </div>
 
-            <div className="flex gap-2.5 mt-2">
-              <button 
-                onClick={handleAssignRider}
-                disabled={!selectedRider}
+            <label className="flex items-center gap-2 text-[11px] text-text-secondary font-semibold cursor-pointer">
+              <input type="checkbox" checked={forceAssign} onChange={(e) => setForceAssign(e.target.checked)} />
+              Force-assign (skip offer / partner acceptance)
+            </label>
+
+            {assignMsg && <div className="text-[11px] font-semibold text-primary">{assignMsg}</div>}
+
+            <div className="flex gap-2.5 mt-1">
+              <button
+                onClick={handleAssign}
+                disabled={!selectedPartnerId || assignBusy}
                 className="flex-1 bg-primary text-white font-bold py-2 rounded-full text-xs hover:bg-secondary cursor-pointer disabled:opacity-50"
               >
-                Confirm Allocation
+                {assignBusy ? 'Working…' : reassignMode ? 'Confirm reassign' : forceAssign ? 'Force-assign' : 'Send offer'}
               </button>
-              <button 
+              <button
                 onClick={() => setShowRiderModal(false)}
-                className="flex-1 bg-background text-text-secondary border border-divider font-bold py-2 rounded-full text-xs hover:bg-surface cursor-pointer"
+                disabled={assignBusy}
+                className="flex-1 bg-background text-text-secondary border border-divider font-bold py-2 rounded-full text-xs hover:bg-surface cursor-pointer disabled:opacity-50"
               >
                 Cancel
               </button>

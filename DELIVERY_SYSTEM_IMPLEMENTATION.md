@@ -878,11 +878,20 @@ sweeper.
 - Deferred to P1/P2: dedicated Failed-Delivery screen polish, background
   location, FCM push for offers, ratings, earnings detail.
 
-**P0-D5 · Admin web — real partner management + manual assign**
-- Rebuild `DeliveryModule`: partner table, Add/Edit/Activate/Deactivate/Reset-pw,
-  online/available badges, last-seen. `Orders.tsx`: real assign/reassign/unassign
-  dropdown (online-first) + assignment state display. Responsive (§16).
-- Tests: component tests for the table + assign actions.
+**P0-D5 · Admin web — real partner management + manual assign** — ✅ DONE 2026-09-01
+- `DeliveryModule` (`Modules.tsx`) rebuilt: consumes `GET /api/admin/delivery/
+  partners`, 15s auto-refresh, online/available/on-delivery/suspended badges,
+  active-orders `n/max`, completed/failed, rating, last-seen; Add partner (`POST
+  /employees` role Delivery), per-row Reset-password + Activate/Deactivate.
+  Responsive: `hidden md:block` table + `md:hidden` card list.
+- `Orders.tsx`: fake hardcoded-name assign replaced with real `POST /api/admin/
+  orders/:id/{assign,reassign,unassign}` + partner `<select>` (online-first),
+  Force-assign checkbox, offered/forced result message, `assignmentStalled`
+  badge, drawer Reassign/Unassign actions.
+- Backend added: `POST /api/admin/delivery/partners/:userId/reset-password`
+  (through `user.save()` hash, min 6, Admin, audit) and `.../account {active}`
+  (suspend/activate, forces offline, 409 if active orders, audit).
+- Verified: backend `npm test` 27 green (+2), `tsc --noEmit` clean, `vite build` OK.
 
 **P0 exit:** an admin can create a real partner; the partner logs into the new
 app, goes online, is offered an order manually assigned by admin, accepts, picks

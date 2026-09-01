@@ -1972,12 +1972,43 @@ export const CustomersModule: React.FC = () => {
 // ==========================================
 // 6. DELIVERY MODULE
 // ==========================================
+interface FleetPartner {
+  userId: string;
+  name: string;
+  email: string;
+  phone: string;
+  vehicleType: string;
+  accountStatus: 'Active' | 'Suspended';
+  isOnline: boolean;
+  availability: 'offline' | 'available' | 'busy';
+  activeOrderIds: string[];
+  maxConcurrent: number;
+  rating: number;
+  completedCount: number;
+  failedCount: number;
+  location: { lat: number; lng: number } | null;
+  locationUpdatedAt: string | null;
+  lastSeenAt: string | null;
+}
+
+const relTime = (iso: string | null): string => {
+  if (!iso) return 'never';
+  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+};
+
 export const DeliveryModule: React.FC = () => {
-  const [riders, setRiders] = useState<any[]>([]);
+  const [partners, setPartners] = useState<FleetPartner[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
@@ -1985,94 +2016,130 @@ export const DeliveryModule: React.FC = () => {
     return token ? { 'Authorization': `Bearer ${token}` } : {};
   };
 
-  const fetchRiders = async () => {
+  const fetchPartners = async () => {
     try {
-      const res = await fetch(`${API_URL}/employees`, { headers: getAuthHeader() });
+      const res = await fetch(`${API_URL}/admin/delivery/partners`, { headers: getAuthHeader() });
       const data = await res.json();
-      if (data.success && data.employees) {
-        setRiders(data.employees.filter((e: any) => e.role === 'Delivery'));
-      }
-    } catch (e) {
-      console.warn('Failed to fetch riders');
+      if (data.success && Array.isArray(data.partners)) setPartners(data.partners);
+    } catch {
+      /* keep last snapshot */
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchRiders();
+    fetchPartners();
+    const t = setInterval(fetchPartners, 15000); // near-live status refresh
+    return () => clearInterval(t);
   }, []);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim()) return;
-
     try {
       const res = await fetch(`${API_URL}/employees`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...getAuthHeader()
-        },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
         body: JSON.stringify({
           name: name.trim(),
           email: email.trim(),
+          phone: phone.trim(),
           password: password || 'delivery123',
-          role: 'Delivery'
-        })
+          role: 'Delivery',
+        }),
       });
       const data = await res.json();
       if (data.success) {
-        setRiders(prev => [...prev, data.employee]);
-        alert('Delivery rider registered successfully on backend!');
+        setName(''); setEmail(''); setPhone(''); setPassword(''); setShowAdd(false);
+        fetchPartners();
       } else {
         alert('Failed: ' + (data.message || 'Unknown error'));
       }
-    } catch (err) {
-      alert('Failed to register rider.');
+    } catch {
+      alert('Failed to register delivery partner.');
     }
-
-    setName('');
-    setEmail('');
-    setPassword('');
-    setShowAdd(false);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to remove this rider from the fleet?')) return;
-
+  const setAccount = async (p: FleetPartner, active: boolean) => {
+    if (!active && !window.confirm(`Deactivate ${p.name}? They will be signed out and cannot log in.`)) return;
+    setBusyId(p.userId);
     try {
-      const res = await fetch(`${API_URL}/employees/${id}`, {
-        method: 'DELETE',
-        headers: getAuthHeader()
+      const res = await fetch(`${API_URL}/admin/delivery/partners/${p.userId}/account`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+        body: JSON.stringify({ active }),
       });
       const data = await res.json();
-      if (data.success) {
-        setRiders(prev => prev.filter(r => r._id !== id));
-        alert('Rider removed successfully!');
-      }
-    } catch (err) {
-      alert('Delete failed.');
+      if (!res.ok || !data.success) alert(data.message || 'Action failed');
+      fetchPartners();
+    } catch {
+      alert('Action failed');
+    } finally {
+      setBusyId(null);
     }
   };
 
+  const resetPassword = async (p: FleetPartner) => {
+    const pw = window.prompt(`New password for ${p.name} (min 6 chars):`);
+    if (!pw) return;
+    setBusyId(p.userId);
+    try {
+      const res = await fetch(`${API_URL}/admin/delivery/partners/${p.userId}/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+        body: JSON.stringify({ password: pw }),
+      });
+      const data = await res.json();
+      alert(res.ok && data.success ? 'Password reset.' : (data.message || 'Reset failed'));
+    } catch {
+      alert('Reset failed');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const availTone = (p: FleetPartner) => {
+    if (p.accountStatus === 'Suspended') return 'text-error bg-error/10';
+    if (!p.isOnline) return 'text-text-secondary bg-divider/40';
+    if (p.availability === 'busy') return 'text-warning bg-warning/10';
+    return 'text-success bg-success/10';
+  };
+  const availLabel = (p: FleetPartner) =>
+    p.accountStatus === 'Suspended' ? 'Suspended'
+      : !p.isOnline ? 'Offline'
+      : p.availability === 'busy' ? 'On delivery' : 'Available';
+
+  const online = partners.filter(p => p.isOnline && p.accountStatus === 'Active').length;
+  const onDelivery = partners.filter(p => p.availability === 'busy').length;
+
   return (
-    <div className="bg-surface border border-divider p-6 rounded-[28px] shadow-card flex flex-col gap-6">
-      <div className="flex justify-between items-center pb-3 border-b border-divider">
+    <div className="bg-surface border border-divider p-4 sm:p-6 rounded-[28px] shadow-card flex flex-col gap-5">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 pb-3 border-b border-divider">
         <div>
-          <h2 className="font-extrabold text-sm text-text-primary">Delivery Fleet Dispatcher</h2>
-          <p className="text-[10px] text-text-secondary font-medium">Assign dark store riders and check coverage zones</p>
+          <h2 className="font-extrabold text-sm text-text-primary">Delivery Partners</h2>
+          <p className="text-[10px] text-text-secondary font-medium">
+            {partners.length} registered • {online} online • {onDelivery} on delivery
+          </p>
         </div>
-        <button onClick={() => setShowAdd(true)} className="flex items-center gap-1 bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[10px] hover:bg-secondary cursor-pointer">
-          <Plus size={12} /> Add Rider
-        </button>
+        <div className="flex gap-2">
+          <button onClick={fetchPartners} className="flex items-center gap-1 border border-divider text-text-secondary font-bold py-1.5 px-3 rounded-full text-[10px] hover:bg-background cursor-pointer">
+            <RefreshCw size={12} /> Refresh
+          </button>
+          <button onClick={() => setShowAdd(v => !v)} className="flex items-center gap-1 bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[10px] hover:bg-secondary cursor-pointer">
+            <Plus size={12} /> Add Partner
+          </button>
+        </div>
       </div>
 
       {showAdd && (
         <form onSubmit={handleAdd} className="bg-background p-4 rounded-2xl border border-divider flex flex-col gap-3">
-          <h3 className="font-bold text-xs">Add Rider Profile</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <input type="text" placeholder="Rider Name" value={name} onChange={(e) => setName(e.target.value)} className="px-3 py-1.5 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary" required />
-            <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="px-3 py-1.5 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary" required />
-            <input type="password" placeholder="Password (default: delivery123)" value={password} onChange={(e) => setPassword(e.target.value)} className="px-3 py-1.5 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary" />
+          <h3 className="font-bold text-xs">Register delivery partner</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <input type="text" placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} className="px-3 py-1.5 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary" required />
+            <input type="email" placeholder="Email (login)" value={email} onChange={(e) => setEmail(e.target.value)} className="px-3 py-1.5 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary" required />
+            <input type="tel" placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="px-3 py-1.5 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary" />
+            <input type="text" placeholder="Password (default: delivery123)" value={password} onChange={(e) => setPassword(e.target.value)} className="px-3 py-1.5 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary" />
           </div>
           <div className="flex gap-2">
             <button type="submit" className="bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[10px] cursor-pointer">Save</button>
@@ -2081,23 +2148,101 @@ export const DeliveryModule: React.FC = () => {
         </form>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {riders.map(r => (
-          <div key={r._id} className="p-4 border border-divider rounded-2xl bg-background flex flex-col gap-2 shadow-sm relative group">
-            <button 
-              onClick={() => handleDelete(r._id)}
-              className="absolute top-2 right-2 p-1.5 rounded-lg bg-surface border border-divider text-text-secondary hover:text-error hover:bg-error/10 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
-              title="Remove Rider"
-            >
-              <Trash2 size={11} />
-            </button>
-            <div className="flex justify-between items-center">
-              <span className="font-extrabold text-xs text-text-primary">🚴 {r.name}</span>
-              <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full text-success bg-success/10">Active Fleet</span>
+      {loading && partners.length === 0 && (
+        <div className="py-10 text-center text-text-secondary text-xs font-semibold">Loading partners…</div>
+      )}
+      {!loading && partners.length === 0 && (
+        <div className="py-10 text-center text-text-secondary text-xs font-semibold">No delivery partners yet. Add one to get started.</div>
+      )}
+
+      {/* Desktop table */}
+      {partners.length > 0 && (
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="text-text-tertiary">
+                {['Partner', 'Status', 'Active orders', 'Completed / Failed', 'Rating', 'Last seen', 'Actions'].map(h => (
+                  <th key={h} className="p-2.5 border-b border-divider font-bold uppercase text-[9px] tracking-wide">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {partners.map(p => (
+                <tr key={p.userId} className="border-b border-divider last:border-0 hover:bg-background/60">
+                  <td className="p-2.5">
+                    <div className="font-extrabold text-text-primary">{p.name}</div>
+                    <div className="text-[10px] text-text-secondary">{p.email}</div>
+                    <div className="text-[10px] text-text-secondary">{p.phone || '—'} • {p.vehicleType}</div>
+                  </td>
+                  <td className="p-2.5">
+                    <span className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full ${availTone(p)}`}>{availLabel(p)}</span>
+                  </td>
+                  <td className="p-2.5 font-bold text-text-primary tabular-nums">
+                    {p.activeOrderIds.length}/{p.maxConcurrent}
+                    {p.activeOrderIds.length > 0 && (
+                      <div className="text-[9px] font-medium text-text-secondary truncate max-w-[140px]">{p.activeOrderIds.join(', ')}</div>
+                    )}
+                  </td>
+                  <td className="p-2.5 tabular-nums text-text-secondary font-semibold">
+                    <span className="text-success">{p.completedCount}</span> / <span className="text-error">{p.failedCount}</span>
+                  </td>
+                  <td className="p-2.5 font-bold text-text-primary tabular-nums">★ {Number(p.rating || 0).toFixed(1)}</td>
+                  <td className="p-2.5 text-[10px] text-text-secondary font-semibold">{relTime(p.lastSeenAt || p.locationUpdatedAt)}</td>
+                  <td className="p-2.5">
+                    <div className="flex gap-1.5">
+                      <button disabled={busyId === p.userId} onClick={() => resetPassword(p)} title="Reset password" className="p-1.5 rounded-lg border border-divider text-text-secondary hover:text-primary hover:bg-primary/5 cursor-pointer disabled:opacity-40">
+                        <Key size={12} />
+                      </button>
+                      {p.accountStatus === 'Active' ? (
+                        <button disabled={busyId === p.userId} onClick={() => setAccount(p, false)} title="Deactivate" className="p-1.5 rounded-lg border border-divider text-text-secondary hover:text-error hover:bg-error/10 cursor-pointer disabled:opacity-40">
+                          <UserMinus size={12} />
+                        </button>
+                      ) : (
+                        <button disabled={busyId === p.userId} onClick={() => setAccount(p, true)} title="Activate" className="p-1.5 rounded-lg border border-divider text-text-secondary hover:text-success hover:bg-success/10 cursor-pointer disabled:opacity-40">
+                          <UserCheck size={12} />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Mobile cards */}
+      <div className="md:hidden grid grid-cols-1 gap-3">
+        {partners.map(p => (
+          <div key={p.userId} className="p-4 border border-divider rounded-2xl bg-background flex flex-col gap-2">
+            <div className="flex justify-between items-start gap-2">
+              <div>
+                <div className="font-extrabold text-xs text-text-primary">{p.name}</div>
+                <div className="text-[10px] text-text-secondary">{p.email}</div>
+                <div className="text-[10px] text-text-secondary">{p.phone || '—'} • {p.vehicleType}</div>
+              </div>
+              <span className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full ${availTone(p)}`}>{availLabel(p)}</span>
             </div>
-            <div className="text-[10px] text-text-secondary font-semibold mt-1">
-              <div>Email: {r.email}</div>
-              <div>Status: Available</div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-text-secondary font-semibold">
+              <span>Active: <b className="text-text-primary">{p.activeOrderIds.length}/{p.maxConcurrent}</b></span>
+              <span>Done: <b className="text-success">{p.completedCount}</b></span>
+              <span>Failed: <b className="text-error">{p.failedCount}</b></span>
+              <span>★ {Number(p.rating || 0).toFixed(1)}</span>
+              <span>Seen {relTime(p.lastSeenAt || p.locationUpdatedAt)}</span>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button disabled={busyId === p.userId} onClick={() => resetPassword(p)} className="flex-1 flex items-center justify-center gap-1 border border-divider text-text-secondary font-bold py-1.5 rounded-full text-[10px] cursor-pointer disabled:opacity-40">
+                <Key size={11} /> Reset PW
+              </button>
+              {p.accountStatus === 'Active' ? (
+                <button disabled={busyId === p.userId} onClick={() => setAccount(p, false)} className="flex-1 flex items-center justify-center gap-1 border border-error/40 text-error font-bold py-1.5 rounded-full text-[10px] cursor-pointer disabled:opacity-40">
+                  <UserMinus size={11} /> Deactivate
+                </button>
+              ) : (
+                <button disabled={busyId === p.userId} onClick={() => setAccount(p, true)} className="flex-1 flex items-center justify-center gap-1 border border-success/40 text-success font-bold py-1.5 rounded-full text-[10px] cursor-pointer disabled:opacity-40">
+                  <UserCheck size={11} /> Activate
+                </button>
+              )}
             </div>
           </div>
         ))}
