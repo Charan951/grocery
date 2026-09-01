@@ -1026,8 +1026,14 @@ the fleet live; customers track the rider on a map on both web and mobile.
   time, cancellations; admin dashboard widgets + leaderboards; SLA/idle alerts.
 - **P2-D5 Background location**: Android foreground service / iOS background modes
   (new dep — see below); geofence auto-"arrived"; heartbeat tuning for battery.
-- **P2-D6 Ratings**: customer rates the delivery post-Delivered → feeds
-  `DeliveryPartner.rating`; low-rating admin flag.
+- **P2-D6 Ratings** — ✅ DONE 2026-09-01. `Order.deliveryRating {stars,comment,at}`;
+  `POST /api/orders/:id/rate-partner` (`attachCustomerOptional`, owner-only,
+  Delivered-only, re-submit edits); recomputes `DeliveryPartner.rating`/`ratingCount`
+  from an aggregate; `stars<=2` → admin `Notification`. Web `TrackOrder` rating
+  card; admin `DeliveryModule` `★ x.x (n)` + red **Low** badge
+  (`ratingCount>=3 && rating<4`); mobile customer order-detail `_RatePartnerCard`
+  (`ApiService.ratePartner`, `OrderModel.deliveryRatingStars`); deliveryapp
+  dashboard shows rating count. Tests: backend 46, mobile 119, deliveryapp 6.
 - **P2-D7 Return-to-store / re-attempt flow** for failed/cancelled-after-pickup.
 
 ---

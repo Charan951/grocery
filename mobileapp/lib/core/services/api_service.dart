@@ -378,6 +378,23 @@ class ApiService {
     }
   }
 
+  /// `POST /api/orders/:id/rate-partner` → `{ deliveryRating, partnerRating, partnerRatingCount }`.
+  /// Only valid once the order is Delivered; re-submitting edits the rating.
+  Future<Map<String, dynamic>> ratePartner(String orderId, {required int stars, String? comment}) async {
+    try {
+      final res = await _dio.post(
+        '/orders/${Uri.encodeComponent(orderId)}/rate-partner',
+        data: {
+          'stars': stars,
+          if (comment != null && comment.trim().isNotEmpty) 'comment': comment.trim(),
+        },
+      );
+      return Map<String, dynamic>.from(res.data as Map);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
   /// `GET /api/customers/me/wallet/transactions` → `{ walletBalance, transactions[] }`.
   Future<Map<String, dynamic>> fetchWalletTransactions({int limit = 50}) async {
     try {

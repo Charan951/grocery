@@ -24,6 +24,16 @@ interface TrackedOrder {
   pickup?: { lat: number; lng: number; name?: string } | null;
   trackingTimeline?: { status: string; note: string; at?: string; timestamp?: string }[];
   delivery?: DeliveryBlock | null;
+  deliveryPartnerName?: string;
+  deliveryRating?: { stars: number; comment?: string; at?: string } | null;
+}
+
+function customerPhone(): string {
+  try {
+    return JSON.parse(localStorage.getItem('customer_user') || '{}')?.phone || '';
+  } catch {
+    return '';
+  }
 }
 
 const STEPS = ['Accepted', 'Packed', 'Ready', 'Assigned', 'Out For Delivery', 'Arrived', 'Delivered'];
@@ -72,6 +82,13 @@ export const TrackOrder: React.FC = () => {
   const [order, setOrder] = useState<TrackedOrder | null>(null);
   const [err, setErr] = useState('');
   const [tick, setTick] = useState(0);
+
+  const [rateStars, setRateStars] = useState(0);
+  const [rateComment, setRateComment] = useState('');
+  const [rateBusy, setRateBusy] = useState(false);
+  const [rateErr, setRateErr] = useState('');
+  const [rateDone, setRateDone] = useState(false);
+  const [rateEditing, setRateEditing] = useState(false);
 
   const elRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -194,6 +211,35 @@ export const TrackOrder: React.FC = () => {
 
   const curStep = order ? stepIndex(order.status) : 0;
 
+  const existingRating = order?.deliveryRating?.stars || 0;
+  const canRate = !!order && order.status === 'Delivered' && !!order.deliveryPartnerName;
+  const shownStars = rateStars || existingRating;
+
+  const submitRating = async () => {
+    if (!order || !rateStars) return;
+    setRateBusy(true);
+    setRateErr('');
+    try {
+      const res = await fetch(`/api/orders/${encodeURIComponent(order.orderId)}/rate-partner`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stars: rateStars, comment: rateComment.trim() || undefined, phone: customerPhone() }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setRateErr(data.message || 'Could not save your rating');
+      } else {
+        setRateDone(true);
+        setRateEditing(false);
+        fetchOrder();
+      }
+    } catch {
+      setRateErr('Network error');
+    } finally {
+      setRateBusy(false);
+    }
+  };
+
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 flex flex-col gap-5">
       <Link to="/account/orders" className="flex items-center gap-1.5 text-gray-500 hover:text-gray-900 text-sm font-bold w-fit">
@@ -258,6 +304,58 @@ export const TrackOrder: React.FC = () => {
                     <MessageCircle size={15} />
                   </a>
                 </div>
+              )}
+            </div>
+          )}
+
+          {canRate && (
+            <div className="rounded-2xl border border-gray-200 p-4 flex flex-col gap-3">
+              <div className="text-sm font-extrabold text-gray-900">
+                {existingRating || rateDone ? 'Thanks for rating your delivery' : `Rate your delivery by ${order.deliveryPartnerName}`}
+              </div>
+              <div className="flex items-center gap-1.5" role="radiogroup" aria-label="Delivery rating">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    role="radio"
+                    aria-checked={shownStars === n}
+                    aria-label={`${n} star${n > 1 ? 's' : ''}`}
+                    disabled={rateBusy}
+                    onClick={() => { setRateStars(n); setRateDone(false); }}
+                    className={`text-2xl leading-none transition-transform hover:scale-110 disabled:opacity-50 ${n <= shownStars ? 'text-amber-400' : 'text-gray-300'}`}
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
+              {(rateEditing || (!existingRating && !rateDone)) && (
+                <>
+                  <textarea
+                    value={rateComment}
+                    onChange={(e) => setRateComment(e.target.value)}
+                    placeholder="Add a note (optional)"
+                    maxLength={500}
+                    rows={2}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32]"
+                  />
+                  {rateErr && <div className="text-xs font-semibold text-red-600">{rateErr}</div>}
+                  <button
+                    onClick={submitRating}
+                    disabled={!rateStars || rateBusy}
+                    className="self-start rounded-full bg-[#2E7D32] text-white font-bold text-xs px-4 py-2 disabled:opacity-40"
+                  >
+                    {rateBusy ? 'Saving…' : 'Submit rating'}
+                  </button>
+                </>
+              )}
+              {(existingRating || rateDone) && !rateEditing && (
+                <button
+                  onClick={() => { setRateEditing(true); setRateStars(existingRating); setRateComment(order.deliveryRating?.comment || ''); }}
+                  className="self-start text-xs font-bold text-[#2E7D32] hover:underline"
+                >
+                  Change rating
+                </button>
               )}
             </div>
           )}

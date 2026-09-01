@@ -21,6 +21,7 @@ const partnerRow = (p, u) => ({
   activeOrderIds: p.activeOrderIds || [],
   maxConcurrent: p.maxConcurrent,
   rating: p.rating,
+  ratingCount: p.ratingCount || 0,
   completedCount: p.completedCount,
   failedCount: p.failedCount,
   location: p.currentLocation?.coordinates

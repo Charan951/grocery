@@ -848,6 +848,73 @@ export const orderController = {
     }
   },
 
+  // POST /api/orders/:id/rate-partner  { stars (1-5), comment? }
+  // attachCustomerOptional — app customer token OR { phone } in the body (web).
+  // Only the order owner, only after Delivered, one rating per order (re-submit
+  // to edit). Recomputes DeliveryPartner.rating/ratingCount from every rated
+  // order for that partner.
+  ratePartner: async (req, res) => {
+    try {
+      const order = await Order.findOne({ orderId: req.params.id });
+      if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+      let cust = req.customer;
+      if (!cust) {
+        const raw = String(req.body.phone || '').replace(/\D/g, '').slice(-10);
+        if (raw) cust = await Customer.findOne({ phone: new RegExp(raw + '$') });
+      }
+      if (!cust) return res.status(401).json({ success: false, message: 'Sign in to rate this delivery' });
+
+      const phone10 = String(cust.phone || '').replace(/\D/g, '').slice(-10);
+      const owns = order.customerId === cust.customerId
+        || (phone10 && String(order.customerPhone || '').endsWith(phone10));
+      if (!owns) return res.status(403).json({ success: false, message: 'Not your order' });
+
+      if (order.status !== 'Delivered') {
+        return res.status(409).json({ success: false, message: 'You can rate the delivery only after it is delivered' });
+      }
+      if (!order.deliveryPartnerUserId) {
+        return res.status(409).json({ success: false, message: 'This order had no delivery partner to rate' });
+      }
+
+      const stars = Number(req.body.stars ?? req.body.rating);
+      if (!Number.isFinite(stars) || stars < 1 || stars > 5) {
+        return res.status(400).json({ success: false, message: 'Rating must be between 1 and 5' });
+      }
+      const comment = String(req.body.comment || '').trim().slice(0, 500);
+
+      order.deliveryRating = { stars: Math.round(stars), comment: comment || undefined, at: new Date() };
+      await order.save();
+
+      // Recompute the partner's aggregate rating from all their rated orders.
+      const partnerUserId = order.deliveryPartnerUserId;
+      const [agg] = await Order.aggregate([
+        { $match: { deliveryPartnerUserId: partnerUserId, 'deliveryRating.stars': { $gte: 1 } } },
+        { $group: { _id: null, avg: { $avg: '$deliveryRating.stars' }, count: { $sum: 1 } } },
+      ]);
+      const ratingCount = agg?.count || 0;
+      const rating = agg ? Math.round(agg.avg * 100) / 100 : 5;
+      await DeliveryPartner.updateOne({ userId: partnerUserId }, { $set: { rating, ratingCount } });
+
+      // Low-rating alert for ops.
+      if (order.deliveryRating.stars <= 2) {
+        try {
+          const admins = await User.find({ role: { $in: ['Admin', 'Manager'] } }).select('_id');
+          await Notification.insertMany(admins.map((a) => ({
+            userId: String(a._id),
+            title: 'Low delivery rating',
+            body: `Order ${order.orderId} rated ${order.deliveryRating.stars}★${comment ? `: "${comment}"` : ''}.`,
+            type: 'Order',
+          })));
+        } catch (_) {}
+      }
+
+      res.json({ success: true, deliveryRating: order.deliveryRating, partnerRating: rating, partnerRatingCount: ratingCount });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
   updateStatus: async (req, res) => {
     try {
       const { status, note, deliveryPartnerId, deliveryPartnerName } = req.body;

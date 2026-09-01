@@ -1985,6 +1985,7 @@ interface FleetPartner {
   activeOrderIds: string[];
   maxConcurrent: number;
   rating: number;
+  ratingCount?: number;
   completedCount: number;
   failedCount: number;
   location: { lat: number; lng: number } | null;
@@ -2192,7 +2193,13 @@ export const DeliveryModule: React.FC = () => {
                   <td className="p-2.5 tabular-nums text-text-secondary font-semibold">
                     <span className="text-success">{p.completedCount}</span> / <span className="text-error">{p.failedCount}</span>
                   </td>
-                  <td className="p-2.5 font-bold text-text-primary tabular-nums">★ {Number(p.rating || 0).toFixed(1)}</td>
+                  <td className="p-2.5 font-bold text-text-primary tabular-nums whitespace-nowrap">
+                    ★ {Number(p.rating || 0).toFixed(1)}
+                    {(p.ratingCount ?? 0) > 0 && <span className="text-[10px] text-text-tertiary font-semibold"> ({p.ratingCount})</span>}
+                    {(p.ratingCount ?? 0) >= 3 && Number(p.rating) < 4 && (
+                      <span className="ml-1.5 rounded-full bg-error/10 text-error text-[9px] font-black uppercase px-1.5 py-0.5 align-middle">Low</span>
+                    )}
+                  </td>
                   <td className="p-2.5 text-[10px] text-text-secondary font-semibold">{relTime(p.lastSeenAt || p.locationUpdatedAt)}</td>
                   <td className="p-2.5">
                     <div className="flex gap-1.5">
@@ -2233,7 +2240,10 @@ export const DeliveryModule: React.FC = () => {
               <span>Active: <b className="text-text-primary">{p.activeOrderIds.length}/{p.maxConcurrent}</b></span>
               <span>Done: <b className="text-success">{p.completedCount}</b></span>
               <span>Failed: <b className="text-error">{p.failedCount}</b></span>
-              <span>★ {Number(p.rating || 0).toFixed(1)}</span>
+              <span>
+                ★ {Number(p.rating || 0).toFixed(1)}{(p.ratingCount ?? 0) > 0 ? ` (${p.ratingCount})` : ''}
+                {(p.ratingCount ?? 0) >= 3 && Number(p.rating) < 4 && <b className="text-error"> · Low</b>}
+              </span>
               <span>Seen {relTime(p.lastSeenAt || p.locationUpdatedAt)}</span>
             </div>
             <div className="flex gap-2 pt-1">

@@ -13,6 +13,7 @@ import 'package:freshcart/core/widgets/buttons.dart';
 import 'package:freshcart/core/widgets/feedback_states.dart';
 import 'package:freshcart/core/widgets/glass_card.dart';
 import 'package:freshcart/core/widgets/skeletons.dart';
+import 'package:freshcart/features/home/presentation/controllers/catalog_providers.dart' show apiServiceProvider;
 import 'package:freshcart/features/orders/data/models/order_model.dart';
 import 'package:freshcart/features/orders/presentation/controllers/orders_controller.dart';
 import 'package:freshcart/features/orders/presentation/screens/orders_list_screen.dart' show reorder, statusColor, statusIcon;
@@ -131,6 +132,18 @@ class OrderDetailScreen extends ConsumerWidget {
                   ],
                 ),
               ),
+              if (order.status == OrderStatus.delivered && order.deliveryPartnerName.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                _title('Rate your delivery', isDark),
+                const SizedBox(height: 8),
+                _RatePartnerCard(
+                  orderId: order.id,
+                  partnerName: order.deliveryPartnerName,
+                  initialStars: order.deliveryRatingStars,
+                  isDark: isDark,
+                  onRated: () => ref.invalidate(orderDetailProvider(orderId)),
+                ),
+              ],
               const SizedBox(height: 24),
               if (order.isActive)
                 PrimaryButton(text: 'Track this order', onPressed: () => context.push('/tracking/${order.id}'))
@@ -326,6 +339,128 @@ class _CancelOrderButtonState extends ConsumerState<_CancelOrderButton> {
       style: TextButton.styleFrom(
         foregroundColor: AppColors.error,
         minimumSize: const Size.fromHeight(44),
+      ),
+    );
+  }
+}
+
+class _RatePartnerCard extends ConsumerStatefulWidget {
+  final String orderId;
+  final String partnerName;
+  final int initialStars;
+  final bool isDark;
+  final VoidCallback onRated;
+  const _RatePartnerCard({
+    required this.orderId,
+    required this.partnerName,
+    required this.initialStars,
+    required this.isDark,
+    required this.onRated,
+  });
+
+  @override
+  ConsumerState<_RatePartnerCard> createState() => _RatePartnerCardState();
+}
+
+class _RatePartnerCardState extends ConsumerState<_RatePartnerCard> {
+  late int _stars = widget.initialStars;
+  final _comment = TextEditingController();
+  bool _busy = false;
+  bool _editing = false;
+
+  @override
+  void dispose() {
+    _comment.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_stars < 1 || _busy) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(apiServiceProvider).ratePartner(
+            widget.orderId,
+            stars: _stars,
+            comment: _comment.text,
+          );
+      if (!mounted) return;
+      setState(() => _editing = false);
+      AppToast.success('Thanks for rating your delivery');
+      widget.onRated();
+    } on ApiException catch (e) {
+      if (mounted) AppToast.error(e.message);
+    } catch (_) {
+      if (mounted) AppToast.error('Could not save your rating. Please try again.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = widget.isDark ? AppColors.textPrimaryDark : AppColors.textPrimary;
+    final subColor = widget.isDark ? AppColors.textSecondaryDark : AppColors.textSecondary;
+    final rated = widget.initialStars > 0;
+    final showForm = _editing || !rated;
+
+    return GlassCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            rated ? 'You rated this delivery' : 'How was the delivery by ${widget.partnerName}?',
+            style: AppTypography.bodyMedium(textColor),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              for (var n = 1; n <= 5; n++)
+                Semantics(
+                  button: true,
+                  label: '$n star${n > 1 ? 's' : ''}',
+                  child: IconButton(
+                    onPressed: _busy ? null : () => setState(() => _stars = n),
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(
+                      n <= _stars ? Icons.star_rounded : Icons.star_border_rounded,
+                      color: n <= _stars ? AppColors.warning : subColor,
+                      size: 30,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          if (showForm) ...[
+            const SizedBox(height: 8),
+            TextField(
+              controller: _comment,
+              maxLength: 500,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                hintText: 'Add a note (optional)',
+                counterText: '',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 10),
+            PrimaryButton(
+              text: _busy ? 'Saving…' : 'Submit rating',
+              onPressed: (_stars >= 1 && !_busy) ? _submit : null,
+            ),
+          ] else
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: () => setState(() {
+                  _editing = true;
+                  _stars = widget.initialStars;
+                }),
+                child: const Text('Change rating'),
+              ),
+            ),
+        ],
       ),
     );
   }

@@ -61,6 +61,8 @@ class OrderModel {
   final String paymentMethod;
   final String paymentStatus;
   final List<OrderTimelineEntry> timeline;
+  final String deliveryPartnerName;
+  final int deliveryRatingStars; // 0 = not yet rated
 
   const OrderModel({
     required this.id,
@@ -79,6 +81,8 @@ class OrderModel {
     this.paymentMethod = '',
     this.paymentStatus = '',
     this.timeline = const [],
+    this.deliveryPartnerName = '',
+    this.deliveryRatingStars = 0,
   });
 
   String get statusText {
@@ -144,6 +148,10 @@ class OrderModel {
           .whereType<Map>()
           .map((e) => OrderTimelineEntry.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
+      deliveryPartnerName: asString(j['deliveryPartnerName']),
+      deliveryRatingStars: (j['deliveryRating'] is Map)
+          ? asInt((j['deliveryRating'] as Map)['stars'])
+          : 0,
     );
   }
 
@@ -196,6 +204,7 @@ class OrderModel {
     String? statusRaw,
     String? eta,
     String? paymentStatus,
+    int? deliveryRatingStars,
   }) {
     return OrderModel(
       id: id,
@@ -214,6 +223,8 @@ class OrderModel {
       paymentMethod: paymentMethod,
       paymentStatus: paymentStatus ?? this.paymentStatus,
       timeline: timeline,
+      deliveryPartnerName: deliveryPartnerName,
+      deliveryRatingStars: deliveryRatingStars ?? this.deliveryRatingStars,
     );
   }
 }

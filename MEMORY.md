@@ -118,6 +118,33 @@
 
 ## 5. Completed Major Work
 
+- **2026-09-01 — Delivery P2-D6 DONE (customer → partner ratings, whole-product).**
+  Backend: `Order.deliveryRating {stars 1-5, comment, at}` (additive). New
+  `POST /api/orders/:id/rate-partner` (`attachCustomerOptional` — app token OR
+  body `{phone}`; owner-only; **409 unless status is `Delivered`**; re-submit
+  edits the same rating). Recomputes `DeliveryPartner.rating` (2-dp avg) +
+  `ratingCount` from an aggregate over every rated order for that partner;
+  `stars <= 2` writes a "Low delivery rating" `Notification` to all
+  Admin/Manager. `orderController.getOrder` now returns top-level
+  `deliveryRating`; `adminDeliveryController.partnerRow` + `deliveryController.getMe`
+  expose `ratingCount`. Web `TrackOrder.tsx`: a star-rating card on `Delivered`
+  orders (5 tap-stars + optional note + "Change rating"), posts `{stars, comment,
+  phone}` with `phone` from `localStorage.customer_user`. Admin `DeliveryModule`
+  (table + mobile cards): `★ x.x (n)` + a red **Low** badge when
+  `ratingCount >= 3 && rating < 4`. Mobile customer app: `OrderModel` gained
+  `deliveryPartnerName` + `deliveryRatingStars` (from `fromServerJson` +
+  `copyWith`); `ApiService.ratePartner`; `_RatePartnerCard` on the delivered
+  order-detail screen (star row + note + submit/Change, `AppToast`,
+  invalidates `orderDetailProvider`). deliveryapp: dashboard "Rating" stat now
+  shows `(n)` count. Tests: backend `npm test` **46** (+1: out-of-range → 400,
+  happy path recomputes, re-submit edits, not-delivered → 409); mobile
+  `flutter test` **119** (+2: rating card renders/submits, already-rated shows
+  "Change rating"); deliveryapp 6; `flutter analyze` clean both; debug APK
+  builds; frontend `vite build` clean.
+  **Still open in P2** (blocked on user input): earnings (commission model),
+  background location (dependency choice), zones, batching, return-to-store,
+  call-masking.
+
 - **2026-09-01 — Live delivery tracking = real map + Zepto-style route (web + mobile).**
   Backend unchanged (`getOrder` already returns `delivery.location` masked→revealed
   + `deliveryLocation` + `pickup`). **Mobile** `tracking_screen`: deleted the

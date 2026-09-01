@@ -512,6 +512,54 @@ test('GET /delivery/orders/:id masks phone before Out For Delivery; 403 for anot
   await DeliveryPartner.updateOne({ userId: riderUserId }, { $set: { activeOrderIds: [] } });
 });
 
+test('customer rates the delivery partner after Delivered → recomputes partner rating', async () => {
+  const cTok = await custToken();
+  const me = await api().get('/api/customers/me').set('Authorization', `Bearer ${cTok}`);
+  const custId = me.body.customer.customerId;
+
+  // A delivered order owned by this customer, delivered by our QA rider.
+  const delivered = await Order.create({
+    orderId: `${ORDER_PREFIX}-rate-${Date.now().toString().slice(-5)}`,
+    customerId: custId, customerName: 'QA Cust', customerPhone: `+91 ${CUST_PHONE}`,
+    items: [{ name: 'Milk', quantity: 1, price: 50 }], itemTotal: 50, totalAmount: 75,
+    deliveryAddress: 'QA Drop',
+    status: 'Delivered', deliveryPartnerUserId: riderUserId, deliveryPartnerName: 'QA Rider',
+    deliveredAt: new Date(),
+  });
+
+  // out-of-range stars → 400
+  const bad = await api().post(`/api/orders/${delivered.orderId}/rate-partner`)
+    .set('Authorization', `Bearer ${cTok}`).send({ stars: 9 });
+  assert.equal(bad.status, 400);
+
+  // happy path
+  const ok = await api().post(`/api/orders/${delivered.orderId}/rate-partner`)
+    .set('Authorization', `Bearer ${cTok}`).send({ stars: 4, comment: 'Quick and polite' });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal(ok.body.deliveryRating.stars, 4);
+  assert.equal(ok.body.partnerRatingCount >= 1, true);
+
+  const dp = await DeliveryPartner.findOne({ userId: riderUserId });
+  assert.equal(dp.ratingCount >= 1, true);
+  assert.ok(dp.rating >= 1 && dp.rating <= 5);
+
+  // re-submitting edits the same rating (count does not double for this order)
+  const again = await api().post(`/api/orders/${delivered.orderId}/rate-partner`)
+    .set('Authorization', `Bearer ${cTok}`).send({ stars: 5 });
+  assert.equal(again.status, 200);
+  assert.equal(again.body.deliveryRating.stars, 5);
+
+  // a not-yet-delivered order → 409
+  const pending = await makeOrder();
+  await Order.updateOne({ orderId: pending.orderId }, { $set: { customerId: custId, customerPhone: `+91 ${CUST_PHONE}`, deliveryPartnerUserId: riderUserId } });
+  const notYet = await api().post(`/api/orders/${pending.orderId}/rate-partner`)
+    .set('Authorization', `Bearer ${cTok}`).send({ stars: 3 });
+  assert.equal(notYet.status, 409);
+
+  await Order.deleteOne({ orderId: delivered.orderId });
+  await DeliveryPartner.updateOne({ userId: riderUserId }, { $set: { rating: 5, ratingCount: 0 } });
+});
+
 test('an authenticated delivery socket joins its personal partner room', async () => {
   const token = await riderToken();
   const socket = ioClient(baseUrl, { transports: ['websocket'], auth: { token } });

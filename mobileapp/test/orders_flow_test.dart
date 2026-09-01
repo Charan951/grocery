@@ -32,10 +32,14 @@ Map<String, dynamic> _orderJson({
   required String id,
   required String status,
   int qty = 2,
+  String? partner,
+  int ratingStars = 0,
 }) =>
     {
       'orderId': id,
       'status': status,
+      'deliveryPartnerName': ?partner,
+      if (ratingStars > 0) 'deliveryRating': {'stars': ratingStars},
       'createdAt': '2026-08-20T10:00:00Z',
       'totalAmount': 120,
       'itemTotal': 100,
@@ -74,6 +78,20 @@ class _Api extends ApiService {
     cancelledId = id;
     cancelReason = reason;
     return {'success': true, 'refunded': true, 'walletBalance': 270};
+  }
+
+  String? ratedId;
+  int? ratedStars;
+  @override
+  Future<Map<String, dynamic>> ratePartner(String id, {required int stars, String? comment}) async {
+    ratedId = id;
+    ratedStars = stars;
+    return {
+      'success': true,
+      'deliveryRating': {'stars': stars},
+      'partnerRating': stars.toDouble(),
+      'partnerRatingCount': 1,
+    };
   }
 }
 
@@ -196,6 +214,31 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
       expect(api.cancelledId, 'N1');
+    });
+
+    testWidgets('a delivered order with a partner shows the rating card and submits', (tester) async {
+      final api = _Api(orders: [_orderJson(id: 'D1', status: 'Delivered', partner: 'Ravi K')]);
+      await _boot(tester, _host(const OrderDetailScreen(orderId: 'D1'), api: api));
+      final sc = find.byType(Scrollable).first;
+      await tester.scrollUntilVisible(find.text('Rate your delivery'), 400, scrollable: sc);
+      expect(find.textContaining('How was the delivery by Ravi K'), findsOneWidget);
+      // tap the 4th star, then submit
+      await tester.tap(find.byIcon(Icons.star_border_rounded).at(3));
+      await tester.pump();
+      await tester.scrollUntilVisible(find.text('Submit rating'), 200, scrollable: sc);
+      await tester.tap(find.text('Submit rating'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(api.ratedId, 'D1');
+      expect(api.ratedStars, 4);
+    });
+
+    testWidgets('a delivered order already rated shows a Change rating action', (tester) async {
+      final api = _Api(orders: [_orderJson(id: 'D2', status: 'Delivered', partner: 'Ravi K', ratingStars: 5)]);
+      await _boot(tester, _host(const OrderDetailScreen(orderId: 'D2'), api: api));
+      final sc = find.byType(Scrollable).first;
+      await tester.scrollUntilVisible(find.text('Change rating'), 400, scrollable: sc);
+      expect(find.text('You rated this delivery'), findsOneWidget);
     });
 
     testWidgets('a dispatched order shows no cancel action', (tester) async {

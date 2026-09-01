@@ -136,7 +136,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 const SizedBox(width: 12),
                 _stat('Failed', '${p?.failedCount ?? 0}', Icons.cancel_rounded),
                 const SizedBox(width: 12),
-                _stat('Rating', (p?.rating ?? 5).toStringAsFixed(1), Icons.star_rounded),
+                _stat(
+                  (p?.ratingCount ?? 0) > 0 ? 'Rating (${p!.ratingCount})' : 'Rating',
+                  (p?.rating ?? 5).toStringAsFixed(1),
+                  Icons.star_rounded,
+                ),
               ],
             ),
             const SizedBox(height: 20),

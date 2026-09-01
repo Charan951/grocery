@@ -53,6 +53,13 @@ const orderSchema = new mongoose.Schema({
   failureReason: { type: String },
   pickedUpAt: { type: Date },
   deliveredAt: { type: Date },
+  // Customer's rating of the delivery partner for this order (P2-D6). One per
+  // order, editable by re-submitting; feeds DeliveryPartner.rating/ratingCount.
+  deliveryRating: {
+    stars: { type: Number, min: 1, max: 5 },
+    comment: { type: String },
+    at: { type: Date }
+  },
   // Append-only status history — every call to updateStatus pushes one entry here.
   // Previously referenced by the controller but missing from the schema, which
   // made PUT /api/orders/:id/status throw on every call.

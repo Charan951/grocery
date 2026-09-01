@@ -115,6 +115,7 @@ export const deliveryController = {
           activeOrderIds: partner.activeOrderIds || [],
           maxConcurrent: partner.maxConcurrent,
           rating: partner.rating,
+          ratingCount: partner.ratingCount || 0,
           completedCount: partner.completedCount,
           failedCount: partner.failedCount,
           lastSeenAt: partner.lastSeenAt,
