@@ -343,4 +343,36 @@ class ApiService {
       throw ApiException.fromDio(e);
     }
   }
+
+  /// `GET /api/products/:id/reviews` → `{ summary: {average, count, distribution}, reviews[] }`.
+  Future<Map<String, dynamic>> fetchProductReviews(String productId) async {
+    try {
+      final res = await _dio.get('/products/${Uri.encodeComponent(productId)}/reviews');
+      return Map<String, dynamic>.from(res.data as Map);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  /// `POST /api/products/:id/reviews` (customer token). Verified-purchase only;
+  /// the review enters moderation. Returns `{ review, updated? }`. Throws 403
+  /// when the customer has not received the product.
+  Future<Map<String, dynamic>> submitProductReview(
+    String productId, {
+    required int rating,
+    String? comment,
+  }) async {
+    try {
+      final res = await _dio.post(
+        '/products/${Uri.encodeComponent(productId)}/reviews',
+        data: {
+          'rating': rating,
+          if (comment != null && comment.trim().isNotEmpty) 'comment': comment.trim(),
+        },
+      );
+      return Map<String, dynamic>.from(res.data as Map);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
 }

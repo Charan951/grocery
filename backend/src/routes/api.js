@@ -208,6 +208,8 @@ router.post('/customers/me/addresses', protectCustomer, asMe, customerController
 router.delete('/customers/me/addresses/:addressId', protectCustomer, asMe, customerController.deleteAddress);
 router.post('/customers/me/wallet/debit', protectCustomer, customerController.walletDebit);
 router.get('/customers/me/wallet/transactions', protectCustomer, customerController.walletTransactions);
+router.post('/customers/me/devices', protectCustomer, customerController.registerDevice);
+router.delete('/customers/me/devices/:token', protectCustomer, customerController.removeDevice);
 
 // Legacy phone-keyed customer auth — still used by the web storefront (no token).
 // TODO: migrate web to the OTP flow above, then lock down the :id routes below.
@@ -252,6 +254,8 @@ router.delete('/employees/:id', protect, authorize('Admin'), employeeController.
 // ==========================================
 // 15. REVIEW ROUTES
 // ==========================================
+router.get('/products/:id/reviews', reviewController.getProductReviews); // public — approved reviews + summary
+router.post('/products/:id/reviews', protectCustomer, reviewController.createProductReview); // verified-purchase only, enters moderation
 router.get('/reviews', protect, authorize('Admin', 'Manager'), reviewController.getReviews); // staff moderation list
 router.put('/reviews/:id/status', protect, authorize('Admin', 'Manager'), reviewController.updateReviewStatus);
 router.delete('/reviews/:id', protect, authorize('Admin'), reviewController.deleteReview);
@@ -280,6 +284,8 @@ router.post('/delivery/auth/forgot', deliveryAuthLimiter, deliveryController.for
 router.post('/delivery/auth/reset', deliveryAuthLimiter, deliveryController.resetPassword);
 
 router.get('/delivery/me', protectDelivery, deliveryController.getMe);
+router.post('/delivery/devices', protectDelivery, deliveryController.registerDevice);
+router.delete('/delivery/devices/:token', protectDelivery, deliveryController.removeDevice);
 router.put('/delivery/status', protectDelivery, deliveryController.setStatus);
 router.post('/delivery/location', locationLimiter, protectDelivery, deliveryController.updateLocation);
 router.get('/delivery/orders/active', protectDelivery, deliveryController.getActiveOrders);

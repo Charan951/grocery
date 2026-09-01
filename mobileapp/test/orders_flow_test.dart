@@ -176,5 +176,25 @@ void main() {
       await tester.pump(const Duration(milliseconds: 200));
       expect(find.text('Try again'), findsOneWidget);
     });
+
+    testWidgets('a pre-dispatch order can be cancelled from the detail screen', (tester) async {
+      final api = _Api(orders: [_orderJson(id: 'N1', status: 'Pending')]);
+      await _boot(tester, _host(const OrderDetailScreen(orderId: 'N1'), api: api));
+      final sc = find.byType(Scrollable).first;
+      await tester.scrollUntilVisible(find.text('Cancel order'), 400, scrollable: sc);
+      await tester.tap(find.text('Cancel order'));
+      await tester.pumpAndSettle();
+      // Confirm in the modal.
+      await tester.tap(find.text('Yes, cancel order'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(api.cancelledId, 'N1');
+    });
+
+    testWidgets('a dispatched order shows no cancel action', (tester) async {
+      final api = _Api(orders: [_orderJson(id: 'A9', status: 'Out for Delivery')]);
+      await _boot(tester, _host(const OrderDetailScreen(orderId: 'A9'), api: api));
+      expect(find.text('Cancel order'), findsNothing);
+    });
   });
 }

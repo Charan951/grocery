@@ -3,6 +3,7 @@ import { Order } from '../models/Order.js';
 import { User } from '../models/User.js';
 import { DeliveryPartner } from '../models/DeliveryPartner.js';
 import { Notification, Settings } from '../models/Operations.js';
+import { sendToOwner } from './pushService.js';
 
 const CANDIDATE_LIMIT = 10;
 
@@ -88,6 +89,12 @@ export const createOffer = async ({ order, partnerUser, partner, attempt = 1, ti
     body: `Order ${order.orderId} — ₹${order.totalAmount}. Respond within ${timeoutSec}s.`,
     type: 'Order',
   });
+  // Push wakes the app when the socket isn't live (backgrounded / killed).
+  sendToOwner(partnerUser._id, {
+    title: 'New delivery offer',
+    body: `Order ${order.orderId} — ₹${order.totalAmount}. Tap to respond.`,
+    data: { type: 'delivery_offer', assignmentId: String(assignment._id), orderId: order.orderId },
+  }).catch(() => {});
   return assignment;
 };
 

@@ -956,11 +956,25 @@ existing timeline. No fake data anywhere.
 - Verified: backend `npm test` 31 green (+1 reveal-window gating); frontend
   `vite build` clean; mobile `flutter analyze` clean + `flutter test` 103 green.
 
-**P1-D4 · Push for offers (FCM)**
-- Shared with customer-app **P1-3**: `DeviceToken` register endpoints,
-  `firebase-admin` send; high-priority data message on `delivery_offer` when the
-  partner socket is idle; on-tap deep-link to the Offer screen; background reconcile.
-- Tests: token lifecycle, send-on-idle, no-dup.
+**P1-D4 · Push for offers (FCM)** — 🟡 BACKEND DONE 2026-09-01 · client blocked on Firebase config
+- `backend/src/services/pushService.js`: lazy `firebase-admin` init from
+  `FIREBASE_SERVICE_ACCOUNT` (raw JSON or base64) or
+  `GOOGLE_APPLICATION_CREDENTIALS`; `isPushConfigured()`, `registerDeviceToken`
+  (upsert by token), `removeDeviceToken`, `sendToOwner(ownerId, {title,body,data})`
+  (`sendEachForMulticast`, high priority, prunes `token-not-registered`).
+  **Not configured → every send is a silent no-op**, so dispatch is unaffected.
+- Endpoints: `POST/DELETE /api/delivery/devices[/:token]` (protectDelivery),
+  `POST/DELETE /api/customers/me/devices[/:token]` (protectCustomer).
+- `assignmentService.createOffer` fires `sendToOwner(partner, {type:'delivery_offer',
+  assignmentId, orderId})` alongside the socket emit (non-blocking).
+- `.env.example` documents `FIREBASE_SERVICE_ACCOUNT`.
+- Tests: token register idempotent + unregister; `isPushConfigured()===false` in
+  CI so offers still work. Backend `npm test` 35 green.
+- **Remaining (needs the user's Firebase project):** add `firebase_core` +
+  `firebase_messaging` to `deliveryapp/` (and `mobileapp/` for P1-3),
+  `google-services.json` / `GoogleService-Info.plist`, register the token after
+  login, handle the `delivery_offer` data message → route to `/order/:id` /
+  raise the offer sheet, background/killed reconcile via `/delivery/orders/active`.
 
 **P1-D5 · Notifications + audit activation**
 - Activate `Notification` (offer / assigned / cancelled / delivered / payout) with

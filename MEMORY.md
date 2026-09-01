@@ -118,6 +118,26 @@
 
 ## 5. Completed Major Work
 
+- **2026-09-01 — Delivery P1-D4 BACKEND DONE** (FCM push for offers; client blocked
+  on the user's Firebase project). `backend/src/services/pushService.js` — lazy
+  `firebase-admin` (dep already present) from `FIREBASE_SERVICE_ACCOUNT` (raw
+  JSON or base64) or `GOOGLE_APPLICATION_CREDENTIALS`; `isPushConfigured()`,
+  `registerDeviceToken` (upsert by token on the existing `DeviceToken` model),
+  `removeDeviceToken`, `sendToOwner(ownerId,{title,body,data})`
+  (`sendEachForMulticast`, `android.priority:'high'`, prunes dead tokens).
+  **Unconfigured ⇒ every send is a silent no-op** — dispatch unaffected.
+  Routes: `POST`/`DELETE /api/delivery/devices[/:token]` (protectDelivery),
+  `POST`/`DELETE /api/customers/me/devices[/:token]` (protectCustomer).
+  `assignmentService.createOffer` now also `sendToOwner(partner,{type:
+  'delivery_offer',assignmentId,orderId})`, non-blocking. `.env.example` +
+  `FIREBASE_SERVICE_ACCOUNT`. Backend `npm test` **35** (token register
+  idempotent/unregister; `isPushConfigured()===false` in CI). **Client TODO
+  (needs Firebase config from the user):** `firebase_core`+`firebase_messaging`
+  in `deliveryapp/` (& `mobileapp/` for P1-3), `google-services.json` /
+  `GoogleService-Info.plist`, token register after login, handle the
+  `delivery_offer` data message → `/order/:id` / offer sheet, killed-state
+  reconcile via `/delivery/orders/active`.
+
 - **2026-09-01 — Delivery P1-D3 DONE** (customer live rider tracking, web + mobile).
   Backend `orderController.getOrder`: owner-flag refactor + a computed `delivery`
   block on non-terminal assigned orders — `partnerName` (first name only),
@@ -139,6 +159,31 @@
   tests**, frontend `vite build` clean, mobile `flutter analyze` clean +
   `flutter test` **103**.
   Next: **P1-D4** — FCM push for delivery offers (shared with mobile P1-3).
+
+- **2026-09-01 — Mobile audit fix Group 2 (Missing core) — order cancel + wallet history DONE.**
+  Backend (`apiController` + `routes/api.js`): `POST /api/orders/:id/cancel`
+  (`attachCustomerOptional` — app customer token OR `{ phone }` in the body for
+  the token-less web storefront). Cancellable only at `Pending / In Transit /
+  Accepted / Packed / Ready`; sets `Cancelled` + `failureReason`, pushes
+  `trackingTimeline`, calls `cancelForOrder()` to release any offered/assigned
+  rider, and for a prepaid non-COD order credits `totalAmount` to
+  `Customer.walletBalance` + `WalletTransaction{type:'Credit'}` +
+  `paymentStatus:'Refunded'`; emits `order_status_update`. Returns
+  `{ order, refunded, walletBalance }`. 409 past-window/already-cancelled,
+  403 non-owner. Also `GET /api/customers/me/wallet/transactions`
+  (`protectCustomer`, `?limit` ≤200, newest first) → `{ walletBalance, transactions }`.
+  Mobile: `ApiService.cancelOrder` / `fetchWalletTransactions`;
+  `OrdersNotifier.cancelOrder` (optimistic list patch, returns `refunded`);
+  `OrderModel.copyWith` extended (`statusRaw`, `paymentStatus`);
+  `order_detail_screen` `_CancelOrderButton` (pre-dispatch only → `AppModal.confirm`
+  → toast); `wallet_screen` `walletTransactionsProvider` + history list
+  (credit/debit rows, pull-to-refresh, skeleton/empty/error).
+  Web: `CustomerOrders.tsx` `handleCancelOrder` + "Cancel Order" button in the
+  order-detail view (posts `{ phone, reason }`), `CANCELLABLE_STATUSES` guard,
+  local + `localStorage` patch.
+  Verified: backend `npm test` 33/33, `flutter test` 105/105, `flutter analyze`
+  clean, frontend `tsc -b && vite build` clean, debug APK built.
+  Group 2 still open: **product reviews** (needs `GET/POST /products/:id/reviews`).
 
 - **2026-09-01 — Mobile audit fix Group 1 (Broken functionality) DONE.**
   (a) Legal: login "Terms of Service" / "Privacy Policy" are now tappable
@@ -968,16 +1013,18 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
 
 ## 12. Testing Status
 
-- **Backend: `npm test` → 31 tests, all green**
+- **Backend: `npm test` → 35 tests, all green**
   (`node:test` + `supertest` against `MONGO_URI`). Covers auth/OTP, protectCustomer,
   coupon validate, order placement + `/orders/mine` + ownership, status timeline,
+  **order cancel (owner check, wallet refund, past-window 409) + wallet ledger**,
   payment test-mode, delivery partner lifecycle + admin assign/reassign/unassign +
   partner password-reset/activate-deactivate.
-- **Mobile: `flutter test` → 103 tests, all green** — `auth_flow_test`,
+- **Mobile: `flutter test` → 105 tests, all green** — `auth_flow_test`,
   `catalog_models_test`, `pricing_test`, `design_flat_test`, `order_model_test`,
   `foundation_widgets_test` (7), `navigation_test` (5 — nested/back nav),
   `auth_flow_widget_test` (10 — PhoneField/OtpField + login→OTP→success flow +
-  Terms/Privacy consent line), `legal_screen_test` (2 — tab default + `?tab=`).
+  Terms/Privacy consent line), `legal_screen_test` (2 — tab default + `?tab=`),
+  `orders_flow_test` (12 — incl. cancel pre-dispatch + no-cancel once dispatched).
   `flutter analyze` clean. `flutter build apk --debug` succeeds (incl. with
   `--dart-define-from-file=env/staging.json`).
 - **Delivery app: `deliveryapp/` — `flutter analyze` clean, `flutter test` → 5
@@ -1024,6 +1071,10 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
 - Frontend: no automated tests; admin `fetchReviews` change not yet run in a browser.
 
 ## 13. Last Updated
+
+2026-09-01 — Delivery P1-D4 (backend): FCM push for delivery offers. New pushService.js (lazy firebase-admin, no-op when FIREBASE_SERVICE_ACCOUNT unset), POST/DELETE /api/delivery/devices + /api/customers/me/devices, createOffer sends a delivery_offer data message. Backend 35 tests. Flutter FCM client still needs the user's Firebase project.
+
+2026-09-01 — Mobile audit fix Group 2 (partial): order cancel + wallet history. New `POST /api/orders/:id/cancel` (dual-auth token-or-{phone}; pre-dispatch only; prepaid → wallet Credit + Refunded; releases rider) wired to mobile order-detail + web CustomerOrders; new `GET /api/customers/me/wallet/transactions` wired to the mobile wallet screen history list. Backend npm test 33/33, flutter test 105/105, frontend build clean, debug APK built. Next in Group 2: product reviews (`GET/POST /products/:id/reviews`).
 
 2026-09-01 — Delivery P1-D3: customer live rider tracking. Backend getOrder adds a masked `delivery` block (real phone/location only in the Out For Delivery/Arrived reveal window; OTP owner-only). Web /track/:orderId (lazy Leaflet, 10s poll, Call/WhatsApp) + "Track live" on in-transit orders. Mobile tracking_screen consumes the block, gates Call on canContact, adds WhatsApp. Backend 31 tests, mobile 103 tests, builds clean. Next: P1-D4 FCM offer push.
 

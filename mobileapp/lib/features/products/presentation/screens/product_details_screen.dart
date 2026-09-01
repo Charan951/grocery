@@ -17,7 +17,10 @@ import 'package:freshcart/core/widgets/skeletons.dart';
 import 'package:freshcart/features/cart/presentation/controllers/cart_controller.dart';
 import 'package:freshcart/features/home/presentation/controllers/catalog_providers.dart';
 import 'package:freshcart/features/home/presentation/widgets/product_rail.dart';
+import 'package:freshcart/core/error/api_exception.dart';
+import 'package:freshcart/core/widgets/app_bottom_sheet.dart';
 import 'package:freshcart/features/products/data/models/product_model.dart';
+import 'package:freshcart/features/products/presentation/controllers/reviews_controller.dart';
 import 'package:freshcart/features/wishlist/presentation/controllers/wishlist_controller.dart';
 
 class ProductDetailsScreen extends ConsumerWidget {
@@ -221,6 +224,9 @@ class _ProductDetailsViewState extends ConsumerState<_ProductDetailsView> {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 24),
+
+                  _ReviewsSection(productId: _p.id, isDark: isDark),
                   const SizedBox(height: 24),
 
                   _TrustBlock(isDark: isDark),

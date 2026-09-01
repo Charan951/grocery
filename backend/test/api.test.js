@@ -10,6 +10,8 @@ import { Customer } from '../src/models/Customer.js';
 import { Order } from '../src/models/Order.js';
 import { Coupon } from '../src/models/Finance.js';
 import { Otp } from '../src/models/Otp.js';
+import { Product } from '../src/models/Catalog.js';
+import { Review } from '../src/models/Operations.js';
 
 dotenv.config();
 
@@ -22,12 +24,17 @@ const PHONE_A = `90000${stamp.slice(-5)}`;
 const PHONE_B = `91111${stamp.slice(-5)}`;
 const COUPON = `TEST${stamp}`;
 const ADMIN_EMAIL = `qa+${stamp}@freshcart.test`;
+const REVIEW_PRODUCT_ID = `qa_prod_${stamp}`;
 
 test.before(async () => {
   process.env.PAYMENTS_TEST_MODE = 'true';
   process.env.OTP_TEST_MODE = 'true';
   await mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 10000 });
   await User.create({ name: 'QA Admin', email: ADMIN_EMAIL, password: 'admin123', role: 'Admin', status: 'Active' });
+  await Product.create({
+    id: REVIEW_PRODUCT_ID, name: 'QA Review Product', price: 40, mrp: 50,
+    category: 'Grocery', categoryId: 'c1', brand: 'FreshCart',
+  });
 });
 
 test.after(async () => {
@@ -37,6 +44,8 @@ test.after(async () => {
     Order.deleteMany({ customerPhone: new RegExp(`(${PHONE_A}|${PHONE_B})$`) }),
     Coupon.deleteMany({ code: COUPON }),
     Otp.deleteMany({ phone: { $in: [PHONE_A, PHONE_B] } }),
+    Product.deleteOne({ id: REVIEW_PRODUCT_ID }),
+    Review.deleteMany({ productId: REVIEW_PRODUCT_ID }),
   ]);
   await mongoose.disconnect();
 });
@@ -207,6 +216,54 @@ test('a dispatched order can no longer be cancelled by the customer', async () =
   const late = await api().post(`/api/orders/${orderId}/cancel`)
     .set('Authorization', `Bearer ${tokenA}`).send({ reason: 'too late' });
   assert.equal(late.status, 409);
+});
+
+test('product reviews: verified-purchase gate, moderation, and summary', async () => {
+  const sToken = await loginAdmin();
+  const tokenA = await customerToken(PHONE_A);
+
+  // No delivered order yet → cannot review.
+  const early = await api().post(`/api/products/${REVIEW_PRODUCT_ID}/reviews`)
+    .set('Authorization', `Bearer ${tokenA}`).send({ rating: 5, comment: 'nice' });
+  assert.equal(early.status, 403);
+
+  // Place an order for the product and mark it Delivered.
+  const place = await api().post('/api/orders').set('Authorization', `Bearer ${tokenA}`).send({
+    items: [{ productId: REVIEW_PRODUCT_ID, name: 'QA Review Product', quantity: 1, price: 40 }],
+    itemTotal: 40, totalAmount: 45, deliveryAddress: 'A',
+  });
+  await api().put(`/api/orders/${place.body.order.orderId}/status`)
+    .set('Authorization', `Bearer ${sToken}`).send({ status: 'Delivered' });
+
+  // Bad rating is rejected.
+  const bad = await api().post(`/api/products/${REVIEW_PRODUCT_ID}/reviews`)
+    .set('Authorization', `Bearer ${tokenA}`).send({ rating: 9 });
+  assert.equal(bad.status, 400);
+
+  // Valid review is accepted but held for moderation (Pending → not yet public).
+  const created = await api().post(`/api/products/${REVIEW_PRODUCT_ID}/reviews`)
+    .set('Authorization', `Bearer ${tokenA}`).send({ rating: 4, comment: 'Fresh and on time' });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.review.status, 'Pending');
+
+  let pub = await api().get(`/api/products/${REVIEW_PRODUCT_ID}/reviews`);
+  assert.equal(pub.status, 200);
+  assert.equal(pub.body.summary.count, 0);
+
+  // A second call edits the same review rather than adding another.
+  const edit = await api().post(`/api/products/${REVIEW_PRODUCT_ID}/reviews`)
+    .set('Authorization', `Bearer ${tokenA}`).send({ rating: 5, comment: 'Even better second time' });
+  assert.equal(edit.status, 200);
+  assert.equal(edit.body.updated, true);
+
+  // Staff approves → it becomes public and the product aggregate updates.
+  await api().put(`/api/reviews/${edit.body.review._id}/status`)
+    .set('Authorization', `Bearer ${sToken}`).send({ status: 'Approved' });
+
+  pub = await api().get(`/api/products/${REVIEW_PRODUCT_ID}/reviews`);
+  assert.equal(pub.body.summary.count, 1);
+  assert.equal(pub.body.summary.average, 5);
+  assert.equal(pub.body.reviews[0].comment, 'Even better second time');
 });
 
 test('payment verify runs in test mode', async () => {

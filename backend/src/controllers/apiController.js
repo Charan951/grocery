@@ -29,6 +29,7 @@ import { Coupon, Offer, Payment, WalletTransaction } from '../models/Finance.js'
 import { Review, Notification, CMSPage, Blog, Settings, AuditLog, SupportTicket } from '../models/Operations.js';
 import { uploadToCloudinary } from '../config/cloudinary.js';
 import { cancelForOrder, tryAssign } from '../services/assignmentService.js';
+import { registerDeviceToken, removeDeviceToken } from '../services/pushService.js';
 
 // Helper to sign JWT
 const signToken = (id) => {
@@ -1334,6 +1335,28 @@ export const customerController = {
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
     }
+  },
+
+  // POST /api/customers/me/devices  { token, platform }
+  registerDevice: async (req, res) => {
+    try {
+      const { token, platform } = req.body || {};
+      if (!token) return res.status(400).json({ success: false, message: 'token required' });
+      await registerDeviceToken({ ownerType: 'customer', ownerId: req.customer.customerId, token, platform });
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // DELETE /api/customers/me/devices/:token
+  removeDevice: async (req, res) => {
+    try {
+      await removeDeviceToken(req.params.token);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
   }
 };
 
@@ -1525,6 +1548,18 @@ export const employeeController = {
   }
 };
 
+// Recompute a product's aggregate rating from its Approved reviews.
+async function recomputeProductRating(productId) {
+  if (!productId) return;
+  const approved = await Review.find({ productId, status: 'Approved' });
+  if (!approved.length) return;
+  const avg = approved.reduce((s, r) => s + r.rating, 0) / approved.length;
+  await Product.updateOne(
+    { id: productId },
+    { $set: { rating: Math.round(avg * 10) / 10, reviewsCount: approved.length } },
+  ).catch(() => {});
+}
+
 export const reviewController = {
   getReviews: async (req, res) => {
     try {
@@ -1534,11 +1569,89 @@ export const reviewController = {
       res.status(500).json({ success: false, message: err.message });
     }
   },
+
+  // GET /api/products/:id/reviews  (public) — Approved reviews + a rating summary.
+  getProductReviews: async (req, res) => {
+    try {
+      const productId = req.params.id;
+      const list = await Review.find({ productId, status: 'Approved' }).sort({ createdAt: -1 });
+      const count = list.length;
+      const average = count ? list.reduce((s, r) => s + r.rating, 0) / count : 0;
+      const distribution = [0, 0, 0, 0, 0]; // index 0 => 1 star
+      for (const r of list) {
+        if (r.rating >= 1 && r.rating <= 5) distribution[r.rating - 1] += 1;
+      }
+      res.json({
+        success: true,
+        summary: { average: Math.round(average * 10) / 10, count, distribution },
+        reviews: list,
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // POST /api/products/:id/reviews  { rating, comment }  (protectCustomer)
+  // Only a customer who has received this product in a Delivered order may
+  // review it, one review per product (a repeat call edits the existing one).
+  // New/edited reviews enter moderation as 'Pending'.
+  createProductReview: async (req, res) => {
+    try {
+      const productId = req.params.id;
+      const rating = Number(req.body.rating);
+      if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
+        return res.status(400).json({ success: false, message: 'Rating must be between 1 and 5' });
+      }
+      const product = await Product.findOne({ id: productId });
+      if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
+
+      const cust = req.customer;
+      const phone10 = String(cust.phone || '').replace(/\D/g, '').slice(-10);
+      const delivered = await Order.findOne({
+        status: 'Delivered',
+        'items.productId': productId,
+        $or: [
+          { customerId: cust.customerId },
+          ...(phone10 ? [{ customerPhone: new RegExp(phone10 + '$') }] : []),
+        ],
+      });
+      if (!delivered) {
+        return res.status(403).json({
+          success: false,
+          message: 'You can review this only after receiving it in an order',
+        });
+      }
+
+      const comment = String(req.body.comment || '').trim().slice(0, 1000);
+      const existing = await Review.findOne({ productId, customerId: cust.customerId });
+      if (existing) {
+        existing.rating = rating;
+        existing.comment = comment;
+        existing.customerName = cust.name || existing.customerName || 'Customer';
+        existing.status = 'Pending';
+        await existing.save();
+        return res.json({ success: true, review: existing, updated: true });
+      }
+      const review = await Review.create({
+        productId,
+        customerId: cust.customerId,
+        customerName: cust.name || 'Customer',
+        rating,
+        comment,
+        status: 'Pending',
+      });
+      res.status(201).json({ success: true, review });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
   updateReviewStatus: async (req, res) => {
     try {
       const { status } = req.body;
       const review = await Review.findByIdAndUpdate(req.params.id, { status }, { new: true });
       if (!review) return res.status(404).json({ success: false, message: 'Review not found' });
+      recomputeProductRating(review.productId);
       res.json({ success: true, review });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
@@ -1548,6 +1661,7 @@ export const reviewController = {
     try {
       const review = await Review.findByIdAndDelete(req.params.id);
       if (!review) return res.status(404).json({ success: false, message: 'Review not found' });
+      recomputeProductRating(review.productId);
       res.json({ success: true, message: 'Review deleted' });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });

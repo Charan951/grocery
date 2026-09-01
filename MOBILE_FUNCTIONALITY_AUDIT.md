@@ -23,10 +23,10 @@ All reflected below.
 | Auth (phone → OTP → JWT) | ✓ | Real. Terms/Privacy now tappable links → bundled `/legal` screen. |
 | Address CRUD | ✓ | Real `POST` / `DELETE /customers/me/addresses`. No edit / set-default endpoint (backend gap, parity with web). |
 | Profile edit | ✓ | `ProfileEditScreen` → `PUT /customers/me/profile`. |
-| Wallet | ⚠ | Real balance + referral code. No transaction history / top-up — **no backend route** (web's wallet drawer is a hardcoded `₹0` stub, so mobile is ahead). |
+| Wallet | ⚠ | Real balance + referral code + **transaction history** (`GET /customers/me/wallet/transactions`, 2026-09-01). Top-up still missing. (Web's wallet drawer is still a hardcoded `₹0` stub.) |
 | Notifications (in-app) | ⚠ | Real activity feed from order timelines + bell entry point. No dedicated endpoint, no push (FCM). Web has nothing. |
 | Reviews (read + write) | ✗ | PDP shows a rating number only. **No customer review endpoint** (staff moderation only). |
-| Order cancel | ✗ | No UI and **no `POST /orders/:id/cancel` route**. |
+| Order cancel | ✓ | `POST /orders/:id/cancel` added (2026-09-01, dual-auth: app token OR `{phone}` for web). Pre-dispatch only; prepaid orders refunded to wallet. Wired on mobile order detail **and** web `CustomerOrders`. |
 | Content pages (Offers, Brands, Blog, About, Legal, Help/FAQ, Careers) | ✗ | Not built on mobile. Backend has `/blogs`, `/brands`. |
 | Payments (Razorpay / Wallet / COD) | ✓ | Real gateway + HMAC verify + webhook. |
 | Push notifications (FCM) | ✗ | No `firebase_*` deps, no `POST_NOTIFICATIONS`, no token routes. |
@@ -143,9 +143,9 @@ createRazorpayOrder, verifyPayment, walletDebit, fetchMyOrders, fetchOrder`.
 | `GET /blogs` | — | ✗ unused |
 | `GET /festival-campaigns/active` | — | ✗ unused |
 | Product reviews (`GET/POST /products/:id/reviews`) | — | ✗ **route does not exist** |
-| Order cancel (`POST /orders/:id/cancel`) | — | ✗ **route does not exist** |
+| Order cancel (`POST /orders/:id/cancel`) | `cancelOrder` | ✓ added 2026-09-01 (attachCustomerOptional; token or `{phone}`) |
 | Notifications list / mark-read | — | ✗ **route does not exist** |
-| Wallet transactions (`GET …/wallet/transactions`) | — | ✗ **route does not exist** |
+| Wallet transactions (`GET /customers/me/wallet/transactions`) | `walletTransactions` | ✓ added 2026-09-01 (protectCustomer) |
 | Wallet top-up (`PUT /customers/:id/wallet`) | — | ✗ exists but `protect` (staff) — not customer-callable |
 | Device tokens (FCM) | — | ✗ **route does not exist** |
 | `GET /api/app/config` (force-update / maintenance) | — | ✗ **route does not exist** |
@@ -163,7 +163,7 @@ createRazorpayOrder, verifyPayment, walletDebit, fetchMyOrders, fetchOrder`.
 | Coupon on cart | ✓ apply | ✓ list | — | ✓ remove | ✓ |
 | Addresses | ✓ real `POST` | ✓ list + select | ✗ (no PUT endpoint; parity w/ web) | ✓ real `DELETE` | ✓ |
 | Profile (name / email) | — | ✓ | ✓ `PUT /me/profile` | ✗ delete-account | ⚠ (no delete on mobile) |
-| Orders | ✓ place | ✓ list + detail | ✗ no cancel | — | ⚠ |
+| Orders | ✓ place | ✓ list + detail + cancel | ✓ cancel (web + mobile) | — | ✓ |
 | Reviews | ✗ | ✗ | ✗ | ✗ | ✗ (no endpoint) |
 | Support tickets | ⚠ chat send | ⚠ live only | — | — | ⚠ no persisted ticket list |
 
@@ -239,7 +239,7 @@ createRazorpayOrder, verifyPayment, walletDebit, fetchMyOrders, fetchOrder`.
 | View name / phone / VIP badge | ✓ | |
 | Edit name / email | ✓ | `ProfileEditScreen`. |
 | Wallet balance | ✓ | Real (`user.walletBalance`). |
-| Wallet transaction history | ✗ | No customer endpoint. Screen shows a funding explainer instead of fake rows. |
+| Wallet transaction history | ✓ | Real `GET /customers/me/wallet/transactions` — credit/debit rows with date, pull-to-refresh, skeleton + empty + error states (2026-09-01). |
 | Wallet top-up | ✗ | No customer endpoint. |
 | Membership / VIP | ⚠ | Static benefits page; no join / renew. |
 | Saved addresses | ✓ | Real CRUD. |
@@ -266,7 +266,7 @@ createRazorpayOrder, verifyPayment, walletDebit, fetchMyOrders, fetchOrder`.
 | Order detail: status header, timeline, items, bill, delivery/payment | ✓ | |
 | Reorder (re-add to cart) | ✓ | List + detail. |
 | Track order | ✓ | → `/tracking/:id`. |
-| Cancel order | ✗ | No UI; **no `POST /orders/:id/cancel` route**. |
+| Cancel order | ✓ | Order-detail "Cancel order" (pre-dispatch only) → confirm modal → `POST /orders/:id/cancel`; wallet refund toast (2026-09-01). |
 | Download / view invoice | ✗ | Web has a stub "Download Invoice"; mobile none. |
 | Rate / review a delivered order | ✗ | No entry point; no endpoint. |
 | Empty / loading / error states | ✓ | `SkeletonList` / `ErrorState` / `EmptyState`. |
@@ -450,18 +450,20 @@ createRazorpayOrder, verifyPayment, walletDebit, fetchMyOrders, fetchOrder`.
 
 ## 28. Prioritised gap list
 
-**Fix log** — Group 1 (Broken functionality) closed 2026-09-01: Legal links + `LegalScreen`, `share_plus` native share on PDP. `flutter test` 103/103, `flutter analyze` clean.
+**Fix log**
+- Group 1 (Broken functionality) closed 2026-09-01: Legal links + `LegalScreen`, `share_plus` native share on PDP. `flutter test` 103/103, `flutter analyze` clean.
+- Group 2 (Missing core) — 2/3 closed 2026-09-01: **order cancel** (`POST /orders/:id/cancel`, dual-auth, wallet refund; mobile + web) and **wallet transaction history** (`GET /customers/me/wallet/transactions`; mobile). Backend `npm test` 33/33, `flutter test` 105/105, frontend `tsc -b && vite build` clean, debug APK built. **Reviews** still open (needs `GET/POST /products/:id/reviews`).
 
 
 ### P0 — user-facing gaps on the core journey
-1. ✗ **Reviews** on PDP (read list + write from a delivered order). **Needs a backend route first** (`GET/POST /products/:id/reviews` — model `Review` exists, only staff moderation is exposed).
-2. ✗ **Order cancel** with reason + wallet refund. **Needs `POST /orders/:id/cancel`** (does not exist).
+1. ✗ **Reviews** on PDP (read list + write from a delivered order). **Needs a backend route first** (`GET/POST /products/:id/reviews` — model `Review` exists, only staff moderation is exposed). *(Group 2 — still open.)*
+2. ✓ **Order cancel** with reason + wallet refund — DONE 2026-09-01. `POST /orders/:id/cancel` (attachCustomerOptional; app token or `{phone}`), pre-dispatch statuses only, prepaid → wallet Credit + `paymentStatus: Refunded`, releases any assigned rider, emits `order_status_update`. Wired: mobile order detail + web `CustomerOrders`. Backend tests 33/33.
 3. ✓ **Legal** — DONE (2026-09-01): login "Terms / Privacy" are real links → bundled `LegalScreen` (`/legal?tab=terms|privacy`).
 4. ✗ **Offline resilience**: `connectivity_plus` banner + retry-with-backoff; `GET /api/app/config` for force-update / maintenance.
 
 ### P1 — parity & completeness
 5. ✗ **Push notifications** (FCM): `firebase_core` + `firebase_messaging`, `POST_NOTIFICATIONS`, `DeviceToken` route + `firebase-admin` send hooked into `orderController.updateStatus`, permission prompt, tap → deep link.
-6. ✗ **Wallet**: `GET …/wallet/transactions` + a customer-scoped top-up (Razorpay) — both need backend routes.
+6. ⚠ **Wallet**: transaction history DONE 2026-09-01 (`GET /customers/me/wallet/transactions`, wired to the mobile wallet screen). Customer-scoped **top-up (Razorpay)** still needs a backend route + UI. Web wallet drawer still a `₹0` stub.
 7. ⚠ **Filters**: price-range (`minPrice/maxPrice` already server-side), brand, in-stock, discount-sort; pagination for large categories.
 8. ⚠ **Orders**: status-filter tabs (All / In Transit / Delivered / Cancelled), active-order banner on Home, invoice.
 9. ✗ **Account deletion** on mobile (`DELETE /customers/:id` exists but is an open route — should be secured to `protectCustomer` first).

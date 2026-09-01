@@ -12,6 +12,8 @@ import { DeliveryPartner } from '../src/models/DeliveryPartner.js';
 import { Order } from '../src/models/Order.js';
 import { Assignment } from '../src/models/Assignment.js';
 import { tryAssign, rejectOffer } from '../src/services/assignmentService.js';
+import { DeviceToken } from '../src/models/DeviceToken.js';
+import { isPushConfigured } from '../src/services/pushService.js';
 
 dotenv.config();
 
@@ -52,6 +54,7 @@ test.after(async () => {
     Customer.deleteMany({ phone: new RegExp(`${CUST_PHONE}$`) }),
     Order.deleteMany({ orderId: new RegExp(`^${ORDER_PREFIX}`) }),
     Assignment.deleteMany({ orderId: new RegExp(`^${ORDER_PREFIX}`) }),
+    DeviceToken.deleteMany({ ownerId: { $in: [riderUserId, rider2UserId] } }),
   ]);
   await new Promise((r) => httpServer.close(r));
   await mongoose.disconnect();
@@ -229,6 +232,28 @@ test('GET /api/orders/:id exposes a masked rider block, revealed only Out For De
   assert.equal(r.body.order.delivery.revealed, true);
   assert.equal(r.body.order.delivery.phone, '9876500000');
   assert.ok(r.body.order.delivery.location && r.body.order.delivery.location.lat === 17.44);
+});
+
+test('partner FCM device token register is idempotent + unregister; push stays optional', async () => {
+  const tok = await riderToken();
+  const fcm = `qa-fcm-${stamp}`;
+
+  assert.equal((await api().post('/api/delivery/devices').set('Authorization', `Bearer ${tok}`).send({})).status, 400);
+
+  await api().post('/api/delivery/devices').set('Authorization', `Bearer ${tok}`).send({ token: fcm, platform: 'android' });
+  await api().post('/api/delivery/devices').set('Authorization', `Bearer ${tok}`).send({ token: fcm, platform: 'ios' });
+  let rows = await DeviceToken.find({ token: fcm });
+  assert.equal(rows.length, 1); // upsert, not duplicated
+  assert.equal(rows[0].ownerType, 'partner');
+  assert.equal(rows[0].ownerId, riderUserId);
+  assert.equal(rows[0].platform, 'ios');
+
+  const del = await api().delete(`/api/delivery/devices/${fcm}`).set('Authorization', `Bearer ${tok}`);
+  assert.equal(del.status, 200);
+  assert.equal((await DeviceToken.find({ token: fcm })).length, 0);
+
+  // No service account in CI/dev → sends are a safe no-op, offers still work.
+  assert.equal(isPushConfigured(), false);
 });
 
 test('admin partner performance + deliveries endpoints', async () => {

@@ -6,6 +6,7 @@ import { Assignment } from '../models/Assignment.js';
 import { Notification } from '../models/Operations.js';
 import { uploadToCloudinary } from '../config/cloudinary.js';
 import { acceptOffer, rejectOffer } from '../services/assignmentService.js';
+import { registerDeviceToken, removeDeviceToken } from '../services/pushService.js';
 
 const RESET_TTL_MS = 15 * 60 * 1000;
 // No mailer wired yet — surface the reset code in the response so ops/support can
@@ -112,6 +113,28 @@ export const deliveryController = {
           lastSeenAt: partner.lastSeenAt,
         },
       });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // POST /api/delivery/devices  { token, platform }
+  registerDevice: async (req, res) => {
+    try {
+      const { token, platform } = req.body || {};
+      if (!token) return res.status(400).json({ success: false, message: 'token required' });
+      await registerDeviceToken({ ownerType: 'partner', ownerId: req.user._id, token, platform });
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // DELETE /api/delivery/devices/:token
+  removeDevice: async (req, res) => {
+    try {
+      await removeDeviceToken(req.params.token);
+      res.json({ success: true });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
     }
