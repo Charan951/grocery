@@ -11,6 +11,7 @@ import { Customer } from '../src/models/Customer.js';
 import { DeliveryPartner } from '../src/models/DeliveryPartner.js';
 import { Order } from '../src/models/Order.js';
 import { Assignment } from '../src/models/Assignment.js';
+import { tryAssign, rejectOffer } from '../src/services/assignmentService.js';
 
 dotenv.config();
 
@@ -19,10 +20,12 @@ const api = () => request(app);
 
 const stamp = Date.now().toString().slice(-7);
 const RIDER_EMAIL = `qa-rider+${stamp}@freshcart.test`;
+const RIDER2_EMAIL = `qa-rider2+${stamp}@freshcart.test`;
 const ADMIN_EMAIL = `qa-dadmin+${stamp}@freshcart.test`;
 const CUST_PHONE = `95555${stamp.slice(-5)}`;
 let baseUrl;
 let riderUserId;
+let rider2UserId;
 
 test.before(async () => {
   process.env.OTP_TEST_MODE = 'true';
@@ -30,6 +33,8 @@ test.before(async () => {
   await mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 10000 });
   const rider = await User.create({ name: 'QA Rider', email: RIDER_EMAIL, password: 'delivery123', role: 'Delivery', status: 'Active', phone: '9876500000' });
   riderUserId = rider._id.toString();
+  const rider2 = await User.create({ name: 'QA Rider2', email: RIDER2_EMAIL, password: 'delivery123', role: 'Delivery', status: 'Active', phone: '9876500001' });
+  rider2UserId = rider2._id.toString();
   await User.create({ name: 'QA DAdmin', email: ADMIN_EMAIL, password: 'admin123', role: 'Admin', status: 'Active' });
   await new Promise((r) => httpServer.listen(0, r));
   baseUrl = `http://localhost:${httpServer.address().port}`;
@@ -40,8 +45,10 @@ const ORDER_PREFIX = `QAD${stamp}`;
 test.after(async () => {
   await Promise.allSettled([
     User.deleteOne({ email: RIDER_EMAIL }),
+    User.deleteOne({ email: RIDER2_EMAIL }),
     User.deleteOne({ email: ADMIN_EMAIL }),
     DeliveryPartner.deleteOne({ userId: riderUserId }),
+    DeliveryPartner.deleteOne({ userId: rider2UserId }),
     Customer.deleteMany({ phone: new RegExp(`${CUST_PHONE}$`) }),
     Order.deleteMany({ orderId: new RegExp(`^${ORDER_PREFIX}`) }),
     Assignment.deleteMany({ orderId: new RegExp(`^${ORDER_PREFIX}`) }),
@@ -174,6 +181,71 @@ test('admin deactivate blocks partner login; reactivate restores it', async () =
     .set('Authorization', `Bearer ${aTok}`).send({ active: true });
   assert.equal(on.status, 200);
   assert.equal((await api().get('/api/delivery/me').set('Authorization', `Bearer ${await riderToken()}`)).status, 200);
+});
+
+// Isolated test region far from any seeded/real partner so $near only sees ours.
+const TP = { name: 'QA remote DS', lat: 1.2345, lng: 1.2345 };
+const bringOnline = (userId, lat, lng) =>
+  DeliveryPartner.findOneAndUpdate(
+    { userId },
+    { $set: { isOnline: true, availability: 'available', activeOrderIds: [],
+      currentLocation: { type: 'Point', coordinates: [lng, lat] }, locationUpdatedAt: new Date() } },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+const makeRemoteOrder = () =>
+  Order.create({
+    orderId: `${ORDER_PREFIX}-R${++_n}`,
+    customerId: 'cust_qa', customerName: 'QA Cust', customerPhone: '+91 9000000000',
+    items: [{ name: 'Milk', quantity: 1, price: 50 }],
+    itemTotal: 50, totalAmount: 75, deliveryAddress: 'QA Drop',
+    status: 'Ready', pickup: TP, deliveryLocation: { lat: TP.lat + 0.01, lng: TP.lng + 0.01 },
+  });
+
+test('auto-assign: order → Ready offers the nearest online partner (source=auto)', async () => {
+  await bringOnline(riderUserId, TP.lat + 0.001, TP.lng + 0.001);
+  await DeliveryPartner.updateOne({ userId: rider2UserId }, { $set: { isOnline: false } });
+
+  const order = await makeRemoteOrder();
+  const r = await tryAssign(order.orderId);
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(r.partnerUserId, riderUserId);
+
+  const a = await Assignment.findOne({ orderId: order.orderId, source: 'auto' });
+  assert.ok(a);
+  assert.equal(a.status, 'offered');
+  assert.equal(String(a.partnerUserId), riderUserId);
+
+  // calling again while an offer is live is a no-op
+  const again = await tryAssign(order.orderId);
+  assert.equal(again.ok, false);
+  assert.equal(again.code, 'offer_pending');
+
+  await Assignment.updateOne({ _id: a._id }, { $set: { status: 'cancelled' } });
+});
+
+test('auto-assign: decline rolls to the next candidate, then stalls when exhausted', async () => {
+  await bringOnline(riderUserId, TP.lat + 0.001, TP.lng + 0.001);
+  await bringOnline(rider2UserId, TP.lat + 0.002, TP.lng + 0.002);
+
+  const order = await makeRemoteOrder();
+  const r1 = await tryAssign(order.orderId);
+  assert.equal(r1.ok, true);
+  const first = r1.partnerUserId;
+  const a1 = await Assignment.findOne({ orderId: order.orderId, status: 'offered' });
+
+  // first partner declines → auto re-offer to the other one
+  await rejectOffer({ assignmentId: a1._id, user: { _id: first, name: 'x' } });
+  const a2 = await Assignment.findOne({ orderId: order.orderId, status: 'offered' });
+  assert.ok(a2, 're-offer should be live');
+  assert.notEqual(String(a2.partnerUserId), first);
+  assert.equal(a2.attempt, 2);
+
+  // second partner declines too → no candidates left → stalled
+  await rejectOffer({ assignmentId: a2._id, user: { _id: String(a2.partnerUserId), name: 'y' } });
+  assert.equal(await Assignment.findOne({ orderId: order.orderId, status: 'offered' }), null);
+  const stalled = await Order.findOne({ orderId: order.orderId });
+  assert.equal(stalled.assignmentStalled, true);
+  assert.equal(stalled.deliveryPartnerUserId, undefined);
 });
 
 test('manual offer → partner accepts → order Assigned + partner queue updated', async () => {

@@ -118,6 +118,30 @@
 
 ## 5. Completed Major Work
 
+- **2026-09-01 — Delivery P1-D1 DONE** (automatic assignment on `Order → Ready`).
+  `assignmentService.js` +`findCandidates({pickup, excludeUserIds, radiusKm})`
+  (2dsphere `$near` on `DeliveryPartner.currentLocation` when pickup has coords,
+  else plain scan; filters `isOnline` + under-capacity + `User.role Delivery
+  status Active`; ranks distance → fewest activeOrders → rating) and
+  +`tryAssign(orderOrId)` (idempotent: bails on `already_assigned` /
+  `not_ready` / `offer_pending`; counts prior `Assignment` attempts for the
+  order, excludes those partners, `attempt = maxPrior+1`; radius auto-expands
+  ×1/×2/×3 of `Settings.assignRadiusKm`; offers the single best candidate via
+  `createOffer({source:'auto'})`; `attempt > Settings.maxOfferAttempts` →
+  `markStalled`; emits `auto_offer` to `admin_fleet`). `onOfferDeclined` (was
+  `onOfferDeclined`, renamed stall body to `markStalled`) now takes
+  `{source}` and, when `source==='auto'`, calls `tryAssign` again to roll to
+  the next candidate before falling back to `markStalled`; `rejectOffer` and
+  `expireStaleOffers` pass `a.source`. Trigger: `apiController.updateStatus`
+  fires `tryAssign(order.orderId)` (non-blocking, after save) when
+  `status==='Ready' && !deliveryPartnerUserId`, gated by new
+  `Settings.autoAssignEnabled` (default true, editable via existing
+  `PUT /api/settings`). No new deps/infra; the 15s `expireStaleOffers` sweeper
+  already drives re-offers on timeout. Backend `npm test` → **29 tests** (+2:
+  auto-offer nearest + offer_pending no-op; decline→re-offer→exhaust→stalled).
+  Next: **P1-D2** — admin live fleet map (Leaflet + `fleet_update`) + partner
+  detail/performance pages.
+
 - **2026-09-01 — Delivery P0-D5 DONE** (admin web delivery management + responsive).
   Backend (2 new endpoints, `adminDeliveryController`):
   `POST /api/admin/delivery/partners/:userId/reset-password {password}` (Admin
@@ -886,7 +910,7 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
 
 ## 12. Testing Status
 
-- **Backend: `npm test` → 27 tests, all green**
+- **Backend: `npm test` → 29 tests, all green**
   (`node:test` + `supertest` against `MONGO_URI`). Covers auth/OTP, protectCustomer,
   coupon validate, order placement + `/orders/mine` + ownership, status timeline,
   payment test-mode, delivery partner lifecycle + admin assign/reassign/unassign +
@@ -941,6 +965,8 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
 - Frontend: no automated tests; admin `fetchReviews` change not yet run in a browser.
 
 ## 13. Last Updated
+
+2026-09-01 — Delivery P1-D1: automatic assignment on Order → Ready. assignmentService +findCandidates (2dsphere $near, capacity + online + active filter, distance/load/rating rank) +tryAssign (idempotent, attempt tracking, radius auto-expand ×1/2/3, re-offer on decline/expire for source=auto, stall when exhausted). Trigger in updateStatus, gated by Settings.autoAssignEnabled. Backend 29 tests green. Next: P1-D2 admin fleet map.
 
 2026-09-01 — Delivery P0-D5: admin web delivery management — DeliveryModule rebuilt on GET /admin/delivery/partners (live status, add, reset-pw, activate/deactivate, responsive table+cards); Orders.tsx assign flow rewired to real POST /admin/orders/:id/assign|reassign|unassign with partner select + force option. 2 new backend endpoints (reset-password through hash, account suspend/activate). Backend 27 tests green, frontend build clean. Next: P1-D1 auto-assign on Ready.
 

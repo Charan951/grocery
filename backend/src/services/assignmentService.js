@@ -2,7 +2,9 @@ import { Assignment } from '../models/Assignment.js';
 import { Order } from '../models/Order.js';
 import { User } from '../models/User.js';
 import { DeliveryPartner } from '../models/DeliveryPartner.js';
-import { Notification } from '../models/Operations.js';
+import { Notification, Settings } from '../models/Operations.js';
+
+const CANDIDATE_LIMIT = 10;
 
 let _io = null;
 export const setIo = (io) => { _io = io; };
@@ -155,11 +157,11 @@ export const rejectOffer = async ({ assignmentId, user, reason }) => {
     { new: true }
   );
   if (!a) return { ok: false, code: 'offer_gone' };
-  await onOfferDeclined(a.orderId, `Partner ${user.name} declined`);
+  await onOfferDeclined(a.orderId, `Partner ${user.name} declined`, { source: a.source });
   return { ok: true };
 };
 
-const onOfferDeclined = async (orderId, why) => {
+const markStalled = async (orderId, why) => {
   const order = await Order.findOneAndUpdate(
     { orderId, deliveryPartnerUserId: { $in: [null, undefined] } },
     { $set: { assignmentStalled: true } },
@@ -170,13 +172,124 @@ const onOfferDeclined = async (orderId, why) => {
   await notifyAdmins('Delivery needs assignment', `Order ${orderId}: ${why}. Assign a partner manually.`);
 };
 
+// A live offer was rejected / expired. For auto-dispatched orders, roll to the
+// next-best candidate; otherwise flag it for the admin.
+const onOfferDeclined = async (orderId, why, { source } = {}) => {
+  const order = await Order.findOne({ orderId });
+  if (!order || order.deliveryPartnerUserId) return; // already assigned elsewhere
+  if (source === 'auto') {
+    const r = await tryAssign(order).catch(() => ({ ok: false }));
+    if (r.ok) return; // re-offered to the next partner
+  }
+  await markStalled(orderId, why);
+};
+
+/**
+ * Rank online, in-radius, under-capacity partners for an order's pickup point.
+ * Uses the 2dsphere `$near` index when the pickup has coords, else a plain scan.
+ */
+export const findCandidates = async ({ pickup, excludeUserIds = [], radiusKm = 6 }) => {
+  const base = { isOnline: true, userId: { $nin: excludeUserIds } };
+  const hasGeo = pickup && pickup.lat != null && pickup.lng != null;
+  const query = hasGeo
+    ? {
+        ...base,
+        currentLocation: {
+          $near: {
+            $geometry: { type: 'Point', coordinates: [pickup.lng, pickup.lat] },
+            $maxDistance: radiusKm * 1000,
+          },
+        },
+      }
+    : base;
+
+  const partners = (await DeliveryPartner.find(query).limit(CANDIDATE_LIMIT).lean())
+    .filter((p) => (p.activeOrderIds || []).length < (p.maxConcurrent || 1));
+  if (!partners.length) return [];
+
+  const users = await User.find({
+    _id: { $in: partners.map((p) => p.userId) },
+    role: 'Delivery',
+    status: 'Active',
+  }).select('name').lean();
+  const byId = Object.fromEntries(users.map((u) => [String(u._id), u]));
+
+  return partners
+    .filter((p) => byId[String(p.userId)])
+    .map((p) => ({
+      partner: p,
+      user: byId[String(p.userId)],
+      distance: geoDistanceMeters(pickup, {
+        lat: p.currentLocation?.coordinates?.[1],
+        lng: p.currentLocation?.coordinates?.[0],
+      }),
+      activeCount: (p.activeOrderIds || []).length,
+      rating: p.rating || 0,
+    }))
+    .sort(
+      (a, b) =>
+        (a.distance ?? 1e12) - (b.distance ?? 1e12) ||
+        a.activeCount - b.activeCount ||
+        b.rating - a.rating
+    );
+};
+
+/**
+ * Try to auto-assign one order: offer to the single best candidate. Called when
+ * an order becomes Ready and on every subsequent decline/expiry (re-offer).
+ * Idempotent — bails if the order already has a partner or a live offer.
+ */
+export const tryAssign = async (orderOrId) => {
+  const order = typeof orderOrId === 'string' ? await Order.findOne({ orderId: orderOrId }) : orderOrId;
+  if (!order) return { ok: false, code: 'no_order' };
+  if (order.deliveryPartnerUserId) return { ok: false, code: 'already_assigned' };
+  if (order.status !== 'Ready') return { ok: false, code: 'not_ready' };
+  if (await Assignment.findOne({ orderId: order.orderId, status: 'offered' })) {
+    return { ok: false, code: 'offer_pending' };
+  }
+
+  const s = (await Settings.findOne()) || {};
+  const timeoutSec = s.offerTimeoutSec || 25;
+  const maxAttempts = s.maxOfferAttempts || 5;
+  const baseRadius = s.assignRadiusKm || 6;
+
+  const prior = await Assignment.find({ orderId: order.orderId }).select('partnerUserId attempt').lean();
+  const excludeUserIds = [...new Set(prior.map((a) => String(a.partnerUserId)))];
+  const attempt = prior.reduce((m, a) => Math.max(m, a.attempt || 1), 0) + 1;
+  if (attempt > maxAttempts) {
+    await markStalled(order.orderId, `no partner accepted after ${maxAttempts} attempts`);
+    return { ok: false, code: 'exhausted' };
+  }
+
+  let candidates = [];
+  for (const mult of [1, 2, 3]) {
+    candidates = await findCandidates({ pickup: order.pickup, excludeUserIds, radiusKm: baseRadius * mult });
+    if (candidates.length) break;
+  }
+  if (!candidates.length) {
+    await markStalled(order.orderId, 'no available partner nearby');
+    return { ok: false, code: 'no_candidate' };
+  }
+
+  const top = candidates[0];
+  const partnerDoc = await DeliveryPartner.findOne({ userId: top.user._id });
+  const assignment = await createOffer({
+    order, partnerUser: top.user, partner: partnerDoc, attempt, timeoutSec, source: 'auto',
+  });
+  await Order.updateOne({ orderId: order.orderId }, { $set: { assignmentStalled: false } });
+  emit('admin_fleet', 'auto_offer', {
+    orderId: order.orderId, partnerUserId: String(top.user._id), attempt, distanceMeters: top.distance,
+  });
+  return { ok: true, assignmentId: assignment._id, partnerUserId: String(top.user._id), attempt };
+};
+
 /** Sweeper body — call on an interval from index.js. */
 export const expireStaleOffers = async () => {
   const stale = await Assignment.find({ status: 'offered', expiresAt: { $lt: new Date() } });
   for (const a of stale) {
     await Assignment.updateOne({ _id: a._id }, { $set: { status: 'expired', respondedAt: new Date() } });
     emit('partner:' + String(a.partnerUserId), 'delivery_offer_revoked', { assignmentId: String(a._id), orderId: a.orderId, reason: 'expired' });
-    await onOfferDeclined(a.orderId, 'offer expired');
+    await onOfferDeclined(a.orderId, 'offer expired', { source: a.source });
   }
   return stale.length;
 };
@@ -203,4 +316,5 @@ export const cancelForOrder = async (orderId, reason = 'order cancelled') => {
 
 export const assignmentService = {
   setIo, geoDistanceMeters, createOffer, acceptOffer, rejectOffer, expireStaleOffers, cancelForOrder,
+  findCandidates, tryAssign,
 };

@@ -67,6 +67,7 @@ const settingsSchema = new mongoose.Schema({
     lat: { type: Number, default: 17.4474 },
     lng: { type: Number, default: 78.3762 }
   },
+  autoAssignEnabled: { type: Boolean, default: true }, // auto-offer on Order → Ready
   offerTimeoutSec: { type: Number, default: 25 },
   maxOfferAttempts: { type: Number, default: 5 },
   assignRadiusKm: { type: Number, default: 6 },

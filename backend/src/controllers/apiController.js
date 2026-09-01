@@ -27,7 +27,7 @@ import { Customer } from '../models/Customer.js';
 import { Coupon, Offer, Payment, WalletTransaction } from '../models/Finance.js';
 import { Review, Notification, CMSPage, Blog, Settings, AuditLog, SupportTicket } from '../models/Operations.js';
 import { uploadToCloudinary } from '../config/cloudinary.js';
-import { cancelForOrder } from '../services/assignmentService.js';
+import { cancelForOrder, tryAssign } from '../services/assignmentService.js';
 
 // Helper to sign JWT
 const signToken = (id) => {
@@ -722,6 +722,16 @@ export const orderController = {
       }
 
       await order.save();
+
+      // Auto-dispatch: when an order becomes Ready with no partner, offer it to
+      // the nearest available rider (P1-D1). Non-blocking, opt-out via Settings.
+      if (status === 'Ready' && !order.deliveryPartnerUserId) {
+        Settings.findOne()
+          .then((s) => {
+            if (!s || s.autoAssignEnabled !== false) return tryAssign(order.orderId);
+          })
+          .catch(() => {});
+      }
 
       // Push the change to anyone watching this order's room.
       const io = req.app.get('io');

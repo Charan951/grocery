@@ -902,11 +902,22 @@ existing timeline. No fake data anywhere.
 
 ### PHASE P1 — Automation + customer live tracking + admin live map
 
-**P1-D1 · Automatic assignment on `Ready`**
-- `assignmentService.tryAssign` wired into `updateStatus` (status→Ready, no
-  partner). `2dsphere` index + `$near` candidate query; ranking; radius
-  auto-expand; `assignmentStalled` + admin alert. `Settings` config fields (§11.6).
-- Tests: candidate filtering, ranking, expand, stall.
+**P1-D1 · Automatic assignment on `Ready`** — ✅ DONE 2026-09-01
+- `assignmentService.findCandidates` (2dsphere `$near` on
+  `DeliveryPartner.currentLocation` when the pickup has coords, else plain scan;
+  filters online + under `maxConcurrent` + `User` role Delivery/status Active;
+  ranks distance → activeOrders → rating) and `tryAssign(orderOrId)` (idempotent;
+  prior-attempt tracking + partner exclusion; radius auto-expand ×1/×2/×3 of
+  `Settings.assignRadiusKm`; single best-candidate offer `source:'auto'`;
+  `attempt > Settings.maxOfferAttempts` → `markStalled` + admin alert).
+- `onOfferDeclined({source})` re-invokes `tryAssign` for `source:'auto'` (rolls
+  to next candidate); `rejectOffer` + `expireStaleOffers` pass `a.source`; the
+  existing 15s sweeper drives timeout re-offers.
+- Trigger: `apiController.updateStatus` fires `tryAssign` non-blocking on
+  `status==='Ready' && !deliveryPartnerUserId`, gated by new
+  `Settings.autoAssignEnabled` (default true).
+- Verified: backend `npm test` 29 green (+2: nearest-offer + `offer_pending`
+  no-op; decline→re-offer(attempt 2)→exhaust→`assignmentStalled`).
 
 **P1-D2 · Admin live fleet map + partner detail**
 - `GET /api/admin/delivery/fleet` + `fleet_update` consumer (Leaflet); partner
