@@ -201,6 +201,22 @@ const makeRemoteOrder = () =>
     status: 'Ready', pickup: TP, deliveryLocation: { lat: TP.lat + 0.01, lng: TP.lng + 0.01 },
   });
 
+test('admin partner performance + deliveries endpoints', async () => {
+  const aTok = await adminToken();
+  const perf = await api().get(`/api/admin/delivery/partners/${riderUserId}/performance`).set('Authorization', `Bearer ${aTok}`);
+  assert.equal(perf.status, 200);
+  assert.equal(perf.body.partner.userId, riderUserId);
+  assert.ok(typeof perf.body.performance.offered === 'number');
+  assert.ok('acceptanceRate' in perf.body.performance);
+
+  const del = await api().get(`/api/admin/delivery/partners/${riderUserId}/deliveries?limit=10`).set('Authorization', `Bearer ${aTok}`);
+  assert.equal(del.status, 200);
+  assert.ok(Array.isArray(del.body.deliveries));
+
+  const missing = await api().get('/api/admin/delivery/partners/000000000000000000000000/performance').set('Authorization', `Bearer ${aTok}`);
+  assert.equal(missing.status, 404);
+});
+
 test('auto-assign: order → Ready offers the nearest online partner (source=auto)', async () => {
   await bringOnline(riderUserId, TP.lat + 0.001, TP.lng + 0.001);
   await DeliveryPartner.updateOne({ userId: rider2UserId }, { $set: { isOnline: false } });

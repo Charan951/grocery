@@ -8,6 +8,7 @@ import {
   ArrowUp, ArrowDown, X, ChevronDown, ChevronUp, Check
 } from 'lucide-react';
 import { useCMS, getCategoryImage, getSubCategoryImage } from '../../context/CMSContext';
+import { DeliveryFleetMap } from './DeliveryFleetMap';
 
 // ==========================================
 // 1. CATEGORIES MODULE
@@ -2001,6 +2002,7 @@ const relTime = (iso: string | null): string => {
 };
 
 export const DeliveryModule: React.FC = () => {
+  const navigate = useNavigate();
   const [partners, setPartners] = useState<FleetPartner[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -2114,6 +2116,8 @@ export const DeliveryModule: React.FC = () => {
   const onDelivery = partners.filter(p => p.availability === 'busy').length;
 
   return (
+   <div className="flex flex-col gap-5">
+    <DeliveryFleetMap />
     <div className="bg-surface border border-divider p-4 sm:p-6 rounded-[28px] shadow-card flex flex-col gap-5">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 pb-3 border-b border-divider">
         <div>
@@ -2170,7 +2174,7 @@ export const DeliveryModule: React.FC = () => {
               {partners.map(p => (
                 <tr key={p.userId} className="border-b border-divider last:border-0 hover:bg-background/60">
                   <td className="p-2.5">
-                    <div className="font-extrabold text-text-primary">{p.name}</div>
+                    <button onClick={() => navigate(`/admin/delivery/${p.userId}`)} className="font-extrabold text-text-primary hover:text-primary hover:underline cursor-pointer text-left">{p.name}</button>
                     <div className="text-[10px] text-text-secondary">{p.email}</div>
                     <div className="text-[10px] text-text-secondary">{p.phone || '—'} • {p.vehicleType}</div>
                   </td>
@@ -2217,7 +2221,7 @@ export const DeliveryModule: React.FC = () => {
           <div key={p.userId} className="p-4 border border-divider rounded-2xl bg-background flex flex-col gap-2">
             <div className="flex justify-between items-start gap-2">
               <div>
-                <div className="font-extrabold text-xs text-text-primary">{p.name}</div>
+                <button onClick={() => navigate(`/admin/delivery/${p.userId}`)} className="font-extrabold text-xs text-text-primary hover:text-primary hover:underline cursor-pointer text-left">{p.name}</button>
                 <div className="text-[10px] text-text-secondary">{p.email}</div>
                 <div className="text-[10px] text-text-secondary">{p.phone || '—'} • {p.vehicleType}</div>
               </div>
@@ -2248,6 +2252,7 @@ export const DeliveryModule: React.FC = () => {
         ))}
       </div>
     </div>
+   </div>
   );
 };
 

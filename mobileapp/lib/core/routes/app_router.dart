@@ -28,6 +28,7 @@ import 'package:freshcart/features/profile/presentation/screens/notifications_sc
 import 'package:freshcart/features/profile/presentation/screens/profile_edit_screen.dart';
 import 'package:freshcart/features/search/presentation/screens/search_screen.dart';
 import 'package:freshcart/features/wishlist/presentation/screens/wishlist_screen.dart';
+import 'package:freshcart/features/legal/presentation/screens/legal_screen.dart';
 
 /// Bridges Riverpod auth changes to go_router's [GoRouter.refreshListenable].
 class _AuthRouterRefresh extends ChangeNotifier {
@@ -37,7 +38,7 @@ class _AuthRouterRefresh extends ChangeNotifier {
 }
 
 /// Routes reachable while signed out.
-const _publicRoutes = {'/splash', '/onboarding', '/login', '/otp'};
+const _publicRoutes = {'/splash', '/onboarding', '/login', '/otp', '/legal'};
 
 final routerProvider = Provider<GoRouter>((ref) {
   final refresh = _AuthRouterRefresh(ref);
@@ -103,6 +104,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/notifications', builder: (c, s) => const NotificationsScreen()),
       GoRoute(path: '/account/edit', builder: (c, s) => const ProfileEditScreen()),
       GoRoute(path: '/search_detail', builder: (c, s) => const SearchDetailScreen()),
+      GoRoute(
+        path: '/legal',
+        builder: (c, s) => LegalScreen(initialTab: s.uri.queryParameters['tab'] ?? 'terms'),
+      ),
       // Legacy alias — Profile is the Account tab now.
       GoRoute(path: '/profile', redirect: (c, s) => '/account'),
 

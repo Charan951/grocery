@@ -118,6 +118,28 @@
 
 ## 5. Completed Major Work
 
+- **2026-09-01 — Delivery P1-D2 DONE** (admin live fleet map + partner detail).
+  Backend `adminDeliveryController`: `GET /api/admin/delivery/partners/:userId/
+  deliveries?status=&limit=` (partner's orders, safe projection) and
+  `.../performance` (Assignment tallies → offered/accepted/rejected/expired +
+  `acceptanceRate`; Order-derived `deliveredCount`/`failedCount` +
+  `avgPickupMins` [createdAt→pickedUpAt] / `avgDeliveryMins` [pickedUpAt→
+  deliveredAt]; lifetime `completedCount`/`failedCount` + `rating`); 404 for
+  unknown/non-Delivery userId. Both `protect, authorize('Admin','Manager')`.
+  Frontend: `frontend/src/pages/admin/DeliveryFleetMap.tsx` — **imperative
+  Leaflet** (`leaflet` was already a dep; no `react-leaflet`, no
+  `socket.io-client` in the web bundle), OSM tiles, `L.divIcon` colour pins,
+  **polls `GET /api/admin/delivery/fleet` every 10s**, marker reconcile +
+  first-fit bounds; mounted at the top of `DeliveryModule`.
+  `frontend/src/pages/admin/PartnerDetail.tsx` at `/admin/delivery/:userId`
+  (route added in `AdminApp.tsx`) — stat grid + delivery-history table; partner
+  names in `DeliveryModule` `navigate()` to it. All responsive.
+  Verified: backend `npm test` **30 tests** (+1), frontend `tsc -b && vite
+  build` clean.
+  Next: **P1-D3** — customer live rider tracking (web `CustomerOrders.tsx` /
+  `/track/:orderId` Leaflet + reveal-window rider marker + ETA; polish mobile
+  `tracking_screen`).
+
 - **2026-09-01 — Delivery P1-D1 DONE** (automatic assignment on `Order → Ready`).
   `assignmentService.js` +`findCandidates({pickup, excludeUserIds, radiusKm})`
   (2dsphere `$near` on `DeliveryPartner.currentLocation` when pickup has coords,
@@ -910,7 +932,7 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
 
 ## 12. Testing Status
 
-- **Backend: `npm test` → 29 tests, all green**
+- **Backend: `npm test` → 30 tests, all green**
   (`node:test` + `supertest` against `MONGO_URI`). Covers auth/OTP, protectCustomer,
   coupon validate, order placement + `/orders/mine` + ownership, status timeline,
   payment test-mode, delivery partner lifecycle + admin assign/reassign/unassign +
@@ -965,6 +987,8 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
 - Frontend: no automated tests; admin `fetchReviews` change not yet run in a browser.
 
 ## 13. Last Updated
+
+2026-09-01 — Delivery P1-D2: admin live fleet map (imperative Leaflet, polls GET /admin/delivery/fleet every 10s) + PartnerDetail page at /admin/delivery/:userId; backend GET /admin/delivery/partners/:userId/deliveries|performance. Backend 30 tests green, frontend build clean. Next: P1-D3 customer live tracking.
 
 2026-09-01 — Delivery P1-D1: automatic assignment on Order → Ready. assignmentService +findCandidates (2dsphere $near, capacity + online + active filter, distance/load/rating rank) +tryAssign (idempotent, attempt tracking, radius auto-expand ×1/2/3, re-offer on decline/expire for source=auto, stall when exhausted). Trigger in updateStatus, gated by Settings.autoAssignEnabled. Backend 29 tests green. Next: P1-D2 admin fleet map.
 

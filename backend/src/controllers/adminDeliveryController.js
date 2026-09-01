@@ -183,6 +183,73 @@ export const adminDeliveryController = {
     }
   },
 
+  // GET /api/admin/delivery/partners/:userId/deliveries?status=&limit=
+  partnerDeliveries: async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const limit = Math.min(Number(req.query.limit) || 50, 200);
+      const q = { deliveryPartnerUserId: userId };
+      if (req.query.status) q.status = req.query.status;
+      const orders = await Order.find(q)
+        .select('orderId status totalAmount paymentMethod paymentStatus deliveryAddress createdAt pickedUpAt deliveredAt failureReason assignmentStalled')
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .lean();
+      res.json({ success: true, deliveries: orders });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // GET /api/admin/delivery/partners/:userId/performance
+  partnerPerformance: async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const user = await User.findOne({ _id: userId, role: 'Delivery' }).select('name email phone status').lean();
+      if (!user) return res.status(404).json({ success: false, message: 'Delivery partner not found' });
+      const partner = await DeliveryPartner.findOne({ userId }).lean();
+
+      const assignments = await Assignment.find({ partnerUserId: userId }).select('status attempt source createdAt respondedAt').lean();
+      const count = (s) => assignments.filter((a) => a.status === s).length;
+      const offered = assignments.length;
+      const accepted = count('accepted') + count('completed'); // completed implies it was accepted
+      const rejected = count('rejected');
+      const expired = count('expired');
+      const responded = accepted + rejected;
+      const acceptanceRate = responded ? Math.round((accepted / responded) * 100) : null;
+
+      const orders = await Order.find({ deliveryPartnerUserId: userId })
+        .select('status pickedUpAt deliveredAt createdAt').lean();
+      const delivered = orders.filter((o) => o.status === 'Delivered');
+      const failed = orders.filter((o) => o.status === 'Failed');
+      const mins = (a, b) => (a && b ? (new Date(b) - new Date(a)) / 60000 : null);
+      const avg = (arr) => (arr.length ? Math.round((arr.reduce((s, n) => s + n, 0) / arr.length) * 10) / 10 : null);
+      const deliveryLegs = delivered.map((o) => mins(o.pickedUpAt, o.deliveredAt)).filter((n) => n != null && n >= 0);
+      const pickupLegs = delivered.map((o) => mins(o.createdAt, o.pickedUpAt)).filter((n) => n != null && n >= 0);
+
+      res.json({
+        success: true,
+        partner: {
+          userId, name: user.name, email: user.email, phone: user.phone || partner?.phone || '',
+          accountStatus: user.status, isOnline: !!partner?.isOnline, availability: partner?.availability || 'offline',
+          vehicleType: partner?.vehicleType || 'bike', rating: partner?.rating ?? 5, ratingCount: partner?.ratingCount ?? 0,
+          activeOrderIds: partner?.activeOrderIds || [], maxConcurrent: partner?.maxConcurrent || 1,
+        },
+        performance: {
+          lifetimeCompleted: partner?.completedCount ?? 0,
+          lifetimeFailed: partner?.failedCount ?? 0,
+          offered, accepted, rejected, expired, acceptanceRate,
+          deliveredCount: delivered.length,
+          failedCount: failed.length,
+          avgPickupMins: avg(pickupLegs),
+          avgDeliveryMins: avg(deliveryLegs),
+        },
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
   // POST /api/admin/delivery/partners/:userId/account  { active: boolean }
   setPartnerAccount: async (req, res) => {
     try {

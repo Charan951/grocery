@@ -6,6 +6,7 @@ import { Dashboard } from './pages/admin/Dashboard';
 import { Orders } from './pages/admin/Orders';
 import { Products as AdminProducts } from './pages/admin/Products';
 import { AdminCMS } from './pages/AdminCMS';
+import { PartnerDetail } from './pages/admin/PartnerDetail';
 import {
   CategoriesModule, SubCategoriesModule, InventoryModule, CustomersModule,
   DeliveryModule, EmployeesModule, CouponsModule, FinanceModule,
@@ -39,6 +40,7 @@ const AdminApp: React.FC<AdminAppProps> = ({ adminUser, onLoginSuccess, onLogout
       <Route path="/admin/inventory" element={<AdminLayout onLogout={onLogout}><InventoryModule /></AdminLayout>} />
       <Route path="/admin/customers" element={<AdminLayout onLogout={onLogout}><CustomersModule /></AdminLayout>} />
       <Route path="/admin/delivery" element={<AdminLayout onLogout={onLogout}><DeliveryModule /></AdminLayout>} />
+      <Route path="/admin/delivery/:userId" element={<AdminLayout onLogout={onLogout}><PartnerDetail /></AdminLayout>} />
       <Route path="/admin/employees" element={<AdminLayout onLogout={onLogout}><EmployeesModule /></AdminLayout>} />
       <Route path="/admin/coupons" element={<AdminLayout onLogout={onLogout}><CouponsModule /></AdminLayout>} />
       <Route path="/admin/cms" element={<AdminLayout onLogout={onLogout}><AdminCMS /></AdminLayout>} />

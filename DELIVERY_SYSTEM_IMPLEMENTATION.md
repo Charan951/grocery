@@ -919,10 +919,21 @@ existing timeline. No fake data anywhere.
 - Verified: backend `npm test` 29 green (+2: nearest-offer + `offer_pending`
   no-op; decline→re-offer(attempt 2)→exhaust→`assignmentStalled`).
 
-**P1-D2 · Admin live fleet map + partner detail**
-- `GET /api/admin/delivery/fleet` + `fleet_update` consumer (Leaflet); partner
-  detail page (deliveries / performance). `GET /partners/:id/{deliveries,performance}`.
-- Responsive map/table. Tests: fleet event scoping, performance aggregation.
+**P1-D2 · Admin live fleet map + partner detail** — ✅ DONE 2026-09-01
+- Backend: `GET /api/admin/delivery/partners/:userId/deliveries?status=&limit=`
+  (partner's orders, safe projection) and `.../performance` (Assignment tallies →
+  offered/accepted/rejected/expired + acceptanceRate; Order-derived
+  deliveredCount/failedCount + avgPickupMins/avgDeliveryMins; lifetime
+  counters + rating). 404 for unknown/non-Delivery userId.
+- Frontend: `DeliveryFleetMap.tsx` — imperative Leaflet (no react-leaflet),
+  OSM tiles, `L.divIcon` colour pins (green available / amber busy / grey
+  offline), **polls `GET /api/admin/delivery/fleet` every 10s** (no
+  socket.io-client added to the admin bundle), marker reconcile + first-fit
+  bounds; rendered at the top of `DeliveryModule`. `PartnerDetail.tsx` at
+  `/admin/delivery/:userId` — stat grid + delivery-history table; partner names
+  in `DeliveryModule` link to it. Responsive throughout.
+- Verified: backend `npm test` 30 green (+1 perf/deliveries/404); frontend
+  `tsc -b && vite build` clean (leaflet CSS bundled).
 
 **P1-D3 · Customer live rider tracking (web + polish mobile)**
 - Web `CustomerOrders.tsx` / `/track/:orderId`: socket room + Leaflet + rider
