@@ -118,6 +118,29 @@
 
 ## 5. Completed Major Work
 
+- **2026-09-01 — Mobile bug fixes + location-permission-after-login.**
+  - **🐛 INTERNET permission** was only in `mobileapp/android/app/src/debug/
+    AndroidManifest.xml` → **release/profile builds had no network at all**
+    (API + remote product images both failed). Added `INTERNET` +
+    `ACCESS_NETWORK_STATE` + `POST_NOTIFICATIONS` to `.../src/main/
+    AndroidManifest.xml`. (Debug builds were unaffected, which is why it went
+    unnoticed.)
+  - New `lib/core/services/location_permission.dart` — `LocationPermissionService`
+    wraps `geolocator`: `check()`, `request()`, `ensureWithUi(context)` (rationale
+    bottom sheet → request → GPS-off → `openLocationSettings()`; deniedForever →
+    `openAppSettings()`). `LocationPermState { granted, serviceDisabled, denied,
+    deniedForever }`.
+  - `AuthNotifier.refreshLocationPermission()` syncs the real OS permission into
+    `AuthState.locationPermissionGranted` (fire-and-forget after `verifyOtp` +
+    `_hydrate`; no `.timeout()` — that hung widget tests). `otp_screen` routes to
+    `/location_select` unless `selectedAddress != null && locationPermissionGranted`.
+    `location_select_screen` auto-runs `ensureWithUi` on open + shows a persistent
+    permission banner (GPS-off / blocked / denied) with a retry/settings CTA;
+    `_locateUser()` now goes through the service too.
+  - Verified: `flutter analyze` clean, `flutter test` 117, `flutter build apk
+    --debug` OK. Network-offline state already covered by `ConnectivityBanner` +
+    `connectivityProvider` (FW-1).
+
 - **2026-09-01 — FUTURE_WORK backlog batch** (see `FUTURE_WORK.md` for the
   per-item detail; all shipped web + mobile + backend where the item spans them):
   - **FW-3 push** — done end to end. Besides the delivery-offer push,
@@ -1237,6 +1260,8 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
 - Frontend: no automated tests; admin `fetchReviews` change not yet run in a browser.
 
 ## 13. Last Updated
+
+2026-09-01 — Mobile fixes: (1) INTERNET permission was debug-manifest-only → added to main AndroidManifest (release builds had no network → API + product images failed). (2) New LocationPermissionService + post-login location-permission flow (rationale sheet, open-settings for deniedForever, GPS-off dialog, in-screen banner); AuthNotifier.refreshLocationPermission wired after verifyOtp/hydrate; otp_screen + splash route to /location_select until granted. mobile analyze/117 tests/debug APK all green.
 
 2026-09-01 — FUTURE_WORK backlog batch: FW-3 (customer order-status push), FW-6 (mobile order tabs + active-order banner web+mobile), FW-5 (product brand/inStock/onSale filters + opt-in pagination), BE-3 (COD orders created Pending), FW-11 (festival hero on mobile Home), FW-4 (wallet top-up backend + mobile; web blocked on WEB-1), BE-2 (admin review bulk-moderation + Pending queue), FW-16 (search bar mic gated / dead file removed), FW-13 (location_select geocode errors toast). FIREBASE_SERVICE_ACCOUNT is now a path to src/config/service_account.json. Backend 45 tests, mobile 117, deliveryapp 6; frontend build clean.
 

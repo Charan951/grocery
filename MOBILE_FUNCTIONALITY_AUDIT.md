@@ -41,7 +41,8 @@ Legend: **✓** Complete · **⚠** Partial · **✗** Missing · **🐛** Broke
 | Stores | ⚠ hardcoded list + fake map | ⚠ hardcoded list + Call + Directions | **⚠ both** | No `/api/stores`. |
 | Offline / maintenance / force-update | ✗ | ✓ banner + `/app/config` gate (FW-1) | **mobile ahead** | Retry-with-backoff still open. |
 | Deep links / app links | ✗ | ✗ | **✗ both** | No `assetlinks`/AASA, no `intent-filter` host. |
-| Permissions UX | n/a (browser) | ⚠ location ad-hoc via `geolocator`; FCM permission prompt (FW-3); **no `permission_handler` rationale / "open settings"** | **⚠** | |
+| Permissions UX | n/a (browser) | ✓ location: post-login flow — real OS check on login/hydrate, rationale sheet, **open-settings** for deniedForever, GPS-off dialog, in-screen banner (`LocationPermissionService`, 2026-09-01). FCM prompt on init (⚠ no pre-rationale). | **✓ location / ⚠ push** | |
+| **INTERNET permission (Android)** | n/a | **🐛→✓ fixed 2026-09-01** — was only in the *debug* manifest, so release builds had no network (API + product images failed). Now in `main/AndroidManifest.xml`. | ✓ | |
 | Analytics / crash reporting | ✗ | ✗ | **✗ both** | FW-12. |
 | Deep back-navigation / state restore | n/a | ⚠ `go_router` + hardware back; filter state survives but **no scroll restore, no tab-state persistence** | **⚠** | |
 | Bookings / Enquiries / Quotes / RFQ | n/a | n/a | **n/a** | Not part of this grocery quick-commerce product on either side. |
@@ -327,10 +328,11 @@ search empty state.
 
 | Permission | Web | Mobile | Status |
 |---|---|---|---|
-| Location (checkout / "locate me") | browser prompt | `geolocator` ad-hoc request; failure now toasts (FW-13) | ⚠ no rationale sheet, no "open settings" fallback |
-| Notifications (FCM) | n/a | `FirebaseMessaging.requestPermission()` on init | ⚠ no pre-prompt rationale; Android 13 `POST_NOTIFICATIONS` relies on plugin default |
+| `android.permission.INTERNET` | n/a | **now in `main/AndroidManifest.xml`** (+ `ACCESS_NETWORK_STATE`, `POST_NOTIFICATIONS`). Was debug-only → release builds had no network. | ✓ (fixed 2026-09-01) |
+| Location | browser prompt | **`LocationPermissionService`**: real OS check on **login + hydrate** → splash routes to `/location_select`; that screen auto-runs the flow — **rationale sheet**, request, GPS-off → `openLocationSettings()`, deniedForever → `openAppSettings()`, persistent in-screen banner with a retry/settings CTA. `grantLocationPermission()` set only on a real grant. | ✓ (2026-09-01) |
+| Notifications (FCM) | n/a | `FirebaseMessaging.requestPermission()` on init | ⚠ no pre-prompt rationale; Android 13 `POST_NOTIFICATIONS` now declared |
 | Camera / photos | n/a | not requested (no avatar/review photo) | n/a |
-| `permission_handler` package | n/a | ✗ not used | ✗ |
+| `permission_handler` package | n/a | ✗ not used — `geolocator` + the new service cover location; would still help for notifications | ⚠ |
 | iOS `Info.plist` usage strings | n/a | ⚠ location strings present; notification/APNs setup incomplete | ⚠ |
 
 ---

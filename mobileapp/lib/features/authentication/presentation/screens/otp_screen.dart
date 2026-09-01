@@ -74,9 +74,11 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
 
     if (ok) {
       AppToast.success('Signed in successfully');
-      // Returning customer with a saved address skips location setup.
-      final hasAddress = ref.read(authProvider).user?.selectedAddress != null;
-      context.go(hasAddress ? '/' : '/location_select');
+      // Straight to Home only if the customer already has an address AND has
+      // granted location — otherwise run address / permission setup first.
+      final s = ref.read(authProvider);
+      final ready = s.user?.selectedAddress != null && s.locationPermissionGranted;
+      context.go(ready ? '/' : '/location_select');
     } else {
       setState(() => _error = ref.read(authProvider).error ?? 'Invalid code. Please try again.');
       _otpKey.currentState?.reset();

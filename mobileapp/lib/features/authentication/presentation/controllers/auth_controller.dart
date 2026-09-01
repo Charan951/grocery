@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freshcart/core/di/injection.dart';
 import 'package:freshcart/core/error/api_exception.dart';
+import 'package:freshcart/core/services/location_permission.dart';
 import 'package:freshcart/core/services/api_service.dart';
 import 'package:freshcart/core/services/push_service.dart';
 import 'package:freshcart/core/services/storage_service.dart';
@@ -187,6 +190,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           isHydrating: false,
           user: UserProfile.fromCustomerJson(customer),
         );
+        unawaited(refreshLocationPermission());
         _push?.registerCurrentToken();
       } on ApiException catch (e) {
         if (e.isUnauthorized) {
@@ -250,6 +254,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         isHydrating: false,
         user: UserProfile.fromCustomerJson(customer),
       );
+      unawaited(refreshLocationPermission());
       _push?.registerCurrentToken();
       return true;
     } on ApiException catch (e) {
@@ -270,6 +275,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   void grantLocationPermission() {
     state = state.copyWith(locationPermissionGranted: true);
+  }
+
+  /// Sync the flag with the real OS permission — called after login / hydrate so
+  /// the splash gate can route a signed-in user without location access to the
+  /// address screen.
+  Future<void> refreshLocationPermission() async {
+    try {
+      final s = await LocationPermissionService.check();
+      if (!mounted) return;
+      state = state.copyWith(locationPermissionGranted: s.ok);
+    } catch (_) {
+      /* plugin unavailable / timed out — leave the flag as-is */
+    }
   }
 
   void selectAddress(String addressId) {

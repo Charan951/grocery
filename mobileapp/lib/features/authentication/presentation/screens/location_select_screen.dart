@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:dio/dio.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
+import 'package:freshcart/core/services/location_permission.dart';
 import 'package:freshcart/core/widgets/app_toast.dart';
 import 'package:freshcart/core/widgets/buttons.dart';
 import 'package:freshcart/features/authentication/presentation/controllers/auth_controller.dart';
@@ -37,10 +38,34 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
   String _fullAddressText = 'Balaji Nagar, KPHB Colony, Kukatpally mandal, Hyderabad, Telangana, 500072, India';
   String _selectedLabel = 'Home';
 
+  LocationPermState? _permState;
+  bool _promptedOnce = false;
+
   @override
   void initState() {
     super.initState();
     _mapController = MapcnController(vsync: this);
+    // Ask for location permission as soon as the screen opens (post-login flow).
+    WidgetsBinding.instance.addPostFrameCallback((_) => _ensurePermission(prompt: true));
+  }
+
+  Future<void> _ensurePermission({required bool prompt}) async {
+    final doPrompt = prompt && !_promptedOnce;
+    _promptedOnce = _promptedOnce || prompt;
+
+    LocationPermState state;
+    if (doPrompt) {
+      if (!mounted) return;
+      state = await LocationPermissionService.ensureWithUi(context);
+    } else {
+      state = await LocationPermissionService.check();
+    }
+    if (!mounted) return;
+    setState(() => _permState = state);
+    if (state.ok) {
+      ref.read(authProvider.notifier).grantLocationPermission();
+      _locateUser();
+    }
   }
 
   @override
@@ -53,23 +78,11 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
 
   Future<void> _locateUser() async {
     try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Please enable GPS/Location services.')),
-          );
-        }
-        return;
-      }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          return;
-        }
-      }
+      final perm = await LocationPermissionService.ensureWithUi(context);
+      if (!mounted) return;
+      setState(() => _permState = perm);
+      if (!perm.ok) return;
+      ref.read(authProvider.notifier).grantLocationPermission();
 
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.best,
@@ -190,6 +203,55 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
     }
   }
 
+  Widget _permissionBanner(bool isDark) {
+    final s = _permState!;
+    final label = switch (s) {
+      LocationPermState.serviceDisabled => 'Turn on GPS',
+      LocationPermState.deniedForever => 'Open settings',
+      _ => 'Allow',
+    };
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: isDark ? 0.14 : 0.10),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.location_off_rounded, size: 18, color: AppColors.warningText),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(s.message,
+                style: AppTypography.bodySmall(isDark ? AppColors.textPrimaryDark : AppColors.textPrimary)),
+          ),
+          TextButton(onPressed: _retryPermission, child: Text(label)),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _retryPermission() async {
+    final s = _permState;
+    if (s == LocationPermState.deniedForever) {
+      await LocationPermissionService.openAppSettings();
+    } else if (s == LocationPermState.serviceDisabled) {
+      await LocationPermissionService.openLocationSettings();
+    } else {
+      final r = await LocationPermissionService.request();
+      if (!mounted) return;
+      setState(() => _permState = r);
+      if (r.ok) {
+        ref.read(authProvider.notifier).grantLocationPermission();
+        _locateUser();
+      }
+      return;
+    }
+    // returned from a settings screen — re-check silently
+    await _ensurePermission(prompt: false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -241,6 +303,7 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (_permState != null && !_permState!.ok) _permissionBanner(isDark),
                 Row(
                   children: [
                     Expanded(
