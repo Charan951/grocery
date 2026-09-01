@@ -186,9 +186,11 @@ web needs a real customer-auth pass first (see WEB-1).
 - `[ ]` Firebase Analytics + Crashlytics (or Sentry) in mobile; funnel events
   (view PDP, add to cart, checkout, order placed). Backend error logging review.
 
-### FW-13 · `location_select` screen cleanup
-- `[ ]` Address fields → `AppTextField`; surface reverse-geocode failures instead
-  of swallowing them; use the shared design tokens.
+### FW-13 · `location_select` screen cleanup — `[~]` 2026-09-01
+- `[x]` Reverse-geocode + "Locate me" failures now toast instead of being
+  swallowed (`catch (_) {}` → `AppToast.error/info`).
+- `[ ]` Address fields → `AppTextField`; replace the remaining hardcoded
+  `Colors.*` / `Color(0x…)` with design tokens (full design pass).
 
 ### FW-14 · Category / subcategory imagery
 - `[ ]` **Backend:** add an image field to subcategories. **Mobile & Web:** show
@@ -199,10 +201,12 @@ web needs a real customer-auth pass first (see WEB-1).
   (`SupportTicket` model exists) and show pending/sent indicators on chat
   bubbles.
 
-### FW-16 · Search polish
-- `[ ]` Wire or remove the decorative mic button on the search bar.
-- `[ ]` Delete the dead `quantity_selector.dart` (superseded by `QtyStepper`).
-- `[ ]` Voice search (if the mic stays) or recent/trending suggestions.
+### FW-16 · Search polish — `[~]` 2026-09-01
+- `[x]` Mic button on `CustomSearchBar` now renders only when `onVoicePressed`
+  is wired (no caller passes it → the dead decoration is gone; the hook stays).
+- `[x]` Deleted the dead `core/widgets/quantity_selector.dart`
+  (`AnimatedQuantitySelector`, unreferenced; `QtyStepper` is the live one).
+- `[ ]` Voice search, or recent/trending suggestions on the empty search state.
 
 ---
 

@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:dio/dio.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
+import 'package:freshcart/core/widgets/app_toast.dart';
 import 'package:freshcart/core/widgets/buttons.dart';
 import 'package:freshcart/features/authentication/presentation/controllers/auth_controller.dart';
 
@@ -81,7 +82,11 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
 
       _mapController.flyTo(userLatLng, zoom: 15.0);
       await _reverseGeocode(userLatLng);
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) {
+        AppToast.error("Couldn't get your location. Search or pick a spot on the map.");
+      }
+    }
   }
 
   Future<void> _reverseGeocode(LatLng pos) async {
@@ -114,7 +119,12 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
           });
         }
       }
-    } catch (_) {}
+    } catch (_) {
+      // Non-fatal: the pin is still usable, we just couldn't name the area.
+      if (mounted) {
+        AppToast.info("Couldn't look up the address — you can still type it in.");
+      }
+    }
   }
 
   bool _saving = false;

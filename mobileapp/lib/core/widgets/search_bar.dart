@@ -61,15 +61,19 @@ class CustomSearchBar extends StatelessWidget {
               color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
               size: 22,
             ),
+            // Voice search is opt-in — only render the mic when a handler is
+            // wired, otherwise it's just a dead decoration.
             suffixIcon: trailing ??
-                GestureDetector(
-                  onTap: onVoicePressed ?? () {},
-                  child: Icon(
-                    Icons.mic_none_rounded,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                    size: 22,
-                  ),
-                ),
+                (onVoicePressed == null
+                    ? null
+                    : GestureDetector(
+                        onTap: onVoicePressed,
+                        child: Icon(
+                          Icons.mic_none_rounded,
+                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                          size: 22,
+                        ),
+                      )),
             border: InputBorder.none,
             isDense: true,
           ),
