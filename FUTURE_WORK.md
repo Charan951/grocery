@@ -171,9 +171,13 @@ web needs a real customer-auth pass first (see WEB-1).
   location (and notifications, camera if PoD photo is ever added to the customer
   app). iOS `Info.plist` usage strings.
 
-### FW-11 · Festival campaign theming on Home
-- `[ ]` **Mobile:** consume `GET /api/festival-campaigns/active` → themed hero /
-  accent colours on Home (web already themed — see commit `f616d5e`).
+### FW-11 · Festival campaign theming on Home — `[~]` 2026-09-01
+- `[x]` **Mobile:** `activeFestivalCampaignProvider` +
+  `api.fetchActiveFestivalCampaign()` → `_FestivalHero` at the top of Home
+  (title/subtitle over solid / gradient / image background, `#hex` parsing,
+  dark scrim on images). Refreshes with the rest of Home.
+- `[ ]` Full parity with the web theme engine (patterns, decorative elements,
+  animations, video, per-section theming) — deferred; the hero is the 80/20.
 
 ### FW-12 · Analytics + crash reporting
 - `[ ]` Firebase Analytics + Crashlytics (or Sentry) in mobile; funnel events
@@ -238,10 +242,13 @@ web needs a real customer-auth pass first (see WEB-1).
 - `[ ]` Admin: surface the customer-submitted `Pending` reviews queue prominently
   (they now arrive from the storefront). Bulk approve/reject.
 
-### BE-3 · Order cancel — COD edge
-- `[~]` `createOrder` defaults `paymentStatus:'Paid'` even for COD. Cancel refund
-  is guarded by a `paymentMethod` COD/cash regex — tighten `createOrder` so COD
-  orders are `paymentStatus:'Pending'` and remove the regex reliance.
+### BE-3 · Order cancel — COD edge — `[x]` DONE 2026-09-01
+- `[x]` `createOrder` now sets `paymentStatus` to `'Pending'` for COD/cash
+  (`/cod|cash/i` on `paymentMethod`) and `'Paid'` for prepaid, unless the caller
+  passes an explicit `paymentStatus`. COD flips to `'Paid'` on Delivered
+  (admin `updateStatus` + delivery `completeDelivery`, unchanged). The
+  cancel-refund COD/cash regex stays as defence for legacy Paid-COD rows.
+- Test: `api.test` "COD orders are created Pending". `npm test` 43.
 
 ### BE-4 · Test coverage for the frontend
 - `[ ]` No automated tests on `frontend/` — add at least smoke/RTL tests for the

@@ -235,6 +235,21 @@ test('customer can cancel a pre-dispatch order; a prepaid one refunds to the wal
   assert.ok(txns.body.transactions.some((t) => t.type === 'Credit' && t.amount === 150));
 });
 
+test('COD orders are created Pending (never Paid on creation)', async () => {
+  const tokenA = await customerToken(PHONE_A);
+  const cod = await api().post('/api/orders').set('Authorization', `Bearer ${tokenA}`).send({
+    items: [{ productId: 'p_cod', name: 'X', quantity: 1, price: 20 }],
+    itemTotal: 20, totalAmount: 25, paymentMethod: 'Cash on Delivery', deliveryAddress: 'A',
+  });
+  assert.equal(cod.body.order.paymentStatus, 'Pending');
+
+  const prepaid = await api().post('/api/orders').set('Authorization', `Bearer ${tokenA}`).send({
+    items: [{ productId: 'p_pp', name: 'Y', quantity: 1, price: 20 }],
+    itemTotal: 20, totalAmount: 25, paymentMethod: 'Razorpay UPI/Card', deliveryAddress: 'A',
+  });
+  assert.equal(prepaid.body.order.paymentStatus, 'Paid');
+});
+
 test('a dispatched order can no longer be cancelled by the customer', async () => {
   const sToken = await loginAdmin();
   const tokenA = await customerToken(PHONE_A);

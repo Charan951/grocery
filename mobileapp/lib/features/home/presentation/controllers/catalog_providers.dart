@@ -21,6 +21,12 @@ final specialGroupsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) {
   return ref.watch(apiServiceProvider).fetchSpecialGroups();
 });
 
+/// The running festival campaign (or null). Server already applies the date
+/// window + isActive flag on `/festival-campaigns/active`.
+final activeFestivalCampaignProvider = FutureProvider<Map<String, dynamic>?>((ref) {
+  return ref.watch(apiServiceProvider).fetchActiveFestivalCampaign();
+});
+
 /// The whole catalog — used by Home rails and the Wishlist (which needs to
 /// resolve favourite ids to products).
 final allProductsProvider = FutureProvider<List<ProductModel>>((ref) {

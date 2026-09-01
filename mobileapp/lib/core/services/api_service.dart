@@ -131,6 +131,18 @@ class ApiService {
     }
   }
 
+  /// `GET /festival-campaigns/active` → the running campaign, or null.
+  Future<Map<String, dynamic>?> fetchActiveFestivalCampaign() async {
+    try {
+      final res = await _dio.get('/festival-campaigns/active');
+      final data = res.data;
+      final c = (data is Map) ? data['campaign'] : null;
+      return c is Map ? Map<String, dynamic>.from(c) : null;
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
   Future<List<CategoryModel>> fetchCategories() async {
     try {
       final res = await _dio.get('/categories');

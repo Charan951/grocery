@@ -695,7 +695,11 @@ export const orderController = {
         discount: Number(orderData.discount || 0),
         deliveryFee: Number(orderData.deliveryFee || 0),
         handlingFee: Number(orderData.handlingFee || 0),
-        paymentStatus: orderData.paymentStatus || 'Paid',
+        // COD/cash is collected on delivery — it is Pending until then, never
+        // "Paid" on creation. Prepaid methods default to Paid unless the caller
+        // says otherwise (e.g. a failed gateway attempt).
+        paymentStatus: orderData.paymentStatus
+          || (/cod|cash/i.test(orderData.paymentMethod || '') ? 'Pending' : 'Paid'),
         paymentMethod: orderData.paymentMethod || 'Razorpay UPI/Card',
         paymentId: orderData.paymentId || undefined,
         paymentRef: orderData.paymentRef || orderData.razorpayOrderId || undefined,

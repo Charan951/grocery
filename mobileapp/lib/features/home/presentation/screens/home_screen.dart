@@ -27,6 +27,7 @@ class HomeScreen extends ConsumerWidget {
     ref.invalidate(categoriesProvider);
     ref.invalidate(specialGroupsProvider);
     ref.invalidate(allProductsProvider);
+    ref.invalidate(activeFestivalCampaignProvider);
   }
 
   @override
@@ -122,6 +123,7 @@ class _HomeContent extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final banners = ref.watch(bannersProvider).valueOrNull ?? const [];
     final groups = ref.watch(specialGroupsProvider).valueOrNull ?? const [];
+    final campaign = ref.watch(activeFestivalCampaignProvider).valueOrNull;
 
     // Only look for a live order once the customer is signed in — keeps Home
     // free of the orders API (and its getIt dependency) for guests/tests.
@@ -152,6 +154,7 @@ class _HomeContent extends ConsumerWidget {
       physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
       padding: EdgeInsets.zero,
       children: [
+        if (campaign != null) _FestivalHero(campaign: campaign),
         if (activeOrder != null) _ActiveOrderBanner(order: activeOrder, isDark: isDark),
 
         // Shop by category
@@ -203,6 +206,74 @@ class _HomeContent extends ConsumerWidget {
         const _TrustRow(),
         const SizedBox(height: 32),
       ],
+    );
+  }
+}
+
+Color? _hex(dynamic v) {
+  final s = (v is String) ? v.trim().replaceFirst('#', '') : '';
+  if (s.length == 6) return Color(int.parse('FF$s', radix: 16));
+  if (s.length == 8) return Color(int.parse(s, radix: 16));
+  return null;
+}
+
+class _FestivalHero extends StatelessWidget {
+  final Map<String, dynamic> campaign;
+  const _FestivalHero({required this.campaign});
+
+  @override
+  Widget build(BuildContext context) {
+    final title = (campaign['title'] ?? campaign['name'] ?? '').toString();
+    if (title.isEmpty) return const SizedBox.shrink();
+    final subtitle =
+        (campaign['subtitle'] ?? campaign['featuredBannerTitle'] ?? '').toString();
+    final bgType = (campaign['backgroundType'] ?? 'solid').toString();
+    final imageUrl = (campaign['backgroundImage'] is Map)
+        ? (campaign['backgroundImage']['url'] ?? '').toString()
+        : '';
+
+    final solid = _hex(campaign['backgroundColor']) ?? AppColors.primary;
+    final gStart = _hex(campaign['gradientStart']) ?? solid;
+    final gEnd = _hex(campaign['gradientEnd']) ?? AppColors.primary;
+
+    BoxDecoration deco;
+    if (bgType == 'image' && imageUrl.startsWith('http')) {
+      deco = BoxDecoration(
+        borderRadius: AppRadius.brLg,
+        image: DecorationImage(
+          image: CachedNetworkImageProvider(imageUrl),
+          fit: BoxFit.cover,
+          colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.35), BlendMode.darken),
+        ),
+      );
+    } else if (bgType == 'gradient') {
+      deco = BoxDecoration(
+        borderRadius: AppRadius.brLg,
+        gradient: LinearGradient(colors: [gStart, gEnd], begin: Alignment.topLeft, end: Alignment.bottomRight),
+      );
+    } else {
+      deco = BoxDecoration(borderRadius: AppRadius.brLg, color: solid);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Container(
+        width: double.infinity,
+        decoration: deco,
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title,
+                style: AppTypography.h3(Colors.white).copyWith(fontWeight: FontWeight.w900)),
+            if (subtitle.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(subtitle,
+                  style: AppTypography.bodySmall(Colors.white.withValues(alpha: 0.92))),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
