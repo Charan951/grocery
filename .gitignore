@@ -9,6 +9,9 @@ Thumbs.db
 .env.*.local
 *.env
 !*.env.example
+# Firebase Admin service-account key (local dev fallback for pushService)
+backend/src/config/service_account.js
+backend/src/config/service_account.json
 
 # ---- Node (backend / frontend) ----
 node_modules/

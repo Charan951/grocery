@@ -1,16 +1,28 @@
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import admin from 'firebase-admin';
 import { DeviceToken } from '../models/DeviceToken.js';
 
-// FCM is optional. It activates only when a service account is provided via
-// FIREBASE_SERVICE_ACCOUNT (raw JSON or base64) or GOOGLE_APPLICATION_CREDENTIALS.
-// Without it every send is a silent no-op so the rest of dispatch keeps working.
+// FCM is optional. It activates from (in order): FIREBASE_SERVICE_ACCOUNT
+// (raw JSON or base64), GOOGLE_APPLICATION_CREDENTIALS, or a local
+// src/config/service_account.json|js file (git-ignored). Without any of these
+// every send is a silent no-op so the rest of dispatch keeps working.
 let _app = null;
 let _warned = false;
+
+const localKeyPath = () => {
+  for (const name of ['service_account.json', 'service_account.js']) {
+    const p = fileURLToPath(new URL(`../config/${name}`, import.meta.url));
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+};
 
 const init = () => {
   if (_app !== null) return _app;
   try {
     const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+    const keyFile = localKeyPath();
     let credential;
     if (raw) {
       const json = raw.trim().startsWith('{')
@@ -19,6 +31,8 @@ const init = () => {
       credential = admin.credential.cert(JSON.parse(json));
     } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
       credential = admin.credential.applicationDefault();
+    } else if (keyFile) {
+      credential = admin.credential.cert(JSON.parse(fs.readFileSync(keyFile, 'utf8')));
     } else {
       _app = false;
       return _app;
