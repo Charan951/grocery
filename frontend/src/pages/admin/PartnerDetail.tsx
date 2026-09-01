@@ -67,12 +67,13 @@ export const PartnerDetail: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <Stat label="Rating" value={<span className="flex items-center gap-1"><Star size={14} className="text-warning" /> {Number(partner.rating).toFixed(1)}</span>} />
+          <Stat label="Rating" value={<span className="flex items-center gap-1"><Star size={14} className="text-warning" /> {Number(partner.rating).toFixed(1)}{partner.ratingCount ? ` (${partner.ratingCount})` : ''}</span>} />
           <Stat label="Lifetime done" value={performance.lifetimeCompleted} />
           <Stat label="Lifetime failed" value={performance.lifetimeFailed} />
           <Stat label="Acceptance" value={performance.acceptanceRate == null ? '—' : `${performance.acceptanceRate}%`} />
           <Stat label="Avg pickup" value={performance.avgPickupMins == null ? '—' : `${performance.avgPickupMins}m`} />
           <Stat label="Avg delivery" value={performance.avgDeliveryMins == null ? '—' : `${performance.avgDeliveryMins}m`} />
+          <Stat label="Distance" value={partner.distanceKm == null ? '—' : `${partner.distanceKm} km`} />
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Stat label="Offers received" value={performance.offered} />

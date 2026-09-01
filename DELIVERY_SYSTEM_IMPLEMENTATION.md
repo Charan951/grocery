@@ -1022,8 +1022,14 @@ the fleet live; customers track the rider on a map on both web and mobile.
   filter; per-zone SLA.
 - **P2-D3 Batching**: `maxConcurrent` > 1; multi-drop offer; nearest-drop
   sequencing; partner "stack" UI.
-- **P2-D4 Performance analytics**: acceptance rate, on-time %, avg pickup/delivery
-  time, cancellations; admin dashboard widgets + leaderboards; SLA/idle alerts.
+- **P2-D4 Performance analytics** — ✅ DONE 2026-09-01 (tracked as P2-D3 in MEMORY).
+  `DeliveryPartner.distanceTravelledM` odometer from heartbeat legs (haversine,
+  jitter/teleport filtered). `GET /api/admin/delivery/analytics?days=` →
+  fleet rollup (partners/online/busy/delivered/acceptance/avgDelivery/avgRating)
+  + per-partner leaderboard. Admin `DeliveryModule` "Fleet performance" card
+  (stat strip + top-8 leaderboard); `PartnerDetail` gains Distance + rating
+  count. Tests: backend 47. **Still open**: SLA/idle alerts, active-hours from
+  an availability log.
 - **P2-D5 Background location**: Android foreground service / iOS background modes
   (new dep — see below); geofence auto-"arrived"; heartbeat tuning for battery.
 - **P2-D6 Ratings** — ✅ DONE 2026-09-01. `Order.deliveryRating {stars,comment,at}`;

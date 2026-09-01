@@ -16,6 +16,17 @@ const RESET_TEST_MODE = () => process.env.OTP_TEST_MODE === 'true' || !process.e
 const clampLat = (v) => typeof v === 'number' && v >= -90 && v <= 90;
 const clampLng = (v) => typeof v === 'number' && v >= -180 && v <= 180;
 
+// Haversine metres between two [lng, lat] pairs.
+const metresBetween = ([lng1, lat1], [lng2, lat2]) => {
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+};
+
 const availabilityFor = (partner) => {
   if (!partner.isOnline) return 'offline';
   return (partner.activeOrderIds || []).length >= (partner.maxConcurrent || 1) ? 'busy' : 'available';
@@ -215,6 +226,15 @@ export const deliveryController = {
       }
 
       const partner = req.partner;
+      // Odometer: add the leg from the last point, ignoring GPS jitter (<15m) and
+      // implausible jumps (>2km between heartbeats = teleport / bad fix).
+      const prev = partner.currentLocation?.coordinates;
+      if (Array.isArray(prev) && prev.length === 2) {
+        const d = metresBetween(prev, [lng, lat]);
+        if (d >= 15 && d <= 2000) {
+          partner.distanceTravelledM = (partner.distanceTravelledM || 0) + d;
+        }
+      }
       partner.currentLocation = { type: 'Point', coordinates: [lng, lat] };
       partner.locationUpdatedAt = new Date();
       partner.lastSeenAt = new Date();

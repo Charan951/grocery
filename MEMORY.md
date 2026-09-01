@@ -118,6 +118,22 @@
 
 ## 5. Completed Major Work
 
+- **2026-09-01 — Delivery P2-D3 DONE (fleet performance analytics UI).**
+  Backend: `DeliveryPartner.distanceTravelledM` odometer — `updateLocation`
+  adds each heartbeat leg via haversine, ignoring <15 m jitter and >2 km
+  jumps. New `GET /api/admin/delivery/analytics?days=7` (`authorize('Admin',
+  'Manager')`, days clamped 1–90) → `{ rangeDays, fleet{totalPartners,
+  onlineNow, busyNow, delivered, acceptanceRate, avgDeliveryMins, avgRating,
+  ratedDeliveries}, leaderboard[] }` from `Assignment` + delivered `Order`
+  (with `deliveryRating`) + `DeliveryPartner` rollups; leaderboard sorted by
+  deliveries desc. `partnerPerformance` now also returns `partner.distanceKm`.
+  Web admin `DeliveryModule`: a "Fleet performance" card above the partner
+  table — 7-stat strip + top-8 leaderboard table (name→`/admin/delivery/:id`,
+  online dot, delivered, acceptance, avg time, ★rating + reused **Low** badge,
+  distance km), 15 s refresh alongside the partner poll. `PartnerDetail` stat
+  grid gains a "Distance" tile + rating count. Tests: backend `npm test` **47**
+  (+1: analytics shape + customer-token 401/403); frontend `vite build` clean.
+
 - **2026-09-01 — Delivery P2-D6 DONE (customer → partner ratings, whole-product).**
   Backend: `Order.deliveryRating {stars 1-5, comment, at}` (additive). New
   `POST /api/orders/:id/rate-partner` (`attachCustomerOptional` — app token OR

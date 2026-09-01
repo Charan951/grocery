@@ -1993,6 +1993,31 @@ interface FleetPartner {
   lastSeenAt: string | null;
 }
 
+interface FleetAnalytics {
+  rangeDays: number;
+  fleet: {
+    totalPartners: number;
+    onlineNow: number;
+    busyNow: number;
+    delivered: number;
+    acceptanceRate: number | null;
+    avgDeliveryMins: number | null;
+    avgRating: number | null;
+    ratedDeliveries: number;
+  };
+  leaderboard: {
+    userId: string;
+    name: string;
+    isOnline: boolean;
+    delivered: number;
+    acceptanceRate: number | null;
+    avgDeliveryMins: number | null;
+    rating: number;
+    ratingCount: number;
+    distanceKm: number | null;
+  }[];
+}
+
 const relTime = (iso: string | null): string => {
   if (!iso) return 'never';
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -2005,6 +2030,7 @@ const relTime = (iso: string | null): string => {
 export const DeliveryModule: React.FC = () => {
   const navigate = useNavigate();
   const [partners, setPartners] = useState<FleetPartner[]>([]);
+  const [analytics, setAnalytics] = useState<FleetAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState('');
@@ -2031,9 +2057,20 @@ export const DeliveryModule: React.FC = () => {
     }
   };
 
+  const fetchAnalytics = async () => {
+    try {
+      const res = await fetch(`${API_URL}/admin/delivery/analytics?days=7`, { headers: getAuthHeader() });
+      const data = await res.json();
+      if (data.success) setAnalytics(data);
+    } catch {
+      /* keep last snapshot */
+    }
+  };
+
   useEffect(() => {
     fetchPartners();
-    const t = setInterval(fetchPartners, 15000); // near-live status refresh
+    fetchAnalytics();
+    const t = setInterval(() => { fetchPartners(); fetchAnalytics(); }, 15000); // near-live status refresh
     return () => clearInterval(t);
   }, []);
 
@@ -2118,9 +2155,71 @@ export const DeliveryModule: React.FC = () => {
   const online = partners.filter(p => p.isOnline && p.accountStatus === 'Active').length;
   const onDelivery = partners.filter(p => p.availability === 'busy').length;
 
+  const fa = analytics?.fleet;
+  const stat = (label: string, value: string) => (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[9px] font-bold uppercase tracking-wide text-text-tertiary">{label}</span>
+      <span className="text-sm font-extrabold text-text-primary tabular-nums">{value}</span>
+    </div>
+  );
+
   return (
    <div className="flex flex-col gap-5">
     <DeliveryFleetMap />
+
+    {fa && (
+      <div className="bg-surface border border-divider p-4 sm:p-6 rounded-[28px] shadow-card flex flex-col gap-4">
+        <div className="flex items-baseline justify-between">
+          <h2 className="font-extrabold text-sm text-text-primary">Fleet performance</h2>
+          <span className="text-[10px] text-text-secondary font-semibold">last {analytics!.rangeDays} days</span>
+        </div>
+        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+          {stat('Partners', `${fa.totalPartners}`)}
+          {stat('Online now', `${fa.onlineNow}`)}
+          {stat('On delivery', `${fa.busyNow}`)}
+          {stat('Delivered', `${fa.delivered}`)}
+          {stat('Acceptance', fa.acceptanceRate == null ? '—' : `${fa.acceptanceRate}%`)}
+          {stat('Avg delivery', fa.avgDeliveryMins == null ? '—' : `${fa.avgDeliveryMins}m`)}
+          {stat('Avg rating', fa.avgRating == null ? '—' : `★ ${fa.avgRating.toFixed(2)} (${fa.ratedDeliveries})`)}
+        </div>
+        {analytics!.leaderboard.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-[11px] mt-1">
+              <thead>
+                <tr className="text-text-tertiary">
+                  {['Partner', 'Delivered', 'Acceptance', 'Avg time', 'Rating', 'Distance'].map(h => (
+                    <th key={h} className="p-2 font-bold uppercase tracking-wide">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {analytics!.leaderboard.slice(0, 8).map(r => (
+                  <tr key={r.userId} className="border-t border-divider/60">
+                    <td className="p-2">
+                      <button onClick={() => navigate(`/admin/delivery/${r.userId}`)} className="font-bold text-text-primary hover:text-primary hover:underline cursor-pointer text-left">
+                        {r.name}
+                      </button>
+                      {r.isOnline && <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-success align-middle" />}
+                    </td>
+                    <td className="p-2 tabular-nums font-semibold text-text-secondary">{r.delivered}</td>
+                    <td className="p-2 tabular-nums text-text-secondary">{r.acceptanceRate == null ? '—' : `${r.acceptanceRate}%`}</td>
+                    <td className="p-2 tabular-nums text-text-secondary">{r.avgDeliveryMins == null ? '—' : `${r.avgDeliveryMins}m`}</td>
+                    <td className="p-2 tabular-nums font-semibold text-text-primary whitespace-nowrap">
+                      ★ {Number(r.rating || 0).toFixed(1)}
+                      {r.ratingCount >= 3 && Number(r.rating) < 4 && (
+                        <span className="ml-1 rounded-full bg-error/10 text-error text-[8px] font-black uppercase px-1 py-0.5 align-middle">Low</span>
+                      )}
+                    </td>
+                    <td className="p-2 tabular-nums text-text-secondary">{r.distanceKm == null ? '—' : `${r.distanceKm} km`}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    )}
+
     <div className="bg-surface border border-divider p-4 sm:p-6 rounded-[28px] shadow-card flex flex-col gap-5">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 pb-3 border-b border-divider">
         <div>

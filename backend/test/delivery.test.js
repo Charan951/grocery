@@ -512,6 +512,20 @@ test('GET /delivery/orders/:id masks phone before Out For Delivery; 403 for anot
   await DeliveryPartner.updateOne({ userId: riderUserId }, { $set: { activeOrderIds: [] } });
 });
 
+test('GET /admin/delivery/analytics returns a fleet rollup + leaderboard', async () => {
+  const aTok = await adminToken();
+  const r = await api().get('/api/admin/delivery/analytics?days=30').set('Authorization', `Bearer ${aTok}`);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.rangeDays, 30);
+  assert.ok(r.body.fleet && typeof r.body.fleet.totalPartners === 'number');
+  assert.ok(Array.isArray(r.body.leaderboard));
+  assert.ok('acceptanceRate' in r.body.fleet && 'avgRating' in r.body.fleet);
+  // customer token must not reach it (staff-only route → 401/403)
+  const cTok = await custToken();
+  assert.ok([401, 403].includes(
+    (await api().get('/api/admin/delivery/analytics').set('Authorization', `Bearer ${cTok}`)).status));
+});
+
 test('customer rates the delivery partner after Delivered → recomputes partner rating', async () => {
   const cTok = await custToken();
   const me = await api().get('/api/customers/me').set('Authorization', `Bearer ${cTok}`);

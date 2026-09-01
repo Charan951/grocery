@@ -247,6 +247,7 @@ export const adminDeliveryController = {
           accountStatus: user.status, isOnline: !!partner?.isOnline, availability: partner?.availability || 'offline',
           vehicleType: partner?.vehicleType || 'bike', rating: partner?.rating ?? 5, ratingCount: partner?.ratingCount ?? 0,
           activeOrderIds: partner?.activeOrderIds || [], maxConcurrent: partner?.maxConcurrent || 1,
+          distanceKm: Math.round(((partner?.distanceTravelledM || 0) / 1000) * 10) / 10,
         },
         performance: {
           lifetimeCompleted: partner?.completedCount ?? 0,
@@ -257,6 +258,73 @@ export const adminDeliveryController = {
           avgPickupMins: avg(pickupLegs),
           avgDeliveryMins: avg(deliveryLegs),
         },
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // GET /api/admin/delivery/analytics?days=7  — fleet-wide rollup + leaderboard
+  fleetAnalytics: async (req, res) => {
+    try {
+      const days = Math.min(Math.max(Number(req.query.days) || 7, 1), 90);
+      const since = new Date(Date.now() - days * 86400000);
+
+      const partners = await DeliveryPartner.find().lean();
+      const users = await User.find({ _id: { $in: partners.map((p) => p.userId) } })
+        .select('name status').lean();
+      const nameById = Object.fromEntries(users.map((u) => [String(u._id), u.name]));
+
+      const [assignments, orders] = await Promise.all([
+        Assignment.find({ createdAt: { $gte: since } }).select('partnerUserId status').lean(),
+        Order.find({ deliveredAt: { $gte: since }, status: 'Delivered' })
+          .select('deliveryPartnerUserId pickedUpAt deliveredAt createdAt deliveryRating').lean(),
+      ]);
+
+      const mins = (a, b) => (a && b ? (new Date(b) - new Date(a)) / 60000 : null);
+      const acc = (arr) => (arr.length ? arr.reduce((s, n) => s + n, 0) / arr.length : null);
+      const round1 = (n) => (n == null ? null : Math.round(n * 10) / 10);
+
+      const responded = assignments.filter((a) => ['accepted', 'completed', 'rejected'].includes(a.status));
+      const acceptedTotal = assignments.filter((a) => ['accepted', 'completed'].includes(a.status)).length;
+      const deliveryLegs = orders.map((o) => mins(o.pickedUpAt, o.deliveredAt)).filter((n) => n != null && n >= 0);
+      const ratings = orders.map((o) => o.deliveryRating?.stars).filter((n) => n >= 1);
+
+      // Per-partner leaderboard rows.
+      const rows = partners.map((p) => {
+        const uid = String(p.userId);
+        const mine = assignments.filter((a) => String(a.partnerUserId) === uid);
+        const myResponded = mine.filter((a) => ['accepted', 'completed', 'rejected'].includes(a.status));
+        const myAccepted = mine.filter((a) => ['accepted', 'completed'].includes(a.status)).length;
+        const myOrders = orders.filter((o) => String(o.deliveryPartnerUserId) === uid);
+        const myLegs = myOrders.map((o) => mins(o.pickedUpAt, o.deliveredAt)).filter((n) => n != null && n >= 0);
+        return {
+          userId: uid,
+          name: nameById[uid] || '—',
+          isOnline: !!p.isOnline,
+          delivered: myOrders.length,
+          acceptanceRate: myResponded.length ? Math.round((myAccepted / myResponded.length) * 100) : null,
+          avgDeliveryMins: round1(acc(myLegs)),
+          rating: p.rating ?? 5,
+          ratingCount: p.ratingCount || 0,
+          distanceKm: round1((p.distanceTravelledM || 0) / 1000),
+        };
+      }).sort((a, b) => b.delivered - a.delivered);
+
+      res.json({
+        success: true,
+        rangeDays: days,
+        fleet: {
+          totalPartners: partners.length,
+          onlineNow: partners.filter((p) => p.isOnline).length,
+          busyNow: partners.filter((p) => p.availability === 'busy').length,
+          delivered: orders.length,
+          acceptanceRate: responded.length ? Math.round((acceptedTotal / responded.length) * 100) : null,
+          avgDeliveryMins: round1(acc(deliveryLegs)),
+          avgRating: ratings.length ? Math.round((acc(ratings)) * 100) / 100 : null,
+          ratedDeliveries: ratings.length,
+        },
+        leaderboard: rows,
       });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });

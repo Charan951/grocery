@@ -27,6 +27,7 @@ const deliveryPartnerSchema = new mongoose.Schema({
   failedCount: { type: Number, default: 0 },
   rating: { type: Number, default: 5 },
   ratingCount: { type: Number, default: 0 },
+  distanceTravelledM: { type: Number, default: 0 }, // odometer, summed from heartbeats (P2-D4)
 
   deviceTokens: [{ type: String }],
   lastSeenAt: { type: Date },
