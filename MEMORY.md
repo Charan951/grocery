@@ -118,6 +118,49 @@
 
 ## 5. Completed Major Work
 
+- **2026-09-01 — FUTURE_WORK backlog batch** (see `FUTURE_WORK.md` for the
+  per-item detail; all shipped web + mobile + backend where the item spans them):
+  - **FW-3 push** — done end to end. Besides the delivery-offer push,
+    `sendToOwner` now fires on customer order milestones:
+    `orderController.updateStatus` (Out For Delivery / Arrived / Delivered /
+    Cancelled) and `deliveryController.notifyCustomer`. Creds resolve from
+    `FIREBASE_SERVICE_ACCOUNT` (**now a path** — `src/config/service_account.json`,
+    git-ignored — or raw JSON / base64), else `GOOGLE_APPLICATION_CREDENTIALS`,
+    else the local key file; silent no-op when unset. iOS APNs key still owed.
+  - **FW-6** — mobile orders list gets All / In Transit / Delivered / Cancelled
+    `ChoiceChip` tabs (`_OrdersTab` → `OrderStatus` buckets). Active-order
+    banner on Home: mobile `_ActiveOrderBanner` (gated on
+    `authProvider.isAuthenticated`), web `components/ActiveOrderBanner.tsx`
+    (phone-keyed, 30s poll) → `/track/:id`. Real invoice still a stub.
+  - **FW-5** — `GET /products` gained `brand` (comma `$in` regex),
+    `inStock=true`, `onSale=true` (`$expr` price<mrp), and **opt-in pagination**
+    (`page`/`limit` → `{total,page,limit,totalPages}`; omit both → unchanged
+    full list). Mobile catalog sheet + In-stock/On-offer toggles
+    (`CatalogQuery`). Web `Products.tsx` filter pills. Brand multi-select UI +
+    mobile infinite scroll still open.
+  - **BE-3** — `createOrder` sets `paymentStatus` from method: `Pending` for
+    COD/cash, `Paid` for prepaid (explicit value still wins). COD → Paid on
+    Delivered unchanged.
+  - **FW-11** — `activeFestivalCampaignProvider` +
+    `api.fetchActiveFestivalCampaign()` → `_FestivalHero` atop mobile Home
+    (title/subtitle over solid/gradient/image bg). Full web theme-engine
+    parity deferred.
+  - **FW-4** — wallet top-up: `POST /api/customers/me/wallet/topup` +
+    `/topup/verify` (HMAC, test-mode aware) → credit `walletBalance` +
+    `WalletTransaction` Credit. Mobile wallet screen "Add money" →
+    `_AmountSheet` → Razorpay/Simulated gateway → verify →
+    `auth.setWalletBalance`. **Web wallet still blocked on WEB-1** (no
+    customer JWT).
+  - **BE-2** — `PUT /api/reviews/bulk-status {ids,status}`; admin
+    `ReviewsModule` rebuilt with Pending/Approved/Rejected/All tabs (defaults
+    Pending), select-all + bulk approve/reject.
+  - **FW-16** — `CustomSearchBar` mic renders only when `onVoicePressed` is
+    wired; deleted dead `core/widgets/quantity_selector.dart`.
+  - **FW-13** — `location_select` "Locate me" / reverse-geocode failures now
+    toast instead of `catch (_) {}`. Full token/AppTextField pass still open.
+  Test totals after the batch: backend **`npm test` 45**, mobile
+  **`flutter test` 117**, deliveryapp **6**; frontend `vite build` clean.
+
 - **2026-09-01 — Delivery P1-D4 CLIENT DONE** (FCM offer push end-to-end).
   Firebase project **`grocery-76b84`** (sender `1014188060345`). Backend:
   `FIREBASE_SERVICE_ACCOUNT` (base64) now set in `backend/.env` (git-ignored) →
@@ -1130,7 +1173,7 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
 
 ## 12. Testing Status
 
-- **Backend: `npm test` → 41 tests, all green**
+- **Backend: `npm test` → 45 tests, all green**
   (`node:test` + `supertest` against `MONGO_URI`). Covers auth/OTP, protectCustomer,
   coupon validate, order placement + `/orders/mine` + ownership, status timeline,
   **order cancel (owner check, wallet refund, past-window 409) + wallet ledger**,
@@ -1194,6 +1237,8 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
 - Frontend: no automated tests; admin `fetchReviews` change not yet run in a browser.
 
 ## 13. Last Updated
+
+2026-09-01 — FUTURE_WORK backlog batch: FW-3 (customer order-status push), FW-6 (mobile order tabs + active-order banner web+mobile), FW-5 (product brand/inStock/onSale filters + opt-in pagination), BE-3 (COD orders created Pending), FW-11 (festival hero on mobile Home), FW-4 (wallet top-up backend + mobile; web blocked on WEB-1), BE-2 (admin review bulk-moderation + Pending queue), FW-16 (search bar mic gated / dead file removed), FW-13 (location_select geocode errors toast). FIREBASE_SERVICE_ACCOUNT is now a path to src/config/service_account.json. Backend 45 tests, mobile 117, deliveryapp 6; frontend build clean.
 
 2026-09-01 — Delivery P1-D4 client: FCM offer push wired end-to-end. Firebase project grocery-76b84; FIREBASE_SERVICE_ACCOUNT (base64) in backend/.env. Both Flutter apps get firebase_core/firebase_messaging + google-services.json/GoogleService-Info.plist + google-services gradle plugin + firebase_options.dart + a PushService (init/permission/token, register after login, unregister on logout, tap→route). Backend 41 tests; deliveryapp 6 tests + APK; mobileapp 117 tests + APK; all analyze clean.
 
