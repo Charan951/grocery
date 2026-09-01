@@ -111,8 +111,8 @@ class ErrorState extends StatelessWidget {
 
   const ErrorState({
     super.key,
-    this.title = 'Something Went Wrong',
-    this.description = 'We couldn\'t load this page. Please check your connection and try again.',
+    this.title = "That didn't load",
+    this.description = "Check your connection and try again.",
     required this.onRetry,
   });
 

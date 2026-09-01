@@ -39,15 +39,13 @@ class AppTheme {
         labelMedium: AppTypography.labelMedium(AppColors.textPrimary),
         labelSmall: AppTypography.labelSmall(AppColors.textPrimary),
       ),
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0.0,
-        iconTheme: IconThemeData(color: AppColors.textPrimary),
-        titleTextStyle: TextStyle(
-          color: AppColors.textPrimary,
-          fontSize: 17.0,
-          fontWeight: FontWeight.w600,
-        ),
+        iconTheme: const IconThemeData(color: AppColors.textPrimary),
+        // Screen titles share the app's display voice (Plus Jakarta Sans),
+        // not the platform system font.
+        titleTextStyle: AppTypography.h3(AppColors.textPrimary),
       ),
       cardTheme: const CardThemeData(
         color: AppColors.surface,
@@ -94,15 +92,11 @@ class AppTheme {
         labelMedium: AppTypography.labelMedium(AppColors.textPrimaryDark),
         labelSmall: AppTypography.labelSmall(AppColors.textPrimaryDark),
       ),
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0.0,
-        iconTheme: IconThemeData(color: AppColors.textPrimaryDark),
-        titleTextStyle: TextStyle(
-          color: AppColors.textPrimaryDark,
-          fontSize: 17.0,
-          fontWeight: FontWeight.w600,
-        ),
+        iconTheme: const IconThemeData(color: AppColors.textPrimaryDark),
+        titleTextStyle: AppTypography.h3(AppColors.textPrimaryDark),
       ),
       cardTheme: const CardThemeData(
         color: AppColors.surfaceDark,
