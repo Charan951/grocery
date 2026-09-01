@@ -270,7 +270,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
   };
 
   const seo = seoSettings.home || {
-    title: 'FreshCart | Premium Organic Groceries Delivered in 15 Mins',
+    title: 'FreshCart | Premium Organic Groceries Delivered in 10 Minutes',
     description: 'Order fresh organic vegetables, fruits, dairy, bakery, snacks, and meats. High-quality produce sourced directly from local farms. First order free!',
     keywords: 'organic groceries, fresh vegetables, grocery delivery Bengaluru, online dairy, FreshCart'
   };
@@ -630,8 +630,8 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
               <div className="w-12 h-12 bg-primary/10 text-primary rounded-full flex items-center justify-center">
                 <Truck size={24} />
               </div>
-              <h3 className="text-lg font-bold text-text-primary">15-Minute Express</h3>
-              <p className="text-xs md:text-sm text-text-secondary leading-relaxed">Hygiene-packed orders delivered by our local rider network in under 30 minutes, or it's completely free.</p>
+              <h3 className="text-lg font-bold text-text-primary">10-Minute Express</h3>
+              <p className="text-xs md:text-sm text-text-secondary leading-relaxed">Hygiene-packed orders delivered by our local rider network in 10 minutes, or it's completely free.</p>
             </div>
 
             <div className="bg-surface p-6 rounded-2xl border border-divider shadow-card flex flex-col items-center text-center gap-3">
@@ -723,7 +723,19 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
               const isExpanded = expandedFaq === faq.id;
               return (
                 <div key={faq.id} className="bg-surface border border-divider rounded-xl overflow-hidden shadow-card">
-                  <div className="flex justify-between items-center p-4 font-bold text-sm text-text-primary cursor-pointer select-none hover:text-primary transition-colors" onClick={() => toggleFaq(faq.id)}>
+                  <div
+                    className="flex justify-between items-center p-4 font-bold text-sm text-text-primary cursor-pointer select-none hover:text-primary transition-colors focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-[-2px]"
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={isExpanded}
+                    onClick={() => toggleFaq(faq.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleFaq(faq.id);
+                      }
+                    }}
+                  >
                     <span>{faq.question}</span>
                     {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                   </div>
