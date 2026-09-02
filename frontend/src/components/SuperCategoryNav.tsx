@@ -46,6 +46,8 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
   }, [superCategories]);
 
   const navRef = React.useRef<HTMLDivElement>(null);
+  const btnRefs = React.useRef<(HTMLButtonElement | null)[]>([]);
+  const [indicator, setIndicator] = React.useState({ left: 0, width: 0, ready: false });
 
   const scrollNav = (direction: 'left' | 'right') => {
     if (navRef.current) {
@@ -53,6 +55,31 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
       navRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
     }
   };
+
+  const activeIndex = React.useMemo(
+    () => items.findIndex((cat) => {
+      const s = cat.slug || cat.id || cat.name.toLowerCase();
+      return activeSuperCategory === s || (activeSuperCategory === '' && s === 'all');
+    }),
+    [items, activeSuperCategory]
+  );
+
+  // Slide the underline to the active tab (and keep it in view).
+  React.useLayoutEffect(() => {
+    const el = btnRefs.current[activeIndex];
+    if (!el) return;
+    setIndicator({ left: el.offsetLeft, width: el.offsetWidth, ready: true });
+    el.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
+  }, [activeIndex, items.length]);
+
+  React.useEffect(() => {
+    const onResize = () => {
+      const el = btnRefs.current[activeIndex];
+      if (el) setIndicator({ left: el.offsetLeft, width: el.offsetWidth, ready: true });
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [activeIndex]);
 
   return (
     <nav
@@ -73,9 +100,20 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
         {/* Scrollable Container */}
         <div
           ref={navRef}
-          className="w-full flex items-center gap-1 sm:gap-2 md:gap-3 overflow-x-auto scrollbar-none py-1.5 sm:py-2 px-1 scroll-smooth"
+          className="relative w-full flex items-center gap-1 sm:gap-2 md:gap-3 overflow-x-auto scrollbar-none py-1.5 sm:py-2 px-1 scroll-smooth"
         >
-          {items.map((cat) => {
+          {/* Sliding active-tab underline */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute bottom-0 h-[3px] bg-emerald-600 dark:bg-emerald-500 rounded-t-full"
+            style={{
+              left: indicator.left + 14,
+              width: Math.max(indicator.width - 28, 0),
+              opacity: indicator.ready ? 1 : 0,
+              transition: 'left 280ms cubic-bezier(0.4, 0, 0.2, 1), width 280ms cubic-bezier(0.4, 0, 0.2, 1), opacity 150ms ease',
+            }}
+          />
+          {items.map((cat, i) => {
             const catSlug = cat.slug || cat.id || cat.name.toLowerCase();
             const isActive = activeSuperCategory === catSlug || (activeSuperCategory === '' && catSlug === 'all');
             
@@ -85,6 +123,7 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
             return (
               <button
                 key={cat.id || catSlug}
+                ref={(el) => { btnRefs.current[i] = el; }}
                 onClick={() => onSelectSuperCategory(catSlug)}
                 className={`relative group inline-flex items-center gap-2 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 shrink-0 select-none ${
                   isActive
@@ -110,11 +149,6 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
 
                 {/* Name */}
                 <span className="tracking-tight whitespace-nowrap">{cat.name}</span>
-
-                {/* Zepto-Style Active Underline Highlight */}
-                {isActive && (
-                  <span className="absolute bottom-0 left-3 right-3 h-[3px] bg-emerald-600 dark:bg-emerald-500 rounded-t-full shadow-xs" />
-                )}
               </button>
             );
           })}
