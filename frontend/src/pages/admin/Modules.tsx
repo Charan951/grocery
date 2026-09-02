@@ -3488,10 +3488,31 @@ export const AuditLogsModule: React.FC = () => {
   );
 };
 
+type DeliveryCfg = {
+  autoAssignEnabled: boolean;
+  assignRadiusKm: number;
+  batchRadiusKm: number;
+  offerTimeoutSec: number;
+  maxOfferAttempts: number;
+  deliveryBaseFee: number;
+  deliveryPerKmFee: number;
+  storeName: string;
+  storeLat: number | '';
+  storeLng: number | '';
+};
+
+const DEFAULT_DELIVERY_CFG: DeliveryCfg = {
+  autoAssignEnabled: true, assignRadiusKm: 6, batchRadiusKm: 1.5,
+  offerTimeoutSec: 25, maxOfferAttempts: 5, deliveryBaseFee: 20, deliveryPerKmFee: 6,
+  storeName: '', storeLat: '', storeLng: '',
+};
+
 export const SettingsModule: React.FC = () => {
   const [bName, setBName] = useState('FreshCart Enterprise India');
   const [bEmail, setBEmail] = useState('contact@freshcart.in');
   const [apiKey, setApiKey] = useState('rzp_live_8F0aK912h83Gka');
+  const [dcfg, setDcfg] = useState<DeliveryCfg>(DEFAULT_DELIVERY_CFG);
+  const [dSaving, setDSaving] = useState(false);
 
   const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
@@ -3504,9 +3525,22 @@ export const SettingsModule: React.FC = () => {
       const res = await fetch(`${API_URL}/settings`, { headers: getAuthHeader() });
       const data = await res.json();
       if (data.success && data.settings) {
-        setBName(data.settings.businessName || 'FreshCart Enterprise India');
-        setBEmail(data.settings.supportEmail || 'contact@freshcart.in');
-        setApiKey(data.settings.gatewayKeys?.razorpayId || 'rzp_live_8F0aK912h83Gka');
+        const s = data.settings;
+        setBName(s.businessName || 'FreshCart Enterprise India');
+        setBEmail(s.supportEmail || 'contact@freshcart.in');
+        setApiKey(s.gatewayKeys?.razorpayId || 'rzp_live_8F0aK912h83Gka');
+        setDcfg({
+          autoAssignEnabled: s.autoAssignEnabled !== false,
+          assignRadiusKm: s.assignRadiusKm ?? 6,
+          batchRadiusKm: s.batchRadiusKm ?? 1.5,
+          offerTimeoutSec: s.offerTimeoutSec ?? 25,
+          maxOfferAttempts: s.maxOfferAttempts ?? 5,
+          deliveryBaseFee: s.deliveryBaseFee ?? 20,
+          deliveryPerKmFee: s.deliveryPerKmFee ?? 6,
+          storeName: s.storeOrigin?.name || '',
+          storeLat: s.storeOrigin?.lat ?? '',
+          storeLng: s.storeOrigin?.lng ?? '',
+        });
       }
     } catch (e) {
       console.warn('Failed to load settings from server');
@@ -3516,6 +3550,38 @@ export const SettingsModule: React.FC = () => {
   useEffect(() => {
     fetchSettings();
   }, []);
+
+  const saveDelivery = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDSaving(true);
+    try {
+      const body: any = {
+        autoAssignEnabled: dcfg.autoAssignEnabled,
+        assignRadiusKm: Number(dcfg.assignRadiusKm) || 6,
+        batchRadiusKm: Number(dcfg.batchRadiusKm) || 1.5,
+        offerTimeoutSec: Number(dcfg.offerTimeoutSec) || 25,
+        maxOfferAttempts: Number(dcfg.maxOfferAttempts) || 5,
+        deliveryBaseFee: Number(dcfg.deliveryBaseFee) || 0,
+        deliveryPerKmFee: Number(dcfg.deliveryPerKmFee) || 0,
+      };
+      if (dcfg.storeLat !== '' && dcfg.storeLng !== '') {
+        body.storeOrigin = { name: dcfg.storeName || 'Dark store', lat: Number(dcfg.storeLat), lng: Number(dcfg.storeLng) };
+      }
+      const res = await fetch(`${API_URL}/settings`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json', ...getAuthHeader() }, body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.success) { alert('Delivery & dispatch settings saved.'); fetchSettings(); }
+      else alert(data.message || 'Save failed');
+    } catch {
+      alert('Save failed');
+    } finally {
+      setDSaving(false);
+    }
+  };
+
+  const dNum = (k: keyof DeliveryCfg) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setDcfg(c => ({ ...c, [k]: e.target.value === '' ? '' : Number(e.target.value) }));
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -3579,6 +3645,55 @@ export const SettingsModule: React.FC = () => {
           <button type="submit" className="bg-primary text-white font-bold py-2 px-6 rounded-full text-xs hover:bg-secondary cursor-pointer shadow-sm">Save Configuration</button>
           <button type="button" onClick={handleBackup} className="flex items-center gap-1.5 border border-divider hover:border-primary/20 bg-background hover:bg-primary/5 py-2 px-6 rounded-full text-xs font-bold text-primary cursor-pointer transition-all"><RefreshCw size={14} /> Back Up Database</button>
         </div>
+      </form>
+
+      <div className="pt-5 border-t border-divider">
+        <h2 className="font-extrabold text-sm text-text-primary">Delivery &amp; dispatch</h2>
+        <p className="text-[10px] text-text-secondary font-medium">Auto-assignment radius, offer timing, batching, partner earning rates, dark-store origin</p>
+      </div>
+      <form onSubmit={saveDelivery} className="flex flex-col gap-4">
+        <label className="flex items-center gap-2 text-xs font-bold text-text-primary">
+          <input type="checkbox" checked={dcfg.autoAssignEnabled}
+            onChange={e => setDcfg(c => ({ ...c, autoAssignEnabled: e.target.checked }))} />
+          Auto-assign orders when they reach “Ready”
+        </label>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          {[
+            { k: 'assignRadiusKm', label: 'Assign radius (km)', step: '0.5' },
+            { k: 'batchRadiusKm', label: '2nd-order radius (km)', step: '0.5' },
+            { k: 'offerTimeoutSec', label: 'Offer timeout (s)', step: '1' },
+            { k: 'maxOfferAttempts', label: 'Max offer attempts', step: '1' },
+            { k: 'deliveryBaseFee', label: 'Base fee (₹)', step: '1' },
+            { k: 'deliveryPerKmFee', label: 'Per-km fee (₹)', step: '1' },
+          ].map(f => (
+            <div key={f.k} className="flex flex-col gap-1">
+              <label className="text-[11px] font-bold text-text-primary">{f.label}</label>
+              <input type="number" step={f.step} min={0} value={(dcfg as any)[f.k]}
+                onChange={dNum(f.k as keyof DeliveryCfg)}
+                className="w-full px-3 py-2 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary font-bold" />
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-bold text-text-primary">Dark-store name</label>
+            <input type="text" value={dcfg.storeName} onChange={e => setDcfg(c => ({ ...c, storeName: e.target.value }))}
+              className="w-full px-3 py-2 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-bold text-text-primary">Store latitude</label>
+            <input type="number" step="any" value={dcfg.storeLat} onChange={dNum('storeLat')}
+              className="w-full px-3 py-2 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary font-mono" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-bold text-text-primary">Store longitude</label>
+            <input type="number" step="any" value={dcfg.storeLng} onChange={dNum('storeLng')}
+              className="w-full px-3 py-2 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary font-mono" />
+          </div>
+        </div>
+        <button type="submit" disabled={dSaving} className="self-start bg-primary text-white font-bold py-2 px-6 rounded-full text-xs hover:bg-secondary disabled:opacity-40 cursor-pointer shadow-sm">
+          {dSaving ? 'Saving…' : 'Save delivery settings'}
+        </button>
       </form>
     </div>
   );

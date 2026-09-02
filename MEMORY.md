@@ -130,6 +130,17 @@
 
 ## 5. Completed Major Work
 
+- **2026-09-02 — Admin: Delivery & dispatch settings UI.**
+  `SettingsModule` (`frontend/src/pages/admin/Modules.tsx`) gained a second form
+  ("Delivery & dispatch") over the existing `GET/PUT /api/settings` — previously
+  these fields were only editable via a raw API call. Exposes: `autoAssignEnabled`
+  toggle, `assignRadiusKm`, `batchRadiusKm`, `offerTimeoutSec`, `maxOfferAttempts`,
+  `deliveryBaseFee`, `deliveryPerKmFee`, and `storeOrigin {name,lat,lng}`. Test:
+  backend `npm test` **53** (+1: PUT persists the fields, GET round-trips,
+  non-admin 401/403); frontend `vite build` clean. `PUT /api/settings` is
+  `protect + authorize('Admin')` and does a top-level merge, so partial bodies
+  are safe.
+
 - **2026-09-02 — Delivery P2 batching guard (partial P2-D3-batching).**
   `Settings.batchRadiusKm` (default 1.5). `assignmentService.findCandidates`
   gained `drop` + `batchRadiusKm`: a partner already carrying a delivery is only

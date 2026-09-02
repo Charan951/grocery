@@ -667,6 +667,34 @@ test('customer rates the delivery partner after Delivered → recomputes partner
   await DeliveryPartner.updateOne({ userId: riderUserId }, { $set: { rating: 5, ratingCount: 0 } });
 });
 
+test('PUT /api/settings persists the delivery/dispatch tuning fields', async () => {
+  const aTok = await adminToken();
+  const put = await api().put('/api/settings').set('Authorization', `Bearer ${aTok}`).send({
+    autoAssignEnabled: true, assignRadiusKm: 7, batchRadiusKm: 2, offerTimeoutSec: 30,
+    maxOfferAttempts: 4, deliveryBaseFee: 25, deliveryPerKmFee: 7,
+    storeOrigin: { name: 'QA DS', lat: 17.44, lng: 78.37 },
+  });
+  assert.equal(put.status, 200, JSON.stringify(put.body));
+
+  const get = await api().get('/api/settings').set('Authorization', `Bearer ${aTok}`);
+  const s = get.body.settings;
+  assert.equal(s.assignRadiusKm, 7);
+  assert.equal(s.batchRadiusKm, 2);
+  assert.equal(s.deliveryBaseFee, 25);
+  assert.equal(s.storeOrigin.name, 'QA DS');
+
+  // non-admin cannot write settings
+  const cTok = await custToken();
+  assert.ok([401, 403].includes(
+    (await api().put('/api/settings').set('Authorization', `Bearer ${cTok}`).send({ assignRadiusKm: 99 })).status));
+
+  // restore defaults so other tests aren't affected
+  await api().put('/api/settings').set('Authorization', `Bearer ${aTok}`).send({
+    assignRadiusKm: 6, batchRadiusKm: 1.5, offerTimeoutSec: 25, maxOfferAttempts: 5,
+    deliveryBaseFee: 20, deliveryPerKmFee: 6,
+  });
+});
+
 test('batching guard: a busy partner only gets a 2nd order if the drop is nearby', async () => {
   await bringOnline(riderUserId, TP.lat + 0.001, TP.lng + 0.001);
   await DeliveryPartner.updateOne({ userId: rider2UserId }, { $set: { isOnline: false } });
