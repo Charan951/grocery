@@ -64,22 +64,32 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
     [items, activeSuperCategory]
   );
 
-  // Slide the underline to the active tab (and keep it in view).
-  React.useLayoutEffect(() => {
+  // Slide the underline to the active tab. Measurement + any scroll is deferred
+  // to the next frame (never in a layout effect) so it can't stall the click.
+  const syncIndicator = React.useCallback((scroll: boolean) => {
+    const track = navRef.current;
     const el = btnRefs.current[activeIndex];
-    if (!el) return;
+    if (!track || !el) return;
     setIndicator({ left: el.offsetLeft, width: el.offsetWidth, ready: true });
-    el.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
-  }, [activeIndex, items.length]);
+    if (scroll) {
+      const left = el.offsetLeft;
+      const right = left + el.offsetWidth;
+      if (left < track.scrollLeft || right > track.scrollLeft + track.clientWidth) {
+        track.scrollTo({ left: left - track.clientWidth / 2 + el.offsetWidth / 2, behavior: 'smooth' });
+      }
+    }
+  }, [activeIndex]);
 
   React.useEffect(() => {
-    const onResize = () => {
-      const el = btnRefs.current[activeIndex];
-      if (el) setIndicator({ left: el.offsetLeft, width: el.offsetWidth, ready: true });
-    };
+    const raf = requestAnimationFrame(() => syncIndicator(true));
+    return () => cancelAnimationFrame(raf);
+  }, [syncIndicator, items.length]);
+
+  React.useEffect(() => {
+    const onResize = () => syncIndicator(false);
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, [activeIndex]);
+  }, [syncIndicator]);
 
   return (
     <nav
