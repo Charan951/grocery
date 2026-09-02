@@ -71,6 +71,7 @@ const settingsSchema = new mongoose.Schema({
   offerTimeoutSec: { type: Number, default: 25 },
   maxOfferAttempts: { type: Number, default: 5 },
   assignRadiusKm: { type: Number, default: 6 },
+  batchRadiusKm: { type: Number, default: 1.5 }, // 2nd order only if its drop is within this of an active drop
   deliveryBaseFee: { type: Number, default: 20 },   // partner earning base (P2)
   deliveryPerKmFee: { type: Number, default: 6 },
   // --- Customer app runtime config (served by GET /api/app/config) ---

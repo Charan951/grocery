@@ -1032,8 +1032,11 @@ the fleet live; customers track the rider on a map on both web and mobile.
   radius model. Admin: `ZonesManager` click-to-draw map + `PartnerDetail`
   "Zones & capacity" card. Tests: backend 51. **Open**: per-zone SLA surfaced in
   analytics/alerts.
-- **P2-D3 Batching**: `maxConcurrent` > 1; multi-drop offer; nearest-drop
-  sequencing; partner "stack" UI.
+- **P2-D3 Batching** — ⚠ PARTIAL 2026-09-02. `Settings.batchRadiusKm` (1.5) +
+  a `findCandidates` guard: a busy partner is only offered a 2nd order when its
+  drop is within `batchRadiusKm` of an active drop (makes `maxConcurrent > 1`
+  safe). Test: backend 52. **Still open**: drop-sequencing hint + a partner
+  multi-order "stack" screen (needs device QA + UX decision).
 - **P2-D4 Performance analytics** — ✅ DONE 2026-09-01 (tracked as P2-D3 in MEMORY).
   `DeliveryPartner.distanceTravelledM` odometer from heartbeat legs (haversine,
   jitter/teleport filtered). `GET /api/admin/delivery/analytics?days=` →

@@ -196,7 +196,7 @@ const onOfferDeclined = async (orderId, why, { source } = {}) => {
  * Rank online, in-radius, under-capacity partners for an order's pickup point.
  * Uses the 2dsphere `$near` index when the pickup has coords, else a plain scan.
  */
-export const findCandidates = async ({ pickup, excludeUserIds = [], radiusKm = 6, restrictUserIds = null }) => {
+export const findCandidates = async ({ pickup, excludeUserIds = [], radiusKm = 6, restrictUserIds = null, drop = null, batchRadiusKm = 0 }) => {
   const base = { isOnline: true, userId: { $nin: excludeUserIds } };
   if (Array.isArray(restrictUserIds) && restrictUserIds.length) base.userId = { $nin: excludeUserIds, $in: restrictUserIds };
   const hasGeo = pickup && pickup.lat != null && pickup.lng != null;
@@ -212,8 +212,28 @@ export const findCandidates = async ({ pickup, excludeUserIds = [], radiusKm = 6
       }
     : base;
 
-  const partners = (await DeliveryPartner.find(query).limit(CANDIDATE_LIMIT).lean())
+  let partners = (await DeliveryPartner.find(query).limit(CANDIDATE_LIMIT).lean())
     .filter((p) => (p.activeOrderIds || []).length < (p.maxConcurrent || 1));
+
+  // Batching guard: a partner who is already carrying a delivery may only take a
+  // second one when the new drop is close to a drop they already have — otherwise
+  // a multi-drop sends them across the city. Partners with a free slot are unaffected.
+  if (drop?.lat != null && drop?.lng != null && batchRadiusKm > 0) {
+    const busyIds = partners.filter((p) => (p.activeOrderIds || []).length > 0).flatMap((p) => p.activeOrderIds);
+    if (busyIds.length) {
+      const activeOrders = await Order.find({ orderId: { $in: busyIds } }).select('orderId deliveryLocation').lean();
+      const dropByOrder = Object.fromEntries(activeOrders.map((o) => [o.orderId, o.deliveryLocation]));
+      partners = partners.filter((p) => {
+        if (!(p.activeOrderIds || []).length) return true;
+        return (p.activeOrderIds || []).some((oid) => {
+          const d = dropByOrder[oid];
+          if (d?.lat == null) return false;
+          const m = geoDistanceMeters(drop, d);
+          return m != null && m <= batchRadiusKm * 1000;
+        });
+      });
+    }
+  }
   if (!partners.length) return [];
 
   const users = await User.find({
@@ -261,6 +281,7 @@ export const tryAssign = async (orderOrId) => {
   const timeoutSec = s.offerTimeoutSec || 25;
   const maxAttempts = s.maxOfferAttempts || 5;
   const baseRadius = s.assignRadiusKm || 6;
+  const batchRadiusKm = s.batchRadiusKm ?? 1.5;
 
   const prior = await Assignment.find({ orderId: order.orderId }).select('partnerUserId attempt').lean();
   const excludeUserIds = [...new Set(prior.map((a) => String(a.partnerUserId)))];
@@ -292,7 +313,10 @@ export const tryAssign = async (orderOrId) => {
   const passes = restrictUserIds ? [restrictUserIds, null] : [null];
   for (const list of passes) {
     for (const mult of [1, 2, 3]) {
-      candidates = await findCandidates({ pickup: order.pickup, excludeUserIds, radiusKm: baseRadius * mult, restrictUserIds: list });
+      candidates = await findCandidates({
+        pickup: order.pickup, excludeUserIds, radiusKm: baseRadius * mult, restrictUserIds: list,
+        drop: order.deliveryLocation, batchRadiusKm,
+      });
       if (candidates.length) break;
     }
     if (candidates.length) break;

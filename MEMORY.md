@@ -130,6 +130,18 @@
 
 ## 5. Completed Major Work
 
+- **2026-09-02 — Delivery P2 batching guard (partial P2-D3-batching).**
+  `Settings.batchRadiusKm` (default 1.5). `assignmentService.findCandidates`
+  gained `drop` + `batchRadiusKm`: a partner already carrying a delivery is only
+  a candidate for a 2nd order when the new drop is within `batchRadiusKm` of one
+  of their active drops (partners with a free slot are unaffected). `tryAssign`
+  passes `order.deliveryLocation` + the setting. This makes the existing
+  `maxConcurrent > 1` path safe (no cross-city multi-drops). Test: backend
+  `npm test` **52** (+1: far drop → busy partner excluded → stalled; near drop →
+  same partner gets it). **Not built** (needs device QA + partner-stack UX
+  decision): drop-sequencing hint, a dedicated multi-order "stack" screen — the
+  dashboard already lists multiple active-order cards.
+
 - **2026-09-02 — Delivery P2-D5 DONE (delivery zones + zone-aware assignment).**
   Model `DeliveryZone {name, polygon:GeoJSON Polygon, slaMinutes(15), active}`
   + `2dsphere` on polygon. Admin CRUD (`authorize('Admin','Manager')`, delete =

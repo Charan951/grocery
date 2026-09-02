@@ -667,6 +667,47 @@ test('customer rates the delivery partner after Delivered → recomputes partner
   await DeliveryPartner.updateOne({ userId: riderUserId }, { $set: { rating: 5, ratingCount: 0 } });
 });
 
+test('batching guard: a busy partner only gets a 2nd order if the drop is nearby', async () => {
+  await bringOnline(riderUserId, TP.lat + 0.001, TP.lng + 0.001);
+  await DeliveryPartner.updateOne({ userId: rider2UserId }, { $set: { isOnline: false } });
+
+  // rider can carry 2, and is already on order A dropping AT the test point
+  const A = await Order.create({
+    orderId: `${ORDER_PREFIX}-BATCH-A${++_n}`,
+    customerId: 'cust_qa', customerName: 'QA', customerPhone: '+91 9000000000',
+    items: [{ name: 'Milk', quantity: 1, price: 50 }], itemTotal: 50, totalAmount: 75,
+    deliveryAddress: 'QA', status: 'Out For Delivery',
+    pickup: TP, deliveryLocation: { lat: TP.lat, lng: TP.lng },
+  });
+  await DeliveryPartner.updateOne({ userId: riderUserId }, { $set: { maxConcurrent: 2, activeOrderIds: [A.orderId] } });
+
+  // order B drops ~11 km away → batching guard excludes the rider → nobody left → stalled
+  const farB = await Order.create({
+    orderId: `${ORDER_PREFIX}-BATCH-B${++_n}`,
+    customerId: 'cust_qa', customerName: 'QA', customerPhone: '+91 9000000000',
+    items: [{ name: 'Milk', quantity: 1, price: 50 }], itemTotal: 50, totalAmount: 75,
+    deliveryAddress: 'QA', status: 'Ready',
+    pickup: TP, deliveryLocation: { lat: TP.lat + 0.1, lng: TP.lng + 0.1 },
+  });
+  const far = await tryAssign(farB.orderId);
+  assert.equal(far.ok, false, JSON.stringify(far));
+
+  // order C drops ~0.15 km from A → within batchRadiusKm → the rider gets it
+  const nearC = await Order.create({
+    orderId: `${ORDER_PREFIX}-BATCH-C${++_n}`,
+    customerId: 'cust_qa', customerName: 'QA', customerPhone: '+91 9000000000',
+    items: [{ name: 'Milk', quantity: 1, price: 50 }], itemTotal: 50, totalAmount: 75,
+    deliveryAddress: 'QA', status: 'Ready',
+    pickup: TP, deliveryLocation: { lat: TP.lat + 0.001, lng: TP.lng + 0.001 },
+  });
+  const near = await tryAssign(nearC.orderId);
+  assert.equal(near.ok, true, JSON.stringify(near));
+  assert.equal(near.partnerUserId, riderUserId);
+
+  await Assignment.updateMany({ orderId: { $in: [farB.orderId, nearC.orderId] } }, { $set: { status: 'cancelled' } });
+  await DeliveryPartner.updateOne({ userId: riderUserId }, { $set: { maxConcurrent: 1, activeOrderIds: [] } });
+});
+
 test('delivery zones: CRUD + validation + partner tagging + assignment scoping', async () => {
   const aTok = await adminToken();
 
