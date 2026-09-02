@@ -129,6 +129,7 @@ const AppContent: React.FC = () => {
 
   const isPDP = location.pathname.startsWith('/product/') || location.pathname.startsWith('/prn/');
   const isCategoriesPage = location.pathname === '/categories' || location.pathname.startsWith('/categories/');
+  const isOrdersPage = location.pathname === '/orders' || location.pathname.startsWith('/orders/') || location.pathname.startsWith('/account/orders');
   const { activeFestivalCampaign } = useCMS();
   const isFestivalMobileHome = isMobile && location.pathname === '/' && !!activeFestivalCampaign && activeFestivalCampaign.isActive !== false;
 
@@ -145,7 +146,7 @@ const AppContent: React.FC = () => {
       {/* Main Pages */}
       <main
         className="flex-grow"
-        style={{ paddingTop: isMobile && (isPDP || isCategoriesPage || isFestivalMobileHome) ? 0 : 'var(--sticky-header-h, 140px)' }}
+        style={{ paddingTop: isMobile && (isPDP || isCategoriesPage || isOrdersPage || isFestivalMobileHome) ? 0 : 'var(--sticky-header-h, 140px)' }}
       >
         <Routes>
           <Route path="/" element={<Home onQuickView={setQuickViewProduct} />} />

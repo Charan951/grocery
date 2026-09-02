@@ -4,11 +4,13 @@ import { useCMS, getSubCategoryImage, getCategoryImage } from '../context/CMSCon
 import { SubcategoryCardImage } from '../components/SubcategoryCardImage';
 import { SEO } from '../components/SEO';
 import { LocationModal } from '../components/LocationModal';
-import { Search, ChevronDown, Zap } from 'lucide-react';
+import { Search, ChevronDown, Zap, ArrowLeft } from 'lucide-react';
+import { useSmartBack } from '../hooks/useSmartBack';
 
 export const Categories: React.FC = () => {
   const { categories = [], products = [], userLocation, updateUserLocation, seoSettings } = useCMS();
   const navigate = useNavigate();
+  const goBack = useSmartBack('/');
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
 
   // Dynamic Trending Searches from real database (NO DUMMY DATA)
@@ -114,36 +116,16 @@ export const Categories: React.FC = () => {
     <div className="min-h-screen bg-white text-text-primary pb-16">
       <SEO title={seo.title} description={seo.description} keywords={seo.keywords} />
 
-      {/* Top Location Header Bar (No search input bar, no category pills) */}
-      <header className="sticky top-0 z-[999] bg-white border-b border-divider px-3.5 py-2.5 flex items-center justify-between shadow-2xs">
-        {/* Left Side: Location */}
-        <div className="flex items-center gap-2 min-w-0">
-          <div
-            onClick={() => setIsLocationModalOpen(true)}
-            className="flex flex-col justify-center cursor-pointer select-none group min-w-0"
-          >
-            <div className="flex items-center gap-1 text-[13px] font-black text-text-primary tracking-tight leading-none">
-              <Zap size={14} className="text-primary fill-primary shrink-0" />
-              <span className="whitespace-nowrap">Delivery in minutes*</span>
-            </div>
-            <div className="flex items-center gap-0.5 text-xs font-bold text-text-secondary group-hover:text-primary transition-colors mt-0.5 min-w-0">
-              <span className="truncate max-w-[200px] sm:max-w-[280px]">{formattedLocation}</span>
-              <ChevronDown size={13} className="shrink-0" />
-            </div>
-          </div>
-        </div>
-
-        {/* Right Side: Search Icon */}
+      {/* Minimal nav bar: back button + title only */}
+      <header className="sticky top-0 z-[999] bg-white border-b border-divider px-3 py-3 flex items-center gap-3 shadow-2xs">
         <button
-          onClick={() => {
-            const firstCat = categories[0]?.slug || categories[0]?.id || 'fruits-vegetables';
-            navigate(`/products?category=${firstCat}&subCategory=All`);
-          }}
-          className="p-1.5 rounded-full hover:bg-background transition-colors text-text-primary cursor-pointer shrink-0 ml-2"
-          aria-label="Search"
+          onClick={goBack}
+          aria-label="Back"
+          className="w-9 h-9 -ml-0.5 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-text-primary transition-colors cursor-pointer shrink-0"
         >
-          <Search size={20} />
+          <ArrowLeft size={18} />
         </button>
+        <h1 className="text-lg font-black text-text-primary tracking-tight font-display">Categories</h1>
       </header>
 
       {/* Main Content Area (Clean Canvas - Our Actual Grocery Categories) */}

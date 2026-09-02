@@ -342,7 +342,9 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
     backgroundColor: dynamicHeaderBg
   };
 
-  if (isMobile && (isProductDetailPage || isCategoriesPage)) {
+  // On mobile these pages carry their own minimal "back + title" bar — the full
+  // location / search / profile app header would just stack on top of it.
+  if (isMobile && (isProductDetailPage || isCategoriesPage || isOrdersPage)) {
     return null;
   }
 
