@@ -109,73 +109,63 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const appBarRef = useRef<HTMLDivElement>(null);
   const lastScrollY = useRef(0);
-  const ticking = useRef(false);
 
-  // Scroll direction listener for smooth mobile AppBar hide/show behavior (Desktop remains 100% static & fixed)
+  // Scroll direction listener for the mobile AppBar hide/show. One rAF-throttled
+  // read per frame, no layout writes here — all the jank came from doing work on
+  // every raw scroll event.
   useEffect(() => {
+    let raf = 0;
     const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-      setIsScrolledDown(currentScrollY > 40);
+      if (raf) return;
+      raf = window.requestAnimationFrame(() => {
+        raf = 0;
+        const y = window.scrollY;
+        setIsScrolledDown(y > 40); // React bails when the boolean is unchanged
 
-      // On desktop, header never hides or moves
-      if (!isMobile) {
-        setHeaderHidden(false);
-        return;
-      }
+        if (!isMobile) { setHeaderHidden(false); lastScrollY.current = y; return; }
+        if (y <= 20) { setHeaderHidden(false); lastScrollY.current = y; return; }
 
-      // Always expand and unhide header when near top of page
-      if (currentScrollY <= 20) {
-        setHeaderHidden(false);
-        lastScrollY.current = currentScrollY;
-        return;
-      }
-
-      if (!ticking.current) {
-        window.requestAnimationFrame(() => {
-          const diff = currentScrollY - lastScrollY.current;
-
-          if (diff > 10 && currentScrollY > 80) {
-            setHeaderHidden(true);
-          } else if (diff < -10) {
-            setHeaderHidden(false);
-          }
-          lastScrollY.current = currentScrollY;
-          ticking.current = false;
-        });
-        ticking.current = true;
-      }
+        const diff = y - lastScrollY.current;
+        if (diff > 10 && y > 80) setHeaderHidden(true);
+        else if (diff < -10) setHeaderHidden(false);
+        lastScrollY.current = y;
+      });
     };
-
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, [isMobile]);
 
-  // Reset header state on EVERY route change
+  // Reset transient header state on route change.
   useEffect(() => {
     setHeaderHidden(false);
     setIsScrolledDown(false);
     lastScrollY.current = 0;
-    if (appBarRef.current && appBarRef.current.offsetHeight > 0) {
-      document.documentElement.style.setProperty('--sticky-header-h', `${appBarRef.current.offsetHeight}px`);
-    }
   }, [location.pathname, location.search]);
 
-  // Measure header height for page padding
+  // Publish the header's *expanded* height as --sticky-header-h. Only ever
+  // measured while the header is NOT collapsed, so the value is stable and the
+  // page's padding-top never chases the collapse animation (that feedback loop
+  // was what made the header + bottom bar judder on scroll). Re-checks on route
+  // change, viewport resize, and when the header expands back.
   useEffect(() => {
-    const el = appBarRef.current;
-    if (!el) return;
-    const updateHeight = () => {
-      if (el.offsetHeight > 0) {
-        document.documentElement.style.setProperty('--sticky-header-h', `${el.offsetHeight}px`);
-      }
+    if (headerHidden) return; // freeze the last expanded value while collapsed
+    const measure = () => {
+      const el = appBarRef.current;
+      if (!el) return;
+      const h = el.offsetHeight;
+      if (h > 0) document.documentElement.style.setProperty('--sticky-header-h', `${h}px`);
     };
-    updateHeight();
-    const observer = new ResizeObserver(updateHeight);
-    observer.observe(el);
+    measure();
+    const raf = requestAnimationFrame(measure); // after the browser paints
+    window.addEventListener('resize', measure);
     return () => {
-      observer.disconnect();
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', measure);
     };
-  }, [location.pathname]);
+  }, [location.pathname, location.search, headerHidden, isMobile, isScrolledDown]);
 
   // Reopen the profile drawer when routed home from a sub-page's Back button
   useEffect(() => {

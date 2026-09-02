@@ -15,24 +15,26 @@ export const BottomNav: React.FC = () => {
   const [hidden, setHidden] = useState(false);
   const lastScrollY = useRef(0);
 
-  // Auto-hide bottom bar on scroll down, reveal on scroll up
+  // Auto-hide on scroll down, reveal on scroll up — rAF-throttled so it does at
+  // most one cheap read per frame (raw scroll events fire far more often).
   useEffect(() => {
+    let raf = 0;
     const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-      const scrollDiff = currentScrollY - lastScrollY.current;
-
-      // Only hide when scrolling down past 60px threshold
-      if (scrollDiff > 8 && currentScrollY > 60) {
-        setHidden(true);
-      } else if (scrollDiff < -8 || currentScrollY <= 20) {
-        setHidden(false);
-      }
-
-      lastScrollY.current = currentScrollY;
+      if (raf) return;
+      raf = window.requestAnimationFrame(() => {
+        raf = 0;
+        const y = window.scrollY;
+        const diff = y - lastScrollY.current;
+        if (diff > 8 && y > 60) setHidden(true);
+        else if (diff < -8 || y <= 20) setHidden(false);
+        lastScrollY.current = y;
+      });
     };
-
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, []);
 
   // Always reset visibility on route change
