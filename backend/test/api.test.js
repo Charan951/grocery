@@ -482,3 +482,19 @@ test('wallet debit checks the balance', async () => {
   assert.equal(ok.status, 200);
   assert.equal(ok.body.walletBalance, 40);
 });
+
+test('GET /api/super-categories returns list and PUT /api/super-categories/:id updates configuration', async () => {
+  const getRes = await api().get('/api/super-categories');
+  assert.equal(getRes.status, 200);
+  assert.equal(getRes.body.success, true);
+  assert.ok(Array.isArray(getRes.body.superCategories));
+
+  const updateRes = await api().put('/api/super-categories/sc_cafe').send({
+    banner: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb',
+    active: true,
+    categories: ['dairy-bread-eggs']
+  });
+  assert.equal(updateRes.status, 200);
+  assert.equal(updateRes.body.success, true);
+  assert.equal(updateRes.body.superCategory.banner, 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb');
+});

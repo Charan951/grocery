@@ -7,6 +7,7 @@ export { authController, dashboardController } from './authController.js';
 export {
   productController,
   categoryController,
+  superCategoryController,
   brandController,
   inventoryController,
   specialGroupController,

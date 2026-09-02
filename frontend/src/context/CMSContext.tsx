@@ -36,6 +36,21 @@ export interface SpecialCategoryGroup {
   items: SpecialGroupItem[];
 }
 
+export interface SuperCategory {
+  id: string;
+  name: string;
+  slug: string;
+  icon: string;
+  banner?: string;
+  bannerLink?: string;
+  categories: string[];
+  subCategories?: string[];
+  products?: string[];
+  displayOrder: number;
+  active: boolean;
+}
+
+
 
 export interface Category {
   id: string;
@@ -352,6 +367,7 @@ export interface CMSState {
   activeFestivalCampaign: FestivalCampaign | null;
   categories: Category[];
   specialCategoryGroups: SpecialCategoryGroup[];
+  superCategories: SuperCategory[];
   products: Product[];
   coupons: Coupon[];
   blogs: Blog[];
@@ -363,6 +379,8 @@ export interface CMSState {
 }
 
 interface CMSContextProps extends CMSState {
+  updateSuperCategory: (id: string, updated: Partial<SuperCategory>) => Promise<void>;
+  reorderSuperCategories: (superCats: SuperCategory[]) => void;
   activeHub: string;
   setActiveHub: (hub: string) => void;
   activeHeroBannerIndex: number;
@@ -429,6 +447,118 @@ interface CMSContextProps extends CMSState {
 }
 
 const CMSContext = createContext<CMSContextProps | undefined>(undefined);
+
+export const defaultSuperCategories: SuperCategory[] = [
+  {
+    id: 'sc_all',
+    name: 'All',
+    slug: 'all',
+    icon: 'LayoutGrid',
+    banner: '',
+    categories: [],
+    subCategories: [],
+    products: [],
+    displayOrder: 0,
+    active: true
+  },
+  {
+    id: 'sc_cafe',
+    name: 'Cafe',
+    slug: 'cafe',
+    icon: 'Coffee',
+    banner: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=1400&auto=format&fit=crop',
+    bannerLink: '/products',
+    categories: ['dairy-bread-eggs', 'breakfast-cereals-spreads-sauces', 'tea-coffee-health-drinks', 'ice-creams-kulfi-frozen-desserts', 'chocolates-indian-sweets'],
+    subCategories: ['Milk', 'Breads & Buns', 'Fresh Bakery', 'Tea', 'Coffee', 'Chocolates', 'Cold Coffee & Iced Tea', 'Batters & Mixes'],
+    products: ['prod_milk_1', 'prod_milk_2', 'prod_milk_3', 'prod_milk_4', 'prod_milk_5'],
+    displayOrder: 1,
+    active: true
+  },
+  {
+    id: 'sc_home',
+    name: 'Home',
+    slug: 'home',
+    icon: 'Home',
+    banner: 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?w=1400&auto=format&fit=crop',
+    categories: ['atta-rice-oil-dals'],
+    subCategories: ['Oil', 'Atta', 'Ghee', 'Dals & Pulses', 'Rice & More'],
+    products: [],
+    displayOrder: 2,
+    active: true
+  },
+  {
+    id: 'sc_toys',
+    name: 'Toys',
+    slug: 'toys',
+    icon: 'Gamepad2',
+    banner: 'https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?w=1400&auto=format&fit=crop',
+    categories: [],
+    subCategories: [],
+    products: [],
+    displayOrder: 3,
+    active: true
+  },
+  {
+    id: 'sc_fresh',
+    name: 'Fresh',
+    slug: 'fresh',
+    icon: 'Leaf',
+    banner: 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=1400&auto=format&fit=crop',
+    categories: ['fruits-vegetables'],
+    subCategories: ['Fresh Vegetables', 'Fresh Fruits', 'Exotics & Premium', 'Mangoes & Melons', 'Leafy, Herbs & Seasonings', 'Cuts & Sprouts'],
+    products: ['prod_fv_1', 'prod_fv_2', 'prod_fv_3', 'prod_fv_4', 'prod_fv_5', 'prod_ff_1', 'prod_ff_2', 'prod_ff_3', 'prod_ff_4', 'prod_ff_5'],
+    displayOrder: 4,
+    active: true
+  },
+  {
+    id: 'sc_electronics',
+    name: 'Electronics',
+    slug: 'electronics',
+    icon: 'Headphones',
+    banner: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=1400&auto=format&fit=crop',
+    categories: [],
+    subCategories: [],
+    products: [],
+    displayOrder: 5,
+    active: true
+  },
+  {
+    id: 'sc_mobiles',
+    name: 'Mobiles',
+    slug: 'mobiles',
+    icon: 'Smartphone',
+    banner: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=1400&auto=format&fit=crop',
+    categories: [],
+    subCategories: [],
+    products: [],
+    displayOrder: 6,
+    active: true
+  },
+  {
+    id: 'sc_beauty',
+    name: 'Beauty',
+    slug: 'beauty',
+    icon: 'Sparkles',
+    banner: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=1400&auto=format&fit=crop',
+    categories: [],
+    subCategories: [],
+    products: [],
+    displayOrder: 7,
+    active: true
+  },
+  {
+    id: 'sc_fashion',
+    name: 'Fashion',
+    slug: 'fashion',
+    icon: 'Shirt',
+    banner: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=1400&auto=format&fit=crop',
+    categories: [],
+    subCategories: [],
+    products: [],
+    displayOrder: 8,
+    active: true
+  }
+];
 
 // Initial default data mirroring Flutter app models and assets
 const defaultBanners: Banner[] = [
@@ -545,8 +675,8 @@ export const subCategoryImages: Record<string, string> = {
 };
 
 export const getSubCategoryImage = (subName: string, catName?: string, customImg?: string) => {
-  if (customImg && (customImg.startsWith('http://') || customImg.startsWith('https://') || customImg.startsWith('data:'))) {
-    if (!customImg.includes('cdn.zeptonow.com')) {
+  if (customImg && typeof customImg === 'string' && customImg.trim().length > 0) {
+    if (customImg.startsWith('http://') || customImg.startsWith('https://') || customImg.startsWith('data:') || customImg.startsWith('/')) {
       return normalizeCategoryImageUrl(customImg);
     }
   }
@@ -643,11 +773,11 @@ export const getCategoryImage = (category: Category | string): string => {
   }
 
   if (typeof category === 'object') {
-    if (category.image && (category.image.startsWith('http://') || category.image.startsWith('https://') || category.image.startsWith('data:'))) {
-      return category.image;
-    }
-    if (category.icon && (category.icon.startsWith('http://') || category.icon.startsWith('https://') || category.icon.startsWith('data:'))) {
-      return category.icon;
+    const customImg = category.image || (category as any).imageUrl || category.icon;
+    if (customImg && typeof customImg === 'string' && customImg.trim().length > 0) {
+      if (customImg.startsWith('http://') || customImg.startsWith('https://') || customImg.startsWith('data:') || customImg.startsWith('/')) {
+        return normalizeCategoryImageUrl(customImg);
+      }
     }
     if (category.id && categoryImages[category.id]) {
       return categoryImages[category.id];
@@ -661,7 +791,7 @@ export const getCategoryImage = (category: Category | string): string => {
       if (subImg) return subImg;
     }
   } else if (typeof category === 'string') {
-    if (category.startsWith('http://') || category.startsWith('https://') || category.startsWith('data:')) {
+    if (category.startsWith('http://') || category.startsWith('https://') || category.startsWith('data:') || category.startsWith('/')) {
       return category;
     }
     if (categoryImages[category]) {
@@ -1263,6 +1393,9 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (!parsed.activeFestivalCampaign) {
           parsed.activeFestivalCampaign = parsed.festivalCampaigns.find((c: any) => c.isActive) || null;
         }
+        if (!parsed.superCategories || parsed.superCategories.length === 0) {
+          parsed.superCategories = defaultSuperCategories;
+        }
         return parsed;
       } catch (e) {
         console.error('Failed to parse cached CMS data', e);
@@ -1275,6 +1408,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       activeFestivalCampaign: defaultFestivalCampaigns[0] || null,
       categories: sanitizeCategoryList(defaultCategories),
       specialCategoryGroups: defaultSpecialGroups,
+      superCategories: defaultSuperCategories,
       products: defaultProducts,
       coupons: defaultCoupons,
       blogs: defaultBlogs,
@@ -1302,7 +1436,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return res.ok ? await res.json() : null;
         };
 
-        const [pData, cData, sgData, bannerData, pcData, cpData, bData, fcActiveData, fcListData] = await Promise.all([
+        const [pData, cData, sgData, bannerData, pcData, cpData, bData, fcActiveData, fcListData, scData] = await Promise.all([
           fetchJson('/api/products').catch(() => null),
           fetchJson('/api/categories').catch(() => null),
           fetchJson('/api/special-groups').catch(() => null),
@@ -1312,6 +1446,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           fetchJson('/api/blogs').catch(() => null),
           fetchJson('/api/festival-campaigns/active').catch(() => null),
           fetchJson('/api/festival-campaigns').catch(() => null),
+          fetchJson('/api/super-categories').catch(() => null),
         ]);
 
         clearTimeout(timeoutId);
@@ -1321,6 +1456,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           products: pData?.success && pData.products?.length ? pData.products : prev.products,
           categories: cData?.success && cData.categories?.length ? sanitizeCategoryList(cData.categories) : sanitizeCategoryList(prev.categories),
           specialCategoryGroups: sgData?.success && sgData.groups?.length ? sgData.groups : prev.specialCategoryGroups,
+          superCategories: scData?.success && scData.superCategories?.length ? scData.superCategories : (prev.superCategories || defaultSuperCategories),
           banners: bannerData?.success && bannerData.banners?.length ? bannerData.banners : prev.banners,
           promoCards: pcData?.success && Array.isArray(pcData.promoCards) ? pcData.promoCards : (prev.promoCards || []),
           coupons: cpData?.success && cpData.coupons?.length ? cpData.coupons : prev.coupons,
@@ -1665,18 +1801,25 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateCategory = async (id: string, updated: Partial<Category>) => {
+    const imgVal = updated.image || (updated as any).imageUrl || updated.icon || '';
+    const payload = {
+      ...updated,
+      image: imgVal || updated.image,
+      imageUrl: imgVal || (updated as any).imageUrl,
+      icon: imgVal || updated.icon
+    };
     setState((prev) => ({
       ...prev,
       categories: prev.categories.map((c) => {
         const isMatch = c.id === id || c.slug === id || (c as any)._id === id || (c.name && c.name.toLowerCase() === id.toLowerCase());
-        return isMatch ? { ...c, ...updated } : c;
+        return isMatch ? { ...c, ...payload } : c;
       }),
     }));
     try {
       await fetch(`/api/categories/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updated)
+        body: JSON.stringify(payload)
       });
     } catch (e) {
       console.warn('API sync updateCategory offline', e);
@@ -2140,6 +2283,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       activeFestivalCampaign: defaultFestivalCampaigns[0] || null,
       categories: defaultCategories,
       specialCategoryGroups: defaultSpecialGroups,
+      superCategories: defaultSuperCategories,
       products: defaultProducts,
       coupons: defaultCoupons,
       blogs: defaultBlogs,
@@ -2148,6 +2292,40 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       stores: defaultStores,
       jobs: defaultJobs,
       seoSettings: defaultSEOSettings,
+    });
+  };
+
+  const updateSuperCategory = async (id: string, updated: Partial<SuperCategory>) => {
+    setState((prev) => ({
+      ...prev,
+      superCategories: (prev.superCategories || defaultSuperCategories).map((sc) =>
+        sc.id === id || sc.slug === id ? { ...sc, ...updated } : sc
+      ),
+    }));
+    try {
+      await fetch(`/api/super-categories/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated),
+      });
+    } catch (e) {
+      console.warn('API sync updateSuperCategory offline', e);
+    }
+  };
+
+  const reorderSuperCategories = (superCats: SuperCategory[]) => {
+    setState((prev) => ({
+      ...prev,
+      superCategories: superCats,
+    }));
+    superCats.forEach(async (sc, index) => {
+      try {
+        await fetch(`/api/super-categories/${sc.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ displayOrder: index }),
+        });
+      } catch (e) { }
     });
   };
 
@@ -2173,6 +2351,8 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <CMSContext.Provider
       value={{
         ...state,
+        updateSuperCategory,
+        reorderSuperCategories,
         activeHub,
         setActiveHub,
         activeHeroBannerIndex,

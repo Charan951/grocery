@@ -2,8 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Product } from '../context/CMSContext';
 import { useCartWishlist, getProductStockQuantity, MAX_CUSTOMER_QTY_LIMIT } from '../context/CartWishlistContext';
-import { motion } from 'framer-motion';
-import { Heart, Plus, Minus, Clock } from 'lucide-react';
+import { Heart, Plus, Minus } from 'lucide-react';
 import { getProductImage } from '../utils/imageUtils';
 
 interface ProductCardProps {
@@ -24,11 +23,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
   const displayImage = getProductImage(product);
 
   const originalPrice = product.originalPrice || product.mrp || product.price;
-
-  // Calculate discount percentage accurately for Blinkit blue badge
-  const discountPercent = (originalPrice > product.price)
-    ? Math.round(((originalPrice - product.price) / originalPrice) * 100)
-    : (product.discountPercentage || 0);
 
   const stockQty = getProductStockQuantity(product);
   const isOutOfStock = stockQty <= 0;
@@ -80,35 +74,30 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
   };
 
   const hasOptions = product.weightOptions && product.weightOptions.length > 1;
+  const isVeg = product.highlights?.dietaryPreference !== 'Non-Veg';
 
   return (
-    <div className="bg-white border border-divider/70 rounded-[6px] relative flex flex-col h-full transition-all duration-200 hover:shadow-md group overflow-hidden">
-      {/* Top Image Container */}
-      <div className="relative w-full aspect-square bg-[#F8F9FA] overflow-hidden flex items-center justify-center p-1.5 group/img rounded-t-[6px]">
-
-        {/* Discount Badge */}
-        {discountPercent > 0 && (
-          <div className="absolute top-0 left-0 bg-[#2554d7] text-white text-[9px] sm:text-[10px] font-black px-1.5 py-0.5 rounded-br-[4px] shadow-2xs z-20 uppercase tracking-tight flex flex-col items-center leading-none">
-            <span className="leading-none">{discountPercent}%</span>
-            <span className="text-[7px] font-extrabold leading-none mt-0.5">OFF</span>
-          </div>
-        )}
+    <div className="bg-transparent flex flex-col h-full group border-0 shadow-none">
+      {/* 1. Image Container Wrapper (Outline Border ONLY around Image Box) */}
+      <div className="relative w-full aspect-square bg-[#f9fafb] dark:bg-emerald-950/20 rounded-2xl border border-divider overflow-hidden flex items-center justify-center p-2 group/img shadow-2xs">
 
         {/* Wishlist Heart Icon */}
         <button
           onClick={handleWishlistToggle}
-          className={`absolute top-1.5 right-1.5 z-20 w-6 h-6 rounded-full bg-white/90 flex items-center justify-center border border-divider/40 shadow-2xs transition-transform active:scale-90 ${favorited ? 'text-rose-500 fill-rose-500' : 'text-text-tertiary hover:text-rose-500'
-            }`}
+          className={`absolute top-2 right-2 z-20 w-6.5 h-6.5 rounded-full bg-white/95 dark:bg-black/60 flex items-center justify-center border border-divider/40 shadow-2xs transition-transform active:scale-90 ${favorited ? 'text-rose-500 fill-rose-500' : 'text-text-secondary hover:text-rose-500'}`}
           title={favorited ? 'Remove from Wishlist' : 'Add to Wishlist'}
-          aria-label={favorited ? 'Remove from Wishlist' : 'Add to Wishlist'}
-          aria-pressed={favorited}
         >
-          <Heart size={12} className={favorited ? 'fill-rose-500 text-rose-500' : ''} />
+          <Heart size={13} className={favorited ? 'fill-rose-500 text-rose-500' : ''} />
         </button>
+
+        {/* Veg / Non-Veg Indicator at Bottom Left */}
+        <div className="absolute bottom-2 left-2 z-20 flex items-center justify-center w-3.5 h-3.5 border border-emerald-600 bg-white p-0.5 rounded-[3px]">
+          <div className={`w-1.5 h-1.5 rounded-full ${isVeg ? 'bg-emerald-600' : 'bg-rose-600'}`} />
+        </div>
 
         {/* Out of Stock Overlay */}
         {isOutOfStock && (
-          <div className="absolute bottom-1 left-1/2 -translate-x-1/2 z-20 bg-rose-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-2xs uppercase">
+          <div className="absolute top-2 left-2 z-20 bg-rose-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-2xs uppercase">
             Out of Stock
           </div>
         )}
@@ -122,82 +111,91 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
             loading="lazy"
           />
         </Link>
+
+        {/* ADD Button Floating on Bottom Right of Image Container */}
+        <div className="absolute bottom-2 right-2 z-20">
+          {isOutOfStock ? (
+            <span className="bg-gray-100 dark:bg-gray-800 text-gray-400 text-[9.5px] font-bold px-2 py-1 rounded-xl border border-gray-200 dark:border-gray-700">
+              Sold Out
+            </span>
+          ) : cartQty > 0 ? (
+            <div className="flex items-center bg-emerald-600 text-white rounded-xl shadow-md font-black text-xs overflow-hidden">
+              <button onClick={handleDecrement} className="p-1.5 hover:bg-emerald-700 transition-colors">
+                <Minus size={12} strokeWidth={3} />
+              </button>
+              <span className="px-2 font-black text-xs">{cartQty}</span>
+              <button
+                onClick={handleIncrement}
+                disabled={cartQty >= stockQty}
+                className={`p-1.5 transition-colors ${cartQty >= stockQty ? 'opacity-40 cursor-not-allowed bg-emerald-800' : 'hover:bg-emerald-700'}`}
+              >
+                <Plus size={12} strokeWidth={3} />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleAddToCart}
+              className="bg-white border-2 border-rose-500 text-rose-600 font-extrabold text-[11px] px-3.5 py-1 rounded-xl hover:bg-rose-600 hover:text-white transition-all duration-200 cursor-pointer shadow-sm uppercase tracking-wider flex flex-col items-center leading-none"
+            >
+              <span>ADD</span>
+              {hasOptions && (
+                <span className="text-[8px] font-medium lowercase leading-none mt-0.5 text-rose-500 group-hover:text-white">
+                  {product.weightOptions?.length} options
+                </span>
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Details Container */}
-      <div className="p-2 sm:p-2.5 flex flex-col flex-1">
-        {/* 10 MINS Delivery Time Badge */}
-        <div className="inline-flex items-center gap-1 bg-gray-100 px-1.5 py-0.5 rounded-[3px] text-[8.5px] sm:text-[9.5px] font-black text-gray-700 uppercase tracking-tight w-fit mb-1">
-          <Clock size={10} className="text-gray-600 shrink-0" />
-          <span>10 MINS</span>
+      {/* 2. Details Section (Outside Image Container, NO outline border) */}
+      <div className="pt-2 sm:pt-2.5 flex flex-col flex-1">
+        {/* Price Row */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="bg-emerald-700 text-white font-black text-xs px-2 py-0.5 rounded-md">
+            ₹{product.price}
+          </span>
+          {originalPrice > product.price && (
+            <span className="text-xs text-text-secondary line-through font-medium">
+              ₹{originalPrice}
+            </span>
+          )}
         </div>
 
+        {/* Discount Amount Tag */}
+        {originalPrice > product.price && (
+          <div className="text-[10px] font-bold text-emerald-600 uppercase tracking-tight mt-1">
+            ₹{originalPrice - product.price} OFF
+          </div>
+        )}
+
         {/* Product Title */}
-        <Link to={`/product/${product.id}`} className="block">
-          <h3 className="text-[11px] sm:text-xs font-bold text-gray-900 leading-tight line-clamp-2 min-h-[2.4em] group-hover:text-emerald-600 transition-colors">
+        <Link to={`/product/${product.id}`} className="block mt-1">
+          <h3 className="text-xs sm:text-sm font-bold text-text-primary leading-snug line-clamp-2 group-hover:text-emerald-600 transition-colors">
             {product.name}
           </h3>
         </Link>
 
-        {/* Net Weight / Quantity */}
-        <div className="text-[10px] sm:text-[11px] text-gray-500 font-medium mt-0.5 mb-1.5">
+        {/* Net Quantity / Weight */}
+        <div className="text-xs text-text-secondary font-medium mt-0.5">
           {netWeight}
         </div>
 
-        {/* Bottom Price & ADD Button Row */}
-        <div className="mt-auto pt-1 flex items-center justify-between gap-1">
-          {/* Price Column */}
-          <div className="flex flex-col">
-            <span className="text-xs sm:text-sm font-black text-gray-900 leading-none">
-              ₹{product.price}
+        {/* Brand Tag & Rating Row */}
+        <div className="mt-1.5 flex items-center justify-between gap-1 flex-wrap">
+          {product.brand && (
+            <span className="text-[10px] text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 font-semibold px-2 py-0.5 rounded-md truncate max-w-[120px]">
+              {product.brand}
             </span>
-            {originalPrice > product.price && (
-              <span className="text-[9px] sm:text-[10px] line-through text-gray-400 font-normal leading-none mt-0.5">
-                ₹{originalPrice}
-              </span>
-            )}
-          </div>
-
-          {/* ADD Button Column */}
-          <div className="flex flex-col items-end">
-            {isOutOfStock ? (
-              <span className="bg-gray-100 text-gray-400 text-[9.5px] font-bold px-2 py-0.5 rounded-[4px] border border-gray-200">
-                Sold Out
-              </span>
-            ) : cartQty > 0 ? (
-              <div className="flex items-center bg-emerald-600 text-white rounded-[4px] shadow-2xs font-black text-xs overflow-hidden">
-                <button onClick={handleDecrement} className="p-1 sm:p-1.5 hover:bg-emerald-700 transition-colors" aria-label="Decrease quantity">
-                  <Minus size={11} strokeWidth={3} />
-                </button>
-                <span className="px-1.5 font-black text-xs" aria-live="polite">{cartQty}</span>
-                <button
-                  onClick={handleIncrement}
-                  disabled={cartQty >= stockQty}
-                  className={`p-1 sm:p-1.5 transition-colors ${cartQty >= stockQty ? 'opacity-40 cursor-not-allowed bg-emerald-800' : 'hover:bg-emerald-700'}`}
-                  aria-label="Increase quantity"
-                >
-                  <Plus size={11} strokeWidth={3} />
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={handleAddToCart}
-                className="bg-emerald-50/80 border border-emerald-600 text-emerald-700 font-extrabold text-[11px] px-3 py-1 rounded-[4px] hover:bg-emerald-600 hover:text-white transition-all duration-200 cursor-pointer shadow-2xs uppercase tracking-wider"
-              >
-                ADD
-              </button>
-            )}
-
-            {hasOptions && !isOutOfStock && cartQty === 0 && (
-              <span className="text-[8.5px] text-gray-500 font-medium block text-right mt-0.5">
-                {product.weightOptions?.length || 0} options
-              </span>
-            )}
-          </div>
+          )}
+          {product.rating && (
+            <div className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5 ml-auto">
+              <span>★ {product.rating}</span>
+              {product.reviewsCount ? <span className="text-text-secondary font-normal">({product.reviewsCount})</span> : null}
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 };
-
-

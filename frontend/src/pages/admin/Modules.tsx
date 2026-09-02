@@ -64,6 +64,8 @@ export const CategoriesModule: React.FC = () => {
         name: cName.trim(),
         displayName: cDisplayName.trim(),
         icon: cIcon,
+        image: cIcon,
+        imageUrl: cIcon,
         color: cColor
       };
       updateCategory(editingCategory.id, updatedData);
@@ -88,6 +90,8 @@ export const CategoriesModule: React.FC = () => {
         name: cName.trim(),
         displayName: cDisplayName.trim(),
         icon: cIcon,
+        image: cIcon,
+        imageUrl: cIcon,
         color: cColor,
         productCount: 0
       };

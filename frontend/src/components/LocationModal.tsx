@@ -306,23 +306,7 @@ export const LocationModal: React.FC<LocationModalProps> = ({
                 )}
               </div>
 
-              {/* Popular Location Tags */}
-              <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-none">
-                <span className="text-[11px] font-black text-gray-400 uppercase tracking-wider shrink-0">POPULAR:</span>
-                {defaultPopularLocations.map((loc, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => {
-                      setPosition([loc.lat, loc.lng]);
-                      setFullAddressText(`${loc.name}, India`);
-                    }}
-                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-[11px] px-3 py-1.5 rounded-full flex items-center gap-1 shrink-0 transition-colors cursor-pointer"
-                  >
-                    <span>📍</span> {loc.name}
-                  </button>
-                ))}
-              </div>
+
 
               {/* OpenStreetMap Iframe Container matching image copy 2.png */}
               <div className="w-full h-44 rounded-2xl overflow-hidden border border-gray-200 relative shadow-2xs shrink-0">

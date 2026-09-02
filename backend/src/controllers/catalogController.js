@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 import { User } from '../models/User.js';
 import { DeliveryPartner } from '../models/DeliveryPartner.js';
-import { Category, Product, Brand, SpecialGroup, Banner, PromoCard } from '../models/Catalog.js';
+import { Category, Product, Brand, SpecialGroup, Banner, PromoCard, SuperCategory } from '../models/Catalog.js';
 import { Inventory } from '../models/Inventory.js';
 import { Order } from '../models/Order.js';
 import { Customer } from '../models/Customer.js';
@@ -672,6 +672,32 @@ export const promoCardController = {
     }
   }
 };
+
+export const superCategoryController = {
+  getSuperCategories: async (req, res) => {
+    try {
+      const list = await SuperCategory.find().sort({ displayOrder: 1, createdAt: 1 });
+      res.json({ success: true, count: list.length, superCategories: list });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  updateSuperCategory: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updated = await SuperCategory.findOneAndUpdate(
+        { id },
+        { $set: req.body },
+        { new: true, upsert: true }
+      );
+      res.json({ success: true, superCategory: updated });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+};
+
 
 
 

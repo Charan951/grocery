@@ -11,6 +11,7 @@ import {
   customerController, supportController, brandController, inventoryController,
   employeeController, reviewController, auditLogController, uploadController,
   specialGroupController, bannerController, promoCardController, paymentController,
+  superCategoryController
 } from '../controllers/apiController.js';
 
 const router = express.Router();
@@ -35,6 +36,10 @@ router.delete('/categories/:id', categoryController.deleteCategory);
 router.post('/categories/:id/subcategories', categoryController.addSubCategory);
 router.put('/categories/:id/subcategories/:subId', categoryController.updateSubCategory);
 router.delete('/categories/:id/subcategories/:subId', categoryController.deleteSubCategory);
+
+// Super Category routes
+router.get('/super-categories', superCategoryController.getSuperCategories);
+router.put('/super-categories/:id', superCategoryController.updateSuperCategory);
 
 // Special Group routes
 router.get('/special-groups', specialGroupController.getSpecialGroups);

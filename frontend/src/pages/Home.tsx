@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import { useCMS, getSubCategoryImage, getCategoryImage, hexToRgba, hexToTintOnWhite, Product, deduplicateSubCategories } from '../context/CMSContext';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useCMS, getSubCategoryImage, getCategoryImage, hexToRgba, hexToTintOnWhite, Product, deduplicateSubCategories, defaultSuperCategories } from '../context/CMSContext';
 import { ProductCard } from '../components/ProductCard';
 import { SubcategoryCardImage } from '../components/SubcategoryCardImage';
 import { SEO } from '../components/SEO';
 import { ActiveOrderBanner } from '../components/ActiveOrderBanner';
 import { BannerCarousel } from '../components/BannerCarousel';
 import { FestivalCampaignWrapper } from '../components/FestivalCampaignWrapper';
+import { SuperCategoryNav } from '../components/SuperCategoryNav';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowRight, ShieldCheck, Truck, Clock,
-  ChevronDown, ChevronUp, Star
+  ChevronDown, ChevronUp, Star, Utensils, Coffee, Leaf, Home as HomeIcon
 } from 'lucide-react';
 import { Instagram } from '../components/BrandIcons';
 
@@ -19,7 +20,30 @@ interface HomeProps {
 }
 
 export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
-  const { banners, promoCards, categories, specialCategoryGroups, products, testimonials, faqs, blogs, seoSettings, homeSelectedSubCategories, activeFestivalCampaign } = useCMS();
+  const {
+    banners, promoCards, categories, specialCategoryGroups, superCategories, products,
+    testimonials, faqs, blogs, seoSettings, homeSelectedSubCategories, activeFestivalCampaign
+  } = useCMS();
+
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const searchParams = new URLSearchParams(location.search);
+  const activeSuperCatSlug = searchParams.get('superCategory') || 'all';
+
+  const handleSelectSuperCategory = (slug: string) => {
+    if (slug === 'all') {
+      navigate('/');
+    } else {
+      navigate(`/?superCategory=${encodeURIComponent(slug)}`);
+    }
+  };
+
+  const currentSuperCategoryObj = useMemo(() => {
+    if (activeSuperCatSlug === 'all') return null;
+    const list = superCategories && superCategories.length > 0 ? superCategories : defaultSuperCategories;
+    return list.find(sc => (sc.slug || sc.id) === activeSuperCatSlug) || null;
+  }, [activeSuperCatSlug, superCategories]);
 
   const [isMobileDevice, setIsMobileDevice] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth < 768 : false
@@ -288,6 +312,93 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
     'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=500&auto=format&fit=crop',
   ];
 
+  // Category cards for active Super Category landing view
+  const superCategoryCategoryCards = useMemo(() => {
+    if (!currentSuperCategoryObj) return [];
+
+    const assignedCatIds = new Set((currentSuperCategoryObj.categories || []).map(c => c.toLowerCase()));
+    const assignedSubNames = new Set((currentSuperCategoryObj.subCategories || []).map(s => s.toLowerCase()));
+
+    const list: Array<{
+      id: string;
+      name: string;
+      image: string | null;
+      catSlug: string;
+      subName?: string;
+    }> = [];
+
+    // Category matches
+    categories.forEach((cat) => {
+      const catSlug = cat.slug || cat.id;
+      if (assignedCatIds.has(cat.id.toLowerCase()) || assignedCatIds.has(catSlug.toLowerCase())) {
+        list.push({
+          id: `sc_cat_${cat.id}`,
+          name: cat.name,
+          image: cat.image || getCategoryImage(cat.name),
+          catSlug: catSlug
+        });
+      }
+    });
+
+    // Subcategory matches
+    categories.forEach((cat) => {
+      const catSlug = cat.slug || cat.id;
+      (cat.subCategories || []).forEach((sub: any) => {
+        const subName = typeof sub === 'string' ? sub : sub.name;
+        if (subName && assignedSubNames.has(subName.toLowerCase())) {
+          const customImg = typeof sub === 'object' ? (sub.image || sub.icon || '') : '';
+          list.push({
+            id: `sc_sub_${subName.replace(/[^a-zA-Z0-9]/g, '_')}`,
+            name: subName,
+            image: getSubCategoryImage(subName, cat.name, customImg),
+            catSlug: catSlug,
+            subName: subName
+          });
+        }
+      });
+    });
+
+    return list;
+  }, [currentSuperCategoryObj, categories]);
+
+  // Filtered products for active Super Category
+  const superCategoryProducts = useMemo(() => {
+    if (!currentSuperCategoryObj) return [];
+
+    const assignedCatIds = new Set((currentSuperCategoryObj.categories || []).map(c => c.toLowerCase()));
+    const assignedSubNames = new Set((currentSuperCategoryObj.subCategories || []).map(s => s.toLowerCase()));
+    const assignedProdIds = new Set(currentSuperCategoryObj.products || []);
+
+    return products.filter((p) => {
+      if (!p) return false;
+      if (assignedProdIds.has(p.id)) return true;
+
+      const pCatId = (p.categoryId || '').toLowerCase();
+      const pCat = (p.category || '').toLowerCase();
+      const pSub = (p.subCategory || '').toLowerCase();
+
+      if (pSub && assignedSubNames.has(pSub)) return true;
+      if (pCatId && assignedCatIds.has(pCatId)) return true;
+      if (pCat && assignedCatIds.has(pCat)) return true;
+
+      return false;
+    });
+  }, [currentSuperCategoryObj, products]);
+
+  // All catalog categories formatted for Zepto Grid (moved from header nav)
+  const zeptoCategoryGridItems = useMemo(() => {
+    return categories.map((cat) => {
+      const catSlug = cat.slug || cat.id;
+      return {
+        id: cat.id,
+        name: cat.displayName || cat.name,
+        image: cat.image || getCategoryImage(cat.name),
+        catSlug: catSlug,
+        link: `/products?category=${catSlug}`
+      };
+    });
+  }, [categories]);
+
   return (
     <div className="w-full page-wrapper bg-background">
       <SEO
@@ -302,6 +413,12 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
         <FestivalCampaignWrapper campaign={activeFestivalCampaign} />
       )}
 
+      {/* Zepto-Style Web Top Category Navigation Bar */}
+      <SuperCategoryNav
+        activeSuperCategory={activeSuperCatSlug}
+        onSelectSuperCategory={handleSelectSuperCategory}
+      />
+
       {/* Centered Web Container Layout */}
       <div className="w-full max-w-[1280px] mx-auto px-3 sm:px-6 lg:px-8 pt-0 sm:pt-3 pb-8">
 
@@ -312,95 +429,195 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
         {/* Live order strip — tap to track */}
         <ActiveOrderBanner />
 
-        {/* 1. Top Active Campaign Banners Carousel (Blinkit Aspect Ratio) */}
-        {activeBanners.length > 0 && (
-          <BannerCarousel
-            banners={activeBanners.filter(b => b.positionIndex === 0 || !b.positionIndex || b.positionIndex <= 0 || b.position === 'top')}
-            className="mb-3.5 sm:mb-4 md:mb-6"
-          />
-        )}
-
-        {/* 2. Blinkit Promotional Cards Row (WEB ONLY - Hidden on Mobile < 768px) */}
-        {activePromoCards.length > 0 && (
-          <section className="hidden md:block mb-6 w-full">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 sm:gap-4">
-              {activePromoCards.map((card) => {
-                const targetLink = card.subCategoryName && card.categoryId
-                  ? `/products?category=${card.categoryId}&subCategory=${encodeURIComponent(card.subCategoryName)}`
-                  : card.categoryId
-                    ? `/products?category=${card.categoryId}`
-                    : card.linkUrl || '/products';
-
-                const isBgImg = card.bgType === 'image' && card.bgImageUrl;
-
-                return (
-                  <Link
-                    key={card.id}
-                    to={targetLink}
-                    className="group relative rounded-2xl md:rounded-[20px] overflow-hidden flex flex-col justify-between shadow-xs hover:shadow-md transition-all duration-300 min-h-[150px] sm:min-h-[165px] border border-white/20 bg-cover bg-center"
-                    style={{
-                      background: isBgImg ? `url(${card.bgImageUrl}) center/cover no-repeat` : card.bgGradient || 'linear-gradient(135deg, #4CAF50, #81C784)',
-                      color: card.textColor || '#ffffff'
-                    }}
-                  >
-                    {/* Render text overlay ONLY if color mode is active */}
-                    {!isBgImg && (
-                      <div className="z-10 p-5 sm:p-6 pr-24 sm:pr-28">
-                        <h3 className="text-base sm:text-lg font-black leading-tight tracking-tight drop-shadow-xs">
-                          {card.title}
-                        </h3>
-                        {card.subtitle && (
-                          <p className="text-xs sm:text-xs font-medium opacity-90 mt-1 leading-snug line-clamp-2">
-                            {card.subtitle}
-                          </p>
-                        )}
-                        <div className="mt-3.5 sm:mt-4 inline-flex items-center gap-1.5 bg-black/80 group-hover:bg-black text-white font-black text-[11px] sm:text-xs px-3.5 py-1.5 rounded-xl shadow-xs transition-transform group-hover:scale-105">
-                          <span>{card.buttonText || 'Order Now'}</span>
-                          <ArrowRight size={13} />
-                        </div>
-                      </div>
-                    )}
-
-                    {!isBgImg && card.imageUrl && (
-                      <img
-                        src={card.imageUrl}
-                        alt={card.title}
-                        className="absolute right-1 sm:right-2 bottom-1 sm:bottom-2 w-28 sm:w-32 h-28 sm:h-32 object-contain z-10 pointer-events-none transition-transform duration-300 group-hover:scale-105 drop-shadow-md"
-                        onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
-                      />
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        {/* Unified 10-Subcategories per Row Grid (Blinkit Home Style) */}
-        {allHomeSubCategories.length > 0 && (
-          <section className="mb-8 w-full">
-            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-8 lg:grid-cols-10 gap-3 sm:gap-4">
-              {allHomeSubCategories.map((item) => (
-                <Link
-                  key={item.id}
-                  to={`/products?category=${item.catSlug}&subCategory=${encodeURIComponent(item.subName)}`}
-                  className="flex flex-col items-center group cursor-pointer text-center col-span-1"
-                >
-                  <div className="w-full aspect-square bg-[#eef6f7] dark:bg-emerald-950/20 border border-emerald-100/60 rounded-2xl p-2 sm:p-2.5 flex items-center justify-center overflow-hidden group-hover:scale-[1.04] transition-transform duration-200 shadow-2xs">
-                    <SubcategoryCardImage
-                      src={item.subImg || ''}
-                      alt={item.subName}
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
-                  <span className="text-[11px] sm:text-xs font-bold text-text-primary line-clamp-2 leading-tight mt-2 group-hover:text-emerald-600 transition-colors">
-                    {item.subName}
-                  </span>
+        {currentSuperCategoryObj ? (
+          /* SUPER CATEGORY LANDING PAGE VIEW (e.g. Cafe, Fresh, Home) */
+          <div className="flex flex-col gap-6 mt-3 sm:mt-4">
+            {/* Super Category Hero Banner (4:1 Aspect Ratio) */}
+            {currentSuperCategoryObj.banner && (
+              <div className="w-full aspect-[4/1] rounded-2xl md:rounded-3xl overflow-hidden shadow-sm border border-divider/60 bg-surface">
+                <Link to={currentSuperCategoryObj.bannerLink || '/products'} className="block w-full h-full">
+                  <img
+                    src={currentSuperCategoryObj.banner}
+                    alt={currentSuperCategoryObj.name}
+                    className="w-full h-full object-cover rounded-2xl md:rounded-3xl block"
+                    onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                  />
                 </Link>
-              ))}
-            </div>
-          </section>
-        )}
+              </div>
+            )}
+                </Link>
+              </div>
+            )}
+
+            {/* Category Cards Row (10 per row like Zepto) */}
+            {superCategoryCategoryCards.length > 0 && (
+              <section className="w-full my-2 sm:my-3">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-base sm:text-lg font-black text-text-primary tracking-tight font-display flex items-center gap-2">
+                    <span>Trending in {currentSuperCategoryObj.name}</span>
+                  </h2>
+                </div>
+                <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-8 lg:grid-cols-10 gap-2.5 sm:gap-3.5">
+                  {superCategoryCategoryCards.map((card) => {
+                    const targetLink = card.subName
+                      ? `/products?category=${card.catSlug}&subCategory=${encodeURIComponent(card.subName)}`
+                      : `/products?category=${card.catSlug}`;
+                    return (
+                      <Link
+                        key={card.id}
+                        to={targetLink}
+                        className="flex flex-col items-center group cursor-pointer text-center"
+                      >
+                        <div className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-full bg-[#f4f7f6] dark:bg-emerald-950/30 border border-emerald-100/80 dark:border-emerald-900/40 p-1 flex items-center justify-center overflow-hidden group-hover:scale-105 transition-transform duration-200 shadow-2xs">
+                          <img
+                            src={card.image || 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=300'}
+                            alt={card.name}
+                            className="w-full h-full object-cover rounded-full"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=300';
+                            }}
+                          />
+                        </div>
+                        <span className="text-[11px] sm:text-xs font-bold text-text-primary line-clamp-2 leading-tight mt-1.5 group-hover:text-emerald-600 transition-colors">
+                          {card.name}
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
+            {/* Super Category Filtered Products Shelves */}
+            {superCategoryProducts.length > 0 ? (
+              <section className="w-full mt-2">
+                <div className="flex items-center justify-between mb-3 border-b border-divider/60 pb-2">
+                  <h3 className="text-lg font-black text-text-primary tracking-tight font-display">
+                    Popular in {currentSuperCategoryObj.name}
+                  </h3>
+                  <Link
+                    to="/products"
+                    className="text-xs font-black text-emerald-600 bg-emerald-500/10 hover:bg-emerald-500/20 px-3 py-1 rounded-full flex items-center gap-1 transition-colors"
+                  >
+                    <span>View All</span>
+                    <ArrowRight size={13} />
+                  </Link>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-3 sm:gap-3.5">
+                  {superCategoryProducts.map((product) => (
+                    <ProductCard key={product.id} product={product} onQuickView={onQuickView} />
+                  ))}
+                </div>
+              </section>
+            ) : (
+              <div className="py-12 text-center text-text-secondary border border-dashed border-divider rounded-2xl">
+                <p className="text-sm font-semibold">No products directly assigned to this super category yet.</p>
+                <Link to="/products" className="mt-2 inline-block text-xs font-bold text-emerald-600 hover:underline">
+                  Browse All Catalog Products &rarr;
+                </Link>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* DEFAULT "ALL" HOMEPAGE MODE */
+          <>
+            {/* 1. Top Active Campaign Banners Carousel (Blinkit Aspect Ratio) */}
+            {activeBanners.length > 0 && (
+              <BannerCarousel
+                banners={activeBanners.filter(b => b.positionIndex === 0 || !b.positionIndex || b.positionIndex <= 0 || b.position === 'top')}
+                className="mb-3.5 sm:mb-4 md:mb-6"
+              />
+            )}
+
+            {/* 2. Blinkit Promotional Cards Row (WEB ONLY - Hidden on Mobile < 768px) */}
+            {activePromoCards.length > 0 && (
+              <section className="hidden md:block mb-6 w-full">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 sm:gap-4">
+                  {activePromoCards.map((card) => {
+                    const targetLink = card.subCategoryName && card.categoryId
+                      ? `/products?category=${card.categoryId}&subCategory=${encodeURIComponent(card.subCategoryName)}`
+                      : card.categoryId
+                        ? `/products?category=${card.categoryId}`
+                        : card.linkUrl || '/products';
+
+                    const isBgImg = card.bgType === 'image' && card.bgImageUrl;
+
+                    return (
+                      <Link
+                        key={card.id}
+                        to={targetLink}
+                        className="group relative rounded-2xl md:rounded-[20px] overflow-hidden flex flex-col justify-between shadow-xs hover:shadow-md transition-all duration-300 min-h-[150px] sm:min-h-[165px] border border-white/20 bg-cover bg-center"
+                        style={{
+                          background: isBgImg ? `url(${card.bgImageUrl}) center/cover no-repeat` : card.bgGradient || 'linear-gradient(135deg, #0284c7, #06b6d4)',
+                          color: card.textColor || '#ffffff'
+                        }}
+                      >
+                        {/* Render text overlay ONLY if color mode is active */}
+                        {!isBgImg && (
+                          <div className="z-10 p-5 sm:p-6 pr-24 sm:pr-28">
+                            <h3 className="text-base sm:text-lg font-black leading-tight tracking-tight drop-shadow-xs">
+                              {card.title}
+                            </h3>
+                            {card.subtitle && (
+                              <p className="text-xs sm:text-xs font-medium opacity-90 mt-1 leading-snug line-clamp-2">
+                                {card.subtitle}
+                              </p>
+                            )}
+                            <div className="mt-3.5 sm:mt-4 inline-flex items-center gap-1.5 bg-black/80 group-hover:bg-black text-white font-black text-[11px] sm:text-xs px-3.5 py-1.5 rounded-xl shadow-xs transition-transform group-hover:scale-105">
+                              <span>{card.buttonText || 'Order Now'}</span>
+                              <ArrowRight size={13} />
+                            </div>
+                          </div>
+                        )}
+
+                        {!isBgImg && card.imageUrl && (
+                          <img
+                            src={card.imageUrl}
+                            alt={card.title}
+                            className="absolute right-1 sm:right-2 bottom-1 sm:bottom-2 w-28 sm:w-32 h-28 sm:h-32 object-contain z-10 pointer-events-none transition-transform duration-300 group-hover:scale-105 drop-shadow-md"
+                            onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                          />
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
+            {/* Zepto-Style Homepage Category Grid (Categories moved from header nav) */}
+            {zeptoCategoryGridItems.length > 0 && (
+              <section className="mb-8 w-full mt-2 sm:mt-4">
+                <div className="flex items-center justify-between mb-3.5">
+                  <h2 className="text-lg sm:text-xl font-black text-text-primary tracking-tight font-display">
+                    Shop by Categories
+                  </h2>
+                </div>
+                <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-8 lg:grid-cols-10 gap-3 sm:gap-4">
+                  {zeptoCategoryGridItems.map((item) => (
+                    <Link
+                      key={item.id}
+                      to={item.link}
+                      className="flex flex-col items-center group cursor-pointer text-center"
+                    >
+                      <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 flex items-center justify-center overflow-hidden group-hover:scale-105 transition-transform duration-200 bg-transparent border-none shadow-none">
+                        <img
+                          src={item.image || 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=300'}
+                          alt={item.name}
+                          className="w-full h-full object-contain rounded-full"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=300';
+                          }}
+                        />
+                      </div>
+                      <span className="text-[11px] sm:text-xs font-bold text-text-primary line-clamp-2 leading-tight mt-2 group-hover:text-emerald-600 transition-colors">
+                        {item.name}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
 
         {/* 2. Dynamic Subcategories Home Sections & Dynamic Inter-Section Banners & In-Between Mobile Special Groups */}
         {subCategorySections.map((sec, secIdx) => (
@@ -443,11 +660,11 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                 </div>
               )}
 
-              {/* Subcategory Product Grid (Horizontally Scrollable 4 Cards Row) */}
+              {/* Subcategory Product Grid (Horizontally Scrollable Cards Row) */}
               {sec.subProducts.length > 0 ? (
                 <div className="flex gap-2.5 sm:gap-3.5 overflow-x-auto scrollbar-none pb-2 flex-nowrap">
                   {sec.subProducts.map((product, pIdx) => (
-                    <div key={product.id || `subp_${pIdx}`} className="w-[155px] sm:w-[180px] md:w-[205px] shrink-0">
+                    <div key={product.id || `subp_${pIdx}`} className="w-[140px] sm:w-[160px] md:w-[175px] shrink-0">
                       <ProductCard product={product} onQuickView={onQuickView} />
                     </div>
                   ))}
@@ -584,7 +801,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
 
             <div className="flex gap-2.5 sm:gap-3.5 overflow-x-auto scrollbar-none pb-2 flex-nowrap">
               {freshPicks.map((product, pIdx) => (
-                <div key={product.id || `fp_${pIdx}`} className="w-[155px] sm:w-[180px] md:w-[205px] shrink-0">
+                <div key={product.id || `fp_${pIdx}`} className="w-[140px] sm:w-[160px] md:w-[175px] shrink-0">
                   <ProductCard product={product} onQuickView={onQuickView} />
                 </div>
               ))}
@@ -610,7 +827,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
 
             <div className="flex gap-2.5 sm:gap-3.5 overflow-x-auto scrollbar-none pb-2 flex-nowrap">
               {organicPicks.map((product, pIdx) => (
-                <div key={product.id || `op_${pIdx}`} className="w-[155px] sm:w-[180px] md:w-[205px] shrink-0">
+                <div key={product.id || `op_${pIdx}`} className="w-[140px] sm:w-[160px] md:w-[175px] shrink-0">
                   <ProductCard product={product} onQuickView={onQuickView} />
                 </div>
               ))}
@@ -794,6 +1011,8 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
               className="my-4"
             />
           </section>
+        )}
+        </>
         )}
 
       </div>

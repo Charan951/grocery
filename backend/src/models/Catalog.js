@@ -21,6 +21,8 @@ const categorySchema = new mongoose.Schema({
   name: { type: String, required: true },
   displayName: { type: String, default: '' }, // customer-facing label shown on Home page & app bar; falls back to `name` when empty
   icon: { type: String, default: 'Leaf' },
+  image: { type: String, default: '' },
+  imageUrl: { type: String, default: '' },
   color: { type: String, default: '#4CAF50' },
   subCategories: [subCategorySchema],
   displayOrder: { type: Number, default: 0 },
@@ -150,12 +152,28 @@ const promoCardSchema = new mongoose.Schema({
   active: { type: Boolean, default: true }
 }, { timestamps: true });
 
+const superCategorySchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true, index: true },
+  name: { type: String, required: true },
+  slug: { type: String, required: true, index: true },
+  icon: { type: String, default: 'Utensils' },
+  banner: { type: String, default: '' },
+  bannerLink: { type: String, default: '' },
+  categories: [{ type: String }],
+  subCategories: [{ type: String }],
+  products: [{ type: String }],
+  displayOrder: { type: Number, default: 0 },
+  active: { type: Boolean, default: true }
+}, { timestamps: true });
+
 export const Category = mongoose.model('Category', categorySchema);
 export const Brand = mongoose.model('Brand', brandSchema);
 export const Product = mongoose.model('Product', productSchema);
 export const SpecialGroup = mongoose.model('SpecialGroup', specialGroupSchema);
 export const Banner = mongoose.model('Banner', bannerSchema);
 export const PromoCard = mongoose.model('PromoCard', promoCardSchema);
+export const SuperCategory = mongoose.model('SuperCategory', superCategorySchema);
+
 
 
 

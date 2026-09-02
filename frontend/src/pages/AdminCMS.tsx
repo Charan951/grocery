@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { useCMS, Product, Coupon, Blog, Banner, PromoCard, FestivalCampaign } from '../context/CMSContext';
+import { useCMS, Product, Coupon, Blog, Banner, PromoCard, FestivalCampaign, SuperCategory, defaultSuperCategories } from '../context/CMSContext';
 import { SEO } from '../components/SEO';
-import { Trash2, Plus, Edit2, CheckSquare, Square, Image, LayoutGrid, Upload, X, ArrowUp, ArrowDown, Smartphone, Sparkles, Layers } from 'lucide-react';
+import { Trash2, Plus, Edit2, CheckSquare, Square, Image, LayoutGrid, Upload, X, ArrowUp, ArrowDown, Smartphone, Sparkles, Layers, Coffee, Leaf, Home, Headphones, Shirt, Gamepad2, Utensils, Check } from 'lucide-react';
 import { FESTIVAL_ASSET_LIBRARY } from '../components/festival/FestivalAssetLibrary';
 import { FestivalCampaignWrapper } from '../components/FestivalCampaignWrapper';
 
 export const AdminCMS: React.FC = () => {
   const {
     banners, promoCards, festivalCampaigns, activeFestivalCampaign, categories, specialCategoryGroups, products, coupons, blogs, seoSettings,
+    superCategories, updateSuperCategory, reorderSuperCategories,
     homeSelectedSubCategories, updateHomeSubCategories, toggleHomeSubCategory,
     updateProduct, addProduct, deleteProduct,
     addBanner, updateBanner, deleteBanner,
@@ -28,7 +29,19 @@ export const AdminCMS: React.FC = () => {
     }))
   );
 
-  const [activeTab, setActiveTab] = useState<'festival_campaigns' | 'banners' | 'promo_cards' | 'home_subcats' | 'special_groups' | 'products' | 'coupons' | 'blogs' | 'seo'>('festival_campaigns');
+  const [activeTab, setActiveTab] = useState<'super_categories' | 'festival_campaigns' | 'banners' | 'promo_cards' | 'home_subcats' | 'special_groups' | 'products' | 'coupons' | 'blogs' | 'seo'>('super_categories');
+
+  // Super Category Editing State
+  const [editingSuperCatId, setEditingSuperCatId] = useState<string | null>(null);
+  const [scIcon, setScIcon] = useState('Coffee');
+  const [scBannerUrl, setScBannerUrl] = useState('');
+  const [scDisplayOrder, setScDisplayOrder] = useState(0);
+  const [scActive, setScActive] = useState(true);
+  const [scCategories, setScCategories] = useState<string[]>([]);
+  const [scSubCategories, setScSubCategories] = useState<string[]>([]);
+  const [scProducts, setScProducts] = useState<string[]>([]);
+  const [isUploadingScBanner, setIsUploadingScBanner] = useState(false);
+  const [prodSearchTerm, setProdSearchTerm] = useState('');
 
   // Festival Campaign Form States
   const [showFestivalForm, setShowFestivalForm] = useState(false);
@@ -967,6 +980,73 @@ export const AdminCMS: React.FC = () => {
     }
   };
 
+  // Super Category Handlers
+  const handleOpenEditSuperCat = (sc: SuperCategory) => {
+    setEditingSuperCatId(sc.id);
+    setScIcon(sc.icon || 'Coffee');
+    setScBannerUrl(sc.banner || '');
+    setScDisplayOrder(sc.displayOrder || 0);
+    setScActive(sc.active !== false);
+    setScCategories(sc.categories || []);
+    setScSubCategories(sc.subCategories || []);
+    setScProducts(sc.products || []);
+  };
+
+  const handleSaveSuperCat = (scId: string) => {
+    updateSuperCategory(scId, {
+      icon: scIcon,
+      banner: scBannerUrl.trim(),
+      displayOrder: Number(scDisplayOrder),
+      active: scActive,
+      categories: scCategories,
+      subCategories: scSubCategories,
+      products: scProducts
+    });
+    setEditingSuperCatId(null);
+    alert('Super Category updated successfully!');
+  };
+
+  const handleScBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingScBanner(true);
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = async () => {
+        const base64 = reader.result as string;
+        try {
+          const cUrl = await uploadImage(base64, 'freshcart/super-categories');
+          setScBannerUrl(cUrl);
+        } catch (err) {
+          setScBannerUrl(base64);
+        } finally {
+          setIsUploadingScBanner(false);
+        }
+      };
+    } catch (err) {
+      setIsUploadingScBanner(false);
+    }
+  };
+
+  const toggleCategorySelection = (catId: string) => {
+    setScCategories(prev =>
+      prev.includes(catId) ? prev.filter(c => c !== catId) : [...prev, catId]
+    );
+  };
+
+  const toggleSubCategorySelection = (subName: string) => {
+    setScSubCategories(prev =>
+      prev.includes(subName) ? prev.filter(s => s !== subName) : [...prev, subName]
+    );
+  };
+
+  const toggleProductSelection = (prodId: string) => {
+    setScProducts(prev =>
+      prev.includes(prodId) ? prev.filter(p => p !== prodId) : [...prev, prodId]
+    );
+  };
+
   return (
     <div className="page-wrapper">
       <SEO
@@ -981,6 +1061,12 @@ export const AdminCMS: React.FC = () => {
           <aside className="bg-surface border border-divider rounded-2xl p-4 shadow-card flex flex-col gap-1.5 h-fit">
             <div className="text-[10px] font-bold text-text-secondary px-3 py-1 border-b border-divider mb-2">CMS MODULES</div>
 
+            <button
+              className={`w-full text-left px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-colors ${activeTab === 'super_categories' ? 'bg-primary/10 border border-primary/20 text-primary' : 'text-text-primary hover:bg-background'}`}
+              onClick={() => setActiveTab('super_categories')}
+            >
+              ✨ Super Categories (Zepto Style)
+            </button>
             <button
               className={`w-full text-left px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-colors ${activeTab === 'festival_campaigns' ? 'bg-primary/10 border border-primary/20 text-primary' : 'text-text-primary hover:bg-background'}`}
               onClick={() => setActiveTab('festival_campaigns')}
@@ -1026,6 +1112,7 @@ export const AdminCMS: React.FC = () => {
             {/* Header section */}
             <div className="border-b border-divider pb-4">
               <h2 className="text-xl font-extrabold text-text-primary font-display">
+                {activeTab === 'super_categories' && '✨ Super Categories & Navigation Header (Zepto Style Concept)'}
                 {activeTab === 'festival_campaigns' && '🎉 Festival Campaigns (Blinkit Festival Concept)'}
                 {activeTab === 'promo_cards' && 'Promotional Cards Management'}
                 {activeTab === 'home_subcats' && 'Home Page Sub-Categories Selection'}
@@ -1033,6 +1120,249 @@ export const AdminCMS: React.FC = () => {
                 {activeTab === 'banners' && 'Dynamic Inter-Section Banners (CRUD)'}
               </h2>
             </div>
+
+            {/* TAB: SUPER CATEGORIES */}
+            {activeTab === 'super_categories' && (
+              <div className="flex flex-col gap-6">
+                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-800 dark:text-emerald-300">
+                  <p className="font-bold text-sm mb-1">Zepto-Style Super Category Navigation Architecture</p>
+                  <p>
+                    Configure presentation, banners, display order, and multi-selected catalog categories, subcategories, or products for each platform Super Category. Enabled Super Categories appear in the web top navigation bar.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                  {(superCategories && superCategories.length > 0 ? superCategories : defaultSuperCategories)
+                    .slice()
+                    .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
+                    .map((sc) => {
+                      const isEditing = editingSuperCatId === sc.id;
+
+                      return (
+                        <div key={sc.id} className="border border-divider rounded-2xl p-5 bg-background shadow-xs flex flex-col gap-4">
+                          <div className="flex items-center justify-between flex-wrap gap-3 border-b border-divider/60 pb-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-lg">
+                                {sc.icon === 'Coffee' && <Coffee size={20} />}
+                                {sc.icon === 'Leaf' && <Leaf size={20} />}
+                                {sc.icon === 'Home' && <Home size={20} />}
+                                {sc.icon === 'Headphones' && <Headphones size={20} />}
+                                {sc.icon === 'Smartphone' && <Smartphone size={20} />}
+                                {sc.icon === 'Sparkles' && <Sparkles size={20} />}
+                                {sc.icon === 'Shirt' && <Shirt size={20} />}
+                                {sc.icon === 'Gamepad2' && <Gamepad2 size={20} />}
+                                {sc.icon === 'LayoutGrid' && <LayoutGrid size={20} />}
+                                {!['Coffee','Leaf','Home','Headphones','Smartphone','Sparkles','Shirt','Gamepad2','LayoutGrid'].includes(sc.icon) && (
+                                  <Utensils size={20} />
+                                )}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <h3 className="text-base font-extrabold text-text-primary">{sc.name}</h3>
+                                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-divider text-text-secondary">
+                                    slug: {sc.slug}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-text-secondary">
+                                  {sc.categories?.length || 0} Categories • {sc.subCategories?.length || 0} Subcategories • {sc.products?.length || 0} Explicit Products
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              {/* Status Toggle */}
+                              <button
+                                onClick={() => updateSuperCategory(sc.id, { active: sc.active === false ? true : false })}
+                                className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${
+                                  sc.active !== false
+                                    ? 'bg-emerald-500/15 text-emerald-600 border border-emerald-500/30'
+                                    : 'bg-gray-200 text-gray-600 border border-gray-300'
+                                }`}
+                              >
+                                {sc.active !== false ? 'Enabled' : 'Disabled'}
+                              </button>
+
+                              <button
+                                onClick={() => handleOpenEditSuperCat(sc)}
+                                className="px-3.5 py-1.5 rounded-xl bg-primary text-white font-bold text-xs flex items-center gap-1.5 shadow-xs hover:bg-primary-hover transition-all"
+                              >
+                                <Edit2 size={14} />
+                                <span>Configure</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Hero Banner Preview */}
+                          {sc.banner && (
+                            <div className="w-full h-24 rounded-xl overflow-hidden relative border border-divider">
+                              <img src={sc.banner} alt={sc.name} className="w-full h-full object-cover" />
+                              <span className="absolute bottom-2 left-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
+                                Super Category Hero Banner
+                              </span>
+                            </div>
+                          )}
+
+                          {/* inline Edit Drawer / Form */}
+                          {isEditing && (
+                            <div className="p-4 sm:p-5 rounded-2xl bg-surface border border-emerald-500/30 flex flex-col gap-4 shadow-sm">
+                              <div className="flex items-center justify-between border-b border-divider pb-2">
+                                <h4 className="font-extrabold text-sm text-emerald-700 dark:text-emerald-400">
+                                  Edit Configuration for {sc.name}
+                                </h4>
+                                <button
+                                  onClick={() => setEditingSuperCatId(null)}
+                                  className="text-text-secondary hover:text-text-primary p-1"
+                                >
+                                  <X size={16} />
+                                </button>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div>
+                                  <label className="block text-xs font-bold text-text-primary mb-1">Display Order</label>
+                                  <input
+                                    type="number"
+                                    value={scDisplayOrder}
+                                    onChange={(e) => setScDisplayOrder(Number(e.target.value))}
+                                    className="w-full text-xs p-2 rounded-xl border border-divider bg-background"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-bold text-text-primary mb-1">Icon Key</label>
+                                  <select
+                                    value={scIcon}
+                                    onChange={(e) => setScIcon(e.target.value)}
+                                    className="w-full text-xs p-2 rounded-xl border border-divider bg-background"
+                                  >
+                                    <option value="Coffee">Coffee (Cafe)</option>
+                                    <option value="Leaf">Leaf (Fresh)</option>
+                                    <option value="Home">Home (Home)</option>
+                                    <option value="Gamepad2">Gamepad2 (Toys)</option>
+                                    <option value="Headphones">Headphones (Electronics)</option>
+                                    <option value="Smartphone">Smartphone (Mobiles)</option>
+                                    <option value="Sparkles">Sparkles (Beauty)</option>
+                                    <option value="Shirt">Shirt (Fashion)</option>
+                                    <option value="LayoutGrid">LayoutGrid (All)</option>
+                                    <option value="Utensils">Utensils</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-bold text-text-primary mb-1">Visibility Status</label>
+                                  <button
+                                    type="button"
+                                    onClick={() => setScActive(!scActive)}
+                                    className={`w-full py-2 rounded-xl text-xs font-bold border transition-colors ${
+                                      scActive ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-gray-100 text-gray-700 border-gray-300'
+                                    }`}
+                                  >
+                                    {scActive ? 'Active / Visible' : 'Hidden'}
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Banner Upload */}
+                              <div>
+                                <label className="block text-xs font-bold text-text-primary mb-1">Hero Banner Image</label>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="text"
+                                    value={scBannerUrl}
+                                    onChange={(e) => setScBannerUrl(e.target.value)}
+                                    placeholder="Upload or enter Banner Image URL"
+                                    className="flex-1 text-xs p-2 rounded-xl border border-divider bg-background"
+                                  />
+                                  <label className="cursor-pointer px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 shrink-0">
+                                    <Upload size={14} />
+                                    <span>{isUploadingScBanner ? 'Uploading...' : 'Upload'}</span>
+                                    <input type="file" accept="image/*" onChange={handleScBannerUpload} className="hidden" />
+                                  </label>
+                                </div>
+                              </div>
+
+                              {/* Multi-Select Main Catalog Categories */}
+                              <div>
+                                <label className="block text-xs font-bold text-text-primary mb-2">
+                                  Select Categories (Multi-Select):
+                                </label>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-40 overflow-y-auto p-2 border border-divider rounded-xl bg-background">
+                                  {categories.map((c) => {
+                                    const isSelected = scCategories.includes(c.id) || scCategories.includes(c.slug || '');
+                                    return (
+                                      <button
+                                        type="button"
+                                        key={c.id}
+                                        onClick={() => toggleCategorySelection(c.id)}
+                                        className={`flex items-center gap-2 p-2 rounded-lg text-left text-xs font-semibold border transition-all ${
+                                          isSelected
+                                            ? 'bg-emerald-500/10 border-emerald-500 text-emerald-700 dark:text-emerald-400'
+                                            : 'border-divider text-text-primary hover:bg-surface'
+                                        }`}
+                                      >
+                                        <div className={`w-4 h-4 rounded flex items-center justify-center text-white text-[10px] ${isSelected ? 'bg-emerald-600' : 'border border-gray-300'}`}>
+                                          {isSelected && <Check size={12} />}
+                                        </div>
+                                        <span className="truncate">{c.name}</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
+                              {/* Multi-Select Subcategories */}
+                              <div>
+                                <label className="block text-xs font-bold text-text-primary mb-2">
+                                  Select Subcategories (Multi-Select):
+                                </label>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-40 overflow-y-auto p-2 border border-divider rounded-xl bg-background">
+                                  {allSubCategories.map((scItem, idx) => {
+                                    const isSelected = scSubCategories.includes(scItem.name);
+                                    return (
+                                      <button
+                                        type="button"
+                                        key={`subsel_${idx}_${scItem.name}`}
+                                        onClick={() => toggleSubCategorySelection(scItem.name)}
+                                        className={`flex items-center gap-2 p-2 rounded-lg text-left text-xs font-semibold border transition-all ${
+                                          isSelected
+                                            ? 'bg-emerald-500/10 border-emerald-500 text-emerald-700 dark:text-emerald-400'
+                                            : 'border-divider text-text-primary hover:bg-surface'
+                                        }`}
+                                      >
+                                        <div className={`w-4 h-4 rounded flex items-center justify-center text-white text-[10px] ${isSelected ? 'bg-emerald-600' : 'border border-gray-300'}`}>
+                                          {isSelected && <Check size={12} />}
+                                        </div>
+                                        <span className="truncate">{scItem.name}</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
+                              {/* Action buttons */}
+                              <div className="flex justify-end gap-2 pt-2 border-t border-divider">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingSuperCatId(null)}
+                                  className="px-4 py-2 rounded-xl border border-divider text-xs font-bold text-text-secondary hover:bg-background"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveSuperCat(sc.id)}
+                                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs"
+                                >
+                                  Save Super Category
+                                </button>
+                              </div>
+
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
 
             {/* TAB: FESTIVAL CAMPAIGNS */}
             {activeTab === 'festival_campaigns' && (

@@ -31,6 +31,7 @@ router.use((req, res, next) => {
     if (req.method === 'GET') {
       if (req.path === '/products') return res.json({ success: true, offlineMode: true, products: [] });
       if (req.path === '/categories') return res.json({ success: true, offlineMode: true, categories: [] });
+      if (req.path.startsWith('/super-categories')) return res.json({ success: true, offlineMode: true, superCategories: [] });
       if (req.path.startsWith('/special-groups')) return res.json({ success: true, offlineMode: true, groups: [] });
       if (req.path.startsWith('/banners')) return res.json({ success: true, offlineMode: true, banners: [] });
       if (req.path.startsWith('/promo-cards')) return res.json({ success: true, offlineMode: true, promoCards: [] });
@@ -60,6 +61,7 @@ router.use((req, res, next) => {
     }
     if (req.method === 'PUT' || req.method === 'POST' || req.method === 'DELETE' || req.method === 'PATCH') {
       if (
+        req.path.startsWith('/super-categories') ||
         req.path.startsWith('/special-groups') ||
         req.path.startsWith('/banners') ||
         req.path.startsWith('/promo-cards') ||

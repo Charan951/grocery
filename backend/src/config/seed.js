@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { User } from '../models/User.js';
-import { Category, Product, Brand } from '../models/Catalog.js';
+import { Category, Product, Brand, SuperCategory } from '../models/Catalog.js';
 import { Coupon, Offer } from '../models/Finance.js';
 import { Blog, Settings } from '../models/Operations.js';
 import { Customer } from '../models/Customer.js';
@@ -465,6 +465,118 @@ export const seedDatabase = async () => {
 
       await Product.insertMany(seedProductsList);
       console.log(`✅ Seeded ${seedProductsList.length} rich product records!`);
+    }
+
+    // 6. Seed Predefined Super Categories
+    const superCatCount = await SuperCategory.countDocuments();
+    if (superCatCount < 7) {
+      await SuperCategory.deleteMany({});
+      const initialSuperCategories = [
+        {
+          id: 'sc_all',
+          name: 'All',
+          slug: 'all',
+          icon: 'LayoutGrid',
+          banner: '',
+          categories: [],
+          displayOrder: 0,
+          active: true
+        },
+        {
+          id: 'sc_cafe',
+          name: 'Cafe',
+          slug: 'cafe',
+          icon: 'Coffee',
+          banner: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=1400&auto=format&fit=crop',
+          bannerLink: '/products',
+          categories: ['dairy-bread-eggs', 'breakfast-cereals-spreads-sauces', 'tea-coffee-health-drinks', 'ice-creams-kulfi-frozen-desserts', 'chocolates-indian-sweets'],
+          subCategories: ['Milk', 'Breads & Buns', 'Fresh Bakery', 'Tea', 'Coffee', 'Chocolates', 'Cold Coffee & Iced Tea', 'Batters & Mixes'],
+          products: ['prod_milk_1', 'prod_milk_2', 'prod_milk_3', 'prod_milk_4', 'prod_milk_5'],
+          displayOrder: 1,
+          active: true
+        },
+        {
+          id: 'sc_home',
+          name: 'Home',
+          slug: 'home',
+          icon: 'Home',
+          banner: 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?w=1400&auto=format&fit=crop',
+          categories: ['atta-rice-oil-dals'],
+          subCategories: ['Oil', 'Atta', 'Ghee', 'Dals & Pulses', 'Rice & More'],
+          displayOrder: 2,
+          active: true
+        },
+        {
+          id: 'sc_toys',
+          name: 'Toys',
+          slug: 'toys',
+          icon: 'Gamepad2',
+          banner: 'https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?w=1400&auto=format&fit=crop',
+          categories: [],
+          subCategories: [],
+          displayOrder: 3,
+          active: true
+        },
+        {
+          id: 'sc_fresh',
+          name: 'Fresh',
+          slug: 'fresh',
+          icon: 'Leaf',
+          banner: 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=1400&auto=format&fit=crop',
+          categories: ['fruits-vegetables'],
+          subCategories: ['Fresh Vegetables', 'Fresh Fruits', 'Exotics & Premium', 'Mangoes & Melons', 'Leafy, Herbs & Seasonings', 'Cuts & Sprouts'],
+          products: ['prod_fv_1', 'prod_fv_2', 'prod_fv_3', 'prod_fv_4', 'prod_fv_5', 'prod_ff_1', 'prod_ff_2', 'prod_ff_3', 'prod_ff_4', 'prod_ff_5'],
+          displayOrder: 4,
+          active: true
+        },
+        {
+          id: 'sc_electronics',
+          name: 'Electronics',
+          slug: 'electronics',
+          icon: 'Headphones',
+          banner: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=1400&auto=format&fit=crop',
+          categories: [],
+          subCategories: [],
+          displayOrder: 5,
+          active: true
+        },
+        {
+          id: 'sc_mobiles',
+          name: 'Mobiles',
+          slug: 'mobiles',
+          icon: 'Smartphone',
+          banner: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=1400&auto=format&fit=crop',
+          categories: [],
+          subCategories: [],
+          displayOrder: 6,
+          active: true
+        },
+        {
+          id: 'sc_beauty',
+          name: 'Beauty',
+          slug: 'beauty',
+          icon: 'Sparkles',
+          banner: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=1400&auto=format&fit=crop',
+          categories: [],
+          subCategories: [],
+          displayOrder: 7,
+          active: true
+        },
+        {
+          id: 'sc_fashion',
+          name: 'Fashion',
+          slug: 'fashion',
+          icon: 'Shirt',
+          banner: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=1400&auto=format&fit=crop',
+          categories: [],
+          subCategories: [],
+          displayOrder: 8,
+          active: true
+        }
+      ];
+
+      await SuperCategory.insertMany(initialSuperCategories);
+      console.log('✅ Seeded predefined Super Categories!');
     }
 
   } catch (error) {
