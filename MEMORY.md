@@ -189,9 +189,11 @@
   `OrderController.markReturned`; order-detail primary action becomes "Returned
   to store" for a `Failed`+`needsReturn` order + a "bring it back" note. Admin web
   `DeliveryModule`: "Returns & re-attempts" card (awaiting-return badge + table +
-  per-row Requeue, disabled while `needsReturn`). Customer surfaces need no code
-  change — `Returned` is already a terminal status and the new timeline notes flow
-  through the existing tracking views. Tests: backend `npm test` **49** (+1: fail
+  per-row Requeue, disabled while `needsReturn`). Customer: `failDelivery` now
+  calls `notifyCustomer()` (persistent `Notification` + FCM "There was a problem
+  with your delivery"); admin `requeueOrder` writes a "being re-attempted"
+  `Notification`; tracking views pick up the new timeline notes; `Returned` is
+  already terminal. Tests: backend `npm test` **49** (+1: fail
   after pickup → needsReturn, requeue-blocked, /returned frees + idempotent,
   admin returns list, requeue → Ready); deliveryapp analyze clean + 6 + APK;
   frontend `vite build` clean.

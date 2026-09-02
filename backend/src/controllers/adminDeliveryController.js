@@ -2,7 +2,7 @@ import { User } from '../models/User.js';
 import { DeliveryPartner } from '../models/DeliveryPartner.js';
 import { Order } from '../models/Order.js';
 import { Assignment } from '../models/Assignment.js';
-import { Settings } from '../models/Operations.js';
+import { Settings, Notification } from '../models/Operations.js';
 import { DeliveryEarning } from '../models/DeliveryEarning.js';
 import { DeliveryZone } from '../models/DeliveryZone.js';
 import { createOffer, acceptOffer, cancelForOrder, tryAssign } from '../services/assignmentService.js';
@@ -492,6 +492,13 @@ export const adminDeliveryController = {
       req.app.get('io')?.to(order.orderId).emit('order_status_update', {
         orderId: order.orderId, status: 'Ready', note: reason, timeline: order.trackingTimeline, at: new Date().toISOString(),
       });
+      if (order.customerId) {
+        await Notification.create({
+          userId: order.customerId, type: 'Order',
+          title: 'Your order is being re-attempted',
+          body: `Order ${order.orderId} is back in the queue for delivery.`,
+        }).catch(() => {});
+      }
 
       // Kick auto-assignment (non-blocking, same as the Ready trigger).
       tryAssign(order.orderId).catch(() => {});

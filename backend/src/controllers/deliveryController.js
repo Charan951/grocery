@@ -439,6 +439,8 @@ export const deliveryController = {
 
       emitOrder(req, order, carryingParcel ? `Delivery failed — returning to store` : `Delivery failed: ${reason}`);
       req.app.get('io')?.to('admin_fleet').emit('assignment_failed', { orderId: order.orderId, reason });
+      await notifyCustomer(order, 'There was a problem with your delivery',
+        `We couldn't complete order ${order.orderId} (${reason}). Our team will reach out about a re-attempt or a refund.`);
       try {
         const admins = await User.find({ role: { $in: ['Admin', 'Manager'] } }).select('_id');
         await Notification.insertMany(admins.map((a) => ({
