@@ -145,27 +145,41 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
     lastScrollY.current = 0;
   }, [location.pathname, location.search]);
 
-  // Publish the header's *expanded* height as --sticky-header-h. Only ever
-  // measured while the header is NOT collapsed, so the value is stable and the
-  // page's padding-top never chases the collapse animation (that feedback loop
-  // was what made the header + bottom bar judder on scroll). Re-checks on route
-  // change, viewport resize, and when the header expands back.
+  // --sticky-header-h drives <main>'s padding-top and the category strip's
+  // sticky offset. It must be STABLE (two discrete values), never swept through
+  // every intermediate height of the collapse animation — that per-frame churn
+  // was the juddering. So: measure the expanded height only while the header is
+  // open, and snap the var to 0 the instant it collapses.
+  const expandedHRef = useRef(0);
+
   useEffect(() => {
-    if (headerHidden) return; // freeze the last expanded value while collapsed
+    if (headerHidden) return;
     const measure = () => {
       const el = appBarRef.current;
       if (!el) return;
       const h = el.offsetHeight;
-      if (h > 0) document.documentElement.style.setProperty('--sticky-header-h', `${h}px`);
+      if (h > 0) {
+        expandedHRef.current = h;
+        document.documentElement.style.setProperty('--sticky-header-h', `${h}px`);
+      }
     };
     measure();
-    const raf = requestAnimationFrame(measure); // after the browser paints
+    const raf = requestAnimationFrame(measure); // after paint
     window.addEventListener('resize', measure);
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', measure);
     };
   }, [location.pathname, location.search, headerHidden, isMobile, isScrolledDown]);
+
+  // One write per collapse/expand — the page padding + sticky category strip
+  // then glide via their own CSS transitions.
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      '--sticky-header-h',
+      headerHidden ? '0px' : `${expandedHRef.current || 140}px`
+    );
+  }, [headerHidden]);
 
   // Reopen the profile drawer when routed home from a sub-page's Back button
   useEffect(() => {
@@ -558,9 +572,14 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
           </div>
         </header>
 
-        {/* Mobile Search bar row (Hidden on Products / Subcategory Page on Mobile) */}
+        {/* Mobile Search bar row (Hidden on Products / Subcategory Page on Mobile).
+            Also collapses on scroll-down so only the category strip stays pinned. */}
         {!isProductListingPage && (
-          <div className="sm:hidden w-full px-3 py-1.5 relative transition-colors duration-300 border-none outline-none" style={{ backgroundColor: dynamicHeaderBg }} ref={searchRef}>
+          <div
+            className={`sm:hidden w-full px-3 relative transition-all duration-300 ease-in-out border-none outline-none overflow-hidden ${headerHidden ? 'max-h-0 opacity-0 py-0 pointer-events-none' : 'max-h-20 opacity-100 py-1.5'}`}
+            style={{ backgroundColor: dynamicHeaderBg }}
+            ref={searchRef}
+          >
             <form
               onSubmit={handleSearchSubmit}
               style={{
