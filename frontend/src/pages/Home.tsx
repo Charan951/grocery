@@ -445,9 +445,6 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                 </Link>
               </div>
             )}
-                </Link>
-              </div>
-            )}
 
             {/* Category Cards Row (10 per row like Zepto) */}
             {superCategoryCategoryCards.length > 0 && (
