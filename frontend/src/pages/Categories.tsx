@@ -4,11 +4,13 @@ import { useCMS, getSubCategoryImage, getCategoryImage } from '../context/CMSCon
 import { SubcategoryCardImage } from '../components/SubcategoryCardImage';
 import { SEO } from '../components/SEO';
 import { LocationModal } from '../components/LocationModal';
-import { Search, ChevronDown, Zap } from 'lucide-react';
+import { Search, ChevronDown, Zap, ArrowLeft } from 'lucide-react';
+import { useSmartBack } from '../hooks/useSmartBack';
 
 export const Categories: React.FC = () => {
   const { categories = [], products = [], userLocation, updateUserLocation, seoSettings } = useCMS();
   const navigate = useNavigate();
+  const goBack = useSmartBack('/');
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
 
   // Dynamic Trending Searches from real database (NO DUMMY DATA)
@@ -116,8 +118,15 @@ export const Categories: React.FC = () => {
 
       {/* Top Location Header Bar (No search input bar, no category pills) */}
       <header className="sticky top-0 z-[999] bg-white border-b border-divider px-3.5 py-2.5 flex items-center justify-between shadow-2xs">
-        {/* Left Side: Location */}
+        {/* Left Side: Back + Location */}
         <div className="flex items-center gap-2 min-w-0">
+          <button
+            onClick={goBack}
+            aria-label="Back"
+            className="w-8 h-8 -ml-1 rounded-full flex items-center justify-center text-text-primary hover:bg-background transition-colors cursor-pointer shrink-0"
+          >
+            <ArrowLeft size={18} />
+          </button>
           <div
             onClick={() => setIsLocationModalOpen(true)}
             className="flex flex-col justify-center cursor-pointer select-none group min-w-0"

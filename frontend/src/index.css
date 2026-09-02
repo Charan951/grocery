@@ -208,6 +208,16 @@ h1, h2, h3, h4, h5, h6 {
 .shelf-tag-blue { background: var(--admin-signal-blue-soft); color: var(--admin-signal-blue); }
 .shelf-tag-neutral { background: var(--admin-ledger-line); color: var(--admin-text-muted); }
 
+/* iOS home-indicator / gesture-bar clearance (needs viewport-fit=cover, set in
+   index.html). env() resolves to 0 on devices without a safe area. */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.mb-safe { margin-bottom: env(safe-area-inset-bottom, 0px); }
+.min-h-safe { min-height: env(safe-area-inset-bottom, 0px); }
+
+/* Floating cart pill: sits above the mobile bottom nav + the home indicator. */
+.fcb-pos { bottom: calc(92px + env(safe-area-inset-bottom, 0px)); }
+@media (min-width: 640px) { .fcb-pos { bottom: 1.5rem; } }
+
 /* Hide scrollbar while keeping scroll functionality */
 .no-scrollbar {
   scrollbar-width: none; /* Firefox */

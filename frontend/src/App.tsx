@@ -115,7 +115,11 @@ const AppContent: React.FC = () => {
     location.pathname.startsWith('/saved-addresses') ||
     location.pathname.startsWith('/account/addresses');
 
+  // The bottom tab bar belongs on the shell/home surface only. Every standalone
+  // sub-page (orders, categories, profile, support, addresses, legal, …) hides it
+  // and relies on its own in-header back button instead.
   const isBottomNavHidden =
+    isStandalonePage ||
     location.pathname.startsWith('/product/') ||
     location.pathname.startsWith('/prn/') ||
     location.pathname.startsWith('/products');
