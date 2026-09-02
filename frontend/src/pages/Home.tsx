@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useTransition } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useCMS, getSubCategoryImage, getCategoryImage, hexToRgba, hexToTintOnWhite, Product, deduplicateSubCategories, defaultSuperCategories } from '../context/CMSContext';
 import { ProductCard } from '../components/ProductCard';
@@ -31,12 +31,14 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
   const searchParams = new URLSearchParams(location.search);
   const activeSuperCatSlug = searchParams.get('superCategory') || 'all';
 
+  const [, startTransition] = useTransition();
+
+  // Mark the (heavy) view swap as a non-urgent transition so the current page
+  // stays painted/interactive while the new super-category view renders.
   const handleSelectSuperCategory = (slug: string) => {
-    if (slug === 'all') {
-      navigate('/');
-    } else {
-      navigate(`/?superCategory=${encodeURIComponent(slug)}`);
-    }
+    startTransition(() => {
+      navigate(slug === 'all' ? '/' : `/?superCategory=${encodeURIComponent(slug)}`);
+    });
   };
 
   const currentSuperCategoryObj = useMemo(() => {

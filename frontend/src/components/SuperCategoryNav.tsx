@@ -49,6 +49,13 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
   const btnRefs = React.useRef<(HTMLButtonElement | null)[]>([]);
   const [indicator, setIndicator] = React.useState({ left: 0, width: 0, ready: false });
 
+  // Optimistic selection: highlight + slide the underline the instant a tab is
+  // tapped, without waiting for the parent's route change to re-render and feed
+  // back a new `activeSuperCategory` prop. Cleared once the prop catches up.
+  const [pending, setPending] = React.useState<string | null>(null);
+  const effectiveActive = pending ?? activeSuperCategory;
+  React.useEffect(() => { setPending(null); }, [activeSuperCategory]);
+
   const scrollNav = (direction: 'left' | 'right') => {
     if (navRef.current) {
       const scrollAmount = direction === 'left' ? -250 : 250;
@@ -59,9 +66,9 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
   const activeIndex = React.useMemo(
     () => items.findIndex((cat) => {
       const s = cat.slug || cat.id || cat.name.toLowerCase();
-      return activeSuperCategory === s || (activeSuperCategory === '' && s === 'all');
+      return effectiveActive === s || (effectiveActive === '' && s === 'all');
     }),
-    [items, activeSuperCategory]
+    [items, effectiveActive]
   );
 
   // Slide the underline to the active tab. Measurement + any scroll is deferred
@@ -125,8 +132,8 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
           />
           {items.map((cat, i) => {
             const catSlug = cat.slug || cat.id || cat.name.toLowerCase();
-            const isActive = activeSuperCategory === catSlug || (activeSuperCategory === '' && catSlug === 'all');
-            
+            const isActive = effectiveActive === catSlug || (effectiveActive === '' && catSlug === 'all');
+
             // Resolve icon
             const IconComponent = ICON_MAP[cat.icon] || (catSlug === 'all' ? LayoutGrid : Utensils);
 
@@ -134,7 +141,11 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
               <button
                 key={cat.id || catSlug}
                 ref={(el) => { btnRefs.current[i] = el; }}
-                onClick={() => onSelectSuperCategory(catSlug)}
+                onClick={() => {
+                  if (catSlug === effectiveActive) return;
+                  setPending(catSlug);            // instant highlight + underline
+                  onSelectSuperCategory(catSlug); // parent routes (wrapped in a transition)
+                }}
                 className={`relative group inline-flex items-center gap-2 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 shrink-0 select-none ${
                   isActive
                     ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50/80 dark:bg-emerald-950/40 shadow-xs'
