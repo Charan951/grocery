@@ -194,20 +194,6 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
     }
   };
 
-  // Let any component (e.g. the mobile BottomNav's Profile tab, the profile
-  // page's guest state) open the account UI without prop drilling.
-  useEffect(() => {
-    const openAccount = () => handleProfileClick();
-    const openAuth = () => setIsCustomerAuthOpen(true);
-    window.addEventListener('freshcart:open-account', openAccount);
-    window.addEventListener('freshcart:open-auth', openAuth);
-    return () => {
-      window.removeEventListener('freshcart:open-account', openAccount);
-      window.removeEventListener('freshcart:open-auth', openAuth);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customerUser]);
-
   const handleCustomerLogout = () => {
     setCustomerUser(null);
     localStorage.removeItem('customer_user');
