@@ -56,7 +56,7 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
 
   return (
     <nav
-      className="w-full bg-white dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800 shadow-2xs sticky z-30 transition-[top,background-color] duration-200 ease-in-out"
+      className="w-full bg-white dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800 shadow-2xs sticky z-30 transition-colors"
       style={{ top: 'var(--sticky-header-h, 64px)' }}
     >
       <div className="max-w-[1280px] mx-auto px-2 sm:px-4 lg:px-8 relative flex items-center group">

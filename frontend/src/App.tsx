@@ -145,10 +145,7 @@ const AppContent: React.FC = () => {
       {/* Main Pages */}
       <main
         className="flex-grow"
-        style={{
-          paddingTop: isMobile && (isPDP || isCategoriesPage || isFestivalMobileHome) ? 0 : 'var(--sticky-header-h, 140px)',
-          transition: 'padding-top 200ms ease',
-        }}
+        style={{ paddingTop: isMobile && (isPDP || isCategoriesPage || isFestivalMobileHome) ? 0 : 'var(--sticky-header-h, 140px)' }}
       >
         <Routes>
           <Route path="/" element={<Home onQuickView={setQuickViewProduct} />} />
