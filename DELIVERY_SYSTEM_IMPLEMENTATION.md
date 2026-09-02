@@ -1024,8 +1024,14 @@ the fleet live; customers track the rider on a map on both web and mobile.
   `EarningsScreen` + dashboard "Today ₹"; admin `PartnerDetail` Earnings card +
   Settle. Tests: backend 48. **Open**: real tips input, COD cash-collected flag,
   payout export/statement.
-- **P2-D2 Zones**: `DeliveryZone` (polygon) CRUD in admin; zone-aware candidate
-  filter; per-zone SLA.
+- **P2-D2 Zones** — ✅ DONE 2026-09-02 (tracked as P2-D5 in MEMORY).
+  `DeliveryZone` (GeoJSON polygon, slaMinutes, active) + admin CRUD
+  (`/api/admin/delivery/zones`); `PUT /api/admin/delivery/partners/:userId`
+  tags partners (`zones`, `maxConcurrent`, `vehicleType`). `tryAssign` scopes
+  candidates to the pickup's zone-tagged partners first, falls back to the
+  radius model. Admin: `ZonesManager` click-to-draw map + `PartnerDetail`
+  "Zones & capacity" card. Tests: backend 51. **Open**: per-zone SLA surfaced in
+  analytics/alerts.
 - **P2-D3 Batching**: `maxConcurrent` > 1; multi-drop offer; nearest-drop
   sequencing; partner "stack" UI.
 - **P2-D4 Performance analytics** — ✅ DONE 2026-09-01 (tracked as P2-D3 in MEMORY).

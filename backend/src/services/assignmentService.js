@@ -3,6 +3,7 @@ import { Order } from '../models/Order.js';
 import { User } from '../models/User.js';
 import { DeliveryPartner } from '../models/DeliveryPartner.js';
 import { Notification, Settings } from '../models/Operations.js';
+import { DeliveryZone } from '../models/DeliveryZone.js';
 import { sendToOwner } from './pushService.js';
 
 const CANDIDATE_LIMIT = 10;
@@ -195,8 +196,9 @@ const onOfferDeclined = async (orderId, why, { source } = {}) => {
  * Rank online, in-radius, under-capacity partners for an order's pickup point.
  * Uses the 2dsphere `$near` index when the pickup has coords, else a plain scan.
  */
-export const findCandidates = async ({ pickup, excludeUserIds = [], radiusKm = 6 }) => {
+export const findCandidates = async ({ pickup, excludeUserIds = [], radiusKm = 6, restrictUserIds = null }) => {
   const base = { isOnline: true, userId: { $nin: excludeUserIds } };
+  if (Array.isArray(restrictUserIds) && restrictUserIds.length) base.userId = { $nin: excludeUserIds, $in: restrictUserIds };
   const hasGeo = pickup && pickup.lat != null && pickup.lng != null;
   const query = hasGeo
     ? {
@@ -268,9 +270,31 @@ export const tryAssign = async (orderOrId) => {
     return { ok: false, code: 'exhausted' };
   }
 
+  // Zone scoping (P2-D5): if the pickup falls inside an active zone and partners
+  // are tagged for it, prefer them. Never strand an order — fall back to the
+  // unrestricted radius search if the zoned search comes up empty.
+  let restrictUserIds = null;
+  if (order.pickup?.lat != null && order.pickup?.lng != null) {
+    try {
+      const zone = await DeliveryZone.findOne({
+        active: true,
+        polygon: { $geoIntersects: { $geometry: { type: 'Point', coordinates: [order.pickup.lng, order.pickup.lat] } } },
+      }).select('_id').lean();
+      if (zone) {
+        const tagged = await DeliveryPartner.find({ zones: String(zone._id) }).select('userId').lean();
+        if (tagged.length) restrictUserIds = tagged.map((p) => String(p.userId));
+      }
+    } catch (_) { /* zone lookup is best-effort */ }
+  }
+
   let candidates = [];
-  for (const mult of [1, 2, 3]) {
-    candidates = await findCandidates({ pickup: order.pickup, excludeUserIds, radiusKm: baseRadius * mult });
+  // Pass 1: zone-restricted (skipped when no zone applies). Pass 2: unrestricted.
+  const passes = restrictUserIds ? [restrictUserIds, null] : [null];
+  for (const list of passes) {
+    for (const mult of [1, 2, 3]) {
+      candidates = await findCandidates({ pickup: order.pickup, excludeUserIds, radiusKm: baseRadius * mult, restrictUserIds: list });
+      if (candidates.length) break;
+    }
     if (candidates.length) break;
   }
   if (!candidates.length) {

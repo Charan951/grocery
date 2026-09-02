@@ -4,11 +4,34 @@ import { Order } from '../models/Order.js';
 import { Assignment } from '../models/Assignment.js';
 import { Settings } from '../models/Operations.js';
 import { DeliveryEarning } from '../models/DeliveryEarning.js';
+import { DeliveryZone } from '../models/DeliveryZone.js';
 import { createOffer, acceptOffer, cancelForOrder, tryAssign } from '../services/assignmentService.js';
 import { logAudit } from './apiController.js';
 import { sendDeliveryCredentials } from '../services/mailService.js';
 
 const TERMINAL = ['Delivered', 'Cancelled', 'Returned', 'Refunded'];
+
+// Accept a flat ring of points ([[lng,lat],...] or [{lat,lng},...]), validate,
+// and return a closed GeoJSON linear ring. { ring } | { error }.
+const normaliseRing = (input) => {
+  if (!Array.isArray(input) || input.length < 3) {
+    return { error: 'A zone needs at least 3 boundary points' };
+  }
+  const pts = input.map((p) => {
+    if (Array.isArray(p) && p.length === 2) return [Number(p[0]), Number(p[1])];
+    if (p && typeof p === 'object') return [Number(p.lng), Number(p.lat)];
+    return [NaN, NaN];
+  });
+  for (const [lng, lat] of pts) {
+    if (!Number.isFinite(lng) || !Number.isFinite(lat) || lng < -180 || lng > 180 || lat < -90 || lat > 90) {
+      return { error: 'Invalid coordinate in the zone boundary' };
+    }
+  }
+  const first = pts[0];
+  const last = pts[pts.length - 1];
+  const ring = (first[0] === last[0] && first[1] === last[1]) ? pts : [...pts, first];
+  return { ring };
+};
 
 const partnerRow = (p, u) => ({
   userId: String(p.userId),
@@ -21,6 +44,7 @@ const partnerRow = (p, u) => ({
   availability: p.availability,
   activeOrderIds: p.activeOrderIds || [],
   maxConcurrent: p.maxConcurrent,
+  zones: p.zones || [],
   rating: p.rating,
   ratingCount: p.ratingCount || 0,
   completedCount: p.completedCount,
@@ -248,6 +272,7 @@ export const adminDeliveryController = {
           accountStatus: user.status, isOnline: !!partner?.isOnline, availability: partner?.availability || 'offline',
           vehicleType: partner?.vehicleType || 'bike', rating: partner?.rating ?? 5, ratingCount: partner?.ratingCount ?? 0,
           activeOrderIds: partner?.activeOrderIds || [], maxConcurrent: partner?.maxConcurrent || 1,
+          zones: partner?.zones || [],
           distanceKm: Math.round(((partner?.distanceTravelledM || 0) / 1000) * 10) / 10,
         },
         performance: {
@@ -312,6 +337,101 @@ export const adminDeliveryController = {
         `${user.name}: ${settled} payout(s)${ids ? ' (selected)' : ' (all pending)'}`);
 
       res.json({ success: true, settled });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // --- Delivery zones (P2-D5) ---
+
+  // GET /api/admin/delivery/zones
+  listZones: async (req, res) => {
+    try {
+      const zones = await DeliveryZone.find().sort({ createdAt: -1 }).lean();
+      res.json({ success: true, zones });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // POST /api/admin/delivery/zones  { name, coordinates:[[lng,lat],...], slaMinutes? }
+  createZone: async (req, res) => {
+    try {
+      const { name, coordinates, slaMinutes } = req.body || {};
+      if (!name || !String(name).trim()) return res.status(400).json({ success: false, message: 'Zone name is required' });
+      const ring = normaliseRing(coordinates);
+      if (ring.error) return res.status(400).json({ success: false, message: ring.error });
+
+      const zone = await DeliveryZone.create({
+        name: String(name).trim(),
+        polygon: { type: 'Polygon', coordinates: [ring.ring] },
+        slaMinutes: Number(slaMinutes) > 0 ? Number(slaMinutes) : 15,
+        active: true,
+      });
+      await logAudit(String(req.user._id), req.user.name, 'Delivery Zone Created', zone.name);
+      res.json({ success: true, zone });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // PUT /api/admin/delivery/zones/:id  { name?, coordinates?, slaMinutes?, active? }
+  updateZone: async (req, res) => {
+    try {
+      const zone = await DeliveryZone.findById(req.params.id);
+      if (!zone) return res.status(404).json({ success: false, message: 'Zone not found' });
+      const { name, coordinates, slaMinutes, active } = req.body || {};
+      if (name != null) zone.name = String(name).trim() || zone.name;
+      if (slaMinutes != null && Number(slaMinutes) > 0) zone.slaMinutes = Number(slaMinutes);
+      if (active != null) zone.active = active === true || active === 'true';
+      if (coordinates != null) {
+        const ring = normaliseRing(coordinates);
+        if (ring.error) return res.status(400).json({ success: false, message: ring.error });
+        zone.polygon = { type: 'Polygon', coordinates: [ring.ring] };
+      }
+      await zone.save();
+      await logAudit(String(req.user._id), req.user.name, 'Delivery Zone Updated', zone.name);
+      res.json({ success: true, zone });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // DELETE /api/admin/delivery/zones/:id
+  deleteZone: async (req, res) => {
+    try {
+      const zone = await DeliveryZone.findByIdAndDelete(req.params.id);
+      if (!zone) return res.status(404).json({ success: false, message: 'Zone not found' });
+      await DeliveryPartner.updateMany({ zones: String(zone._id) }, { $pull: { zones: String(zone._id) } });
+      await logAudit(String(req.user._id), req.user.name, 'Delivery Zone Deleted', zone.name);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // PUT /api/admin/delivery/partners/:userId  { vehicleType?, maxConcurrent?, zones? }
+  updatePartner: async (req, res) => {
+    try {
+      const user = await User.findOne({ _id: req.params.userId, role: 'Delivery' }).select('name').lean();
+      if (!user) return res.status(404).json({ success: false, message: 'Delivery partner not found' });
+      const partner = await DeliveryPartner.findOne({ userId: req.params.userId })
+        || await DeliveryPartner.create({ userId: req.params.userId });
+
+      const { vehicleType, maxConcurrent, zones } = req.body || {};
+      if (vehicleType && ['bike', 'scooter', 'bicycle', 'car', 'on_foot'].includes(vehicleType)) {
+        partner.vehicleType = vehicleType;
+      }
+      if (maxConcurrent != null) {
+        partner.maxConcurrent = Math.min(Math.max(parseInt(maxConcurrent, 10) || 1, 1), 5);
+      }
+      if (Array.isArray(zones)) {
+        const valid = await DeliveryZone.find({ _id: { $in: zones } }).select('_id').lean();
+        partner.zones = valid.map((z) => String(z._id));
+      }
+      await partner.save();
+      await logAudit(String(req.user._id), req.user.name, 'Delivery Partner Updated', user.name);
+      res.json({ success: true, partner: { userId: req.params.userId, vehicleType: partner.vehicleType, maxConcurrent: partner.maxConcurrent, zones: partner.zones } });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
     }

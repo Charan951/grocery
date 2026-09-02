@@ -15,6 +15,7 @@ import { tryAssign, rejectOffer } from '../src/services/assignmentService.js';
 import { DeviceToken } from '../src/models/DeviceToken.js';
 import { Notification } from '../src/models/Operations.js';
 import { DeliveryEarning } from '../src/models/DeliveryEarning.js';
+import { DeliveryZone } from '../src/models/DeliveryZone.js';
 import { sendToOwner } from '../src/services/pushService.js';
 
 dotenv.config();
@@ -77,6 +78,7 @@ test.after(async () => {
     Order.deleteMany({ orderId: new RegExp(`^${ORDER_PREFIX}`) }),
     Assignment.deleteMany({ orderId: new RegExp(`^${ORDER_PREFIX}`) }),
     DeliveryEarning.deleteMany({ orderId: new RegExp(`^${ORDER_PREFIX}`) }),
+    DeliveryZone.deleteMany({ name: new RegExp(`^QA Zone ${stamp}`) }),
     DeviceToken.deleteMany({ ownerId: { $in: [riderUserId, rider2UserId] } }),
     Notification.deleteMany({ userId: { $in: [riderUserId, rider2UserId] } }),
   ]);
@@ -663,6 +665,60 @@ test('customer rates the delivery partner after Delivered → recomputes partner
 
   await Order.deleteOne({ orderId: delivered.orderId });
   await DeliveryPartner.updateOne({ userId: riderUserId }, { $set: { rating: 5, ratingCount: 0 } });
+});
+
+test('delivery zones: CRUD + validation + partner tagging + assignment scoping', async () => {
+  const aTok = await adminToken();
+
+  // bad ring → 400
+  const bad = await api().post('/api/admin/delivery/zones')
+    .set('Authorization', `Bearer ${aTok}`).send({ name: `QA Zone ${stamp} bad`, coordinates: [[1, 1], [2, 2]] });
+  assert.equal(bad.status, 400);
+
+  // create a zone that contains the remote test point (TP = 1.2345,1.2345)
+  const create = await api().post('/api/admin/delivery/zones').set('Authorization', `Bearer ${aTok}`).send({
+    name: `QA Zone ${stamp} A`,
+    coordinates: [[1.23, 1.23], [1.24, 1.23], [1.24, 1.24], [1.23, 1.24]],
+    slaMinutes: 12,
+  });
+  assert.equal(create.status, 200, JSON.stringify(create.body));
+  const zoneId = create.body.zone._id;
+  assert.equal(create.body.zone.polygon.type, 'Polygon');
+
+  // list
+  const list = await api().get('/api/admin/delivery/zones').set('Authorization', `Bearer ${aTok}`);
+  assert.ok(list.body.zones.some((z) => z._id === zoneId));
+
+  // update SLA
+  const upd = await api().put(`/api/admin/delivery/zones/${zoneId}`).set('Authorization', `Bearer ${aTok}`).send({ slaMinutes: 20 });
+  assert.equal(upd.body.zone.slaMinutes, 20);
+
+  // tag rider2 (only) to the zone
+  const tag = await api().put(`/api/admin/delivery/partners/${rider2UserId}`)
+    .set('Authorization', `Bearer ${aTok}`).send({ zones: [zoneId], maxConcurrent: 2 });
+  assert.equal(tag.status, 200);
+  assert.deepEqual(tag.body.partner.zones, [zoneId]);
+
+  // both riders online near TP; rider is nearer, but rider2 owns the zone → rider2 gets the offer
+  await bringOnline(riderUserId, TP.lat + 0.0005, TP.lng + 0.0005);
+  await bringOnline(rider2UserId, TP.lat + 0.002, TP.lng + 0.002);
+  const order = await makeRemoteOrder();
+  const r = await tryAssign(order.orderId);
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(r.partnerUserId, rider2UserId, 'zone-tagged partner is preferred over the nearer one');
+  await Assignment.updateMany({ orderId: order.orderId }, { $set: { status: 'cancelled' } });
+
+  // delete the zone → pulled from the partner
+  const del = await api().delete(`/api/admin/delivery/zones/${zoneId}`).set('Authorization', `Bearer ${aTok}`);
+  assert.equal(del.status, 200);
+  assert.equal((await DeliveryPartner.findOne({ userId: rider2UserId })).zones.length, 0);
+
+  // a customer token can't touch zones
+  const cTok = await custToken();
+  assert.ok([401, 403].includes(
+    (await api().get('/api/admin/delivery/zones').set('Authorization', `Bearer ${cTok}`)).status));
+
+  await DeliveryPartner.updateOne({ userId: rider2UserId }, { $set: { maxConcurrent: 1 } });
 });
 
 test('an authenticated delivery socket joins its personal partner room', async () => {

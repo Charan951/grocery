@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useCMS, getCategoryImage, getSubCategoryImage } from '../../context/CMSContext';
 import { DeliveryFleetMap } from './DeliveryFleetMap';
+import { ZonesManager } from './ZonesManager';
 
 // ==========================================
 // 1. CATEGORIES MODULE
@@ -2200,6 +2201,8 @@ export const DeliveryModule: React.FC = () => {
   return (
    <div className="flex flex-col gap-5">
     <DeliveryFleetMap />
+
+    <ZonesManager />
 
     {fa && (
       <div className="bg-surface border border-divider p-4 sm:p-6 rounded-[28px] shadow-card flex flex-col gap-4">

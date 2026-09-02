@@ -23,6 +23,10 @@ export const PartnerDetail: React.FC = () => {
   const [deliveries, setDeliveries] = useState<any[]>([]);
   const [earnings, setEarnings] = useState<any | null>(null);
   const [settling, setSettling] = useState(false);
+  const [allZones, setAllZones] = useState<{ _id: string; name: string; active: boolean }[]>([]);
+  const [partnerZones, setPartnerZones] = useState<string[]>([]);
+  const [maxConcurrent, setMaxConcurrent] = useState(1);
+  const [zoneSaving, setZoneSaving] = useState(false);
   const [err, setErr] = useState('');
 
   const loadEarnings = async () => {
@@ -42,12 +46,31 @@ export const PartnerDetail: React.FC = () => {
         if (!p.success) { setErr(p.message || 'Failed to load partner'); return; }
         setData(p);
         setDeliveries(d.success ? d.deliveries : []);
+        setPartnerZones(p.partner?.zones || []);
+        setMaxConcurrent(p.partner?.maxConcurrent || 1);
         loadEarnings();
+        fetch(`${API_URL}/admin/delivery/zones`, { headers: authHeader() }).then(r => r.json())
+          .then(z => { if (z.success) setAllZones(z.zones); }).catch(() => {});
       } catch {
         setErr('Network error');
       }
     })();
   }, [userId]);
+
+  const saveZones = async () => {
+    setZoneSaving(true);
+    try {
+      const r = await fetch(`${API_URL}/admin/delivery/partners/${userId}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json', ...authHeader() },
+        body: JSON.stringify({ zones: partnerZones, maxConcurrent }),
+      }).then(r => r.json());
+      if (!r.success) alert(r.message || 'Could not save');
+    } catch {
+      alert('Could not save');
+    } finally {
+      setZoneSaving(false);
+    }
+  };
 
   const settleAll = async () => {
     if (!window.confirm('Mark all pending earnings as settled (paid out)?')) return;
@@ -107,6 +130,36 @@ export const PartnerDetail: React.FC = () => {
           <Stat label="Rejected" value={performance.rejected} />
           <Stat label="Expired" value={performance.expired} />
         </div>
+      </div>
+
+      <div className="bg-surface border border-divider rounded-[28px] shadow-card p-4 sm:p-6 flex flex-col gap-3">
+        <h3 className="font-extrabold text-sm text-text-primary">Zones & capacity</h3>
+        <label className="flex items-center gap-2 text-xs text-text-secondary font-semibold">
+          Max concurrent deliveries
+          <input type="number" min={1} max={5} value={maxConcurrent}
+            onChange={e => setMaxConcurrent(Math.min(5, Math.max(1, Number(e.target.value) || 1)))}
+            className="w-20 px-2 py-1.5 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary" />
+        </label>
+        {allZones.length === 0 ? (
+          <p className="text-[11px] text-text-secondary">No zones defined yet — add them from the Delivery Partners page.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {allZones.map(z => {
+              const on = partnerZones.includes(z._id);
+              return (
+                <button key={z._id}
+                  onClick={() => setPartnerZones(p => on ? p.filter(x => x !== z._id) : [...p, z._id])}
+                  className={`rounded-full px-3 py-1 text-[10px] font-bold border cursor-pointer ${on ? 'bg-primary/10 border-primary/40 text-primary' : 'border-divider text-text-secondary'}`}>
+                  {z.name}{!z.active && ' (off)'}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <button onClick={saveZones} disabled={zoneSaving}
+          className="self-start bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[10px] disabled:opacity-40 cursor-pointer">
+          {zoneSaving ? 'Saving…' : 'Save zones & capacity'}
+        </button>
       </div>
 
       {earnings && (

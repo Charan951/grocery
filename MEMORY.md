@@ -130,6 +130,26 @@
 
 ## 5. Completed Major Work
 
+- **2026-09-02 — Delivery P2-D5 DONE (delivery zones + zone-aware assignment).**
+  Model `DeliveryZone {name, polygon:GeoJSON Polygon, slaMinutes(15), active}`
+  + `2dsphere` on polygon. Admin CRUD (`authorize('Admin','Manager')`, delete =
+  Admin): `GET/POST/PUT/DELETE /api/admin/delivery/zones` — POST/PUT take a flat
+  ring (`[[lng,lat],…]` or `[{lat,lng},…]`), `normaliseRing()` validates ≥3 pts
+  + coord ranges + auto-closes; delete `$pull`s the id from every partner's
+  `zones`. New `PUT /api/admin/delivery/partners/:userId {vehicleType?,
+  maxConcurrent?(1–5), zones?}` (validates zone ids). `partnerRow` +
+  `partnerPerformance` now return `zones`. **Assignment scoping**
+  (`assignmentService.tryAssign`): if the pickup `$geoIntersects` an active zone
+  and partners are tagged for it → **pass 1** offers only those (across the ×1/2/3
+  radius expansion), **pass 2** falls back to the unrestricted radius search so an
+  order is never stranded by zone config; `findCandidates` gained
+  `restrictUserIds`. Admin web: new `ZonesManager.tsx` (click-to-draw polygon on
+  a Leaflet/OSM map, list + active toggle + delete) mounted in `DeliveryModule`
+  under the fleet map; `PartnerDetail` gained a "Zones & capacity" card
+  (zone chips + max-concurrent, `PUT /partners/:userId`). Tests: backend
+  `npm test` **51** (+1: zone CRUD, bad-ring 400, partner tag, zone-tagged
+  partner beats the nearer one, delete untags, RBAC); frontend `vite build` clean.
+
 - **2026-09-02 — Delivery P2-D7 DONE (return-to-store + re-attempt).**
   `Order` additive: `needsReturn` (bool), `returnedAt`. `deliveryController.failDelivery`
   — when `pickedUpAt` is set the parcel is with the rider, so it sets

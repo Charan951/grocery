@@ -50,6 +50,11 @@ router.post('/delivery/orders/:id/returned', protectDelivery, deliveryController
 router.get('/admin/delivery/partners', protect, authorize('Admin', 'Manager'), adminDeliveryController.listPartners);
 router.get('/admin/delivery/fleet', protect, authorize('Admin', 'Manager'), adminDeliveryController.fleet);
 router.get('/admin/delivery/returns', protect, authorize('Admin', 'Manager'), adminDeliveryController.listReturns);
+router.get('/admin/delivery/zones', protect, authorize('Admin', 'Manager'), adminDeliveryController.listZones);
+router.post('/admin/delivery/zones', protect, authorize('Admin', 'Manager'), adminDeliveryController.createZone);
+router.put('/admin/delivery/zones/:id', protect, authorize('Admin', 'Manager'), adminDeliveryController.updateZone);
+router.delete('/admin/delivery/zones/:id', protect, authorize('Admin'), adminDeliveryController.deleteZone);
+router.put('/admin/delivery/partners/:userId', protect, authorize('Admin', 'Manager'), adminDeliveryController.updatePartner);
 router.get('/admin/delivery/analytics', protect, authorize('Admin', 'Manager'), adminDeliveryController.fleetAnalytics);
 router.get('/admin/delivery/partners/:userId/deliveries', protect, authorize('Admin', 'Manager'), adminDeliveryController.partnerDeliveries);
 router.get('/admin/delivery/partners/:userId/performance', protect, authorize('Admin', 'Manager'), adminDeliveryController.partnerPerformance);
