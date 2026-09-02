@@ -12,8 +12,18 @@ interface SubcategoryCardImageProps {
  * If Cloudinary URLs are supplied, applies automatic transparent padding (b_transparent)
  * and quality formatting (f_auto, q_auto) to ensure transparent cutout rendering.
  */
-export const normalizeCategoryImageUrl = (url: string): string => {
+export const normalizeCategoryImageUrl = (url: string, altText?: string): string => {
   if (!url || url.includes('cdn.zeptonow.com')) {
+    if (altText) {
+      const lower = altText.toLowerCase();
+      if (lower.includes('milk')) return 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=300&auto=format&fit=crop';
+      if (lower.includes('bread') || lower.includes('bun')) return 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300&auto=format&fit=crop';
+      if (lower.includes('egg') || lower.includes('poultry')) return 'https://images.unsplash.com/photo-1516467508483-a7212febe31a?w=300&auto=format&fit=crop';
+      if (lower.includes('tea')) return 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=300&auto=format&fit=crop';
+      if (lower.includes('coffee')) return 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=300&auto=format&fit=crop';
+      if (lower.includes('snack') || lower.includes('popcorn')) return 'https://images.unsplash.com/photo-1578849278619-e73505e9610f?w=300&auto=format&fit=crop';
+      if (lower.includes('fruit')) return 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=300&auto=format&fit=crop';
+    }
     return 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=300&auto=format&fit=crop';
   }
 

@@ -519,20 +519,17 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ onQuickView }) =
       {/* ========================================================================= */}
       <div className="hidden md:block bg-[#F8F9FB] min-h-screen font-sans text-gray-900 pb-20">
         
-        {/* BREADCRUMBS BAR */}
+        {/* TOP NAVIGATION BAR (ONLY BACK BUTTON) */}
         <div className="bg-white border-b border-gray-100">
-          <div className="max-w-[1280px] mx-auto px-4 py-2.5 flex items-center text-[11px] font-semibold text-gray-500 gap-1.5 overflow-x-auto whitespace-nowrap">
-            <Link to="/" className="hover:text-[#0c831f]">Home</Link>
-            <span>/</span>
-            <Link to={`/products?category=${product.categoryId}`} className="hover:text-[#0c831f]">{categoryName}</Link>
-            <span>/</span>
-            {product.subCategory && (
-              <>
-                <Link to={`/products?subCategory=${encodeURIComponent(product.subCategory)}`} className="hover:text-[#0c831f]">{product.subCategory}</Link>
-                <span>/</span>
-              </>
-            )}
-            <span className="text-gray-800 font-bold truncate max-w-[280px]">{product.name}</span>
+          <div className="max-w-[1280px] mx-auto px-4 py-2.5 flex items-center">
+            <button
+              onClick={handleBackNav}
+              className="inline-flex items-center gap-1.5 text-xs font-black text-gray-700 hover:text-emerald-700 bg-gray-100 hover:bg-emerald-50 px-3 py-1.5 rounded-xl transition-all border border-gray-200 cursor-pointer shadow-2xs active:scale-95"
+              title="Go back to previous page"
+            >
+              <ArrowLeft size={14} />
+              <span>Back</span>
+            </button>
           </div>
         </div>
 

@@ -2341,10 +2341,10 @@ export const AdminCMS: React.FC = () => {
                           onChange={(e) => setPromoDisplayOn(e.target.value as any)}
                           className="w-full px-3.5 py-2 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-emerald-500 text-text-primary font-bold"
                         >
-                          <option value="HOME">Home Page Only</option>
-                          <option value="CATEGORY">Category Page</option>
-                          <option value="SUBCATEGORY">Subcategory Page</option>
-                          <option value="ALL">All Pages (Home, Category & Subcategory)</option>
+                          <option value="HOME">📍 Home Page (Top Promotional Cards Grid below Hero Banner)</option>
+                          <option value="CATEGORY">📍 Category Landing Page (Top Header of Category Catalog)</option>
+                          <option value="SUBCATEGORY">📍 Subcategory Page (Top Header of Subcategory Product List)</option>
+                          <option value="ALL">📍 All Pages (Visible on Home, Category & Subcategory Pages)</option>
                         </select>
                       </div>
 
@@ -2761,16 +2761,16 @@ export const AdminCMS: React.FC = () => {
                             onChange={(e) => setBannerPosition(parseInt(e.target.value) >= 0 ? parseInt(e.target.value) : 0)}
                             className="w-full px-3.5 py-2 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-emerald-500 text-text-primary font-bold cursor-pointer"
                           >
-                            <option value={0}>Top Hero Carousel (Main Top Banner under App Bar / Header)</option>
-                            <option value={1}>In Between: After Sub-category Section #1</option>
-                            <option value={2}>In Between: After Sub-category Section #2</option>
-                            <option value={3}>In Between: After Sub-category Section #3</option>
-                            <option value={4}>In Between: After Sub-category Section #4</option>
-                            <option value={5}>In Between: After Sub-category Section #5</option>
-                            <option value={6}>In Between: After Sub-category Section #6</option>
-                            <option value={7}>In Between: After Sub-category Section #7</option>
-                            <option value={8}>In Between: After Sub-category Section #8</option>
-                            <option value={99}>Bottom of Home Page (After all subcategory sections & products)</option>
+                            <option value={0}>📍 Top Hero Carousel (Main Header Banner under Navigation Bar)</option>
+                            <option value={1}>📍 Inter-Section Banner #1 (Placed after 1st Subcategory section)</option>
+                            <option value={2}>📍 Inter-Section Banner #2 (Placed after 2nd Subcategory section)</option>
+                            <option value={3}>📍 Inter-Section Banner #3 (Placed after 3rd Subcategory section)</option>
+                            <option value={4}>📍 Inter-Section Banner #4 (Placed after 4th Subcategory section)</option>
+                            <option value={5}>📍 Inter-Section Banner #5 (Placed after 5th Subcategory section)</option>
+                            <option value={6}>📍 Inter-Section Banner #6 (Placed after 6th Subcategory section)</option>
+                            <option value={7}>📍 Inter-Section Banner #7 (Placed after 7th Subcategory section)</option>
+                            <option value={8}>📍 Inter-Section Banner #8 (Placed after 8th Subcategory section)</option>
+                            <option value={99}>📍 Bottom Banner (Placed at the very bottom of Home page)</option>
                           </select>
                         </div>
                       )}
@@ -2802,10 +2802,10 @@ export const AdminCMS: React.FC = () => {
                               className="w-full px-3.5 py-2 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-emerald-500 text-text-primary font-bold"
                               required
                             >
-                              <option value="top">Top of Category Page</option>
-                              <option value="before_subcategories">Before Subcategories</option>
-                              <option value="after_subcategories">After Subcategories</option>
-                              <option value="before_products">Before Products</option>
+                              <option value="top">📍 Top Banner (Header area above category filter tabs)</option>
+                              <option value="before_subcategories">📍 Above Subcategories Grid</option>
+                              <option value="after_subcategories">📍 Between Subcategories & Product Grid</option>
+                              <option value="before_products">📍 Directly Above Product Cards Shelf</option>
                             </select>
                           </div>
                         </>
@@ -2861,8 +2861,8 @@ export const AdminCMS: React.FC = () => {
                               className="w-full px-3.5 py-2 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-emerald-500 text-text-primary font-bold"
                               required
                             >
-                              <option value="top">Top of Subcategory Page</option>
-                              <option value="before_products">Before Products</option>
+                              <option value="top">📍 Top Header Banner of Subcategory Page</option>
+                              <option value="before_products">📍 Directly Above Subcategory Products</option>
                             </select>
                           </div>
                         </>
@@ -3261,13 +3261,13 @@ export const AdminCMS: React.FC = () => {
                           onChange={(e) => setSgInsertAfterIndex(Number(e.target.value))}
                           className="w-full px-3.5 py-2.5 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary font-semibold cursor-pointer"
                         >
-                          <option value={0}>Top Position (Before 1st Subcategory section)</option>
-                          <option value={1}>In Between: After 1st Subcategory section</option>
-                          <option value={2}>In Between: After 2nd Subcategory section</option>
-                          <option value={3}>In Between: After 3rd Subcategory section</option>
-                          <option value={4}>In Between: After 4th Subcategory section</option>
-                          <option value={5}>In Between: After 5th Subcategory section</option>
-                          <option value={99}>Bottom Position (After all Subcategory sections)</option>
+                          <option value={0}>📍 Top Header Position (Immediately below Hero Banners, before 1st Subcategory row)</option>
+                          <option value={1}>📍 Mid-Page Section 1 (Placed after 1st Homepage Subcategory section)</option>
+                          <option value={2}>📍 Mid-Page Section 2 (Placed after 2nd Homepage Subcategory section)</option>
+                          <option value={3}>📍 Mid-Page Section 3 (Placed after 3rd Homepage Subcategory section)</option>
+                          <option value={4}>📍 Mid-Page Section 4 (Placed after 4th Homepage Subcategory section)</option>
+                          <option value={5}>📍 Mid-Page Section 5 (Placed after 5th Homepage Subcategory section)</option>
+                          <option value={99}>📍 Bottom Footer Position (Placed below all Homepage sections & products)</option>
                         </select>
                       </div>
                     </div>
