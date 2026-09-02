@@ -7,8 +7,12 @@ const NAV_ITEMS = [
   { label: 'Home', path: '/', icon: Home, match: (p: string) => p === '/' },
   { label: 'Order Again', path: '/orders', icon: History, match: (p: string) => p.startsWith('/orders') || p.startsWith('/account/orders') },
   { label: 'Categories', path: '/categories', icon: Grid3x3, match: (p: string) => p.startsWith('/categories') || p.startsWith('/products') },
-  { label: 'Profile', path: '/profile', icon: CircleUserRound, match: (p: string) => p.startsWith('/profile') || p.startsWith('/account/profile') },
+  { label: 'Profile', path: '/profile', icon: CircleUserRound, match: (p: string) => p.startsWith('/profile') || p.startsWith('/account'), account: true },
 ];
+
+const isSignedIn = () => {
+  try { return !!localStorage.getItem('customer_user'); } catch { return false; }
+};
 
 export const BottomNav: React.FC = () => {
   const location = useLocation();
@@ -61,7 +65,15 @@ export const BottomNav: React.FC = () => {
           return (
             <button
               key={item.path}
-              onClick={() => navigate(item.path)}
+              onClick={() => {
+                if ((item as { account?: boolean }).account) {
+                  // Signed in → open the account/profile; guest → open the sign-in modal.
+                  if (isSignedIn()) navigate('/profile');
+                  else window.dispatchEvent(new Event('freshcart:open-auth'));
+                  return;
+                }
+                navigate(item.path);
+              }}
               aria-label={item.label}
               aria-current={isActive ? 'page' : undefined}
               className={`flex items-center justify-center gap-1.5 cursor-pointer transition-all ${

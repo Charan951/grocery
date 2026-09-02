@@ -20,11 +20,15 @@ export const CustomerProfile: React.FC = () => {
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
+  // Keep in sync if the user signs in/out elsewhere (auth modal, another tab).
   useEffect(() => {
-    if (!customerUser) {
-      navigate('/');
-    }
-  }, [customerUser, navigate]);
+    const sync = () => {
+      const cached = localStorage.getItem('customer_user');
+      setCustomerUser(cached ? JSON.parse(cached) : null);
+    };
+    window.addEventListener('storage', sync);
+    return () => window.removeEventListener('storage', sync);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,9 +90,47 @@ export const CustomerProfile: React.FC = () => {
     }
   };
 
+  if (!customerUser) {
+    return (
+      <div className="min-h-screen bg-white text-gray-900 flex flex-col font-sans pb-16">
+        <SEO title="Account | FreshCart" description="Sign in to manage your FreshCart account, orders and addresses." />
+        <header className="bg-white border-b border-gray-100 py-4 px-6 md:px-12 flex items-center gap-3 sticky top-0 z-40">
+          <button onClick={goBack} className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 transition-colors cursor-pointer" aria-label="Back">
+            <ArrowLeft size={18} />
+          </button>
+          <span className="text-xl md:text-2xl font-black text-gray-900 tracking-tight font-display">Account</span>
+        </header>
+        <main className="w-full max-w-[900px] mx-auto px-6 md:px-12 py-10 flex flex-col gap-6">
+          <div className="border border-gray-200 rounded-2xl p-6 flex flex-col gap-3 items-start">
+            <h2 className="text-lg font-black text-gray-900">You're not signed in</h2>
+            <p className="text-sm text-gray-600 font-medium">Sign in to see your orders, saved addresses, wallet and profile.</p>
+            <button
+              onClick={() => window.dispatchEvent(new Event('freshcart:open-auth'))}
+              className="mt-1 bg-[#4CAF50] hover:bg-[#43a047] text-white font-black text-sm px-6 py-3 rounded-full transition-colors cursor-pointer"
+            >
+              Sign in
+            </button>
+          </div>
+          <div className="flex flex-col divide-y divide-gray-100 border border-gray-200 rounded-2xl overflow-hidden">
+            {[
+              { label: 'Your orders', to: '/orders' },
+              { label: 'Delivery locations', to: '/locations' },
+              { label: 'Help & support', to: '/account/support' },
+              { label: 'About FreshCart', to: '/about' },
+            ].map((l) => (
+              <Link key={l.to} to={l.to} className="px-5 py-4 text-sm font-bold text-gray-800 hover:bg-gray-50 transition-colors">
+                {l.label}
+              </Link>
+            ))}
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-white text-gray-900 flex flex-col font-sans pb-16">
-      <SEO 
+      <SEO
         title="Edit Profile | FreshCart"
         description="Manage your account profile details, name, and email preferences."
       />
