@@ -115,19 +115,28 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
   // every raw scroll event.
   useEffect(() => {
     let raf = 0;
+    // Track the last *dispatched* values so setState (and the Header re-render)
+    // fires only on an actual transition, not on every scrolled frame.
+    let scrolledDown = false;
+    let hidden = false;
     const handleScroll = () => {
       if (raf) return;
       raf = window.requestAnimationFrame(() => {
         raf = 0;
         const y = window.scrollY;
-        setIsScrolledDown(y > 40); // React bails when the boolean is unchanged
 
-        if (!isMobile) { setHeaderHidden(false); lastScrollY.current = y; return; }
-        if (y <= 20) { setHeaderHidden(false); lastScrollY.current = y; return; }
+        const nextScrolled = y > 40;
+        if (nextScrolled !== scrolledDown) { scrolledDown = nextScrolled; setIsScrolledDown(nextScrolled); }
 
-        const diff = y - lastScrollY.current;
-        if (diff > 10 && y > 80) setHeaderHidden(true);
-        else if (diff < -10) setHeaderHidden(false);
+        let nextHidden = hidden;
+        if (!isMobile || y <= 20) {
+          nextHidden = false;
+        } else {
+          const diff = y - lastScrollY.current;
+          if (diff > 10 && y > 80) nextHidden = true;
+          else if (diff < -10) nextHidden = false;
+        }
+        if (nextHidden !== hidden) { hidden = nextHidden; setHeaderHidden(nextHidden); }
         lastScrollY.current = y;
       });
     };
