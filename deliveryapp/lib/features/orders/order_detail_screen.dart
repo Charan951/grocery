@@ -195,6 +195,11 @@ class _BodyState extends ConsumerState<_Body> {
         return (label: 'I have arrived', icon: Icons.pin_drop_rounded, run: () => _do(ctl.arrived));
       case 'Arrived':
         return (label: 'Complete delivery', icon: Icons.done_all_rounded, run: _completeFlow);
+      case 'Failed':
+        if (o.needsReturn) {
+          return (label: 'Returned to store', icon: Icons.store_mall_directory_rounded, run: () => _do(ctl.markReturned));
+        }
+        return null;
       default:
         return null;
     }
@@ -253,7 +258,12 @@ class _BodyState extends ConsumerState<_Body> {
                 ],
                 if (o.status == 'Failed' && o.failureReason.isNotEmpty) ...[
                   const SizedBox(height: 12),
-                  _section('Failure reason', [_kv(Icons.error_outline, o.failureReason)]),
+                  _section('Failure reason', [
+                    _kv(Icons.error_outline, o.failureReason),
+                    if (o.needsReturn)
+                      _kv(Icons.store_mall_directory_outlined,
+                          'Bring this order back to the store, then tap "Returned to store".'),
+                  ]),
                 ],
               ],
             ),

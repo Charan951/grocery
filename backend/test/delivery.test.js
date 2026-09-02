@@ -541,6 +541,49 @@ test('wrong OTP three times locks completion', async () => {
   await DeliveryPartner.updateOne({ userId: riderUserId }, { $set: { activeOrderIds: [] } });
 });
 
+test('fail after pickup → needsReturn, then /returned frees the partner; admin can requeue', async () => {
+  const rTok = await riderToken();
+  const aTok = await adminToken();
+  const orderId = await assignAndAccept(rTok, aTok);
+  const D = (s, b) => api().post(`/api/delivery/orders/${orderId}/${s}`).set('Authorization', `Bearer ${rTok}`).send(b || {});
+
+  await D('picked-up');
+  const failed = await D('fail', { reason: 'customer unreachable' });
+  assert.equal(failed.status, 200);
+  assert.equal(failed.body.order.status, 'Failed');
+  assert.equal(failed.body.order.needsReturn, true);
+  // parcel still with the partner
+  assert.ok((await DeliveryPartner.findOne({ userId: riderUserId })).activeOrderIds.includes(orderId));
+
+  // requeue is blocked while the parcel is still out
+  const early = await api().post(`/api/admin/orders/${orderId}/requeue`).set('Authorization', `Bearer ${aTok}`).send({});
+  assert.equal(early.status, 409);
+
+  // return the parcel
+  const ret = await D('returned');
+  assert.equal(ret.status, 200);
+  assert.equal(ret.body.order.status, 'Returned');
+  assert.equal(ret.body.order.needsReturn, false);
+  assert.ok(ret.body.order.returnedAt);
+  assert.ok(!(await DeliveryPartner.findOne({ userId: riderUserId })).activeOrderIds.includes(orderId));
+
+  // idempotent
+  assert.equal((await D('returned')).body.idempotent, true);
+
+  // admin returns list shows it
+  const returns = await api().get('/api/admin/delivery/returns').set('Authorization', `Bearer ${aTok}`);
+  assert.equal(returns.status, 200);
+  assert.ok(returns.body.orders.some((o) => o.orderId === orderId));
+
+  // admin requeues the Returned order → back to Ready
+  const rq = await api().post(`/api/admin/orders/${orderId}/requeue`).set('Authorization', `Bearer ${aTok}`).send({ reason: 'retry' });
+  assert.equal(rq.status, 200);
+  assert.equal(rq.body.order.status, 'Ready');
+  assert.equal(rq.body.order.deliveryPartnerUserId ?? null, null);
+
+  await DeliveryPartner.updateOne({ userId: riderUserId }, { $set: { activeOrderIds: [] } });
+});
+
 test('GET /delivery/orders/:id masks phone before Out For Delivery; 403 for another order', async () => {
   const rTok = await riderToken();
   const aTok = await adminToken();

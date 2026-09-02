@@ -4,7 +4,7 @@ import { Order } from '../models/Order.js';
 import { Assignment } from '../models/Assignment.js';
 import { Settings } from '../models/Operations.js';
 import { DeliveryEarning } from '../models/DeliveryEarning.js';
-import { createOffer, acceptOffer, cancelForOrder } from '../services/assignmentService.js';
+import { createOffer, acceptOffer, cancelForOrder, tryAssign } from '../services/assignmentService.js';
 import { logAudit } from './apiController.js';
 import { sendDeliveryCredentials } from '../services/mailService.js';
 
@@ -312,6 +312,71 @@ export const adminDeliveryController = {
         `${user.name}: ${settled} payout(s)${ids ? ' (selected)' : ' (all pending)'}`);
 
       res.json({ success: true, settled });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // GET /api/admin/delivery/returns  — orders awaiting return + recently returned
+  listReturns: async (req, res) => {
+    try {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 86400000);
+      const orders = await Order.find({
+        $or: [
+          { needsReturn: true },
+          { status: 'Returned', returnedAt: { $gte: sevenDaysAgo } },
+        ],
+      })
+        .select('orderId status failureReason needsReturn returnedAt deliveryPartnerName deliveryPartnerUserId totalAmount paymentMethod paymentStatus updatedAt')
+        .sort({ updatedAt: -1 })
+        .limit(100)
+        .lean();
+      res.json({
+        success: true,
+        awaiting: orders.filter((o) => o.needsReturn).length,
+        orders,
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // POST /api/admin/orders/:id/requeue  { reason? }
+  // Put a Failed (pre-pickup) or Returned order back into the assignment queue.
+  requeueOrder: async (req, res) => {
+    try {
+      const order = await Order.findOne({ orderId: req.params.id });
+      if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+      if (!['Failed', 'Returned'].includes(order.status)) {
+        return res.status(409).json({ success: false, message: `Only a Failed or Returned order can be requeued (this is ${order.status})` });
+      }
+      if (order.needsReturn) {
+        return res.status(409).json({ success: false, message: 'Parcel is still out with the partner — wait for the return first' });
+      }
+
+      const reason = String(req.body.reason || '').trim() || 'Requeued for another attempt';
+      order.status = 'Ready';
+      order.failureReason = undefined;
+      order.assignmentStalled = false;
+      order.deliveryPartnerUserId = undefined;
+      order.deliveryPartnerId = undefined;
+      order.deliveryPartnerName = undefined;
+      order.assignmentId = undefined;
+      order.pickedUpAt = undefined;
+      order.deliveredAt = undefined;
+      order.returnedAt = undefined;
+      order.trackingTimeline.push({ status: 'Ready', note: `${reason} (by ${req.user.name})` });
+      await order.save();
+
+      await logAudit(String(req.user._id), req.user.name, 'Order Requeued', `${order.orderId}: ${reason}`);
+      req.app.get('io')?.to(order.orderId).emit('order_status_update', {
+        orderId: order.orderId, status: 'Ready', note: reason, timeline: order.trackingTimeline, at: new Date().toISOString(),
+      });
+
+      // Kick auto-assignment (non-blocking, same as the Ready trigger).
+      tryAssign(order.orderId).catch(() => {});
+
+      res.json({ success: true, order });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
     }

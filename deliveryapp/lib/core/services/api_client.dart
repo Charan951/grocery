@@ -180,6 +180,7 @@ class ApiClient {
   }
 
   Future<DeliveryOrder> fail(String o, String reason) => _step(o, 'fail', {'reason': reason});
+  Future<DeliveryOrder> markReturned(String o) => _step(o, 'returned');
 
   Future<({int unread, List<AppNotification> items})> notifications({bool unreadOnly = false}) async {
     try {

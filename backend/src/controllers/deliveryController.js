@@ -414,10 +414,19 @@ export const deliveryController = {
         return res.status(409).json({ success: false, message: `Order is already ${order.status}` });
       }
 
+      // Parcel already picked up → the partner must carry it back to the store
+      // before they're freed. Otherwise the failure is clean and they're released.
+      const carryingParcel = !!order.pickedUpAt;
       order.status = 'Failed';
       order.failureReason = reason;
+      order.needsReturn = carryingParcel;
       order.deliveryOtp = undefined;
-      order.trackingTimeline.push({ status: 'Failed', note: `Delivery failed: ${reason}` });
+      order.trackingTimeline.push({
+        status: 'Failed',
+        note: carryingParcel
+          ? `Delivery failed: ${reason}. Partner returning the order to the store.`
+          : `Delivery failed: ${reason}`,
+      });
       await order.save();
 
       await Assignment.updateOne(
@@ -425,15 +434,49 @@ export const deliveryController = {
         { $set: { status: 'failed', reason, respondedAt: new Date() } }
       );
       await DeliveryPartner.updateOne({ userId: req.user._id }, { $inc: { failedCount: 1 } });
-      await freePartnerFromOrder(req.user._id, order.orderId);
+      // Keep the order on the partner's plate until it's physically returned.
+      if (!carryingParcel) await freePartnerFromOrder(req.user._id, order.orderId);
 
-      emitOrder(req, order, `Delivery failed: ${reason}`);
+      emitOrder(req, order, carryingParcel ? `Delivery failed — returning to store` : `Delivery failed: ${reason}`);
       req.app.get('io')?.to('admin_fleet').emit('assignment_failed', { orderId: order.orderId, reason });
       try {
         const admins = await User.find({ role: { $in: ['Admin', 'Manager'] } }).select('_id');
         await Notification.insertMany(admins.map((a) => ({
           userId: String(a._id), title: 'Delivery failed',
           body: `Order ${order.orderId}: ${reason}. Needs a reattempt or refund.`, type: 'Order',
+        })));
+      } catch (_) {}
+
+      res.json({ success: true, order });
+    } catch (e) {
+      res.status(500).json({ success: false, message: e.message });
+    }
+  },
+
+  // POST /api/delivery/orders/:id/returned  — parcel handed back at the store
+  markReturned: async (req, res) => {
+    try {
+      const { order, err } = await loadMyOrder(req);
+      if (err) return res.status(err[0]).json({ success: false, message: err[1] });
+      if (order.status === 'Returned') return res.json({ success: true, order, idempotent: true });
+      if (!(order.status === 'Failed' && order.needsReturn)) {
+        return res.status(409).json({ success: false, message: 'This order is not awaiting a return' });
+      }
+
+      order.status = 'Returned';
+      order.needsReturn = false;
+      order.returnedAt = new Date();
+      order.trackingTimeline.push({ status: 'Returned', note: 'Order returned to the store' });
+      await order.save();
+
+      await freePartnerFromOrder(req.user._id, order.orderId);
+      emitOrder(req, order, 'Order returned to the store');
+      req.app.get('io')?.to('admin_fleet').emit('order_returned', { orderId: order.orderId, partnerUserId: String(req.user._id) });
+      try {
+        const admins = await User.find({ role: { $in: ['Admin', 'Manager'] } }).select('_id');
+        await Notification.insertMany(admins.map((a) => ({
+          userId: String(a._id), title: 'Order returned to store',
+          body: `Order ${order.orderId} is back at the store. Restock / refund as needed.`, type: 'Order',
         })));
       } catch (_) {}
 

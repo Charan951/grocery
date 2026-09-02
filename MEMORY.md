@@ -130,6 +130,29 @@
 
 ## 5. Completed Major Work
 
+- **2026-09-02 — Delivery P2-D7 DONE (return-to-store + re-attempt).**
+  `Order` additive: `needsReturn` (bool), `returnedAt`. `deliveryController.failDelivery`
+  — when `pickedUpAt` is set the parcel is with the rider, so it sets
+  `needsReturn:true`, keeps the order in `activeOrderIds` (partner **not** freed,
+  can't go offline), and the timeline/emit say "returning to store"; a pre-pickup
+  fail is unchanged (clean release). New `POST /api/delivery/orders/:id/returned`
+  (`protectDelivery`, idempotent) → `status:'Returned'` + `returnedAt`, clears
+  `needsReturn`, frees the partner, `order_returned`→`admin_fleet`, admin
+  Notification. Admin: `GET /api/admin/delivery/returns` (awaiting + last-7d
+  returned), `POST /api/admin/orders/:id/requeue` (`Admin`/`Manager`; only a
+  `Failed`(pre-pickup) or `Returned` order, **409 while `needsReturn`**) → resets
+  to `Ready`, clears partner/failure fields, `logAudit`, fires `tryAssign`.
+  Delivery app: `DeliveryOrder.needsReturn`, `ApiClient.markReturned` /
+  `OrderController.markReturned`; order-detail primary action becomes "Returned
+  to store" for a `Failed`+`needsReturn` order + a "bring it back" note. Admin web
+  `DeliveryModule`: "Returns & re-attempts" card (awaiting-return badge + table +
+  per-row Requeue, disabled while `needsReturn`). Customer surfaces need no code
+  change — `Returned` is already a terminal status and the new timeline notes flow
+  through the existing tracking views. Tests: backend `npm test` **49** (+1: fail
+  after pickup → needsReturn, requeue-blocked, /returned frees + idempotent,
+  admin returns list, requeue → Ready); deliveryapp analyze clean + 6 + APK;
+  frontend `vite build` clean.
+
 - **2026-09-01 — Delivery P2-D1 DONE (delivery-partner earnings).**
   Model: `DeliveryEarning {partnerUserId, orderId(unique), baseFee, distanceKm,
   distanceFee, tips, total, status:'pending'|'settled', earnedAt, settledAt}`

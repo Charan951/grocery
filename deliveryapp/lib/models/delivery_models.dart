@@ -121,6 +121,7 @@ class DeliveryOrder {
   final Map<String, dynamic>? pickup;
   final Map<String, dynamic>? deliveryLocation;
   final List<Map<String, dynamic>> timeline;
+  final bool needsReturn;
 
   DeliveryOrder({
     required this.orderId,
@@ -136,6 +137,7 @@ class DeliveryOrder {
     required this.pickup,
     required this.deliveryLocation,
     required this.timeline,
+    this.needsReturn = false,
   });
 
   bool get isCOD => RegExp(r'cash|cod', caseSensitive: false).hasMatch(paymentMethod);
@@ -160,5 +162,6 @@ class DeliveryOrder {
             .whereType<Map>()
             .map((e) => Map<String, dynamic>.from(e))
             .toList(),
+        needsReturn: j['needsReturn'] == true,
       );
 }

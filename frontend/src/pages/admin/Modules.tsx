@@ -2035,6 +2035,8 @@ export const DeliveryModule: React.FC = () => {
   const navigate = useNavigate();
   const [partners, setPartners] = useState<FleetPartner[]>([]);
   const [analytics, setAnalytics] = useState<FleetAnalytics | null>(null);
+  const [returns, setReturns] = useState<{ awaiting: number; orders: any[] } | null>(null);
+  const [reqBusy, setReqBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState('');
@@ -2071,10 +2073,38 @@ export const DeliveryModule: React.FC = () => {
     }
   };
 
+  const fetchReturns = async () => {
+    try {
+      const res = await fetch(`${API_URL}/admin/delivery/returns`, { headers: getAuthHeader() });
+      const data = await res.json();
+      if (data.success) setReturns({ awaiting: data.awaiting, orders: data.orders });
+    } catch {
+      /* keep last snapshot */
+    }
+  };
+
+  const requeue = async (orderId: string) => {
+    if (!window.confirm(`Send order ${orderId} back into the assignment queue?`)) return;
+    setReqBusy(orderId);
+    try {
+      const res = await fetch(`${API_URL}/admin/orders/${orderId}/requeue`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeader() }, body: '{}',
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) alert(data.message || 'Requeue failed');
+      fetchReturns();
+    } catch {
+      alert('Requeue failed');
+    } finally {
+      setReqBusy(null);
+    }
+  };
+
   useEffect(() => {
     fetchPartners();
     fetchAnalytics();
-    const t = setInterval(() => { fetchPartners(); fetchAnalytics(); }, 15000); // near-live status refresh
+    fetchReturns();
+    const t = setInterval(() => { fetchPartners(); fetchAnalytics(); fetchReturns(); }, 15000); // near-live status refresh
     return () => clearInterval(t);
   }, []);
 
@@ -2221,6 +2251,55 @@ export const DeliveryModule: React.FC = () => {
             </table>
           </div>
         )}
+      </div>
+    )}
+
+    {returns && returns.orders.length > 0 && (
+      <div className="bg-surface border border-divider rounded-[28px] shadow-card p-4 sm:p-6 flex flex-col gap-3">
+        <h3 className="font-extrabold text-sm text-text-primary">
+          Returns & re-attempts
+          {returns.awaiting > 0 && (
+            <span className="ml-2 rounded-full bg-warning/15 text-warning text-[9px] font-black uppercase px-2 py-0.5 align-middle">
+              {returns.awaiting} awaiting return
+            </span>
+          )}
+        </h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-[11px]">
+            <thead>
+              <tr className="text-text-tertiary">
+                {['Order', 'State', 'Partner', 'Reason', 'Amount', ''].map(h => (
+                  <th key={h} className="p-2 font-bold uppercase tracking-wide">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {returns.orders.map((o: any) => (
+                <tr key={o.orderId} className="border-t border-divider/60">
+                  <td className="p-2 font-bold text-text-primary">{o.orderId}</td>
+                  <td className="p-2">
+                    <span className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase ${o.needsReturn ? 'bg-warning/15 text-warning' : 'bg-success/10 text-success'}`}>
+                      {o.needsReturn ? 'Awaiting return' : o.status}
+                    </span>
+                  </td>
+                  <td className="p-2 text-text-secondary">{o.deliveryPartnerName || '—'}</td>
+                  <td className="p-2 text-text-secondary max-w-[200px] truncate">{o.failureReason || '—'}</td>
+                  <td className="p-2 tabular-nums text-text-secondary">₹{o.totalAmount}</td>
+                  <td className="p-2">
+                    <button
+                      onClick={() => requeue(o.orderId)}
+                      disabled={o.needsReturn || reqBusy === o.orderId}
+                      className="rounded-full bg-primary text-white font-bold text-[10px] px-3 py-1 hover:bg-secondary disabled:opacity-40 cursor-pointer"
+                      title={o.needsReturn ? 'Wait for the parcel to be returned first' : 'Send back into the assignment queue'}
+                    >
+                      {reqBusy === o.orderId ? 'Requeuing…' : 'Requeue'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     )}
 

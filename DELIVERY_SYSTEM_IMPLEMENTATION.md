@@ -1046,7 +1046,13 @@ the fleet live; customers track the rider on a map on both web and mobile.
   (`ratingCount>=3 && rating<4`); mobile customer order-detail `_RatePartnerCard`
   (`ApiService.ratePartner`, `OrderModel.deliveryRatingStars`); deliveryapp
   dashboard shows rating count. Tests: backend 46, mobile 119, deliveryapp 6.
-- **P2-D7 Return-to-store / re-attempt flow** for failed/cancelled-after-pickup.
+- **P2-D7 Return-to-store / re-attempt flow** — ✅ DONE 2026-09-02.
+  `Order.needsReturn`/`returnedAt`. `failDelivery` after pickup → `needsReturn`,
+  partner kept on the order; `POST /api/delivery/orders/:id/returned` →
+  `Returned` + frees partner. Admin `GET /api/admin/delivery/returns` +
+  `POST /api/admin/orders/:id/requeue` (Failed pre-pickup / Returned → `Ready` +
+  `tryAssign`; 409 while `needsReturn`). Delivery app "Returned to store" action;
+  admin `DeliveryModule` "Returns & re-attempts" card. Tests: backend 49.
 
 ---
 

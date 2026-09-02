@@ -42,12 +42,14 @@ router.post('/delivery/orders/:id/picked-up', protectDelivery, deliveryControlle
 router.post('/delivery/orders/:id/arrived', protectDelivery, deliveryController.arrived);
 router.post('/delivery/orders/:id/complete', protectDelivery, deliveryController.completeDelivery);
 router.post('/delivery/orders/:id/fail', protectDelivery, deliveryController.failDelivery);
+router.post('/delivery/orders/:id/returned', protectDelivery, deliveryController.markReturned);
 
 // ==========================================
 // 19. ADMIN DELIVERY / DISPATCH  (/api/admin/delivery/*, /api/admin/orders/:id/*)
 // ==========================================
 router.get('/admin/delivery/partners', protect, authorize('Admin', 'Manager'), adminDeliveryController.listPartners);
 router.get('/admin/delivery/fleet', protect, authorize('Admin', 'Manager'), adminDeliveryController.fleet);
+router.get('/admin/delivery/returns', protect, authorize('Admin', 'Manager'), adminDeliveryController.listReturns);
 router.get('/admin/delivery/analytics', protect, authorize('Admin', 'Manager'), adminDeliveryController.fleetAnalytics);
 router.get('/admin/delivery/partners/:userId/deliveries', protect, authorize('Admin', 'Manager'), adminDeliveryController.partnerDeliveries);
 router.get('/admin/delivery/partners/:userId/performance', protect, authorize('Admin', 'Manager'), adminDeliveryController.partnerPerformance);
@@ -58,5 +60,6 @@ router.post('/admin/delivery/partners/:userId/account', protect, authorize('Admi
 router.post('/admin/orders/:id/assign', protect, authorize('Admin', 'Manager'), adminDeliveryController.assignOrder);
 router.post('/admin/orders/:id/reassign', protect, authorize('Admin', 'Manager'), adminDeliveryController.reassignOrder);
 router.post('/admin/orders/:id/unassign', protect, authorize('Admin', 'Manager'), adminDeliveryController.unassignOrder);
+router.post('/admin/orders/:id/requeue', protect, authorize('Admin', 'Manager'), adminDeliveryController.requeueOrder);
 
 export default router;

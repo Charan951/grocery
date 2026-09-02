@@ -36,6 +36,7 @@ class OrderNotifier extends StateNotifier<AsyncValue<DeliveryOrder>> {
   Future<void> complete({String? otp, String? photoBase64}) =>
       _run(() => _ref.read(apiProvider).complete(orderId, otp: otp, podPhotoBase64: photoBase64));
   Future<void> fail(String reason) => _run(() => _ref.read(apiProvider).fail(orderId, reason));
+  Future<void> markReturned() => _run(() => _ref.read(apiProvider).markReturned(orderId));
 }
 
 final orderProvider = StateNotifierProvider.family<OrderNotifier, AsyncValue<DeliveryOrder>, String>(

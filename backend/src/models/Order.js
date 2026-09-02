@@ -53,6 +53,10 @@ const orderSchema = new mongoose.Schema({
   failureReason: { type: String },
   pickedUpAt: { type: Date },
   deliveredAt: { type: Date },
+  // Return-to-store (P2-D7): set true when a delivery fails *after* pickup so the
+  // parcel is physically with the partner and must be brought back.
+  needsReturn: { type: Boolean, default: false },
+  returnedAt: { type: Date },
   // Customer's rating of the delivery partner for this order (P2-D6). One per
   // order, editable by re-submitting; feeds DeliveryPartner.rating/ratingCount.
   deliveryRating: {
