@@ -60,11 +60,24 @@ export const adminDeliveryController = {
   // GET /api/admin/delivery/partners
   listPartners: async (req, res) => {
     try {
-      const partners = await DeliveryPartner.find().lean();
-      const users = await User.find({ _id: { $in: partners.map((p) => p.userId) } })
-        .select('name email phone status').lean();
-      const byId = Object.fromEntries(users.map((u) => [String(u._id), u]));
-      res.json({ success: true, partners: partners.map((p) => partnerRow(p, byId[String(p.userId)])) });
+      const deliveryUsers = await User.find({ role: 'Delivery' }).select('name email phone status').lean();
+      const existingPartners = await DeliveryPartner.find().lean();
+      const partnerByUserId = Object.fromEntries(existingPartners.map((p) => [String(p.userId), p]));
+
+      // Auto-create partner doc for any user with role 'Delivery' who lacks one
+      for (const u of deliveryUsers) {
+        const uId = String(u._id);
+        if (!partnerByUserId[uId]) {
+          try {
+            const created = await DeliveryPartner.create({ userId: u._id, phone: u.phone || '' });
+            partnerByUserId[uId] = created.toObject();
+          } catch (_) {}
+        }
+      }
+
+      const allPartners = Object.values(partnerByUserId);
+      const userMap = Object.fromEntries(deliveryUsers.map((u) => [String(u._id), u]));
+      res.json({ success: true, partners: allPartners.map((p) => partnerRow(p, userMap[String(p.userId)])) });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
     }

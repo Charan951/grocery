@@ -512,25 +512,28 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
                       ),
                       const SizedBox(height: 12),
 
-                      Row(
-                        children: [
-                          const Text('SAVE AS:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.grey)),
-                          const SizedBox(width: 8),
-                          ...['Home', 'Work', 'Other'].map((lbl) {
-                            final isSelected = _selectedLabel == lbl;
-                            final iconStr = lbl == 'Home' ? '🏠' : (lbl == 'Work' ? '💼' : '📍');
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 6.0),
-                              child: ChoiceChip(
-                                label: Text('$iconStr $lbl', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isSelected ? Colors.white : Colors.black87)),
-                                selected: isSelected,
-                                selectedColor: AppColors.primaryText,
-                                backgroundColor: Colors.white,
-                                onSelected: (_) => setState(() => _selectedLabel = lbl),
-                              ),
-                            );
-                          }),
-                        ],
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            const Text('SAVE AS:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.grey)),
+                            const SizedBox(width: 8),
+                            ...['Home', 'Work', 'Other'].map((lbl) {
+                              final isSelected = _selectedLabel == lbl;
+                              final iconStr = lbl == 'Home' ? '🏠' : (lbl == 'Work' ? '💼' : '📍');
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 6.0),
+                                child: ChoiceChip(
+                                  label: Text('$iconStr $lbl', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isSelected ? Colors.white : Colors.black87)),
+                                  selected: isSelected,
+                                  selectedColor: AppColors.primaryText,
+                                  backgroundColor: Colors.white,
+                                  onSelected: (_) => setState(() => _selectedLabel = lbl),
+                                ),
+                              );
+                            }),
+                          ],
+                        ),
                       ),
                     ],
                   ),

@@ -74,11 +74,11 @@ export const Footer: React.FC = () => {
           <div>
             <h4 className="text-sm font-bold text-text-primary mb-5 font-display">Products</h4>
             <div className="flex flex-col gap-3">
-              <Link to="/products?category=cat_organic" className="text-sm text-text-secondary transition-all duration-200 hover:text-primary hover:pl-0.5">Organic Items</Link>
-              <Link to="/products?category=cat_veg" className="text-sm text-text-secondary transition-all duration-200 hover:text-primary hover:pl-0.5">Vegetables</Link>
-              <Link to="/products?category=cat_fruits" className="text-sm text-text-secondary transition-all duration-200 hover:text-primary hover:pl-0.5">Fresh Fruits</Link>
-              <Link to="/products?category=cat_dairy" className="text-sm text-text-secondary transition-all duration-200 hover:text-primary hover:pl-0.5">Dairy & Milk</Link>
-              <Link to="/products?category=cat_bakery" className="text-sm text-text-secondary transition-all duration-200 hover:text-primary hover:pl-0.5">Bakery</Link>
+              <Link to="/products?category=fruits-vegetables&organic=true" className="text-sm text-text-secondary transition-all duration-200 hover:text-primary hover:pl-0.5">Organic Items</Link>
+              <Link to="/products?category=fruits-vegetables&subCategory=Fresh%20Vegetables" className="text-sm text-text-secondary transition-all duration-200 hover:text-primary hover:pl-0.5">Vegetables</Link>
+              <Link to="/products?category=fruits-vegetables&subCategory=Fresh%20Fruits" className="text-sm text-text-secondary transition-all duration-200 hover:text-primary hover:pl-0.5">Fresh Fruits</Link>
+              <Link to="/products?category=dairy-bread-eggs" className="text-sm text-text-secondary transition-all duration-200 hover:text-primary hover:pl-0.5">Dairy & Milk</Link>
+              <Link to="/products?category=meats-fish-eggs" className="text-sm text-text-secondary transition-all duration-200 hover:text-primary hover:pl-0.5">Meats & Seafood</Link>
             </div>
           </div>
 

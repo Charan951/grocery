@@ -74,6 +74,19 @@ export const seedDatabase = async () => {
     }
 
     // 4. Seed Categories & Subcategories
+    const defaultCategoryImages = {
+      'fruits-vegetables': 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=600&auto=format&fit=crop',
+      'dairy-bread-eggs': 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=600&auto=format&fit=crop',
+      'atta-rice-oil-dals': 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=600&auto=format&fit=crop',
+      'meats-fish-eggs': 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=600&auto=format&fit=crop',
+      'masala-dry-fruits-more': 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=600&auto=format&fit=crop',
+      'breakfast-cereals-spreads-sauces': 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=600&auto=format&fit=crop',
+      'packaged-food': 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=600&auto=format&fit=crop',
+      'tea-coffee-health-drinks': 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=600&auto=format&fit=crop',
+      'ice-creams-kulfi-frozen-desserts': 'https://images.unsplash.com/photo-1570197788417-0e82375c9371?w=600&auto=format&fit=crop',
+      'chocolates-indian-sweets': 'https://images.unsplash.com/photo-1549007994-cb92caebd54b?w=600&auto=format&fit=crop'
+    };
+
     const categoryCount = await Category.countDocuments();
     if (categoryCount < 7 && ALLOW_DESTRUCTIVE_RESEED) {
       await Category.deleteMany({}); // refresh categories (non-production only)
@@ -83,6 +96,8 @@ export const seedDatabase = async () => {
           slug: 'fruits-vegetables',
           name: 'Fruits & Vegetables',
           icon: 'Apple',
+          image: defaultCategoryImages['fruits-vegetables'],
+          imageUrl: defaultCategoryImages['fruits-vegetables'],
           color: '#22c55e',
           subCategories: [
             "Fresh Vegetables", "New Launches in Fruits & Vegetables", "Fresh Fruits",
@@ -96,6 +111,8 @@ export const seedDatabase = async () => {
           slug: 'dairy-bread-eggs',
           name: 'Dairy, Bread & Eggs',
           icon: 'Milk',
+          image: defaultCategoryImages['dairy-bread-eggs'],
+          imageUrl: defaultCategoryImages['dairy-bread-eggs'],
           color: '#3b82f6',
           subCategories: [
             "Milk", "Breads & Buns", "Fresh Bakery", "Eggs", "Curd & Probiotic Drinks",
@@ -109,6 +126,8 @@ export const seedDatabase = async () => {
           slug: 'atta-rice-oil-dals',
           name: 'Atta, Rice, Oil & Dals',
           icon: 'Wheat',
+          image: defaultCategoryImages['atta-rice-oil-dals'],
+          imageUrl: defaultCategoryImages['atta-rice-oil-dals'],
           color: '#eab308',
           subCategories: [
             "Healthy Picks in Grocery", "Olive & Cold Press Oil", "Oil", "Atta",
@@ -121,6 +140,8 @@ export const seedDatabase = async () => {
           slug: 'breakfast-cereals-spreads-sauces',
           name: 'Breakfast Cereals, Spreads & Sauces',
           icon: 'Coffee',
+          image: defaultCategoryImages['breakfast-cereals-spreads-sauces'],
+          imageUrl: defaultCategoryImages['breakfast-cereals-spreads-sauces'],
           color: '#f97316',
           subCategories: [
             "Top Picks in Breakfast Cereals, Spreads & Sauces", "Breakfast Cereals",
@@ -133,6 +154,8 @@ export const seedDatabase = async () => {
           slug: 'tea-coffee-health-drinks',
           name: 'Tea, Coffee & Health Drinks',
           icon: 'CupSoup',
+          image: defaultCategoryImages['tea-coffee-health-drinks'],
+          imageUrl: defaultCategoryImages['tea-coffee-health-drinks'],
           color: '#a855f7',
           subCategories: [
             "Top Picks in Tea, Coffee & Health Drinks", "Tea", "Coffee",
@@ -145,6 +168,8 @@ export const seedDatabase = async () => {
           slug: 'ice-creams-kulfi-frozen-desserts',
           name: 'Ice Creams, Kulfi & Frozen Desserts',
           icon: 'IceCream',
+          image: defaultCategoryImages['ice-creams-kulfi-frozen-desserts'],
+          imageUrl: defaultCategoryImages['ice-creams-kulfi-frozen-desserts'],
           color: '#ec4899',
           subCategories: [
             "Tubs", "Sticks", "Cones", "Mango Mania", "Guilt Free", "Cups",
@@ -156,6 +181,8 @@ export const seedDatabase = async () => {
           slug: 'chocolates-indian-sweets',
           name: 'Chocolates & Indian Sweets',
           icon: 'Candy',
+          image: defaultCategoryImages['chocolates-indian-sweets'],
+          imageUrl: defaultCategoryImages['chocolates-indian-sweets'],
           color: '#84cc16',
           subCategories: [
             "Top Picks in Chocolates & Indian Sweets", "Chocolates", "Premium Chocolates",
@@ -167,6 +194,17 @@ export const seedDatabase = async () => {
 
       await Category.insertMany(initialCategories);
       console.log('✅ Seeded 7 Zepto Categories with subcategories!');
+    }
+
+    // Auto-heal existing MongoDB categories that lack valid HTTP image URLs
+    const existingCats = await Category.find();
+    for (const cat of existingCats) {
+      if (!cat.imageUrl || !cat.imageUrl.startsWith('http')) {
+        const fallbackImg = defaultCategoryImages[cat.id] || defaultCategoryImages[cat.slug] || 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=600&auto=format&fit=crop';
+        cat.imageUrl = fallbackImg;
+        cat.image = fallbackImg;
+        await cat.save();
+      }
     }
 
     // 5. Seed Products with Rich Schema (5 products per subcategory)

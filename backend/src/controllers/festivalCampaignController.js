@@ -144,20 +144,25 @@ export const festivalCampaignController = {
       }
 
       if (!activeCampaign) {
-        try {
-          activeCampaign = await FestivalCampaign.create(defaultCampaign);
-        } catch (e) {
-          activeCampaign = defaultCampaign;
+        const count = await FestivalCampaign.countDocuments();
+        if (count === 0) {
+          try {
+            activeCampaign = await FestivalCampaign.create(defaultCampaign);
+          } catch (e) {
+            activeCampaign = null;
+          }
         }
       }
 
+      const finalCampaign = (activeCampaign && activeCampaign.isActive) ? activeCampaign : null;
+
       res.json({
         success: true,
-        campaign: activeCampaign
+        campaign: finalCampaign
       });
     } catch (err) {
       console.error('Error fetching active festival campaign:', err);
-      res.json({ success: true, campaign: defaultCampaign });
+      res.json({ success: true, campaign: null });
     }
   },
 

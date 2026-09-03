@@ -614,21 +614,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                     />
                   ))}
 
-                {/* 2. Zepto Ticker Bar ("19K+ Tiramisu ordered last week") */}
-                <div className="w-full bg-[#FFFBEB] dark:bg-amber-950/40 border-y border-amber-200/80 dark:border-amber-900/60 py-2.5 px-4 my-2 flex items-center justify-between rounded-xl overflow-hidden shadow-2xs">
-                  <div className="flex items-center gap-3 overflow-x-auto scrollbar-none whitespace-nowrap text-xs font-bold text-amber-900 dark:text-amber-200">
-                    <span className="bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
-                      TRENDING
-                    </span>
-                    <span>🔥 19K+ Tiramisu ordered last week</span>
-                    <span className="opacity-40">•</span>
-                    <span>⚡ 10 Min Express Delivery</span>
-                    <span className="opacity-40">•</span>
-                    <span>🎉 Special Cafe Coupon Applied</span>
-                  </div>
-                </div>
-
-                {/* 3. Additional Shelves below News Line Ticker */}
+                {/* 3. Additional Shelves */}
                 {superCategoryShelves
                   .filter((shelf) => {
                     if (!selectedCategoryFilter) return true;
@@ -664,18 +650,6 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                   seeAllLink="/products"
                   categoryColor="#10b981"
                 />
-
-                {/* Zepto Ticker Bar */}
-                <div className="w-full bg-[#FFFBEB] dark:bg-amber-950/40 border-y border-amber-200/80 dark:border-amber-900/60 py-2.5 px-4 my-2 flex items-center justify-between rounded-xl overflow-hidden shadow-2xs">
-                  <div className="flex items-center gap-3 overflow-x-auto scrollbar-none whitespace-nowrap text-xs font-bold text-amber-900 dark:text-amber-200">
-                    <span className="bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
-                      TRENDING
-                    </span>
-                    <span>🔥 19K+ Tiramisu ordered last week</span>
-                    <span className="opacity-40">•</span>
-                    <span>⚡ 10 Min Express Delivery</span>
-                  </div>
-                </div>
               </>
             ) : (
               <div className="py-12 text-center text-text-secondary border border-dashed border-divider rounded-2xl">

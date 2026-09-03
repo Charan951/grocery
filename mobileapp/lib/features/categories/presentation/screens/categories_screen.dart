@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -132,6 +133,7 @@ class _CategorySection extends StatelessWidget {
   Widget build(BuildContext context) {
     final subs = category.subCategories;
     final textColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimary;
+    final hasCategoryHeaderImage = category.imageUrl.trim().startsWith(RegExp(r'https?://'));
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 24),
@@ -140,8 +142,24 @@ class _CategorySection extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(CategoriesScreen.iconFor(category.icon, category.name),
-                  size: 20, color: category.color),
+              if (hasCategoryHeaderImage)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: CachedNetworkImage(
+                    imageUrl: category.imageUrl,
+                    width: 20,
+                    height: 20,
+                    fit: BoxFit.contain,
+                    errorWidget: (context, url, error) => Icon(
+                      CategoriesScreen.iconFor(category.icon, category.name),
+                      size: 20,
+                      color: category.color,
+                    ),
+                  ),
+                )
+              else
+                Icon(CategoriesScreen.iconFor(category.icon, category.name),
+                    size: 20, color: category.color),
               const SizedBox(width: 8),
               Expanded(child: Text(category.name, style: AppTypography.title(textColor))),
               GestureDetector(
@@ -161,6 +179,7 @@ class _CategorySection extends StatelessWidget {
               label: category.name,
               color: category.color,
               icon: CategoriesScreen.iconFor(category.icon, category.name),
+              imageUrl: category.imageUrl,
               isDark: isDark,
               onTap: () => context.push('/category/${category.id}'),
             )
@@ -174,12 +193,13 @@ class _CategorySection extends StatelessWidget {
                 crossAxisCount: 4,
                 mainAxisSpacing: 12,
                 crossAxisSpacing: 12,
-                childAspectRatio: 0.74,
+                childAspectRatio: 0.65,
               ),
               itemBuilder: (context, i) => _SubTile(
                 label: subs[i],
                 color: category.color,
                 icon: CategoriesScreen.iconFor('', subs[i]),
+                imageUrl: category.imageUrl,
                 isDark: isDark,
                 onTap: () => context.push(
                   '/category/${category.id}?sub=${Uri.encodeComponent(subs[i])}',
@@ -196,21 +216,30 @@ class _SubTile extends StatelessWidget {
   final String label;
   final Color color;
   final IconData icon;
+  final String? imageUrl;
   final bool isDark;
   final VoidCallback onTap;
+
   const _SubTile({
     required this.label,
     required this.color,
     required this.icon,
+    this.imageUrl,
     required this.isDark,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final hasValidUrl = imageUrl != null &&
+        imageUrl!.trim().startsWith(RegExp(r'https?://', caseSensitive: false));
+
+    final fallbackIcon = Icon(icon, color: isDark ? AppColors.accent : color, size: 24);
+
     return GestureDetector(
       onTap: onTap,
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           AspectRatio(
             aspectRatio: 1,
@@ -219,18 +248,29 @@ class _SubTile extends StatelessWidget {
                 color: color.withOpacity(isDark ? 0.14 : 0.09),
                 borderRadius: AppRadius.brMd,
               ),
-              child: Icon(icon, color: isDark ? AppColors.accent : color, size: 26),
+              child: Padding(
+                padding: const EdgeInsets.all(6.0),
+                child: hasValidUrl
+                    ? CachedNetworkImage(
+                        imageUrl: imageUrl!,
+                        fit: BoxFit.contain,
+                        errorWidget: (context, url, error) => fallbackIcon,
+                      )
+                    : fallbackIcon,
+              ),
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            label,
-            maxLines: 2,
-            textAlign: TextAlign.center,
-            overflow: TextOverflow.ellipsis,
-            style: AppTypography.labelSmall(
-              isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-            ).copyWith(fontWeight: FontWeight.w500, height: 1.2),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.labelSmall(
+                isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+              ).copyWith(fontWeight: FontWeight.w500, height: 1.1, fontSize: 11),
+            ),
           ),
         ],
       ),
