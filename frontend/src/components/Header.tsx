@@ -264,8 +264,26 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
 
   const isHomePage = location.pathname === '/';
 
-  // Festival campaign continuous header mode for Mobile
-  const isFestivalActive = isHomePage && isMobile && activeFestivalCampaign && activeFestivalCampaign.isActive !== false;
+  // Festival campaign active check ONLY for Mobile
+  const isFestivalActive = useMemo(() => {
+    if (!isMobile) return false; // Festival theme is strictly MOBILE ONLY
+    if (!activeFestivalCampaign || activeFestivalCampaign.isActive === false || activeFestivalCampaign.status === 'draft') {
+      return false;
+    }
+    const now = new Date();
+    const start = new Date(activeFestivalCampaign.startDate);
+    const end = new Date(activeFestivalCampaign.endDate);
+    if (now < start || now > end) return false;
+
+    const scopes = activeFestivalCampaign.applicableSuperCategories || ['all'];
+    const appliesToAll = scopes.includes('all') || scopes.includes('sc_all') || scopes.includes('All');
+
+    if (isHomePage) return true;
+
+    const currentSlug = location.pathname.replace(/^\//, '').split('/')[0] || '';
+    if (appliesToAll) return true;
+    return scopes.includes(currentSlug) || scopes.includes(`sc_${currentSlug}`);
+  }, [isMobile, activeFestivalCampaign, location.pathname, isHomePage]);
 
   // Active campaign banners list for Home Page
   const validHomeBanners = useMemo(() => {
@@ -292,8 +310,8 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
   }, [validHomeBanners, activeHeroBannerIndex]);
 
   const campaignBgColor = isHomePage ? (activeCampaignBanner?.themeBgColor || activeCampaignBanner?.gradient?.[0]) : null;
-  const campaignTextColor = isHomePage ? (activeFestivalCampaign?.theme?.textColor || activeCampaignBanner?.themeTextColor) : null;
-  const campaignAccentColor = isHomePage ? (activeFestivalCampaign?.theme?.accentColor || activeCampaignBanner?.themeAccentColor || '#F6C453') : '#10B981';
+  const campaignTextColor = isHomePage ? (activeFestivalCampaign?.cardStyling?.textColor || activeCampaignBanner?.themeTextColor) : null;
+  const campaignAccentColor = isHomePage ? (activeFestivalCampaign?.cardStyling?.accentColor || activeCampaignBanner?.themeAccentColor || '#F6C453') : '#10B981';
 
   const getIsDarkColor = (colorHexOrRgb?: string) => {
     if (!colorHexOrRgb) return false;
@@ -329,15 +347,11 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
 
   const isDarkHeader = useMemo(() => {
     if (isScrolledDown) return false;
-    if (!isHomePage || !isMobile) return false;
-    if (isFestivalActive && activeFestivalCampaign?.theme?.textColor) {
-      return true; // Use themed white/light text contrast over continuous campaign background
-    }
-    if (campaignTextColor) {
-      return !getIsDarkColor(campaignTextColor);
-    }
+    if (!isMobile) return false;
+    if (isFestivalActive) return true; // Crisp white text over continuous campaign background on mobile
+    if (campaignTextColor) return !getIsDarkColor(campaignTextColor);
     return getIsDarkColor(dynamicHeaderBg);
-  }, [isScrolledDown, isHomePage, isMobile, isFestivalActive, activeFestivalCampaign, dynamicHeaderBg, campaignTextColor]);
+  }, [isScrolledDown, isMobile, isFestivalActive, dynamicHeaderBg, campaignTextColor]);
 
   const headerTextColor = isDarkHeader ? 'text-white' : 'text-text-primary';
   const headerSubTextColor = isDarkHeader ? 'text-white/90 hover:text-white' : 'text-text-secondary hover:text-primary';

@@ -226,11 +226,10 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
       setSelectedCategory(urlCategory);
       if (urlSubCategory) {
         setSelectedSubCategory(urlSubCategory === 'All' ? '' : urlSubCategory);
-        setInCategoryView(true);
       } else {
         setSelectedSubCategory('');
-        setInCategoryView(false);
       }
+      setInCategoryView(true);
     } else if (urlSearch) {
       setSelectedCategory('');
       setSelectedSubCategory('');
@@ -556,7 +555,10 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
                 <div className="flex flex-col gap-2">
                   {/* All Subcategories Button */}
                   <button
-                    onClick={() => setSelectedSubCategory('')}
+                    onClick={() => {
+                      setSelectedSubCategory('');
+                      setSearchParams({ category: selectedCategory, subCategory: 'All' }, { replace: true });
+                    }}
                     className={`relative w-full flex flex-col items-center justify-center p-1 py-1.5 rounded-xl text-center transition-all duration-200 group cursor-pointer ${selectedSubCategory === '' ? 'font-black' : 'hover:bg-background'
                       }`}
                   >
@@ -583,7 +585,10 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
                     return (
                       <button
                         key={idx}
-                        onClick={() => setSelectedSubCategory(subName)}
+                        onClick={() => {
+                          setSelectedSubCategory(subName);
+                          setSearchParams({ category: selectedCategory, subCategory: subName }, { replace: true });
+                        }}
                         className={`relative w-full flex flex-col items-center justify-center p-1 py-1.5 rounded-xl text-center transition-all duration-200 group cursor-pointer`}
                       >
                         {isActive && (

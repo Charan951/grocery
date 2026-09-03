@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freshcart/core/di/injection.dart';
 import 'package:freshcart/core/services/api_service.dart';
 import 'package:freshcart/features/categories/data/models/category_model.dart';
 import 'package:freshcart/features/products/data/models/product_model.dart';
+import '../../data/models/festival_campaign_model.dart';
 
 final apiServiceProvider = Provider<ApiService>((ref) => getIt<ApiService>());
 
@@ -27,10 +29,16 @@ final superCategoriesProvider = FutureProvider<List<Map<String, dynamic>>>((ref)
 
 final selectedSuperCategoryProvider = StateProvider<String>((ref) => 'all');
 
-/// The running festival campaign (or null). Server already applies the date
-/// window + isActive flag on `/festival-campaigns/active`.
-final activeFestivalCampaignProvider = FutureProvider<Map<String, dynamic>?>((ref) {
-  return ref.watch(apiServiceProvider).fetchActiveFestivalCampaign();
+final activeFestivalCampaignProvider = FutureProvider<FestivalCampaignModel?>((ref) async {
+  final rawMap = await ref.watch(apiServiceProvider).fetchActiveFestivalCampaign();
+  if (rawMap == null) return null;
+
+  final campaign = FestivalCampaignModel.fromJson(rawMap);
+  if (!campaign.isCurrentlyActive) return null;
+
+  debugPrint('Active Festival Campaign: ${campaign.name}, Theme: ${campaign.themeKey}, Groups: ${campaign.festivalGroups.length}, Scope: ${campaign.applicableSuperCategories}');
+
+  return campaign;
 });
 
 /// The whole catalog — used by Home rails and the Wishlist (which needs to

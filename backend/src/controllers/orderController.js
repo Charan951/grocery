@@ -9,6 +9,7 @@ import { Inventory } from '../models/Inventory.js';
 import { Order } from '../models/Order.js';
 import { Customer } from '../models/Customer.js';
 import { Coupon, Offer, Payment, WalletTransaction } from '../models/Finance.js';
+import { FestivalCampaign } from '../models/FestivalCampaign.js';
 import { Review, Notification, CMSPage, Blog, Settings, AuditLog, SupportTicket } from '../models/Operations.js';
 import { uploadToCloudinary } from '../config/cloudinary.js';
 import { cancelForOrder, tryAssign } from '../services/assignmentService.js';
@@ -115,23 +116,69 @@ export const orderController = {
         authedCustomer?.phone || orderData.customerPhone || orderData.phone || '9626626626'
       ).replace(/\D/g, '').slice(-10);
 
+      // Fetch active festival campaign for server-side pricing verification
+      const now = new Date();
+      const activeCampaign = await FestivalCampaign.findOne({
+        isActive: true,
+        status: { $ne: 'draft' },
+        startDate: { $lte: now },
+        endDate: { $gte: now }
+      });
+
+      const productDiscountMap = new Map();
+      if (activeCampaign && Array.isArray(activeCampaign.festivalGroups)) {
+        for (const grp of activeCampaign.festivalGroups) {
+          if (grp.isActive !== false && grp.discountPercent > 0 && Array.isArray(grp.products)) {
+            for (const pid of grp.products) {
+              if (pid) productDiscountMap.set(String(pid), grp.discountPercent);
+            }
+          }
+        }
+      }
+
+      const rawItems = Array.isArray(orderData.items) ? orderData.items : [];
+      const validatedItems = await Promise.all(
+        rawItems.map(async (it) => {
+          const prodId = String(it.productId || it.id || 'p_1');
+          let dbProduct = null;
+          if (mongoose.Types.ObjectId.isValid(prodId)) {
+            dbProduct = await Product.findById(prodId);
+          }
+          if (!dbProduct) {
+            dbProduct = await Product.findOne({ $or: [{ id: prodId }, { _id: prodId }] });
+          }
+
+          const basePrice = dbProduct ? Number(dbProduct.price || 50) : Number(it.price || 50);
+          let discountPct = productDiscountMap.get(prodId) || 0;
+          if (!discountPct && dbProduct) {
+            discountPct = productDiscountMap.get(String(dbProduct.id)) || productDiscountMap.get(String(dbProduct._id)) || 0;
+          }
+
+          const finalPrice = discountPct > 0 ? Math.round(basePrice * (1 - discountPct / 100)) : basePrice;
+
+          return {
+            id: prodId,
+            productId: prodId,
+            name: dbProduct?.name || it.name || it.product?.name || 'Grocery Item',
+            weightSpec: it.weightSpec || it.selectedWeight || '500g',
+            quantity: Number(it.quantity || it.qty || 1),
+            qty: Number(it.quantity || it.qty || 1),
+            price: finalPrice,
+            image: dbProduct?.imageUrl || it.image || it.product?.imageUrl || ''
+          };
+        })
+      );
+
+      const calculatedSubtotal = validatedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
       const normalizedOrder = {
         orderId: orderData.orderId || orderData.orderNumber || 'PNNHJHTYP' + Math.floor(100000 + Math.random() * 900000),
         customerId: authedCustomer?.customerId || orderData.customerId || 'cust_' + cleanPhone,
         customerName: authedCustomer?.name || orderData.customerName || 'Customer',
         customerPhone: `+91 ${cleanPhone}`,
-        items: Array.isArray(orderData.items) ? orderData.items.map((it) => ({
-          id: it.id || it.productId || 'p_1',
-          productId: it.productId || it.id || 'p_1',
-          name: it.name || it.product?.name || 'Grocery Item',
-          weightSpec: it.weightSpec || it.selectedWeight || '500g',
-          quantity: Number(it.quantity || it.qty || 1),
-          qty: Number(it.quantity || it.qty || 1),
-          price: Number(it.price || it.product?.price || 50),
-          image: it.image || it.product?.imageUrl || ''
-        })) : [],
-        itemTotal: Number(orderData.itemTotal || orderData.totalAmount || 100),
-        totalAmount: Number(orderData.totalAmount || orderData.itemTotal || 100),
+        items: validatedItems,
+        itemTotal: calculatedSubtotal,
+        totalAmount: calculatedSubtotal + Number(orderData.deliveryFee || 0) + Number(orderData.handlingFee || 0) - Number(orderData.discount || 0),
         discount: Number(orderData.discount || 0),
         deliveryFee: Number(orderData.deliveryFee || 0),
         handlingFee: Number(orderData.handlingFee || 0),

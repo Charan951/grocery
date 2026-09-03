@@ -239,50 +239,128 @@ export interface CampaignAnimationConfig {
   intensity?: 'subtle' | 'medium' | 'high' | string;
 }
 
+export interface FestivalGroup {
+  id?: string;
+  displayName: string;
+  products: string[];
+  discountPercent: number;
+  displayOrder?: number;
+  isActive?: boolean;
+}
+
+export interface CardStyling {
+  cardBackground?: string;
+  cardBorder?: string;
+  accentColor?: string;
+  buttonColor?: string;
+  textColor?: string;
+}
+
 export interface FestivalCampaign {
   _id?: string;
   id?: string;
   name: string;
-  title: string;
-  subtitle?: string;
-  type?: 'Festival' | 'Seasonal' | 'Special Event';
+  startDate: string | Date;
+  endDate: string | Date;
 
-  // Layered Theme Engine
-  backgroundType?: 'solid' | 'gradient' | 'image';
+  // Step 2: Theme & Banner
+  themeKey?: string;
+  backgroundType?: 'predefined' | 'solid' | 'gradient';
   backgroundColor?: string;
   gradientStart?: string;
   gradientEnd?: string;
   gradientDirection?: string;
-  backgroundImage?: {
-    url: string;
-    publicId?: string;
-  };
-  backgroundPattern?: 'none' | 'floral' | 'mandala' | 'paisley' | 'traditional' | 'dots' | 'festival';
-  patternOpacity?: number;
-  patternScale?: 'small' | 'medium' | 'large';
 
-  decorativeElements?: DecorativeElement[];
-  titleConfig?: TitleConfig;
+  // Step 2: Banner (Optional)
+  enableBanner?: boolean;
+  bannerImage?: string;
+  bannerLink?: string;
 
-  video?: {
-    url?: string;
-    publicId?: string;
-    posterUrl?: string;
-  };
-  featuredBannerTitle?: string;
-  featuredItems?: FeaturedCampaignItem[];
-  animationConfig?: CampaignAnimationConfig;
-  bottomDecoration?: 'scallop' | 'floral' | 'wave' | 'cutwork' | 'traditional' | 'plain' | 'none';
-  theme?: CampaignTheme;
-  content?: CampaignContent;
-  specialSubcategories: CampaignSubcategory[];
-  startDate: string | Date;
-  endDate: string | Date;
+  // Step 3: Festival Product Groups
+  festivalGroups?: FestivalGroup[];
+
+  // Step 4: Styling Tokens & Scope
+  cardStyling?: CardStyling;
+  applicableSuperCategories?: string[];
+
+  // Status & Metadata
   isActive: boolean;
-  priority: number;
+  status?: 'draft' | 'published';
   createdAt?: string;
   updatedAt?: string;
+
+  // Legacy compatibility fields (optional)
+  title?: string;
+  subtitle?: string;
+  theme?: any;
+  specialSubcategories?: any[];
+  featuredBannerTitle?: string;
+  featuredItems?: any[];
 }
+
+export interface CampaignPricingResult {
+  price: number;
+  originalPrice: number;
+  discountPercent: number;
+  isDiscounted: boolean;
+  groupName?: string;
+}
+
+export const getCampaignProductPricing = (
+  product: Product | null | undefined,
+  campaign: FestivalCampaign | null | undefined,
+  currentSuperCatId?: string
+): CampaignPricingResult => {
+  if (!product) {
+    return { price: 0, originalPrice: 0, discountPercent: 0, isDiscounted: false };
+  }
+
+  const basePrice = product.price || 0;
+  const rawOriginal = product.originalPrice || product.mrp || basePrice;
+
+  if (!campaign || campaign.isActive === false || campaign.status === 'draft') {
+    return { price: basePrice, originalPrice: rawOriginal, discountPercent: 0, isDiscounted: false };
+  }
+
+  // Strict Date/Time check
+  const now = new Date();
+  const start = new Date(campaign.startDate);
+  const end = new Date(campaign.endDate);
+  if (now < start || now > end) {
+    return { price: basePrice, originalPrice: rawOriginal, discountPercent: 0, isDiscounted: false };
+  }
+
+  // Super category scope check if provided
+  if (currentSuperCatId) {
+    const scopes = campaign.applicableSuperCategories || ['all'];
+    const appliesToAll = scopes.includes('all') || scopes.includes('sc_all') || scopes.includes('All');
+    if (!appliesToAll && !scopes.includes(currentSuperCatId)) {
+      return { price: basePrice, originalPrice: rawOriginal, discountPercent: 0, isDiscounted: false };
+    }
+  }
+
+  // Look for product in festival groups
+  const groups = campaign.festivalGroups || [];
+  for (const grp of groups) {
+    if (grp.isActive !== false && grp.discountPercent > 0 && Array.isArray(grp.products)) {
+      const match = grp.products.some(
+        (pid) => pid === product.id || pid === product._id || (product.id && pid === String(product.id)) || (product._id && pid === String(product._id))
+      );
+      if (match) {
+        const offerPrice = Math.round(basePrice * (1 - grp.discountPercent / 100));
+        return {
+          price: offerPrice,
+          originalPrice: basePrice,
+          discountPercent: grp.discountPercent,
+          isDiscounted: true,
+          groupName: grp.displayName
+        };
+      }
+    }
+  }
+
+  return { price: basePrice, originalPrice: rawOriginal, discountPercent: 0, isDiscounted: false };
+};
 
 export interface Coupon {
   code: string;
@@ -938,6 +1016,19 @@ const defaultCategories: Category[] = [
       { name: 'Coffee', showOnHome: true, displayOrder: 2 },
       { name: 'Fruit Juices & Soft Drinks', showOnHome: true, displayOrder: 3 }
     ]
+  },
+  {
+    id: 'chocolates-indian-sweets',
+    slug: 'chocolates-indian-sweets',
+    name: 'Sweets & Chocolates',
+    icon: 'Candy',
+    color: '#E91E63',
+    productCount: 20,
+    subCategories: [
+      { name: 'Indian Sweets', showOnHome: true, displayOrder: 1 },
+      { name: 'Chocolates', showOnHome: true, displayOrder: 2 },
+      { name: 'Ice Creams & Desserts', showOnHome: true, displayOrder: 3 }
+    ]
   }
 ];
 
@@ -1232,158 +1323,45 @@ const defaultFestivalCampaigns: FestivalCampaign[] = [
     id: 'fc_krishna_janmashtami',
     _id: 'fc_krishna_janmashtami',
     name: 'Krishna Janmashtami',
-    title: 'Krishna Janmashtami',
-    subtitle: 'Celebrate the divine spirit',
-    type: 'Festival',
+    themeKey: 'krishna',
     backgroundType: 'gradient',
-    backgroundColor: '#DFF4E8',
-    gradientStart: '#E8F6EF',
-    gradientEnd: '#C2E8D3',
+    backgroundColor: '#E0F2FE',
+    gradientStart: '#E0F2FE',
+    gradientEnd: '#CFFAFE',
     gradientDirection: 'to bottom',
-    backgroundPattern: 'floral',
-    patternOpacity: 0.12,
-    patternScale: 'medium',
-    decorativeElements: [
+    enableBanner: false,
+    bannerImage: '',
+    bannerLink: '',
+    festivalGroups: [
       {
-        id: 'el_krishna',
-        asset: 'krishna',
-        type: 'character',
-        position: { x: 50, y: 15, align: 'center' },
-        size: 45,
-        opacity: 100,
-        animation: 'none',
-        speed: 'slow'
+        id: 'fg_pooja',
+        displayName: 'Pooja & Naivedyam Specials',
+        products: [],
+        discountPercent: 20,
+        displayOrder: 1,
+        isActive: true
       },
       {
-        id: 'el_cloud_1',
-        asset: 'cloud',
-        type: 'nature',
-        position: { x: 10, y: 8, align: 'left' },
-        size: 28,
-        opacity: 85,
-        animation: 'horizontal-move',
-        speed: 'slow'
-      },
-      {
-        id: 'el_peacock_feather',
-        asset: 'peacock_feather',
-        type: 'festive',
-        position: { x: 82, y: 12, align: 'right' },
-        size: 22,
-        opacity: 95,
-        animation: 'gentle-sway',
-        speed: 'slow'
-      },
-      {
-        id: 'el_diya_1',
-        asset: 'diya',
-        type: 'lighting',
-        position: { x: 15, y: 78, align: 'left' },
-        size: 18,
-        opacity: 90,
-        animation: 'glow-flicker',
-        speed: 'slow'
-      },
-      {
-        id: 'el_diya_2',
-        asset: 'diya',
-        type: 'lighting',
-        position: { x: 85, y: 78, align: 'right' },
-        size: 18,
-        opacity: 90,
-        animation: 'glow-flicker',
-        speed: 'slow'
+        id: 'fg_sweets',
+        displayName: 'Sweets, Milk & Butter',
+        products: [],
+        discountPercent: 15,
+        displayOrder: 2,
+        isActive: true
       }
     ],
-    titleConfig: {
-      title: 'Krishna Janmashtami',
-      subtitle: 'Celebrate the divine spirit',
-      position: 'center',
-      textColor: '#1B4D3E',
-      fontStyle: 'festive',
-      animation: 'soft-reveal'
+    cardStyling: {
+      cardBackground: '#FFFBEB',
+      cardBorder: '#BAE6FD',
+      accentColor: '#F59E0B',
+      buttonColor: '#0EA5E9',
+      textColor: '#0C4A6E'
     },
-    backgroundImage: {
-      url: ''
-    },
-    video: {
-      url: '',
-      posterUrl: ''
-    },
-    featuredBannerTitle: 'JANMASHTAMI POOJA SPECIALS',
-    featuredItems: [
-      { name: 'Makhan & Pure Organic Ghee', originalPrice: '299', offerPrice: '149', image: 'https://images.unsplash.com/photo-1599488615731-7e5c2823ff28?w=400&auto=format&fit=crop' },
-      { name: 'Pooja Flowers & Tulsi Garland', originalPrice: '199', offerPrice: '99', image: 'https://images.unsplash.com/photo-1608686207856-001b95cf60ca?w=400&auto=format&fit=crop' }
-    ],
-    animationConfig: {
-      enabled: true,
-      type: 'auto',
-      intensity: 'subtle'
-    },
-    bottomDecoration: 'scallop',
-    theme: {
-      textColor: '#1B4D3E',
-      accentColor: '#2E7D32',
-      cardBackground: '#FFF9E6',
-      cardTextColor: '#1B4D3E',
-      overlayOpacity: 0.05,
-      backgroundPosition: 'center top',
-      backgroundSize: 'cover',
-      cardBorderRadius: '18px',
-      cardSpacing: '8px'
-    },
-    content: {
-      heading: 'Varalakshmi Vratham Essentials',
-      subtitle: 'Everything for your divine celebration',
-      ctaText: 'Explore Collection',
-      ctaLink: '#festival-cards'
-    },
-    specialSubcategories: [
-      {
-        subcategoryId: 'Fresh Vegetables',
-        title: 'Pooja Essentials',
-        image: { url: 'https://images.unsplash.com/photo-1608686207856-001b95cf60ca?w=400&auto=format&fit=crop' },
-        badge: 'Up to 30% OFF',
-        isFeatured: true,
-        order: 1
-      },
-      {
-        subcategoryId: 'Fresh Fruits',
-        title: 'Naivedyam Essentials',
-        image: { url: 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=400&auto=format&fit=crop' },
-        badge: 'Fresh Daily',
-        isFeatured: false,
-        order: 2
-      },
-      {
-        subcategoryId: 'Organics & Hydroponics',
-        title: 'Thamboolam Needs',
-        image: { url: 'https://images.unsplash.com/photo-1588879460417-af2b369527f5?w=400&auto=format&fit=crop' },
-        badge: 'Special Combo',
-        isFeatured: false,
-        order: 3
-      },
-      {
-        subcategoryId: 'Breads & Buns',
-        title: 'Indian Sweets & Ghee',
-        image: { url: 'https://images.unsplash.com/photo-1599488615731-7e5c2823ff28?w=400&auto=format&fit=crop' },
-        badge: 'Pure Organic',
-        isFeatured: false,
-        order: 4
-      },
-      {
-        subcategoryId: 'Exotics & Premium',
-        title: 'Festive Ready Decor',
-        image: { url: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=400&auto=format&fit=crop' },
-        badge: 'Express 10 Min',
-        isFeatured: false,
-        order: 5
-      }
-    ],
+    applicableSuperCategories: ['all'],
     startDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
     endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     isActive: true,
-    priority: 10
+    status: 'published'
   }
 ];
 

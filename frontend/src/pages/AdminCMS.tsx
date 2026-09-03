@@ -2,8 +2,115 @@ import React, { useState } from 'react';
 import { useCMS, Product, Coupon, Blog, Banner, PromoCard, FestivalCampaign, SuperCategory, defaultSuperCategories } from '../context/CMSContext';
 import { SEO } from '../components/SEO';
 import { Trash2, Plus, Edit2, CheckSquare, Square, Image, LayoutGrid, Upload, X, ArrowUp, ArrowDown, Smartphone, Sparkles, Layers, Coffee, Leaf, Home, Headphones, Shirt, Gamepad2, Utensils, Check } from 'lucide-react';
-import { FESTIVAL_ASSET_LIBRARY } from '../components/festival/FestivalAssetLibrary';
 import { FestivalCampaignWrapper } from '../components/FestivalCampaignWrapper';
+
+export interface PredefinedTheme {
+  key: string;
+  name: string;
+  emoji: string;
+  gradientStart: string;
+  gradientEnd: string;
+  gradientDirection: string;
+  cardBackground: string;
+  cardBorder: string;
+  accentColor: string;
+  buttonColor: string;
+  textColor: string;
+}
+
+export const PREDEFINED_FESTIVAL_THEMES: Record<string, PredefinedTheme> = {
+  krishna: {
+    key: 'krishna',
+    name: 'Krishna Janmashtami',
+    emoji: '🦚',
+    gradientStart: '#E0F2FE',
+    gradientEnd: '#CFFAFE',
+    gradientDirection: 'to bottom',
+    cardBackground: '#FFFBEB',
+    cardBorder: '#BAE6FD',
+    accentColor: '#F59E0B',
+    buttonColor: '#0EA5E9',
+    textColor: '#0C4A6E'
+  },
+  diwali: {
+    key: 'diwali',
+    name: 'Diwali',
+    emoji: '🪔',
+    gradientStart: '#FFF7ED',
+    gradientEnd: '#FFEDD5',
+    gradientDirection: 'to bottom',
+    cardBackground: '#FEF3C7',
+    cardBorder: '#FDBA74',
+    accentColor: '#D97706',
+    buttonColor: '#B91C1C',
+    textColor: '#78350F'
+  },
+  onam: {
+    key: 'onam',
+    name: 'Onam',
+    emoji: '🌸',
+    gradientStart: '#F7FEE7',
+    gradientEnd: '#ECFDF5',
+    gradientDirection: 'to bottom',
+    cardBackground: '#FAFAF9',
+    cardBorder: '#A3E635',
+    accentColor: '#D97706',
+    buttonColor: '#15803D',
+    textColor: '#14532D'
+  },
+  raksha_bandhan: {
+    key: 'raksha_bandhan',
+    name: 'Raksha Bandhan',
+    emoji: '🧿',
+    gradientStart: '#FFF1F2',
+    gradientEnd: '#F3E8FF',
+    gradientDirection: 'to bottom',
+    cardBackground: '#FFF1F2',
+    cardBorder: '#F472B6',
+    accentColor: '#EC4899',
+    buttonColor: '#9333EA',
+    textColor: '#701A75'
+  },
+  ganesh_chaturthi: {
+    key: 'ganesh_chaturthi',
+    name: 'Ganesh Chaturthi',
+    emoji: '🌺',
+    gradientStart: '#FEF3C7',
+    gradientEnd: '#FFEDD5',
+    gradientDirection: 'to bottom',
+    cardBackground: '#FFFBEB',
+    cardBorder: '#FCD34D',
+    accentColor: '#EA580C',
+    buttonColor: '#D97706',
+    textColor: '#7C2D12'
+  },
+  holi: {
+    key: 'holi',
+    name: 'Holi',
+    emoji: '🎨',
+    gradientStart: '#FFF1F2',
+    gradientEnd: '#F0FDF4',
+    gradientDirection: '135deg',
+    cardBackground: '#FFFFFF',
+    cardBorder: '#F472B6',
+    accentColor: '#E11D48',
+    buttonColor: '#2563EB',
+    textColor: '#1E3A8A'
+  },
+  navratri: {
+    key: 'navratri',
+    name: 'Navratri',
+    emoji: '🪷',
+    gradientStart: '#FEF9C3',
+    gradientEnd: '#FAF5FF',
+    gradientDirection: 'to bottom',
+    cardBackground: '#FFFBEB',
+    cardBorder: '#E9D5FF',
+    accentColor: '#9333EA',
+    buttonColor: '#7E22CE',
+    textColor: '#581C87'
+  }
+};
 
 export const AdminCMS: React.FC = () => {
   const {
@@ -43,349 +150,305 @@ export const AdminCMS: React.FC = () => {
   const [isUploadingScBanner, setIsUploadingScBanner] = useState(false);
   const [prodSearchTerm, setProdSearchTerm] = useState('');
 
-  // Festival Campaign Form States
+  // Clean 4-Step Festival Campaign Wizard Form States
   const [showFestivalForm, setShowFestivalForm] = useState(false);
   const [editingFestivalId, setEditingFestivalId] = useState<string | null>(null);
+  const [wizardStep, setWizardStep] = useState<1 | 2 | 3 | 4>(1);
+
+  // Step 1: Festival Basic Details
   const [fcName, setFcName] = useState('');
-  const [fcTitle, setFcTitle] = useState('');
-  const [fcSubtitle, setFcSubtitle] = useState('');
-  const [fcType, setFcType] = useState<'Festival' | 'Seasonal' | 'Special Event'>('Festival');
-  const [fcBgImageUrl, setFcBgImageUrl] = useState('');
-  const [isUploadingFcBg, setIsUploadingFcBg] = useState(false);
-  const [fcVideoUrl, setFcVideoUrl] = useState('');
-  const [fcPosterUrl, setFcPosterUrl] = useState('');
-  const [fcHeading, setFcHeading] = useState('');
-  const [fcContentSubtitle, setFcContentSubtitle] = useState('');
-  const [fcCtaText, setFcCtaText] = useState('');
-  const [fcCtaLink, setFcCtaLink] = useState('');
-  const [fcTextColor, setFcTextColor] = useState('#FFFFFF');
-  const [fcAccentColor, setFcAccentColor] = useState('#F6C453');
-  const [fcCardBackground, setFcCardBackground] = useState('#FEEAA7');
-  const [fcCardTextColor, setFcCardTextColor] = useState('#4A001F');
-  const [fcFeaturedBannerTitle, setFcFeaturedBannerTitle] = useState('EXPLORE ALL SPECIALS');
-  const [fcAnimEnabled, setFcAnimEnabled] = useState(true);
-  const [fcAnimType, setFcAnimType] = useState<'auto' | 'floral' | 'diya' | 'leaves' | 'particles'>('auto');
-  const [fcBottomDecoration, setFcBottomDecoration] = useState<'scallop' | 'floral' | 'wave' | 'cutwork' | 'traditional' | 'none'>('scallop');
-  // Layered Theme Engine State
-  const [fcBackgroundType, setFcBackgroundType] = useState<'solid' | 'gradient' | 'image'>('solid');
-  const [fcBackgroundColor, setFcBackgroundColor] = useState('#DFF4E8');
-  const [fcGradientStart, setFcGradientStart] = useState('#E8F6EF');
-  const [fcGradientEnd, setFcGradientEnd] = useState('#C2E8D3');
-  const [fcGradientDirection, setFcGradientDirection] = useState('to bottom');
-  const [fcBackgroundPattern, setFcBackgroundPattern] = useState<'none' | 'floral' | 'mandala' | 'paisley' | 'traditional' | 'dots' | 'festival'>('floral');
-  const [fcPatternOpacity, setFcPatternOpacity] = useState(0.12);
-  const [fcPatternScale, setFcPatternScale] = useState<'small' | 'medium' | 'large'>('medium');
-
-  // Dynamic Asset Elements state array
-  const [fcDecorativeElements, setFcDecorativeElements] = useState<any[]>([]);
-
-  // Individual element input state inside form
-  const [elAsset, setElAsset] = useState('krishna');
-  const [elPosX, setElPosX] = useState(50);
-  const [elPosY, setElPosY] = useState(15);
-  const [elAlign, setElAlign] = useState<'left' | 'center' | 'right'>('center');
-  const [elSize, setElSize] = useState(40);
-  const [elOpacity, setElOpacity] = useState(100);
-  const [elAnim, setElAnim] = useState<'none' | 'horizontal-move' | 'gentle-sway' | 'glow-flicker' | 'float-vertical' | 'pulse'>('none');
-  const [elSpeed, setElSpeed] = useState<'slow' | 'medium' | 'fast'>('slow');
-
-  // Title Config
-  const [fcTitleText, setFcTitleText] = useState('');
-  const [fcTitleSubtitle, setFcTitleSubtitle] = useState('');
-  const [fcTitlePosition, setFcTitlePosition] = useState<'center' | 'left' | 'right'>('center');
-  const [fcTitleColor, setFcTitleColor] = useState('#1B4D3E');
-  const [fcTitleFontStyle, setFcTitleFontStyle] = useState<'festive' | 'modern'>('festive');
-
-  const [fcOverlayOpacity, setFcOverlayOpacity] = useState(0.05);
-  const [fcBackgroundPosition, setFcBackgroundPosition] = useState('center top');
-  const [fcBackgroundSize, setFcBackgroundSize] = useState('cover');
-  const [fcCardBorderRadius, setFcCardBorderRadius] = useState('18px');
-  const [fcCardSpacing, setFcCardSpacing] = useState('8px');
   const [fcStartDate, setFcStartDate] = useState('');
+  const [fcStartTime, setFcStartTime] = useState('00:00');
   const [fcEndDate, setFcEndDate] = useState('');
-  const [fcPriority, setFcPriority] = useState(10);
-  const [fcIsActive, setFcIsActive] = useState(true);
+  const [fcEndTime, setFcEndTime] = useState('23:59');
 
-  // Festival subcategory card item input state inside form
-  const [fcSubcategories, setFcSubcategories] = useState<any[]>([]);
-  const [subSearchQuery, setSubSearchQuery] = useState('');
-  const [selectedSubcatId, setSelectedSubcatId] = useState('');
-  const [subcardTitle, setSubcardTitle] = useState('');
-  const [subcardImageUrl, setSubcardImageUrl] = useState('');
-  const [subcardBadge, setSubcardBadge] = useState('');
-  const [subcardIsFeatured, setSubcardIsFeatured] = useState(false);
-  const [isUploadingSubImg, setIsUploadingSubImg] = useState(false);
+  // Step 2: Festival Theme & Banner
+  const [fcThemeKey, setFcThemeKey] = useState('krishna');
+  const [fcBackgroundType, setFcBackgroundType] = useState<'predefined' | 'solid' | 'gradient'>('predefined');
+  const [fcBackgroundColor, setFcBackgroundColor] = useState('#E0F2FE');
+  const [fcGradientStart, setFcGradientStart] = useState('#E0F2FE');
+  const [fcGradientEnd, setFcGradientEnd] = useState('#CFFAFE');
+  const [fcGradientDirection, setFcGradientDirection] = useState('to bottom');
+
+  const [fcEnableBanner, setFcEnableBanner] = useState(false);
+  const [fcBannerImage, setFcBannerImage] = useState('');
+  const [fcBannerLink, setFcBannerLink] = useState('');
+  const [isUploadingFcBanner, setIsUploadingFcBanner] = useState(false);
+
+  // Step 3: Festival Product Groups
+  const [fcGroups, setFcGroups] = useState<any[]>([]);
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [groupNameInput, setGroupNameInput] = useState('');
+  const [groupDiscountInput, setGroupDiscountInput] = useState(20);
+  const [groupOrderInput, setGroupOrderInput] = useState(1);
+  const [groupProductsInput, setGroupProductsInput] = useState<string[]>([]);
+  const [showProductPickerModal, setShowProductPickerModal] = useState(false);
+  const [productPickerSearch, setProductPickerSearch] = useState('');
+  const [productPickerCategory, setProductPickerCategory] = useState('');
+
+  // Step 4: Theme Styling & Scope
+  const [fcCardBackground, setFcCardBackground] = useState('#FFFBEB');
+  const [fcCardBorder, setFcCardBorder] = useState('#BAE6FD');
+  const [fcAccentColor, setFcAccentColor] = useState('#F59E0B');
+  const [fcButtonColor, setFcButtonColor] = useState('#0EA5E9');
+  const [fcTextColor, setFcTextColor] = useState('#0C4A6E');
+  const [fcApplicableScopes, setFcApplicableScopes] = useState<string[]>(['all']);
+
+  const applyPredefinedTheme = (themeKey: string) => {
+    setFcThemeKey(themeKey);
+    const preset = PREDEFINED_FESTIVAL_THEMES[themeKey];
+    if (preset) {
+      setFcBackgroundType('predefined');
+      setFcGradientStart(preset.gradientStart);
+      setFcGradientEnd(preset.gradientEnd);
+      setFcGradientDirection(preset.gradientDirection);
+      setFcCardBackground(preset.cardBackground);
+      setFcCardBorder(preset.cardBorder);
+      setFcAccentColor(preset.accentColor);
+      setFcButtonColor(preset.buttonColor);
+      setFcTextColor(preset.textColor);
+    }
+  };
 
   const resetFestivalForm = () => {
     setEditingFestivalId(null);
+    setWizardStep(1);
     setFcName('');
-    setFcTitle('');
-    setFcSubtitle('');
-    setFcType('Festival');
-    setFcBackgroundType('solid');
-    setFcBackgroundColor('#DFF4E8');
-    setFcGradientStart('#E8F6EF');
-    setFcGradientEnd('#C2E8D3');
-    setFcGradientDirection('to bottom');
-    setFcBackgroundPattern('floral');
-    setFcPatternOpacity(0.12);
-    setFcPatternScale('medium');
-    setFcDecorativeElements([]);
-    setFcTitleText('');
-    setFcTitleSubtitle('');
-    setFcTitlePosition('center');
-    setFcTitleColor('#1B4D3E');
-    setFcTitleFontStyle('festive');
-    setFcBgImageUrl('');
-    setFcVideoUrl('');
-    setFcPosterUrl('');
-    setFcHeading('');
-    setFcContentSubtitle('');
-    setFcCtaText('');
-    setFcCtaLink('');
-    setFcTextColor('#1B4D3E');
-    setFcAccentColor('#2E7D32');
-    setFcCardBackground('#FFF9E6');
-    setFcCardTextColor('#1B4D3E');
-    setFcFeaturedBannerTitle('EXPLORE ALL SPECIALS');
-    setFcAnimEnabled(true);
-    setFcAnimType('auto');
-    setFcBottomDecoration('scallop');
-    setFcOverlayOpacity(0.05);
-    setFcBackgroundPosition('center top');
-    setFcBackgroundSize('cover');
-    setFcCardBorderRadius('18px');
-    setFcCardSpacing('8px');
-    setFcStartDate(new Date().toISOString().split('T')[0]);
-    setFcEndDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
-    setFcPriority(10);
-    setFcIsActive(true);
-    setFcSubcategories([]);
-    setSelectedSubcatId('');
-    setSubcardTitle('');
-    setSubcardImageUrl('');
-    setSubcardBadge('');
-    setSubcardIsFeatured(false);
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const endStr = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    setFcStartDate(todayStr);
+    setFcStartTime('00:00');
+    setFcEndDate(endStr);
+    setFcEndTime('23:59');
+
+    applyPredefinedTheme('krishna');
+
+    setFcEnableBanner(false);
+    setFcBannerImage('');
+    setFcBannerLink('');
+
+    setFcGroups([]);
+    setEditingGroupId(null);
+    setGroupNameInput('');
+    setGroupDiscountInput(20);
+    setGroupOrderInput(1);
+    setGroupProductsInput([]);
+    setShowProductPickerModal(false);
+
+    setFcApplicableScopes(['all']);
     setShowFestivalForm(false);
   };
 
   const handleEditFestival = (campaign: any) => {
     setEditingFestivalId(campaign.id || campaign._id);
+    setWizardStep(1);
     setFcName(campaign.name || '');
-    setFcTitle(campaign.title || '');
-    setFcSubtitle(campaign.subtitle || '');
-    setFcType(campaign.type || 'Festival');
-    setFcBackgroundType(campaign.backgroundType || 'solid');
-    setFcBackgroundColor(campaign.backgroundColor || '#DFF4E8');
-    setFcGradientStart(campaign.gradientStart || '#E8F6EF');
-    setFcGradientEnd(campaign.gradientEnd || '#C2E8D3');
+
+    if (campaign.startDate) {
+      const sDate = new Date(campaign.startDate);
+      setFcStartDate(sDate.toISOString().split('T')[0]);
+      setFcStartTime(sDate.toTimeString().slice(0, 5));
+    } else {
+      setFcStartDate(new Date().toISOString().split('T')[0]);
+      setFcStartTime('00:00');
+    }
+
+    if (campaign.endDate) {
+      const eDate = new Date(campaign.endDate);
+      setFcEndDate(eDate.toISOString().split('T')[0]);
+      setFcEndTime(eDate.toTimeString().slice(0, 5));
+    } else {
+      setFcEndDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+      setFcEndTime('23:59');
+    }
+
+    setFcThemeKey(campaign.themeKey || 'krishna');
+    setFcBackgroundType(campaign.backgroundType || 'predefined');
+    setFcBackgroundColor(campaign.backgroundColor || '#E0F2FE');
+    setFcGradientStart(campaign.gradientStart || '#E0F2FE');
+    setFcGradientEnd(campaign.gradientEnd || '#CFFAFE');
     setFcGradientDirection(campaign.gradientDirection || 'to bottom');
-    setFcBackgroundPattern(campaign.backgroundPattern || 'floral');
-    setFcPatternOpacity(campaign.patternOpacity ?? 0.12);
-    setFcPatternScale(campaign.patternScale || 'medium');
-    setFcDecorativeElements(campaign.decorativeElements || []);
-    setFcTitleText(campaign.titleConfig?.title || campaign.title || '');
-    setFcTitleSubtitle(campaign.titleConfig?.subtitle || campaign.subtitle || '');
-    setFcTitlePosition(campaign.titleConfig?.position || 'center');
-    setFcTitleColor(campaign.titleConfig?.textColor || campaign.theme?.textColor || '#1B4D3E');
-    setFcTitleFontStyle(campaign.titleConfig?.fontStyle || 'festive');
-    setFcBgImageUrl(campaign.backgroundImage?.url || '');
-    setFcVideoUrl(campaign.video?.url || '');
-    setFcPosterUrl(campaign.video?.posterUrl || '');
-    setFcHeading(campaign.content?.heading || '');
-    setFcContentSubtitle(campaign.content?.subtitle || '');
-    setFcCtaText(campaign.content?.ctaText || '');
-    setFcCtaLink(campaign.content?.ctaLink || '');
-    setFcTextColor(campaign.theme?.textColor || '#1B4D3E');
-    setFcAccentColor(campaign.theme?.accentColor || '#2E7D32');
-    setFcCardBackground(campaign.theme?.cardBackground || '#FFF9E6');
-    setFcCardTextColor(campaign.theme?.cardTextColor || '#1B4D3E');
-    setFcFeaturedBannerTitle(campaign.featuredBannerTitle || 'EXPLORE ALL SPECIALS');
-    setFcAnimEnabled(campaign.animationConfig?.enabled !== false);
-    setFcAnimType(campaign.animationConfig?.type || 'auto');
-    setFcBottomDecoration(campaign.bottomDecoration || 'scallop');
-    setFcOverlayOpacity(campaign.theme?.overlayOpacity ?? 0.05);
-    setFcBackgroundPosition(campaign.theme?.backgroundPosition || 'center top');
-    setFcBackgroundSize(campaign.theme?.backgroundSize || 'cover');
-    setFcCardBorderRadius(campaign.theme?.cardBorderRadius || '18px');
-    setFcCardSpacing(campaign.theme?.cardSpacing || '8px');
-    setFcStartDate(campaign.startDate ? new Date(campaign.startDate).toISOString().split('T')[0] : '');
-    setFcEndDate(campaign.endDate ? new Date(campaign.endDate).toISOString().split('T')[0] : '');
-    setFcPriority(campaign.priority || 10);
-    setFcIsActive(campaign.isActive !== false);
-    setFcSubcategories(campaign.specialSubcategories || []);
+
+    setFcEnableBanner(campaign.enableBanner || false);
+    setFcBannerImage(campaign.bannerImage || '');
+    setFcBannerLink(campaign.bannerLink || '');
+
+    setFcGroups(campaign.festivalGroups || []);
+
+    const styling = campaign.cardStyling || {};
+    setFcCardBackground(styling.cardBackground || '#FFFBEB');
+    setFcCardBorder(styling.cardBorder || '#BAE6FD');
+    setFcAccentColor(styling.accentColor || '#F59E0B');
+    setFcButtonColor(styling.buttonColor || '#0EA5E9');
+    setFcTextColor(styling.textColor || '#0C4A6E');
+
+    setFcApplicableScopes(campaign.applicableSuperCategories || ['all']);
     setShowFestivalForm(true);
   };
 
-  const handleAddDecorativeElement = () => {
-    const newEl = {
-      id: `el_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-      asset: elAsset,
-      type: 'festive',
-      position: { x: elPosX, y: elPosY, align: elAlign },
-      size: elSize,
-      opacity: elOpacity,
-      animation: elAnim,
-      speed: elSpeed
-    };
-    setFcDecorativeElements([...fcDecorativeElements, newEl]);
+  const handleFcBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingFcBanner(true);
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = async () => {
+        const base64 = reader.result as string;
+        try {
+          const cUrl = await uploadImage(base64, 'freshcart/festival-banner');
+          setFcBannerImage(cUrl);
+        } catch (err) {
+          setFcBannerImage(base64);
+        } finally {
+          setIsUploadingFcBanner(false);
+        }
+      };
+    } catch (err) {
+      setIsUploadingFcBanner(false);
+    }
   };
 
-  const handleRemoveDecorativeElement = (idx: number) => {
-    setFcDecorativeElements(fcDecorativeElements.filter((_, i) => i !== idx));
-  };
-
-  const handleAddSubcardToCampaign = () => {
-    if (!subcardTitle.trim()) {
-      alert('Please enter card title');
+  const handleSaveGroup = () => {
+    if (!groupNameInput.trim()) {
+      alert('Please enter group display name');
       return;
     }
-    const newCard = {
-      subcategoryId: selectedSubcatId || subcardTitle.trim(),
-      title: subcardTitle.trim(),
-      image: { url: subcardImageUrl.trim() },
-      badge: subcardBadge.trim(),
-      isFeatured: subcardIsFeatured,
-      order: fcSubcategories.length + 1
-    };
-    setFcSubcategories([...fcSubcategories, newCard]);
-    setSelectedSubcatId('');
-    setSubcardTitle('');
-    setSubcardImageUrl('');
-    setSubcardBadge('');
-    setSubcardIsFeatured(false);
-  };
-
-  const handleRemoveSubcard = (idx: number) => {
-    setFcSubcategories(fcSubcategories.filter((_, i) => i !== idx));
-  };
-
-  const handleMoveSubcard = (idx: number, direction: 'up' | 'down') => {
-    const list = [...fcSubcategories];
-    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
-    if (targetIdx < 0 || targetIdx >= list.length) return;
-    const temp = list[idx];
-    list[idx] = list[targetIdx];
-    list[targetIdx] = temp;
-    setFcSubcategories(list);
-  };
-
-  const handleFestivalSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!fcName.trim() || !fcTitle.trim()) {
-      alert('Please provide campaign name and title');
+    if (groupProductsInput.length === 0) {
+      alert('Please select at least 1 product for this festival group');
       return;
     }
-    if (!fcBgImageUrl.trim()) {
-      alert('Please upload or provide a continuous background image URL');
+
+    const gId = editingGroupId || 'fg_' + Date.now();
+    const newGroup = {
+      id: gId,
+      displayName: groupNameInput.trim(),
+      discountPercent: Number(groupDiscountInput) || 0,
+      displayOrder: Number(groupOrderInput) || 1,
+      products: groupProductsInput,
+      isActive: true
+    };
+
+    if (editingGroupId) {
+      setFcGroups(prev => prev.map(g => g.id === editingGroupId ? newGroup : g));
+    } else {
+      setFcGroups(prev => [...prev, newGroup]);
+    }
+
+    setEditingGroupId(null);
+    setGroupNameInput('');
+    setGroupDiscountInput(20);
+    setGroupOrderInput(fcGroups.length + 2);
+    setGroupProductsInput([]);
+  };
+
+  const handleEditGroup = (grp: any) => {
+    setEditingGroupId(grp.id);
+    setGroupNameInput(grp.displayName || '');
+    setGroupDiscountInput(grp.discountPercent ?? 20);
+    setGroupOrderInput(grp.displayOrder ?? 1);
+    setGroupProductsInput(grp.products || []);
+  };
+
+  const handleRemoveGroup = (groupId: string) => {
+    setFcGroups(prev => prev.filter(g => g.id !== groupId));
+    if (editingGroupId === groupId) {
+      setEditingGroupId(null);
+      setGroupNameInput('');
+      setGroupProductsInput([]);
+    }
+  };
+
+  const handleToggleProductInGroup = (prodId: string) => {
+    // Check if product is in ANOTHER group of this campaign
+    const existingOtherGroup = fcGroups.find(
+      g => g.id !== editingGroupId && (g.products || []).includes(prodId)
+    );
+    if (existingOtherGroup) {
+      alert(`Product is already assigned to festival group "${existingOtherGroup.displayName}". A product can belong to only one group per campaign.`);
+      return;
+    }
+
+    setGroupProductsInput(prev =>
+      prev.includes(prodId) ? prev.filter(p => p !== prodId) : [...prev, prodId]
+    );
+  };
+
+  const handleToggleScope = (scopeId: string) => {
+    if (scopeId === 'all') {
+      setFcApplicableScopes(['all']);
+    } else {
+      setFcApplicableScopes(prev => {
+        const cleanPrev = prev.filter(s => s !== 'all' && s !== 'sc_all');
+        if (cleanPrev.includes(scopeId)) {
+          const next = cleanPrev.filter(s => s !== scopeId);
+          return next.length === 0 ? ['all'] : next;
+        } else {
+          return [...cleanPrev, scopeId];
+        }
+      });
+    }
+  };
+
+  const handleSaveCampaignSubmit = async (publishStatus: 'draft' | 'published') => {
+    if (!fcName.trim()) {
+      alert('Please enter Festival Name in Step 1');
+      setWizardStep(1);
+      return;
+    }
+    if (!fcStartDate || !fcEndDate) {
+      alert('Please enter Start Date and End Date in Step 1');
+      setWizardStep(1);
+      return;
+    }
+
+    const startDateTime = new Date(`${fcStartDate}T${fcStartTime || '00:00'}:00`);
+    const endDateTime = new Date(`${fcEndDate}T${fcEndTime || '23:59'}:00`);
+
+    if (endDateTime <= startDateTime) {
+      alert('End Date & Time must be strictly after Start Date & Time');
+      setWizardStep(1);
       return;
     }
 
     const payload = {
+      id: editingFestivalId || 'fc_' + Date.now(),
       name: fcName.trim(),
-      title: fcTitle.trim(),
-      subtitle: fcSubtitle.trim(),
-      type: fcType,
+      startDate: startDateTime.toISOString(),
+      endDate: endDateTime.toISOString(),
+      themeKey: fcThemeKey,
       backgroundType: fcBackgroundType,
       backgroundColor: fcBackgroundColor,
       gradientStart: fcGradientStart,
       gradientEnd: fcGradientEnd,
       gradientDirection: fcGradientDirection,
-      backgroundImage: { url: fcBgImageUrl.trim() },
-      backgroundPattern: fcBackgroundPattern,
-      patternOpacity: Number(fcPatternOpacity),
-      patternScale: fcPatternScale,
-      decorativeElements: fcDecorativeElements,
-      titleConfig: {
-        title: fcTitleText.trim() || fcTitle.trim(),
-        subtitle: fcTitleSubtitle.trim() || fcSubtitle.trim(),
-        position: fcTitlePosition,
-        textColor: fcTitleColor,
-        fontStyle: fcTitleFontStyle
-      },
-      video: { url: fcVideoUrl.trim(), posterUrl: fcPosterUrl.trim() },
-      featuredBannerTitle: fcFeaturedBannerTitle.trim() || 'EXPLORE ALL SPECIALS',
-      animationConfig: {
-        enabled: fcAnimEnabled,
-        type: fcAnimType,
-        intensity: 'subtle'
-      },
-      bottomDecoration: fcBottomDecoration,
-      theme: {
-        textColor: fcTextColor,
-        accentColor: fcAccentColor,
+      enableBanner: fcEnableBanner,
+      bannerImage: fcBannerImage.trim(),
+      bannerLink: fcBannerLink.trim(),
+      festivalGroups: fcGroups,
+      cardStyling: {
         cardBackground: fcCardBackground,
-        cardTextColor: fcCardTextColor,
-        overlayOpacity: Number(fcOverlayOpacity),
-        backgroundPosition: fcBackgroundPosition,
-        backgroundSize: fcBackgroundSize,
-        cardBorderRadius: fcCardBorderRadius,
-        cardSpacing: fcCardSpacing
+        cardBorder: fcCardBorder,
+        accentColor: fcAccentColor,
+        buttonColor: fcButtonColor,
+        textColor: fcTextColor
       },
-      content: {
-        heading: fcHeading.trim() || fcTitle.trim(),
-        subtitle: fcContentSubtitle.trim() || fcSubtitle.trim(),
-        ctaText: fcCtaText.trim(),
-        ctaLink: fcCtaLink.trim()
-      },
-      specialSubcategories: fcSubcategories,
-      startDate: fcStartDate ? new Date(fcStartDate).toISOString() : new Date().toISOString(),
-      endDate: fcEndDate ? new Date(fcEndDate).toISOString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      priority: Number(fcPriority) || 1,
-      isActive: fcIsActive
+      applicableSuperCategories: fcApplicableScopes,
+      isActive: publishStatus === 'published',
+      status: publishStatus
     };
 
-    if (editingFestivalId) {
-      await updateFestivalCampaign(editingFestivalId, payload);
-    } else {
-      await addFestivalCampaign(payload);
-    }
-    resetFestivalForm();
-  };
-
-  const handleFcBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setIsUploadingFcBg(true);
     try {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = async () => {
-        const base64 = reader.result as string;
-        try {
-          const cUrl = await uploadImage(base64, 'freshcart/festival-bg');
-          setFcBgImageUrl(cUrl);
-        } catch (err) {
-          setFcBgImageUrl(base64);
-        } finally {
-          setIsUploadingFcBg(false);
-        }
-      };
-    } catch (err) {
-      setIsUploadingFcBg(false);
-    }
-  };
-
-  const handleSubcardImgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setIsUploadingSubImg(true);
-    try {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = async () => {
-        const base64 = reader.result as string;
-        try {
-          const cUrl = await uploadImage(base64, 'freshcart/festival-cards');
-          setSubcardImageUrl(cUrl);
-        } catch (err) {
-          setSubcardImageUrl(base64);
-        } finally {
-          setIsUploadingSubImg(false);
-        }
-      };
-    } catch (err) {
-      setIsUploadingSubImg(false);
+      if (editingFestivalId) {
+        await updateFestivalCampaign(editingFestivalId, payload);
+      } else {
+        await addFestivalCampaign(payload);
+      }
+      resetFestivalForm();
+      alert(`Festival campaign ${publishStatus === 'published' ? 'published' : 'saved as draft'} successfully!`);
+    } catch (err: any) {
+      alert(err.message || 'Failed to save festival campaign');
     }
   };
 
@@ -465,7 +528,7 @@ export const AdminCMS: React.FC = () => {
 
   // Special Groups Form States
   const [showSpecialGroupForm, setShowSpecialGroupForm] = useState(false);
-  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [editingSpecialGroupId, setEditingSpecialGroupId] = useState<string | null>(null);
   const [sgTitle, setSgTitle] = useState('');
   const [sgInsertAfterIndex, setSgInsertAfterIndex] = useState<number>(0);
   const [sgItems, setSgItems] = useState<any[]>([]);
@@ -521,7 +584,7 @@ export const AdminCMS: React.FC = () => {
   };
 
   const handleOpenEditGroup = (g: any) => {
-    setEditingGroupId(g.id);
+    setEditingSpecialGroupId(g.id);
     setSgTitle(g.title);
     setSgInsertAfterIndex(g.insertAfterSubCategoryIndex !== undefined ? Number(g.insertAfterSubCategoryIndex) : 0);
     setSgItems(g.items || []);
@@ -581,9 +644,9 @@ export const AdminCMS: React.FC = () => {
       setSgItems(nextItems);
     }
 
-    if (editingGroupId) {
+    if (editingSpecialGroupId) {
       const payload = {
-        id: editingGroupId,
+        id: editingSpecialGroupId,
         title: sgTitle.trim() || 'Special Group',
         slug: (sgTitle.trim() || 'Special Group').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
         displayOrder: specialCategoryGroups.length + 1,
@@ -591,7 +654,7 @@ export const AdminCMS: React.FC = () => {
         active: true,
         items: nextItems
       };
-      updateSpecialGroup(editingGroupId, payload);
+      updateSpecialGroup(editingSpecialGroupId, payload);
     }
 
     setItemSubName('');
@@ -621,7 +684,7 @@ export const AdminCMS: React.FC = () => {
     }
 
     const payload = {
-      id: editingGroupId || 'sg_' + Date.now(),
+      id: editingSpecialGroupId || 'sg_' + Date.now(),
       title: sgTitle.trim(),
       slug: sgTitle.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'),
       displayOrder: specialCategoryGroups.length + 1,
@@ -630,8 +693,8 @@ export const AdminCMS: React.FC = () => {
       items: sgItems
     };
 
-    if (editingGroupId) {
-      updateSpecialGroup(editingGroupId, payload);
+    if (editingSpecialGroupId) {
+      updateSpecialGroup(editingSpecialGroupId, payload);
       alert('Special group updated successfully!');
     } else {
       addSpecialGroup(payload);
@@ -639,7 +702,7 @@ export const AdminCMS: React.FC = () => {
     }
 
     setShowSpecialGroupForm(false);
-    setEditingGroupId(null);
+    setEditingSpecialGroupId(null);
     setEditingItemIdx(null);
     setSgTitle('');
     setSgInsertAfterIndex(0);
@@ -1370,15 +1433,18 @@ export const AdminCMS: React.FC = () => {
                 {!showFestivalForm ? (
                   <div className="flex flex-col gap-4">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs text-text-secondary">
-                        Manage themed continuous festival sections for mobile (e.g. Varalakshmi Vratham, Diwali, Raksha Bandhan).
-                      </p>
+                      <div>
+                        <h2 className="text-base font-extrabold text-text-primary">Festival Campaign Management</h2>
+                        <p className="text-xs text-text-secondary">
+                          Create lightweight, date-bound themed festival campaigns with temporary product merchandising groups and dynamic discounts.
+                        </p>
+                      </div>
                       <button
                         onClick={() => {
                           resetFestivalForm();
                           setShowFestivalForm(true);
                         }}
-                        className="bg-primary text-white font-bold py-2.5 px-5 rounded-xl text-xs hover:bg-secondary transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                        className="bg-primary text-white font-bold py-2.5 px-5 rounded-xl text-xs hover:bg-secondary transition-all shadow-md flex items-center gap-2 cursor-pointer shrink-0"
                       >
                         <Plus size={16} />
                         <span>Create Festival Campaign</span>
@@ -1388,65 +1454,101 @@ export const AdminCMS: React.FC = () => {
                     {/* Campaigns List */}
                     {festivalCampaigns.length === 0 ? (
                       <div className="p-8 border border-dashed border-divider rounded-2xl text-center text-text-secondary text-sm">
-                        No festival campaigns created yet. Click "Create Festival Campaign" to set up your first themed festival experience.
+                        No festival campaigns created yet. Click "Create Festival Campaign" to launch your first 4-step festival campaign wizard.
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 gap-4">
                         {festivalCampaigns.map((camp: any) => {
                           const id = camp.id || camp._id;
-                          const isActive = camp.isActive !== false;
-                          const bgUrl = camp.backgroundImage?.url || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&auto=format&fit=crop';
-                          const subCount = camp.specialSubcategories?.length || 0;
+                          const isPublished = camp.status === 'published' && camp.isActive !== false;
+                          const now = new Date();
+                          const sDate = camp.startDate ? new Date(camp.startDate) : null;
+                          const eDate = camp.endDate ? new Date(camp.endDate) : null;
+                          const isLiveNow = isPublished && sDate && eDate && now >= sDate && now <= eDate;
+                          const isExpired = eDate && now > eDate;
+
+                          const themePreset = PREDEFINED_FESTIVAL_THEMES[camp.themeKey || 'krishna'] || PREDEFINED_FESTIVAL_THEMES.krishna;
+                          const groupsCount = camp.festivalGroups?.length || 0;
+                          const totalProductsCount = (camp.festivalGroups || []).reduce((acc: number, g: any) => acc + (g.products?.length || 0), 0);
+                          const scopes = camp.applicableSuperCategories || ['all'];
+                          const scopeLabel = (scopes.includes('all') || scopes.includes('sc_all')) ? 'All Super Categories' : `${scopes.length} Super Categories`;
 
                           return (
                             <div
                               key={id}
-                              className={`relative overflow-hidden border rounded-2xl p-4 transition-all flex flex-col md:flex-row gap-4 items-start md:items-center justify-between ${isActive ? 'border-primary/40 bg-primary/5 shadow-xs' : 'border-divider bg-background/50 opacity-75'
-                                }`}
+                              className={`relative overflow-hidden border rounded-2xl p-4 transition-all flex flex-col md:flex-row gap-4 items-start md:items-center justify-between ${
+                                isLiveNow
+                                  ? 'border-emerald-500/60 bg-emerald-500/5 shadow-md'
+                                  : isPublished
+                                  ? 'border-primary/40 bg-surface'
+                                  : 'border-divider bg-background/50 opacity-75'
+                              }`}
                             >
                               <div className="flex items-center gap-4 min-w-0 flex-1">
-                                <div className="w-20 h-16 rounded-xl overflow-hidden shrink-0 border border-white/20 relative bg-black/20">
-                                  <img src={bgUrl} alt={camp.name} className="w-full h-full object-cover" />
-                                  <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-[9px] font-bold text-white uppercase">
-                                    {camp.type || 'Festival'}
-                                  </div>
+                                <div
+                                  className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shrink-0 border border-black/10 shadow-xs"
+                                  style={{ background: `linear-gradient(135deg, ${themePreset.gradientStart}, ${themePreset.gradientEnd})` }}
+                                >
+                                  <span>{themePreset.emoji}</span>
                                 </div>
 
                                 <div className="flex flex-col min-w-0">
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
                                     <h3 className="font-extrabold text-base text-text-primary truncate">{camp.name}</h3>
-                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${isActive ? 'bg-success/20 text-success' : 'bg-divider text-text-secondary'
-                                      }`}>
-                                      {isActive ? 'ACTIVE' : 'INACTIVE'}
-                                    </span>
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-secondary/10 text-secondary">
-                                      Priority: {camp.priority || 1}
-                                    </span>
+
+                                    {isLiveNow && (
+                                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-600 text-white animate-pulse">
+                                        ⚡ LIVE NOW
+                                      </span>
+                                    )}
+
+                                    {!isLiveNow && isPublished && !isExpired && (
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-blue-500/20 text-blue-600 dark:text-blue-400">
+                                        SCHEDULED
+                                      </span>
+                                    )}
+
+                                    {isExpired && (
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-gray-200 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                                        EXPIRED
+                                      </span>
+                                    )}
+
+                                    {!isPublished && (
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-500/20 text-amber-700 dark:text-amber-400">
+                                        DRAFT
+                                      </span>
+                                    )}
                                   </div>
-                                  <p className="text-xs font-semibold text-text-secondary truncate mt-0.5">{camp.title}</p>
-                                  <div className="flex items-center gap-3 text-[11px] text-text-tertiary mt-1">
-                                    <span>Subcategories: <strong>{subCount} cards</strong></span>
+
+                                  <div className="flex items-center gap-3 text-xs text-text-secondary mt-1 flex-wrap">
+                                    <span>Theme: <strong>{themePreset.name}</strong></span>
                                     <span>•</span>
-                                    <span>Starts: {camp.startDate ? new Date(camp.startDate).toLocaleDateString() : 'N/A'}</span>
+                                    <span>Groups: <strong>{groupsCount}</strong> ({totalProductsCount} products)</span>
                                     <span>•</span>
-                                    <span>Ends: {camp.endDate ? new Date(camp.endDate).toLocaleDateString() : 'N/A'}</span>
+                                    <span>Scope: <strong>{scopeLabel}</strong></span>
+                                  </div>
+
+                                  <div className="text-[11px] text-text-tertiary mt-1">
+                                    {sDate ? sDate.toLocaleString() : 'N/A'} → {eDate ? eDate.toLocaleString() : 'N/A'}
                                   </div>
                                 </div>
                               </div>
 
-                              {/* Controls */}
+                              {/* Action Buttons */}
                               <div className="flex items-center gap-2 self-end md:self-center shrink-0">
                                 <button
-                                  onClick={() => toggleFestivalCampaignStatus(id, !isActive)}
-                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${isActive ? 'bg-error/10 text-error hover:bg-error/20' : 'bg-success/10 text-success hover:bg-success/20'
-                                    }`}
+                                  onClick={() => toggleFestivalCampaignStatus(id, !isPublished)}
+                                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                                    isPublished ? 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20' : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                  }`}
                                 >
-                                  {isActive ? 'Deactivate' : 'Activate'}
+                                  {isPublished ? 'Unpublish' : 'Publish'}
                                 </button>
                                 <button
                                   onClick={() => handleEditFestival(camp)}
-                                  className="p-2 rounded-lg border border-divider hover:bg-background text-text-primary transition-colors cursor-pointer"
-                                  title="Edit Campaign"
+                                  className="p-2 rounded-xl border border-divider hover:bg-background text-text-primary transition-colors cursor-pointer"
+                                  title="Edit Campaign Wizard"
                                 >
                                   <Edit2 size={16} />
                                 </button>
@@ -1456,7 +1558,7 @@ export const AdminCMS: React.FC = () => {
                                       deleteFestivalCampaign(id);
                                     }
                                   }}
-                                  className="p-2 rounded-lg border border-error/20 bg-error/5 text-error hover:bg-error/10 transition-colors cursor-pointer"
+                                  className="p-2 rounded-xl border border-error/20 bg-error/5 text-error hover:bg-error/10 transition-colors cursor-pointer"
                                   title="Delete Campaign"
                                 >
                                   <Trash2 size={16} />
@@ -1469,598 +1571,859 @@ export const AdminCMS: React.FC = () => {
                     )}
                   </div>
                 ) : (
-                  /* Split-Screen Festival Theme Builder Modal with LIVE MOBILE PREVIEW */
-                  (() => {
-                    const draftCampaign: FestivalCampaign = {
-                      name: fcName || 'Festival Campaign',
-                      title: fcTitleText || fcTitle || 'Krishna Janmashtami',
-                      subtitle: fcTitleSubtitle || fcSubtitle || 'Celebrate the divine spirit',
-                      backgroundType: fcBackgroundType,
-                      backgroundColor: fcBackgroundColor,
-                      gradientStart: fcGradientStart,
-                      gradientEnd: fcGradientEnd,
-                      gradientDirection: fcGradientDirection,
-                      backgroundImage: { url: fcBgImageUrl },
-                      backgroundPattern: fcBackgroundPattern,
-                      patternOpacity: fcPatternOpacity,
-                      patternScale: fcPatternScale,
-                      decorativeElements: fcDecorativeElements,
-                      titleConfig: {
-                        title: fcTitleText || fcTitle,
-                        subtitle: fcTitleSubtitle || fcSubtitle,
-                        position: fcTitlePosition,
-                        textColor: fcTitleColor,
-                        fontStyle: fcTitleFontStyle
-                      },
-                      featuredBannerTitle: fcFeaturedBannerTitle,
-                      bottomDecoration: fcBottomDecoration,
-                      theme: {
-                        textColor: fcTitleColor || fcTextColor,
-                        accentColor: fcAccentColor,
-                        cardBackground: fcCardBackground,
-                        cardTextColor: fcCardTextColor,
-                        overlayOpacity: fcOverlayOpacity
-                      },
-                      specialSubcategories: fcSubcategories,
-                      isActive: true,
-                      priority: fcPriority,
-                      startDate: fcStartDate,
-                      endDate: fcEndDate
-                    };
+                  /* CLEAN 4-STEP FESTIVAL CAMPAIGN WIZARD */
+                  <div className="flex flex-col gap-6 bg-background p-6 rounded-2xl border border-divider w-full">
+                    {/* Top Wizard Header */}
+                    <div className="flex items-center justify-between border-b border-divider pb-4">
+                      <div>
+                        <h3 className="text-lg font-black text-text-primary flex items-center gap-2">
+                          <Sparkles className="text-amber-500" size={20} />
+                          <span>{editingFestivalId ? 'Edit Festival Campaign Wizard' : 'Create Festival Campaign Wizard'}</span>
+                        </h3>
+                        <p className="text-xs text-text-secondary">Follow the step-by-step wizard to build lightweight date-bound festival campaigns.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={resetFestivalForm}
+                        className="px-3 py-1.5 rounded-xl border border-divider text-xs font-bold text-text-secondary hover:bg-surface transition-colors cursor-pointer flex items-center gap-1"
+                      >
+                        <X size={16} />
+                        <span>Cancel Wizard</span>
+                      </button>
+                    </div>
 
-                    return (
-                      <div className="flex flex-col xl:flex-row gap-6 items-start w-full">
-                        {/* LEFT COLUMN: Form Controls */}
-                        <form onSubmit={handleFestivalSubmit} className="flex-1 flex flex-col gap-6 bg-background p-5 md:p-6 rounded-2xl border border-divider w-full">
-                          <div className="flex items-center justify-between border-b border-divider pb-3">
-                            <div>
-                              <h3 className="text-lg font-black text-text-primary flex items-center gap-2">
-                                <Sparkles className="text-amber-500" size={20} />
-                                <span>{editingFestivalId ? 'Edit Festival Campaign' : 'Create Festival Campaign'}</span>
-                              </h3>
-                              <p className="text-xs text-text-secondary">Configure continuous background layers, pattern design, dynamic elements & cards.</p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={resetFestivalForm}
-                              className="p-1.5 rounded-full text-text-secondary hover:bg-surface transition-colors cursor-pointer"
-                            >
-                              <X size={20} />
-                            </button>
+                    {/* Step Navigation Bar */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 bg-surface p-1.5 rounded-xl border border-divider">
+                      {[
+                        { step: 1, title: 'Step 1: Details', desc: 'Name & Schedule' },
+                        { step: 2, title: 'Step 2: Theme & Banner', desc: 'CSS Style & Banner' },
+                        { step: 3, title: 'Step 3: Product Groups', desc: 'Group Discounts' },
+                        { step: 4, title: 'Step 4: Scope & Save', desc: 'Super Categories & Publish' }
+                      ].map((item) => (
+                        <button
+                          key={item.step}
+                          type="button"
+                          onClick={() => setWizardStep(item.step as any)}
+                          className={`p-2.5 rounded-lg text-left transition-all cursor-pointer flex flex-col ${
+                            wizardStep === item.step
+                              ? 'bg-emerald-600 text-white shadow-sm'
+                              : wizardStep > item.step
+                              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold'
+                              : 'text-text-secondary hover:bg-background'
+                          }`}
+                        >
+                          <span className="text-xs font-black">{item.title}</span>
+                          <span className={`text-[10px] truncate opacity-90 ${wizardStep === item.step ? 'text-white' : 'text-text-tertiary'}`}>
+                            {item.desc}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* STEP 1 — FESTIVAL BASIC DETAILS */}
+                    {wizardStep === 1 && (
+                      <div className="flex flex-col gap-6 animate-fadeIn">
+                        <div className="border-b border-divider pb-3">
+                          <h4 className="text-sm font-extrabold text-text-primary">Step 1 — Festival Basic Details</h4>
+                          <p className="text-xs text-text-secondary">Set the festival name and date/time window. The campaign will automatically activate and expire based on these times.</p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="md:col-span-2">
+                            <label className="block text-xs font-bold text-text-primary mb-1.5">Festival Name</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="e.g. Krishna Janmashtami"
+                              value={fcName}
+                              onChange={(e) => setFcName(e.target.value)}
+                              className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-surface border border-divider outline-none focus:border-primary font-bold text-text-primary"
+                            />
                           </div>
 
-                          {/* 1. Basic Details */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-xs font-bold text-text-primary mb-1">Festival Name (Internal)</label>
+                          <div>
+                            <label className="block text-xs font-bold text-text-primary mb-1.5">Start Date</label>
+                            <input
+                              type="date"
+                              required
+                              value={fcStartDate}
+                              onChange={(e) => setFcStartDate(e.target.value)}
+                              className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-surface border border-divider outline-none focus:border-primary text-text-primary"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-text-primary mb-1.5">Start Time</label>
+                            <input
+                              type="time"
+                              required
+                              value={fcStartTime}
+                              onChange={(e) => setFcStartTime(e.target.value)}
+                              className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-surface border border-divider outline-none focus:border-primary text-text-primary"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-text-primary mb-1.5">End Date</label>
+                            <input
+                              type="date"
+                              required
+                              value={fcEndDate}
+                              onChange={(e) => setFcEndDate(e.target.value)}
+                              className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-surface border border-divider outline-none focus:border-primary text-text-primary"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-text-primary mb-1.5">End Time</label>
+                            <input
+                              type="time"
+                              required
+                              value={fcEndTime}
+                              onChange={(e) => setFcEndTime(e.target.value)}
+                              className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-surface border border-divider outline-none focus:border-primary text-text-primary"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-4 border-t border-divider">
+                          <button
+                            type="button"
+                            onClick={resetFestivalForm}
+                            className="px-4 py-2 border border-divider rounded-xl text-xs font-bold text-text-secondary hover:bg-surface cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!fcName.trim()) {
+                                alert('Please enter Festival Name');
+                                return;
+                              }
+                              if (!fcStartDate || !fcEndDate) {
+                                alert('Please select valid Start and End dates');
+                                return;
+                              }
+                              const sDT = new Date(`${fcStartDate}T${fcStartTime}:00`);
+                              const eDT = new Date(`${fcEndDate}T${fcEndTime}:00`);
+                              if (eDT <= sDT) {
+                                alert('End Date & Time must be strictly after Start Date & Time');
+                                return;
+                              }
+                              setWizardStep(2);
+                            }}
+                            className="px-6 py-2.5 bg-emerald-600 text-white font-extrabold rounded-xl text-xs hover:bg-emerald-700 transition-colors shadow-md cursor-pointer flex items-center gap-1"
+                          >
+                            <span>Next: Theme & Banner</span>
+                            <span>→</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* STEP 2 — FESTIVAL THEME & BANNER */}
+                    {wizardStep === 2 && (
+                      <div className="flex flex-col gap-6 animate-fadeIn">
+                        <div className="border-b border-divider pb-3">
+                          <h4 className="text-sm font-extrabold text-text-primary">Step 2 — Festival Theme & Banner</h4>
+                          <p className="text-xs text-text-secondary">Select a predefined lightweight CSS theme or customize background colors. Theme assets are 100% CSS-based for optimal load speed.</p>
+                        </div>
+
+                        {/* Predefined Themes Grid */}
+                        <div>
+                          <label className="block text-xs font-bold text-text-primary mb-2">Select Predefined Festival Theme:</label>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                            {Object.values(PREDEFINED_FESTIVAL_THEMES).map((preset) => {
+                              const isSelected = fcThemeKey === preset.key && fcBackgroundType === 'predefined';
+                              return (
+                                <button
+                                  key={preset.key}
+                                  type="button"
+                                  onClick={() => applyPredefinedTheme(preset.key)}
+                                  className={`p-3 rounded-2xl border text-left flex flex-col gap-2 transition-all cursor-pointer ${
+                                    isSelected
+                                      ? 'border-emerald-600 ring-2 ring-emerald-500/30 shadow-md bg-surface'
+                                      : 'border-divider bg-surface/50 hover:bg-surface'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-2xl">{preset.emoji}</span>
+                                    {isSelected && (
+                                      <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px]">
+                                        ✓
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-xs font-extrabold text-text-primary line-clamp-1">{preset.name}</span>
+
+                                  {/* Color Preview Bar */}
+                                  <div className="flex items-center h-2 rounded-full overflow-hidden border border-black/10">
+                                    <div className="flex-1 h-full" style={{ backgroundColor: preset.gradientStart }} />
+                                    <div className="flex-1 h-full" style={{ backgroundColor: preset.cardBackground }} />
+                                    <div className="flex-1 h-full" style={{ backgroundColor: preset.buttonColor }} />
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Custom Background Mode Fallback */}
+                        <div className="p-4 rounded-xl border border-divider bg-surface/50 flex flex-col gap-3">
+                          <label className="text-xs font-bold text-text-primary">Or Custom Background Mode:</label>
+                          <div className="flex items-center gap-4">
+                            {['predefined', 'solid', 'gradient'].map((mode) => (
+                              <label key={mode} className="flex items-center gap-1.5 text-xs font-semibold text-text-primary cursor-pointer capitalize">
+                                <input
+                                  type="radio"
+                                  name="bgType"
+                                  value={mode}
+                                  checked={fcBackgroundType === mode}
+                                  onChange={() => setFcBackgroundType(mode as any)}
+                                  className="text-emerald-600"
+                                />
+                                <span>{mode}</span>
+                              </label>
+                            ))}
+                          </div>
+
+                          {fcBackgroundType === 'solid' && (
+                            <div className="flex items-center gap-3 mt-1">
+                              <label className="text-xs font-bold text-text-primary">Solid Color:</label>
+                              <input
+                                type="color"
+                                value={fcBackgroundColor}
+                                onChange={(e) => setFcBackgroundColor(e.target.value)}
+                                className="w-8 h-8 rounded border border-divider cursor-pointer"
+                              />
                               <input
                                 type="text"
-                                required
-                                placeholder="e.g. Krishna Janmashtami"
-                                value={fcName}
-                                onChange={(e) => setFcName(e.target.value)}
-                                className="w-full px-3 py-2 rounded-xl text-xs bg-surface border border-divider outline-none focus:border-primary"
+                                value={fcBackgroundColor}
+                                onChange={(e) => setFcBackgroundColor(e.target.value)}
+                                className="w-28 px-2 py-1 text-xs rounded bg-surface border border-divider"
                               />
                             </div>
+                          )}
 
-                            <div>
-                              <label className="block text-xs font-bold text-text-primary mb-1">Customer Heading Title</label>
-                              <input
-                                type="text"
-                                required
-                                placeholder="e.g. Krishna Janmashtami"
-                                value={fcTitle}
-                                onChange={(e) => {
-                                  setFcTitle(e.target.value);
-                                  if (!fcTitleText) setFcTitleText(e.target.value);
+                          {fcBackgroundType === 'gradient' && (
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-1">
+                              <div>
+                                <label className="block text-[11px] font-bold text-text-primary mb-1">Start Color</label>
+                                <input
+                                  type="color"
+                                  value={fcGradientStart}
+                                  onChange={(e) => setFcGradientStart(e.target.value)}
+                                  className="w-full h-8 rounded border border-divider cursor-pointer"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[11px] font-bold text-text-primary mb-1">End Color</label>
+                                <input
+                                  type="color"
+                                  value={fcGradientEnd}
+                                  onChange={(e) => setFcGradientEnd(e.target.value)}
+                                  className="w-full h-8 rounded border border-divider cursor-pointer"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[11px] font-bold text-text-primary mb-1">Direction</label>
+                                <select
+                                  value={fcGradientDirection}
+                                  onChange={(e) => setFcGradientDirection(e.target.value)}
+                                  className="w-full px-2 py-1.5 text-xs rounded bg-surface border border-divider outline-none"
+                                >
+                                  <option value="to bottom">To Bottom ↓</option>
+                                  <option value="to right">To Right →</option>
+                                  <option value="135deg">Diagonal ↘</option>
+                                </select>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Optional Festival Banner */}
+                        <div className="p-4 rounded-xl border border-divider bg-surface/50 flex flex-col gap-3">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              id="enable_banner"
+                              checked={fcEnableBanner}
+                              onChange={(e) => setFcEnableBanner(e.target.checked)}
+                              className="w-4 h-4 text-emerald-600 rounded"
+                            />
+                            <label htmlFor="enable_banner" className="text-xs font-extrabold text-text-primary cursor-pointer">
+                              Enable Festival Banner (Optional)
+                            </label>
+                          </div>
+
+                          {fcEnableBanner && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2 animate-fadeIn">
+                              <div>
+                                <label className="block text-[11px] font-bold text-text-primary mb-1">Banner Image URL / Upload</label>
+                                <div className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    placeholder="https://images.unsplash.com/..."
+                                    value={fcBannerImage}
+                                    onChange={(e) => setFcBannerImage(e.target.value)}
+                                    className="flex-1 px-3 py-1.5 text-xs bg-surface border border-divider rounded-xl outline-none"
+                                  />
+                                  <label className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-xl cursor-pointer shrink-0">
+                                    <span>{isUploadingFcBanner ? '...' : 'Upload'}</span>
+                                    <input type="file" accept="image/*" className="hidden" onChange={handleFcBannerUpload} />
+                                  </label>
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-bold text-text-primary mb-1">Banner Click Link (Optional)</label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. /products?search=sweets"
+                                  value={fcBannerLink}
+                                  onChange={(e) => setFcBannerLink(e.target.value)}
+                                  className="w-full px-3 py-1.5 text-xs bg-surface border border-divider rounded-xl outline-none"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between pt-4 border-t border-divider">
+                          <button
+                            type="button"
+                            onClick={() => setWizardStep(1)}
+                            className="px-4 py-2 border border-divider rounded-xl text-xs font-bold text-text-secondary hover:bg-surface cursor-pointer"
+                          >
+                            ← Back
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setWizardStep(3)}
+                            className="px-6 py-2.5 bg-emerald-600 text-white font-extrabold rounded-xl text-xs hover:bg-emerald-700 transition-colors shadow-md cursor-pointer flex items-center gap-1"
+                          >
+                            <span>Next: Product Groups</span>
+                            <span>→</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* STEP 3 — FESTIVAL PRODUCT GROUPS */}
+                    {wizardStep === 3 && (
+                      <div className="flex flex-col gap-6 animate-fadeIn">
+                        <div className="border-b border-divider pb-3">
+                          <h4 className="text-sm font-extrabold text-text-primary">Step 3 — Festival Product Groups</h4>
+                          <p className="text-xs text-text-secondary">
+                            Create temporary campaign display groups (e.g. "Gifts", "Krishna Specials"). You can select products from MULTIPLE existing categories for each group.
+                          </p>
+                        </div>
+
+                        {/* Created Groups List */}
+                        <div className="flex flex-col gap-3">
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs font-extrabold text-text-primary">Created Merchandising Groups ({fcGroups.length}):</label>
+                            {editingGroupId && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingGroupId(null);
+                                  setGroupNameInput('');
+                                  setGroupProductsInput([]);
                                 }}
-                                className="w-full px-3 py-2 rounded-xl text-xs bg-surface border border-divider outline-none focus:border-primary"
-                              />
-                            </div>
-
-                            <div className="md:col-span-2">
-                              <label className="block text-xs font-bold text-text-primary mb-1">Campaign Subtitle / Promo Tagline</label>
-                              <input
-                                type="text"
-                                placeholder="e.g. Celebrate the divine spirit"
-                                value={fcSubtitle}
-                                onChange={(e) => {
-                                  setFcSubtitle(e.target.value);
-                                  if (!fcTitleSubtitle) setFcTitleSubtitle(e.target.value);
-                                }}
-                                className="w-full px-3 py-2 rounded-xl text-xs bg-surface border border-divider outline-none focus:border-primary"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-xs font-bold text-text-primary mb-1">Campaign Type</label>
-                              <select
-                                value={fcType}
-                                onChange={(e) => setFcType(e.target.value as any)}
-                                className="w-full px-3 py-2 rounded-xl text-xs bg-surface border border-divider outline-none"
+                                className="text-xs text-rose-500 font-bold hover:underline"
                               >
-                                <option value="Festival">Festival (e.g. Varalakshmi, Janmashtami, Diwali)</option>
-                                <option value="Seasonal">Seasonal (e.g. Summer Mangoes, Winter)</option>
-                                <option value="Special Event">Special Event (e.g. Weekend Flash Sale)</option>
-                              </select>
+                                Cancel Group Editing
+                              </button>
+                            )}
+                          </div>
+
+                          {fcGroups.length === 0 ? (
+                            <div className="p-4 border border-dashed border-divider rounded-xl text-center text-xs text-text-secondary">
+                              No product groups created yet. Use the form below to create your first group (e.g. "Gifts" with 20% OFF).
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {fcGroups.map((grp) => {
+                                const prodCount = (grp.products || []).length;
+                                return (
+                                  <div
+                                    key={grp.id}
+                                    className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 ${
+                                      editingGroupId === grp.id ? 'border-emerald-600 bg-emerald-500/10' : 'border-divider bg-surface'
+                                    }`}
+                                  >
+                                    <div className="flex flex-col min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-extrabold text-xs text-text-primary truncate">{grp.displayName}</span>
+                                        <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-emerald-600 text-white">
+                                          {grp.discountPercent}% OFF
+                                        </span>
+                                      </div>
+                                      <span className="text-[11px] text-text-secondary mt-0.5">{prodCount} products selected</span>
+                                    </div>
+
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleEditGroup(grp)}
+                                        className="p-1.5 rounded-lg border border-divider hover:bg-background text-text-primary"
+                                        title="Edit Group"
+                                      >
+                                        <Edit2 size={14} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveGroup(grp.id)}
+                                        className="p-1.5 rounded-lg border border-rose-500/20 text-rose-500 hover:bg-rose-500/10"
+                                        title="Delete Group"
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Add / Edit Group Inline Form */}
+                        <div className="p-4 rounded-xl border border-divider bg-surface flex flex-col gap-4">
+                          <h5 className="text-xs font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                            {editingGroupId ? `Edit Group "${groupNameInput}"` : '+ Add New Festival Group'}
+                          </h5>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                              <label className="block text-[11px] font-bold text-text-primary mb-1">Group Display Name</label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Gifts or Sweets & Chocolates"
+                                value={groupNameInput}
+                                onChange={(e) => setGroupNameInput(e.target.value)}
+                                className="w-full px-3 py-2 text-xs rounded-xl bg-background border border-divider outline-none"
+                              />
                             </div>
 
                             <div>
-                              <label className="block text-xs font-bold text-text-primary mb-1">Priority</label>
+                              <label className="block text-[11px] font-bold text-text-primary mb-1">Discount (%)</label>
+                              <input
+                                type="number"
+                                min="0"
+                                max="99"
+                                value={groupDiscountInput}
+                                onChange={(e) => setGroupDiscountInput(Number(e.target.value))}
+                                className="w-full px-3 py-2 text-xs rounded-xl bg-background border border-divider outline-none font-bold text-emerald-600"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-bold text-text-primary mb-1">Display Order</label>
                               <input
                                 type="number"
                                 min="1"
-                                max="100"
-                                value={fcPriority}
-                                onChange={(e) => setFcPriority(Number(e.target.value))}
-                                className="w-full px-3 py-2 rounded-xl text-xs bg-surface border border-divider outline-none"
+                                value={groupOrderInput}
+                                onChange={(e) => setGroupOrderInput(Number(e.target.value))}
+                                className="w-full px-3 py-2 text-xs rounded-xl bg-background border border-divider outline-none"
                               />
                             </div>
                           </div>
 
-                          {/* 2. Background Layer Controls */}
-                          <div className="border-t border-divider pt-4 flex flex-col gap-3">
-                            <h4 className="text-xs font-black uppercase text-primary tracking-wider flex items-center gap-1.5">
-                              <Layers size={14} />
-                              <span>2. Background Layer</span>
-                            </h4>
-
-                            <div className="flex items-center gap-4">
-                              <label className="text-xs font-bold text-text-primary">Background Type:</label>
-                              <div className="flex items-center gap-3">
-                                {['solid', 'gradient', 'image'].map((type) => (
-                                  <label key={type} className="flex items-center gap-1 text-xs capitalize cursor-pointer">
-                                    <input
-                                      type="radio"
-                                      name="bgType"
-                                      value={type}
-                                      checked={fcBackgroundType === type}
-                                      onChange={() => setFcBackgroundType(type as any)}
-                                      className="text-primary"
-                                    />
-                                    <span>{type}</span>
-                                  </label>
-                                ))}
-                              </div>
-                            </div>
-
-                            {fcBackgroundType === 'solid' && (
-                              <div className="flex items-center gap-3 mt-1">
-                                <label className="text-xs font-bold text-text-primary shrink-0">Background Color:</label>
-                                <input
-                                  type="color"
-                                  value={fcBackgroundColor}
-                                  onChange={(e) => setFcBackgroundColor(e.target.value)}
-                                  className="w-8 h-8 rounded border border-divider cursor-pointer shrink-0"
-                                />
-                                <input
-                                  type="text"
-                                  value={fcBackgroundColor}
-                                  onChange={(e) => setFcBackgroundColor(e.target.value)}
-                                  className="w-28 px-2 py-1 text-xs rounded bg-surface border border-divider"
-                                />
-                                <div className="flex gap-1">
-                                  {['#DFF4E8', '#FEF3C7', '#FCE7F3', '#800040', '#1B4D3E'].map((c) => (
-                                    <button
-                                      key={c}
-                                      type="button"
-                                      onClick={() => setFcBackgroundColor(c)}
-                                      className="w-5 h-5 rounded-full border border-divider"
-                                      style={{ backgroundColor: c }}
-                                    />
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {fcBackgroundType === 'gradient' && (
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-1">
-                                <div>
-                                  <label className="block text-[11px] font-bold text-text-primary mb-1">Start Color</label>
-                                  <input
-                                    type="color"
-                                    value={fcGradientStart}
-                                    onChange={(e) => setFcGradientStart(e.target.value)}
-                                    className="w-full h-8 rounded border border-divider cursor-pointer"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-[11px] font-bold text-text-primary mb-1">End Color</label>
-                                  <input
-                                    type="color"
-                                    value={fcGradientEnd}
-                                    onChange={(e) => setFcGradientEnd(e.target.value)}
-                                    className="w-full h-8 rounded border border-divider cursor-pointer"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-[11px] font-bold text-text-primary mb-1">Direction</label>
-                                  <select
-                                    value={fcGradientDirection}
-                                    onChange={(e) => setFcGradientDirection(e.target.value)}
-                                    className="w-full px-2 py-1.5 text-xs rounded bg-surface border border-divider outline-none"
-                                  >
-                                    <option value="to bottom">To Bottom ↓</option>
-                                    <option value="to right">To Right →</option>
-                                    <option value="135deg">Diagonal ↘</option>
-                                  </select>
-                                </div>
-                              </div>
-                            )}
-
-                            {fcBackgroundType === 'image' && (
-                              <div className="flex gap-2 mt-1">
-                                <input
-                                  type="text"
-                                  placeholder="https://images.unsplash.com/..."
-                                  value={fcBgImageUrl}
-                                  onChange={(e) => setFcBgImageUrl(e.target.value)}
-                                  className="flex-1 px-3 py-1.5 rounded-xl text-xs bg-surface border border-divider outline-none"
-                                />
-                                <label className="px-3 py-1.5 rounded-xl bg-primary text-white text-xs font-bold cursor-pointer shrink-0">
-                                  <span>{isUploadingFcBg ? 'Uploading...' : 'Upload'}</span>
-                                  <input type="file" accept="image/*" className="hidden" onChange={handleFcBgUpload} />
-                                </label>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* 3. Background Design / Pattern */}
-                          <div className="border-t border-divider pt-4 flex flex-col gap-3">
-                            <h4 className="text-xs font-black uppercase text-primary tracking-wider">3. Background Design / Pattern</h4>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                              <div>
-                                <label className="block text-[11px] font-bold text-text-primary mb-1">Pattern Overlay</label>
-                                <select
-                                  value={fcBackgroundPattern}
-                                  onChange={(e) => setFcBackgroundPattern(e.target.value as any)}
-                                  className="w-full px-2.5 py-1.5 text-xs rounded bg-surface border border-divider outline-none"
-                                >
-                                  <option value="none">None</option>
-                                  <option value="floral">🌸 Floral</option>
-                                  <option value="mandala">☸ Mandala</option>
-                                  <option value="paisley">🌿 Paisley</option>
-                                  <option value="traditional">❖ Traditional</option>
-                                  <option value="dots">░ Dots</option>
-                                </select>
-                              </div>
-
-                              <div>
-                                <label className="block text-[11px] font-bold text-text-primary mb-1">Opacity ({(fcPatternOpacity * 100).toFixed(0)}%)</label>
-                                <input
-                                  type="range"
-                                  min="0"
-                                  max="0.4"
-                                  step="0.02"
-                                  value={fcPatternOpacity}
-                                  onChange={(e) => setFcPatternOpacity(Number(e.target.value))}
-                                  className="w-full"
-                                />
-                              </div>
-
-                              <div>
-                                <label className="block text-[11px] font-bold text-text-primary mb-1">Pattern Scale</label>
-                                <select
-                                  value={fcPatternScale}
-                                  onChange={(e) => setFcPatternScale(e.target.value as any)}
-                                  className="w-full px-2.5 py-1.5 text-xs rounded bg-surface border border-divider outline-none"
-                                >
-                                  <option value="small">Small</option>
-                                  <option value="medium">Medium</option>
-                                  <option value="large">Large</option>
-                                </select>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* 4. Decorative Elements Array Builder (+ Add Element) */}
-                          <div className="border-t border-divider pt-4 flex flex-col gap-3">
+                          {/* Selected Products Preview & Selector Modal Launcher */}
+                          <div className="flex flex-col gap-2 border-t border-divider pt-3">
                             <div className="flex items-center justify-between">
-                              <h4 className="text-xs font-black uppercase text-primary tracking-wider">4. Decorative Elements ({fcDecorativeElements.length})</h4>
-                              <span className="text-[11px] text-text-tertiary">Each element receives its own animation</span>
+                              <label className="text-xs font-bold text-text-primary">
+                                Selected Products ({groupProductsInput.length}):
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => setShowProductPickerModal(true)}
+                                className="px-3 py-1.5 bg-emerald-600 text-white font-extrabold text-xs rounded-xl hover:bg-emerald-700 cursor-pointer flex items-center gap-1 shadow-xs"
+                              >
+                                <Plus size={14} />
+                                <span>Select Products ({groupProductsInput.length})</span>
+                              </button>
                             </div>
 
-                            {/* Add Element Controls Sub-form */}
-                            <div className="p-3.5 bg-surface border border-divider rounded-xl flex flex-col gap-3">
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                <div>
-                                  <label className="block text-[11px] font-bold text-text-primary mb-1">Select Asset</label>
-                                  <select
-                                    value={elAsset}
-                                    onChange={(e) => setElAsset(e.target.value)}
-                                    className="w-full px-2 py-1.5 text-xs rounded bg-background border border-divider outline-none"
-                                  >
-                                    {Object.values(FESTIVAL_ASSET_LIBRARY).map((asset) => (
-                                      <option key={asset.id} value={asset.id}>
-                                        {asset.name}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-
-                                <div>
-                                  <label className="block text-[11px] font-bold text-text-primary mb-1">Animation</label>
-                                  <select
-                                    value={elAnim}
-                                    onChange={(e) => setElAnim(e.target.value as any)}
-                                    className="w-full px-2 py-1.5 text-xs rounded bg-background border border-divider outline-none"
-                                  >
-                                    <option value="none">Static (None)</option>
-                                    <option value="horizontal-move">Horizontal Move (Cloud)</option>
-                                    <option value="gentle-sway">Gentle Sway (Leaf/Feather)</option>
-                                    <option value="glow-flicker">Glow / Flicker (Diya)</option>
-                                    <option value="float-vertical">Float Vertical</option>
-                                    <option value="pulse">Pulse Scale</option>
-                                  </select>
-                                </div>
-
-                                <div>
-                                  <label className="block text-[11px] font-bold text-text-primary mb-1">Position X ({elPosX}%)</label>
-                                  <input
-                                    type="range"
-                                    min="0"
-                                    max="100"
-                                    value={elPosX}
-                                    onChange={(e) => setElPosX(Number(e.target.value))}
-                                    className="w-full"
-                                  />
-                                </div>
-
-                                <div>
-                                  <label className="block text-[11px] font-bold text-text-primary mb-1">Position Y ({elPosY}%)</label>
-                                  <input
-                                    type="range"
-                                    min="0"
-                                    max="90"
-                                    value={elPosY}
-                                    onChange={(e) => setElPosY(Number(e.target.value))}
-                                    className="w-full"
-                                  />
-                                </div>
-
-                                <div>
-                                  <label className="block text-[11px] font-bold text-text-primary mb-1">Size ({elSize}%)</label>
-                                  <input
-                                    type="range"
-                                    min="10"
-                                    max="80"
-                                    value={elSize}
-                                    onChange={(e) => setElSize(Number(e.target.value))}
-                                    className="w-full"
-                                  />
-                                </div>
-
-                                <div>
-                                  <label className="block text-[11px] font-bold text-text-primary mb-1">Alignment</label>
-                                  <select
-                                    value={elAlign}
-                                    onChange={(e) => setElAlign(e.target.value as any)}
-                                    className="w-full px-2 py-1.5 text-xs rounded bg-background border border-divider outline-none"
-                                  >
-                                    <option value="center">Center</option>
-                                    <option value="left">Left</option>
-                                    <option value="right">Right</option>
-                                  </select>
-                                </div>
-
-                                <div>
-                                  <label className="block text-[11px] font-bold text-text-primary mb-1">Speed</label>
-                                  <select
-                                    value={elSpeed}
-                                    onChange={(e) => setElSpeed(e.target.value as any)}
-                                    className="w-full px-2 py-1.5 text-xs rounded bg-background border border-divider outline-none"
-                                  >
-                                    <option value="slow">Slow</option>
-                                    <option value="medium">Medium</option>
-                                    <option value="fast">Fast</option>
-                                  </select>
-                                </div>
-
-                                <div className="flex items-end">
-                                  <button
-                                    type="button"
-                                    onClick={handleAddDecorativeElement}
-                                    className="w-full py-1.5 bg-emerald-600 text-white text-xs font-extrabold rounded-lg hover:bg-emerald-700 transition-colors cursor-pointer shadow-xs"
-                                  >
-                                    + Add Element
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Added Elements Table */}
-                            {fcDecorativeElements.length > 0 && (
-                              <div className="flex flex-col gap-1.5 mt-1">
-                                {fcDecorativeElements.map((el, idx) => {
-                                  const assetDef = FESTIVAL_ASSET_LIBRARY[el.asset];
+                            {/* Tags of selected products */}
+                            {groupProductsInput.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto p-2 bg-background border border-divider rounded-xl">
+                                {groupProductsInput.map((pid) => {
+                                  const prod = products.find((p) => p.id === pid || p._id === pid);
                                   return (
-                                    <div key={el.id || idx} className="flex items-center justify-between p-2 bg-surface border border-divider rounded-xl text-xs gap-2">
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-6 h-6 shrink-0">{assetDef?.svg()}</div>
-                                        <span className="font-bold text-text-primary">{assetDef?.name || el.asset}</span>
-                                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-primary/10 text-primary uppercase font-bold">
-                                          {el.animation || 'none'}
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center gap-3 text-[11px] text-text-tertiary">
-                                        <span>X: {el.position?.x}%</span>
-                                        <span>Y: {el.position?.y}%</span>
-                                        <span>Size: {el.size}%</span>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleRemoveDecorativeElement(idx)}
-                                          className="p-1 text-error hover:bg-error/10 rounded"
-                                        >
-                                          <Trash2 size={14} />
-                                        </button>
-                                      </div>
-                                    </div>
+                                    <span
+                                      key={pid}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-500/20"
+                                    >
+                                      <span>{prod?.name || pid}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleProductInGroup(pid)}
+                                        className="hover:text-rose-500 ml-1 text-xs"
+                                      >
+                                        ×
+                                      </button>
+                                    </span>
                                   );
                                 })}
                               </div>
                             )}
                           </div>
 
-                          {/* 5. Festival Title & Typography */}
-                          <div className="border-t border-divider pt-4 flex flex-col gap-3">
-                            <h4 className="text-xs font-black uppercase text-primary tracking-wider">5. Festival Content & Title</h4>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                              <div>
-                                <label className="block text-[11px] font-bold text-text-primary mb-1">Heading Title</label>
+                          <div className="flex justify-end pt-2">
+                            <button
+                              type="button"
+                              onClick={handleSaveGroup}
+                              className="px-5 py-2 bg-emerald-700 text-white font-extrabold text-xs rounded-xl hover:bg-emerald-800 cursor-pointer shadow-xs"
+                            >
+                              {editingGroupId ? 'Update Group' : '+ Save Group to Campaign'}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-4 border-t border-divider">
+                          <button
+                            type="button"
+                            onClick={() => setWizardStep(2)}
+                            className="px-4 py-2 border border-divider rounded-xl text-xs font-bold text-text-secondary hover:bg-surface cursor-pointer"
+                          >
+                            ← Back
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (fcGroups.length === 0) {
+                                alert('Please create at least 1 festival product group before proceeding');
+                                return;
+                              }
+                              setWizardStep(4);
+                            }}
+                            className="px-6 py-2.5 bg-emerald-600 text-white font-extrabold rounded-xl text-xs hover:bg-emerald-700 transition-colors shadow-md cursor-pointer flex items-center gap-1"
+                          >
+                            <span>Next: Scope & Save</span>
+                            <span>→</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* STEP 4 — STYLING & SCOPE + SUMMARY & SAVE */}
+                    {wizardStep === 4 && (
+                      <div className="flex flex-col gap-6 animate-fadeIn">
+                        <div className="border-b border-divider pb-3">
+                          <h4 className="text-sm font-extrabold text-text-primary">Step 4 — Styling & Application Scope</h4>
+                          <p className="text-xs text-text-secondary">Review light card styling tokens and select which Super Categories receive this festival campaign experience.</p>
+                        </div>
+
+                        {/* Styling Tokens */}
+                        <div className="p-4 rounded-xl border border-divider bg-surface flex flex-col gap-3">
+                          <h5 className="text-xs font-extrabold text-text-primary uppercase tracking-wider">Card Theme Styling (Pre-populated from Theme)</h5>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div>
+                              <label className="block text-[11px] font-bold text-text-primary mb-1">Card Background</label>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="color"
+                                  value={fcCardBackground}
+                                  onChange={(e) => setFcCardBackground(e.target.value)}
+                                  className="w-7 h-7 rounded border border-divider cursor-pointer"
+                                />
                                 <input
                                   type="text"
-                                  placeholder="e.g. Krishna Janmashtami"
-                                  value={fcTitleText}
-                                  onChange={(e) => setFcTitleText(e.target.value)}
-                                  className="w-full px-2.5 py-1.5 text-xs rounded bg-surface border border-divider outline-none"
+                                  value={fcCardBackground}
+                                  onChange={(e) => setFcCardBackground(e.target.value)}
+                                  className="w-full px-2 py-1 text-xs rounded bg-background border border-divider"
                                 />
                               </div>
+                            </div>
 
-                              <div>
-                                <label className="block text-[11px] font-bold text-text-primary mb-1">Text Color</label>
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="color"
-                                    value={fcTitleColor}
-                                    onChange={(e) => setFcTitleColor(e.target.value)}
-                                    className="w-8 h-8 rounded border border-divider cursor-pointer shrink-0"
-                                  />
-                                  <input
-                                    type="text"
-                                    value={fcTitleColor}
-                                    onChange={(e) => setFcTitleColor(e.target.value)}
-                                    className="w-full px-2 py-1 text-xs rounded bg-surface border border-divider"
-                                  />
-                                </div>
+                            <div>
+                              <label className="block text-[11px] font-bold text-text-primary mb-1">Card Border</label>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="color"
+                                  value={fcCardBorder}
+                                  onChange={(e) => setFcCardBorder(e.target.value)}
+                                  className="w-7 h-7 rounded border border-divider cursor-pointer"
+                                />
+                                <input
+                                  type="text"
+                                  value={fcCardBorder}
+                                  onChange={(e) => setFcCardBorder(e.target.value)}
+                                  className="w-full px-2 py-1 text-xs rounded bg-background border border-divider"
+                                />
                               </div>
+                            </div>
 
-                              <div>
-                                <label className="block text-[11px] font-bold text-text-primary mb-1">Font Style</label>
-                                <select
-                                  value={fcTitleFontStyle}
-                                  onChange={(e) => setFcTitleFontStyle(e.target.value as any)}
-                                  className="w-full px-2.5 py-1.5 text-xs rounded bg-surface border border-divider outline-none"
-                                >
-                                  <option value="festive">Festive (Classic Serif)</option>
-                                  <option value="modern">Modern (Sans-serif)</option>
-                                </select>
+                            <div>
+                              <label className="block text-[11px] font-bold text-text-primary mb-1">Accent Color</label>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="color"
+                                  value={fcAccentColor}
+                                  onChange={(e) => setFcAccentColor(e.target.value)}
+                                  className="w-7 h-7 rounded border border-divider cursor-pointer"
+                                />
+                                <input
+                                  type="text"
+                                  value={fcAccentColor}
+                                  onChange={(e) => setFcAccentColor(e.target.value)}
+                                  className="w-full px-2 py-1 text-xs rounded bg-background border border-divider"
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-bold text-text-primary mb-1">Button Color</label>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="color"
+                                  value={fcButtonColor}
+                                  onChange={(e) => setFcButtonColor(e.target.value)}
+                                  className="w-7 h-7 rounded border border-divider cursor-pointer"
+                                />
+                                <input
+                                  type="text"
+                                  value={fcButtonColor}
+                                  onChange={(e) => setFcButtonColor(e.target.value)}
+                                  className="w-full px-2 py-1 text-xs rounded bg-background border border-divider"
+                                />
                               </div>
                             </div>
                           </div>
+                        </div>
 
-                          {/* 6. Special Subcategories Cards */}
-                          <div className="border-t border-divider pt-4 flex flex-col gap-3">
-                            <h4 className="text-xs font-black uppercase text-primary tracking-wider">6. Campaign Subcategory Cards ({fcSubcategories.length})</h4>
-                            <div className="p-3 bg-surface border border-divider rounded-xl flex flex-col gap-2">
-                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                <select
-                                  value={selectedSubcatId}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setSelectedSubcatId(val);
-                                    const found = allSubCategories.find(s => s.id === val || s.name === val);
-                                    if (found) setSubcardTitle(found.name);
-                                  }}
-                                  className="px-2 py-1.5 text-xs rounded bg-background border border-divider outline-none"
-                                >
-                                  <option value="">-- DB Subcategory --</option>
-                                  {allSubCategories.map((sub, i) => (
-                                    <option key={`sub_${i}`} value={sub.name}>{sub.catName} → {sub.name}</option>
-                                  ))}
-                                </select>
+                        {/* Application Scope */}
+                        <div className="p-4 rounded-xl border border-divider bg-surface flex flex-col gap-3">
+                          <h5 className="text-xs font-extrabold text-text-primary uppercase tracking-wider">Apply Festival Campaign To:</h5>
+                          <p className="text-[11px] text-text-secondary">
+                            When customers visit selected Super Categories during active campaign dates, festival theme styling and merchandising groups will be displayed.
+                          </p>
 
-                                <input
-                                  type="text"
-                                  placeholder="Display Title"
-                                  value={subcardTitle}
-                                  onChange={(e) => setSubcardTitle(e.target.value)}
-                                  className="px-2 py-1.5 text-xs rounded bg-background border border-divider outline-none"
-                                />
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-1">
+                            {/* ALL Checkbox */}
+                            <button
+                              type="button"
+                              onClick={() => handleToggleScope('all')}
+                              className={`p-2.5 rounded-xl border text-left text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
+                                (fcApplicableScopes.includes('all') || fcApplicableScopes.includes('sc_all'))
+                                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                                  : 'bg-background border-divider text-text-primary hover:bg-surface'
+                              }`}
+                            >
+                              <span>✨ All Super Categories</span>
+                              {(fcApplicableScopes.includes('all') || fcApplicableScopes.includes('sc_all')) && <Check size={14} />}
+                            </button>
 
+                            {/* Dynamic Super Categories from DB */}
+                            {superCategories.map((sc) => {
+                              const isChecked = !fcApplicableScopes.includes('all') && fcApplicableScopes.includes(sc.id);
+                              return (
                                 <button
                                   type="button"
-                                  onClick={handleAddSubcardToCampaign}
-                                  className="py-1.5 bg-primary text-white text-xs font-bold rounded-lg hover:bg-secondary cursor-pointer"
+                                  key={sc.id}
+                                  onClick={() => handleToggleScope(sc.id)}
+                                  className={`p-2.5 rounded-xl border text-left text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
+                                    isChecked
+                                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                                      : 'bg-background border-divider text-text-primary hover:bg-surface'
+                                  }`}
                                 >
-                                  + Add Card
+                                  <span className="truncate">{sc.name}</span>
+                                  {isChecked && <Check size={14} />}
                                 </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* EMBEDDED SUMMARY CARD */}
+                        {(() => {
+                          const themePreset = PREDEFINED_FESTIVAL_THEMES[fcThemeKey] || PREDEFINED_FESTIVAL_THEMES.krishna;
+                          const totalProds = fcGroups.reduce((acc, g) => acc + (g.products?.length || 0), 0);
+                          const discounts = fcGroups.map((g) => g.discountPercent || 0);
+                          const minDisc = discounts.length ? Math.min(...discounts) : 0;
+                          const maxDisc = discounts.length ? Math.max(...discounts) : 0;
+                          const discLabel = minDisc === maxDisc ? `${minDisc}% OFF` : `${minDisc}% - ${maxDisc}% OFF`;
+                          const scopes = fcApplicableScopes.includes('all') ? 'All Super Categories' : `${fcApplicableScopes.length} selected areas`;
+
+                          return (
+                            <div className="p-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 flex flex-col gap-3">
+                              <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2">
+                                <h5 className="text-sm font-black text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                                  <span>{themePreset.emoji}</span>
+                                  <span>{fcName || 'Festival Campaign'} Summary</span>
+                                </h5>
+                                <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">READY TO PUBLISH</span>
+                              </div>
+
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                                <div>
+                                  <span className="text-text-secondary text-[11px]">Schedule:</span>
+                                  <div className="font-bold text-text-primary">{fcStartDate || 'N/A'} {fcStartTime} → {fcEndDate || 'N/A'} {fcEndTime}</div>
+                                </div>
+
+                                <div>
+                                  <span className="text-text-secondary text-[11px]">Selected Theme:</span>
+                                  <div className="font-bold text-text-primary">{themePreset.name}</div>
+                                </div>
+
+                                <div>
+                                  <span className="text-text-secondary text-[11px]">Festival Groups:</span>
+                                  <div className="font-bold text-text-primary">{fcGroups.length} groups ({totalProds} products)</div>
+                                </div>
+
+                                <div>
+                                  <span className="text-text-secondary text-[11px]">Discount Range:</span>
+                                  <div className="font-bold text-emerald-600">{discLabel}</div>
+                                </div>
                               </div>
                             </div>
-                          </div>
+                          );
+                        })()}
 
-                          {/* 7. Bottom Decorative Border */}
-                          <div className="border-t border-divider pt-4 flex flex-col gap-3">
-                            <h4 className="text-xs font-black uppercase text-primary tracking-wider">7. Bottom Decorative Border</h4>
-                            <select
-                              value={fcBottomDecoration}
-                              onChange={(e) => setFcBottomDecoration(e.target.value as any)}
-                              className="w-full md:w-1/2 px-2.5 py-1.5 text-xs rounded bg-surface border border-divider outline-none"
+                        {/* Action Buttons: Save Draft / Publish Campaign */}
+                        <div className="flex items-center justify-between pt-4 border-t border-divider">
+                          <button
+                            type="button"
+                            onClick={() => setWizardStep(3)}
+                            className="px-4 py-2 border border-divider rounded-xl text-xs font-bold text-text-secondary hover:bg-surface cursor-pointer"
+                          >
+                            ← Back
+                          </button>
+
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => handleSaveCampaignSubmit('draft')}
+                              className="px-5 py-2.5 border border-divider rounded-xl text-xs font-extrabold text-text-primary hover:bg-surface cursor-pointer"
                             >
-                              <option value="scallop">◠ Scallop Arch (Blinkit Style)</option>
-                              <option value="floral">✿ Floral Pattern</option>
-                              <option value="wave">〰 Gentle Wave</option>
-                              <option value="cutwork">❖ Temple Cutwork / Lattice</option>
-                              <option value="traditional">◇ Traditional Beaded Dots</option>
-                              <option value="plain">― Plain Straight Edge</option>
-                              <option value="none">None</option>
-                            </select>
-                          </div>
-
-                          {/* Dates & Publish */}
-                          <div className="border-t border-divider pt-4 flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                id="fc_active"
-                                checked={fcIsActive}
-                                onChange={(e) => setFcIsActive(e.target.checked)}
-                                className="w-4 h-4 text-primary rounded"
-                              />
-                              <label htmlFor="fc_active" className="text-xs font-bold cursor-pointer">Activate Campaign</label>
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                              <button
-                                type="button"
-                                onClick={resetFestivalForm}
-                                className="px-4 py-2 border border-divider rounded-xl text-xs font-bold text-text-secondary hover:bg-surface cursor-pointer"
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                type="submit"
-                                className="px-6 py-2 bg-primary text-white text-xs font-extrabold rounded-xl hover:bg-secondary shadow-md cursor-pointer"
-                              >
-                                {editingFestivalId ? 'Save Changes' : 'Publish Campaign'}
-                              </button>
-                            </div>
-                          </div>
-                        </form>
-
-                        {/* RIGHT COLUMN: LIVE MOBILE PHONE PREVIEW */}
-                        <div className="w-full xl:w-[360px] shrink-0 sticky top-4 bg-gray-950 p-4 rounded-3xl border border-gray-800 flex flex-col items-center shadow-2xl">
-                          <div className="flex items-center gap-2 mb-3 text-xs font-black text-amber-400 uppercase tracking-widest">
-                            <Smartphone size={16} />
-                            <span>Live Mobile Preview</span>
-                          </div>
-
-                          {/* Phone Device Container */}
-                          <div className="w-[320px] h-[620px] rounded-2xl overflow-y-auto border-4 border-gray-700 bg-background shadow-inner relative flex flex-col">
-                            {/* Fake Top App Bar */}
-                            <div className="w-full h-11 bg-emerald-700 text-white flex items-center justify-between px-3 text-xs font-bold shrink-0 sticky top-0 z-30 shadow-sm">
-                              <span>⚡ 10 mins</span>
-                              <span className="truncate max-w-[140px]">WORK - Kukatpally</span>
-                              <span>👤</span>
-                            </div>
-
-                            {/* Render Component Live */}
-                            <FestivalCampaignWrapper campaign={draftCampaign} />
+                              Save Draft
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSaveCampaignSubmit('published')}
+                              className="px-6 py-2.5 bg-emerald-600 text-white font-extrabold rounded-xl text-xs hover:bg-emerald-700 transition-colors shadow-md cursor-pointer flex items-center gap-1"
+                            >
+                              <span>Publish Campaign</span>
+                              <span>✓</span>
+                            </button>
                           </div>
                         </div>
                       </div>
-                    );
-                  })()
+                    )}
+                  </div>
                 )}
+              </div>
+            )}
+
+            {/* PRODUCT PICKER MODAL FOR STEP 3 */}
+            {showProductPickerModal && (
+              <div className="fixed inset-0 z-[999] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+                <div className="bg-background border border-divider rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+                  <div className="p-4 border-b border-divider flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-extrabold text-text-primary">Select Products for Festival Group</h4>
+                      <p className="text-xs text-text-secondary">Products can be selected from multiple existing categories.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowProductPickerModal(false)}
+                      className="p-1 rounded-full text-text-secondary hover:bg-surface"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  {/* Filter & Search Controls */}
+                  <div className="p-3 border-b border-divider bg-surface flex flex-col sm:flex-row gap-3">
+                    <input
+                      type="text"
+                      placeholder="Search products by name or brand..."
+                      value={productPickerSearch}
+                      onChange={(e) => setProductPickerSearch(e.target.value)}
+                      className="flex-1 px-3 py-1.5 text-xs bg-background border border-divider rounded-xl outline-none"
+                    />
+
+                    <select
+                      value={productPickerCategory}
+                      onChange={(e) => setProductPickerCategory(e.target.value)}
+                      className="px-3 py-1.5 text-xs bg-background border border-divider rounded-xl outline-none shrink-0"
+                    >
+                      <option value="">All Database Categories</option>
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Products Grid */}
+                  <div className="p-4 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 flex-1">
+                    {products
+                      .filter((p) => {
+                        const matchesCat = !productPickerCategory || p.categoryId === productPickerCategory || p.category === productPickerCategory;
+                        const matchesSearch = !productPickerSearch || p.name.toLowerCase().includes(productPickerSearch.toLowerCase()) || (p.brand || '').toLowerCase().includes(productPickerSearch.toLowerCase());
+                        return matchesCat && matchesSearch;
+                      })
+                      .map((prod) => {
+                        const isSelectedInCurrentGroup = groupProductsInput.includes(prod.id) || (prod._id && groupProductsInput.includes(prod._id));
+                        const otherGroup = fcGroups.find((g) => g.id !== editingGroupId && (g.products || []).some((pid: string) => pid === prod.id || pid === prod._id));
+
+                        return (
+                          <div
+                            key={prod.id}
+                            onClick={() => {
+                              if (!otherGroup) {
+                                handleToggleProductInGroup(prod.id);
+                              }
+                            }}
+                            className={`p-2.5 rounded-xl border text-left flex items-center justify-between gap-2 transition-all cursor-pointer ${
+                              isSelectedInCurrentGroup
+                                ? 'border-emerald-600 bg-emerald-500/10'
+                                : otherGroup
+                                ? 'border-divider bg-gray-100 dark:bg-gray-800 opacity-50 cursor-not-allowed'
+                                : 'border-divider bg-surface hover:bg-background'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <img
+                                src={prod.imageUrl || prod.image}
+                                alt={prod.name}
+                                className="w-9 h-9 object-contain rounded bg-white p-0.5 shrink-0"
+                              />
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-xs font-bold text-text-primary truncate">{prod.name}</span>
+                                <span className="text-[10px] text-text-secondary">₹{prod.price}</span>
+                                {otherGroup && (
+                                  <span className="text-[9px] font-bold text-amber-600 truncate">
+                                    Assigned to "{otherGroup.displayName}"
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className={`w-5 h-5 rounded-md flex items-center justify-center text-white text-xs shrink-0 ${isSelectedInCurrentGroup ? 'bg-emerald-600' : 'border border-divider'}`}>
+                              {isSelectedInCurrentGroup && <Check size={14} />}
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+
+                  {/* Modal Footer */}
+                  <div className="p-3 border-t border-divider bg-surface flex items-center justify-between">
+                    <span className="text-xs font-bold text-text-secondary">{groupProductsInput.length} products selected for group</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowProductPickerModal(false)}
+                      className="px-5 py-2 bg-emerald-600 text-white font-extrabold text-xs rounded-xl hover:bg-emerald-700 cursor-pointer"
+                    >
+                      Done Selecting
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 

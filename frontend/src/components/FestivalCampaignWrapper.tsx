@@ -1,313 +1,203 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FestivalCampaign, CampaignSubcategory } from '../context/CMSContext';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight } from 'lucide-react';
-import { FestivalPatternLayer } from './festival/FestivalPatternLayer';
-import { FestivalElementsLayer } from './festival/FestivalElementsLayer';
-import { FestivalBottomDecoration } from './festival/FestivalBottomDecoration';
+import { FestivalCampaign, useCMS } from '../context/CMSContext';
+import { PREDEFINED_FESTIVAL_THEMES } from '../pages/AdminCMS';
 
 interface FestivalCampaignWrapperProps {
   campaign: FestivalCampaign;
+  currentSuperCatId?: string;
+  onQuickView?: (product: any) => void;
 }
 
-export const FestivalCampaignWrapper: React.FC<FestivalCampaignWrapperProps> = ({ campaign }) => {
+export const FestivalCampaignWrapper: React.FC<FestivalCampaignWrapperProps> = ({
+  campaign,
+  currentSuperCatId
+}) => {
   const navigate = useNavigate();
+  const { products } = useCMS();
 
-  if (!campaign || campaign.isActive === false) return null;
-
-  const {
-    name,
-    title,
-    subtitle,
-    backgroundType = 'gradient',
-    backgroundColor = '#DFF4E8',
-    gradientStart = '#E8F6EF',
-    gradientEnd = '#C2E8D3',
-    gradientDirection = 'to bottom',
-    backgroundImage,
-    backgroundPattern = 'floral',
-    patternOpacity = 0.10,
-    patternScale = 'medium',
-    decorativeElements = [],
-    titleConfig,
-    theme,
-    content,
-    specialSubcategories,
-    featuredItems,
-    featuredBannerTitle,
-    bottomDecoration = 'scallop'
-  } = campaign;
-
-  // Background Style Assembly
-  let bgStyle: React.CSSProperties = {
-    backgroundColor: backgroundColor || '#DFF4E8'
-  };
-
-  if (backgroundType === 'gradient') {
-    bgStyle = {
-      background: `linear-gradient(${gradientDirection || 'to bottom'}, ${gradientStart || '#E8F6EF'}, ${gradientEnd || '#C2E8D3'})`
-    };
-  } else if (backgroundType === 'image' && backgroundImage?.url) {
-    bgStyle = {
-      backgroundImage: `url("${backgroundImage.url}")`,
-      backgroundPosition: theme?.backgroundPosition || 'center top',
-      backgroundSize: theme?.backgroundSize || 'cover',
-      backgroundColor: backgroundColor || '#800040'
-    };
-  }
-
-  const textColor = titleConfig?.textColor || theme?.textColor || '#1B4D3E';
-  const accentColor = theme?.accentColor || '#2E7D32';
-  const cardBgColor = (theme?.cardBackground && theme.cardBackground !== 'rgba(255, 255, 255, 0.18)' && theme.cardBackground !== 'rgba(255, 255, 255, 0.15)')
-    ? theme.cardBackground
-    : '#FFF9E6';
-  const cardTextColor = theme?.cardTextColor || '#1B4D3E';
-  const cardRadius = theme?.cardBorderRadius || '18px';
-
-  // Featured Banner Item List
-  const bannerItemList = (featuredItems && featuredItems.length > 0)
-    ? featuredItems
-    : (specialSubcategories || []).map((sub, i) => ({
-      name: sub.title,
-      originalPrice: i === 0 ? '499' : i === 1 ? '350' : '599',
-      offerPrice: i === 0 ? '199' : i === 1 ? '149' : '299',
-      image: sub.image?.url || 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=400&auto=format&fit=crop',
-      link: `/products?search=${encodeURIComponent(sub.subcategoryId || sub.title)}`
-    }));
-
-  const [activeItemIndex, setActiveItemIndex] = useState(0);
+  // 1. Strictly MOBILE ONLY: Hide entirely on Desktop Web (screen width >= 768px)
+  const [isMobile, setIsMobile] = useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
 
   useEffect(() => {
-    if (bannerItemList.length <= 1) return;
-    const interval = setInterval(() => {
-      setActiveItemIndex((prev) => (prev + 1) % bannerItemList.length);
-    }, 2500);
-    return () => clearInterval(interval);
-  }, [bannerItemList.length]);
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
-  const activeFeaturedItem = bannerItemList[activeItemIndex] || bannerItemList[0];
-  const sortedSubcategories = [...(specialSubcategories || [])].sort((a, b) => (a.order || 0) - (b.order || 0));
+  if (!isMobile) {
+    return null; // Festival theme continuous section is strictly for Mobile
+  }
 
-  const handleCardClick = (sub: CampaignSubcategory) => {
-    if (!sub) return;
-    const searchTarget = encodeURIComponent(sub.subcategoryId || sub.title);
-    navigate(`/products?search=${searchTarget}`);
+  if (!campaign || campaign.isActive === false || campaign.status === 'draft') {
+    return null;
+  }
+
+  // Strict Date/Time Bounds Check
+  const now = new Date();
+  const start = new Date(campaign.startDate);
+  const end = new Date(campaign.endDate);
+  if (now < start || now > end) {
+    return null;
+  }
+
+  // Scope check
+  if (currentSuperCatId) {
+    const scopes = campaign.applicableSuperCategories || ['all'];
+    const appliesToAll = scopes.includes('all') || scopes.includes('sc_all') || scopes.includes('All');
+    if (!appliesToAll && !scopes.includes(currentSuperCatId)) {
+      return null;
+    }
+  }
+
+  const themePreset = PREDEFINED_FESTIVAL_THEMES[campaign.themeKey || 'krishna'] || PREDEFINED_FESTIVAL_THEMES.krishna;
+  const styling = campaign.cardStyling || {};
+
+  const bgStyle: React.CSSProperties = campaign.backgroundType === 'solid'
+    ? { backgroundColor: campaign.backgroundColor || '#800040' }
+    : campaign.backgroundType === 'gradient'
+    ? { background: `linear-gradient(${campaign.gradientDirection || 'to bottom'}, ${campaign.gradientStart || '#800040'}, ${campaign.gradientEnd || '#58002C'})` }
+    : { background: `linear-gradient(to bottom, ${themePreset.gradientStart || '#800040'}, ${themePreset.gradientEnd || '#58002C'})` };
+
+  const cardBg = styling.cardBackground || '#FFF9E6';
+  const cardTextColor = styling.textColor || '#4A001F';
+  const accentColor = styling.accentColor || '#F6C453';
+
+  const groups = campaign.festivalGroups || [];
+
+  // Map product groups to cards
+  const displayGroups = groups.length > 0 ? groups : [
+    { id: 'fg_pooja', displayName: 'Pooja Essentials', products: [], discountPercent: 30 },
+    { id: 'fg_naivedyam', displayName: 'Naivedyam Essentials', products: [], discountPercent: 20 },
+    { id: 'fg_thamboolam', displayName: 'Thamboolam Needs', products: [], discountPercent: 15 },
+    { id: 'fg_sweets', displayName: 'Indian Sweets', products: [], discountPercent: 25 },
+    { id: 'fg_festive', displayName: 'Festive Ready', products: [], discountPercent: 20 }
+  ];
+
+  const firstGroup = displayGroups[0];
+  const rightGridGroups = displayGroups.slice(1, 5);
+
+  // Get sample product or image for a group
+  const getGroupDetails = (grp: any) => {
+    const groupProducts = (grp.products || [])
+      .map((pid: string) => products.find((p) => p.id === pid || p._id === pid))
+      .filter(Boolean);
+
+    const firstProd = groupProducts[0];
+    const image = firstProd?.imageUrl || firstProd?.image || 'https://images.unsplash.com/photo-1608686207856-001b95cf60ca?w=400&auto=format&fit=crop';
+    const mrp = firstProd?.mrp || firstProd?.price || 70;
+    const discount = grp.discountPercent || 20;
+    const offerPrice = firstProd?.price ? Math.round(firstProd.price * (1 - discount / 100)) : Math.round(mrp * (1 - discount / 100));
+
+    return { image, mrp, offerPrice, title: grp.displayName, prodName: firstProd?.name || 'Special Item' };
   };
 
+  const leftCard = getGroupDetails(firstGroup);
+
   return (
-    <section className="relative w-full overflow-hidden transition-all duration-300 min-h-[360px]">
-      {/* 1. Base Background Layer (Solid / Gradient / Image) */}
-      <div
-        className="absolute inset-0 z-0 bg-no-repeat transition-all duration-500"
-        style={bgStyle}
-      />
+    <section className="relative w-full overflow-hidden transition-all duration-300 pt-2 pb-0" style={bgStyle}>
+      <div className="relative z-10 w-full px-3 pt-2 pb-4 flex flex-col gap-3">
 
-      {/* 2. Pattern Layer Overlay */}
-      <FestivalPatternLayer
-        pattern={backgroundPattern}
-        opacity={patternOpacity}
-        scale={patternScale}
-        color={textColor}
-      />
-
-      {/* 3. Layered Decorative Elements with Element-Specific Animations */}
-      <FestivalElementsLayer elements={decorativeElements} />
-
-      {/* 4. Festival Content Container */}
-      <div className="relative z-10 w-full max-w-[1280px] mx-auto px-3 sm:px-6 pt-[var(--sticky-header-h,140px)] pb-3">
-
-        {/* Campaign Header / Title */}
-        <div className="flex flex-col items-center text-center my-2 sm:my-4 relative px-2">
-          <div className="flex items-center justify-center gap-2 w-full mb-0.5">
-            <svg className="w-6 h-4 opacity-90" viewBox="0 0 40 30" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M20 0C22 8 30 14 38 14C32 20 24 24 20 30C16 24 8 20 2 14C10 14 18 8 20 0Z" fill={accentColor} />
-            </svg>
-            <span
-              className="text-[10px] sm:text-xs font-black uppercase tracking-[0.3em] font-serif"
-              style={{ color: accentColor }}
-            >
+        {/* Blinkit Style Header Header: — CELEBRATE — Varalakshmi Vratham */}
+        <div className="flex flex-col items-center text-center my-1">
+          <div className="flex items-center justify-center gap-2 mb-0.5">
+            <span className="text-xs text-amber-300 opacity-90 font-serif">◇</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.25em] text-amber-200 font-serif">
               CELEBRATE
             </span>
-            <svg className="w-6 h-4 opacity-90" viewBox="0 0 40 30" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M20 0C22 8 30 14 38 14C32 20 24 24 20 30C16 24 8 20 2 14C10 14 18 8 20 0Z" fill={accentColor} />
-            </svg>
+            <span className="text-xs text-amber-300 opacity-90 font-serif">◇</span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs opacity-80 font-serif" style={{ color: accentColor }}>◇</span>
-            <h2
-              className={`text-2xl sm:text-3xl md:text-4xl font-black tracking-tight drop-shadow-sm leading-tight text-center ${titleConfig?.fontStyle === 'modern' ? 'font-sans' : 'font-serif'
-                }`}
-              style={{ color: textColor }}
-            >
-              {titleConfig?.title || content?.heading || title}
-            </h2>
-            <span className="text-xs opacity-80 font-serif" style={{ color: accentColor }}>◇</span>
-          </div>
-
-          {(titleConfig?.subtitle || content?.subtitle || subtitle) && (
-            <p
-              className="mt-0.5 text-[10px] sm:text-xs font-bold uppercase tracking-wider max-w-md opacity-95 drop-shadow-xs"
-              style={{ color: accentColor }}
-            >
-              {titleConfig?.subtitle || content?.subtitle || subtitle}
-            </p>
-          )}
+          <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-amber-100 font-serif leading-tight drop-shadow-md">
+            {campaign.name}
+          </h2>
         </div>
 
-        {/* 5. Blinkit Featured Top Banner Card */}
-        <div
-          className="w-full max-w-2xl mx-auto mb-3 rounded-2xl border border-black/10 shadow-md overflow-hidden relative transition-all"
-          style={{
-            backgroundColor: cardBgColor,
-            borderRadius: cardRadius
-          }}
-        >
-          <div className="absolute inset-0 opacity-10 pointer-events-none bg-[radial-gradient(#1B4D3E_1px,transparent_1px)] [background-size:12px_12px]" />
+        {/* Optional Banner */}
+        {campaign.enableBanner && campaign.bannerImage && (
+          <div
+            onClick={() => {
+              if (campaign.bannerLink) navigate(campaign.bannerLink);
+            }}
+            className="w-full rounded-2xl overflow-hidden shadow-md border border-white/20 mb-2"
+          >
+            <img src={campaign.bannerImage} alt={campaign.name} className="w-full h-auto max-h-[140px] object-cover" />
+          </div>
+        )}
 
-          <div className="grid grid-cols-12 items-center p-3 sm:p-4 min-h-[110px] sm:min-h-[135px] relative z-10">
-            <div className="col-span-7 flex flex-col justify-center pr-2">
-              <span
-                className="text-[10px] sm:text-xs font-black uppercase tracking-wider font-serif mb-1 opacity-80"
-                style={{ color: cardTextColor }}
-              >
-                {featuredBannerTitle || 'EXPLORE ALL SPECIALS'}
-              </span>
+        {/* Blinkit 2-Column Section Layout: Tall Card on Left + 2x2 Grid on Right */}
+        <div className="grid grid-cols-12 gap-2.5 items-stretch min-h-[260px]">
 
-              {activeFeaturedItem && (
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={activeItemIndex}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -6 }}
-                    transition={{ duration: 0.3 }}
-                    className="flex flex-col"
-                  >
-                    <h3
-                      className="text-xs sm:text-sm md:text-base font-extrabold font-serif line-clamp-1 leading-snug"
-                      style={{ color: cardTextColor }}
-                    >
-                      {activeFeaturedItem.name}
-                    </h3>
+          {/* Left Column: 1 Tall Featured Card (Pooja Essentials) */}
+          <div
+            onClick={() => navigate('/products')}
+            className="col-span-5 rounded-2xl p-2.5 flex flex-col justify-between shadow-md relative overflow-hidden border border-black/10 cursor-pointer active:scale-98 transition-transform"
+            style={{ backgroundColor: '#FEEAA7' }}
+          >
+            <div className="flex flex-col">
+              <h3 className="font-extrabold text-sm font-serif leading-tight text-center" style={{ color: cardTextColor }}>
+                {leftCard.title}
+              </h3>
 
-                    <div className="flex items-center gap-2 mt-1.5">
-                      {activeFeaturedItem.originalPrice && (
-                        <span className="text-[11px] font-bold text-gray-500 line-through">
-                          ₹{activeFeaturedItem.originalPrice}
-                        </span>
-                      )}
-                      {activeFeaturedItem.offerPrice && (
-                        <span
-                          className="px-2 py-0.5 rounded-md text-white text-[11px] font-black uppercase shadow-2xs"
-                          style={{ backgroundColor: accentColor }}
-                        >
-                          ₹{activeFeaturedItem.offerPrice}
-                        </span>
-                      )}
-                    </div>
-                  </motion.div>
-                </AnimatePresence>
-              )}
+              <div className="flex flex-col items-center mt-2">
+                <span className="text-[10px] font-extrabold text-gray-600 line-through">
+                  ₹{leftCard.mrp}
+                </span>
+                <span className="px-2 py-0.5 rounded-md bg-amber-400 text-gray-900 font-black text-xs shadow-2xs mt-0.5">
+                  ₹{leftCard.offerPrice}
+                </span>
+                <span className="text-[10px] font-bold text-gray-700 line-clamp-1 mt-1 text-center">
+                  {leftCard.prodName}
+                </span>
+              </div>
             </div>
 
-            <div className="col-span-5 h-20 sm:h-28 flex items-center justify-end relative overflow-hidden">
-              {activeFeaturedItem?.image && (
-                <AnimatePresence mode="wait">
-                  <motion.img
-                    key={activeItemIndex}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    transition={{ duration: 0.3 }}
-                    src={activeFeaturedItem.image}
-                    alt={activeFeaturedItem.name}
-                    className="max-h-full max-w-full object-contain filter drop-shadow-md"
-                  />
-                </AnimatePresence>
-              )}
+            <div className="w-full h-28 flex items-center justify-center overflow-hidden mt-1">
+              <img
+                src={leftCard.image}
+                alt={leftCard.title}
+                className="max-h-full max-w-full object-contain filter drop-shadow-sm"
+              />
             </div>
           </div>
-        </div>
 
-        {/* 6. Blinkit 4-Column Compact Grid */}
-        {sortedSubcategories.length > 0 && (
-          <div className="grid grid-cols-4 gap-1.5 sm:gap-2.5 mt-2">
-            {sortedSubcategories.slice(0, 4).map((sub, idx) => {
-              const imgUrl = sub.image?.url || 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=300&auto=format&fit=crop';
-
+          {/* Right Column: 2x2 Grid of Cards */}
+          <div className="col-span-7 grid grid-cols-2 gap-2">
+            {rightGridGroups.map((grp, idx) => {
+              const details = getGroupDetails(grp);
               return (
-                <motion.div
-                  key={sub._id || `sub_card_${idx}`}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => handleCardClick(sub)}
-                  className="col-span-1 relative cursor-pointer group flex flex-col items-center justify-between overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 border border-black/10 min-h-[105px] sm:min-h-[130px] p-1.5 sm:p-2 gap-1"
-                  style={{
-                    backgroundColor: cardBgColor,
-                    borderRadius: cardRadius
-                  }}
+                <div
+                  key={grp.id || idx}
+                  onClick={() => navigate('/products')}
+                  className="rounded-2xl p-2 flex flex-col justify-between shadow-sm relative overflow-hidden border border-black/10 cursor-pointer active:scale-98 transition-transform min-h-[120px]"
+                  style={{ backgroundColor: cardBg }}
                 >
-                  <div className="text-center flex flex-col items-center shrink-0">
-                    <span
-                      className="text-[10px] sm:text-xs font-black font-serif line-clamp-2 leading-tight tracking-tight"
-                      style={{ color: cardTextColor }}
-                    >
-                      {sub.title}
-                    </span>
-                    {sub.badge && (
-                      <span
-                        className="mt-0.5 px-1 py-0.2 rounded text-[8px] font-black uppercase"
-                        style={{ backgroundColor: accentColor, color: '#FFFFFF' }}
-                      >
-                        {sub.badge}
-                      </span>
-                    )}
-                  </div>
+                  <h4 className="font-extrabold text-[11px] font-serif leading-tight text-center line-clamp-2" style={{ color: cardTextColor }}>
+                    {details.title}
+                  </h4>
 
-                  <div className="relative w-full flex-1 min-h-[55px] sm:min-h-[75px] flex items-center justify-center overflow-hidden">
+                  <div className="w-full h-16 flex items-center justify-center overflow-hidden mt-1">
                     <img
-                      src={imgUrl}
-                      alt={sub.title}
-                      className="max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-105 filter drop-shadow-xs"
-                      loading="lazy"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=300&auto=format&fit=crop';
-                      }}
+                      src={details.image}
+                      alt={details.title}
+                      className="max-h-full max-w-full object-contain filter drop-shadow-2xs"
                     />
                   </div>
-                </motion.div>
+                </div>
               );
             })}
           </div>
-        )}
-
-        {/* Optional CTA Button */}
-        {content?.ctaText && (
-          <div className="flex justify-center mt-3">
-            <button
-              onClick={() => {
-                if (content.ctaLink) {
-                  navigate(content.ctaLink);
-                }
-              }}
-              className="inline-flex items-center gap-2 px-5 py-1.5 rounded-full text-xs font-black tracking-wider uppercase shadow-md transition-transform hover:scale-105 active:scale-95 cursor-pointer"
-              style={{
-                backgroundColor: accentColor,
-                color: '#FFFFFF'
-              }}
-            >
-              <span>{content.ctaText}</span>
-              <ArrowRight size={14} />
-            </button>
-          </div>
-        )}
-
+        </div>
       </div>
 
-      {/* 7. Bottom Decorative Border */}
-      <FestivalBottomDecoration type={bottomDecoration} accentColor={accentColor} />
+      {/* Scallop Arch Ornamental Border at Bottom */}
+      <div className="w-full overflow-hidden leading-none relative z-10 text-white">
+        <svg className="w-full h-5" viewBox="0 0 1200 30" preserveAspectRatio="none" fill="currentColor">
+          <path d="M0,0 C30,20 60,20 90,0 C120,20 150,20 180,0 C210,20 240,20 270,0 C300,20 330,20 360,0 C390,20 420,20 450,0 C480,20 510,20 540,0 C570,20 600,20 630,0 C660,20 690,20 720,0 C750,20 780,20 810,0 C840,20 870,20 900,0 C930,20 960,20 990,0 C1020,20 1050,20 1080,0 C1110,20 1140,20 1170,0 C1200,20 1230,20 1260,0 L1200,30 L0,30 Z" />
+        </svg>
+      </div>
     </section>
   );
 };

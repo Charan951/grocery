@@ -18,11 +18,45 @@ import 'package:freshcart/features/home/presentation/widgets/product_rail.dart';
 import 'package:freshcart/features/orders/data/models/order_model.dart';
 import 'package:freshcart/features/orders/presentation/controllers/orders_controller.dart';
 import 'package:freshcart/features/products/data/models/product_model.dart';
+import '../utils/festival_theme_resolver.dart';
+import '../widgets/festival_campaign_section.dart';
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
-  void _refresh(WidgetRef ref) {
+  @override
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  final ScrollController _scrollController = ScrollController();
+  bool _isScrolledPastFestival = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (_scrollController.hasClients) {
+      final isPast = _scrollController.offset > 140.0;
+      if (isPast != _isScrolledPastFestival) {
+        setState(() {
+          _isScrolledPastFestival = isPast;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _refresh() {
     ref.invalidate(bannersProvider);
     ref.invalidate(categoriesProvider);
     ref.invalidate(specialGroupsProvider);
@@ -32,7 +66,7 @@ class HomeScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final auth = ref.watch(authProvider);
     final cartCount = ref.watch(cartProvider.select((c) => c.totalItemsCount));
@@ -40,35 +74,57 @@ class HomeScreen extends ConsumerWidget {
     final categoriesAsync = ref.watch(categoriesProvider);
     final productsAsync = ref.watch(allProductsProvider);
 
+    final selectedSuperCat = ref.watch(selectedSuperCategoryProvider);
+    final campaign = ref.watch(activeFestivalCampaignProvider).valueOrNull;
+
+    final isFestivalActive = campaign != null &&
+        campaign.isCurrentlyActive &&
+        campaign.appliesToSuperCategory(selectedSuperCat);
+
+    final festivalTheme = isFestivalActive
+        ? FestivalThemeResolver.resolve(campaign)
+        : null;
+
     final address = auth.user?.selectedAddress?['addressLine'] as String? ??
         'Select a delivery address';
 
-    final header = HomeHeader(
+    final isFestivalHeaderActive = isFestivalActive && !_isScrolledPastFestival;
+
+    final locationHeader = LocationHeader(
       addressLine: address,
-      cartCount: cartCount,
       onAddressTap: () => context.push('/location_select'),
       onProfileTap: () => context.go('/account'),
-      onSearchTap: () => context.push('/search_detail'),
-      onCartTap: () => context.push('/cart'),
       onNotificationsTap: () => context.push('/notifications'),
+      backgroundColor: isFestivalActive ? Colors.transparent : null,
     );
 
-    Widget body;
+    final stickyHeader = SearchBarHeader(
+      cartCount: cartCount,
+      onSearchTap: () => context.push('/search_detail'),
+      onCartTap: () => context.push('/cart'),
+      backgroundColor: isFestivalHeaderActive ? Colors.transparent : null,
+    );
+
+    final superCatNav = _SuperCategoryNav(
+      isFestivalActive: isFestivalHeaderActive,
+    );
+
+    Widget bodyContent;
     if (categoriesAsync.isLoading && productsAsync.isLoading) {
-      body = const _HomeSkeleton();
+      bodyContent = const _HomeSkeleton();
     } else if (categoriesAsync.hasError && productsAsync.hasError) {
-      body = ErrorState(onRetry: () => _refresh(ref));
+      bodyContent = ErrorState(onRetry: _refresh);
     } else {
       final categories = categoriesAsync.valueOrNull ?? const <CategoryModel>[];
       final products = productsAsync.valueOrNull ?? const <ProductModel>[];
       if (categories.isEmpty && products.isEmpty) {
-        body = const EmptyState(
+        bodyContent = const EmptyState(
           icon: Icons.storefront_outlined,
           title: 'Store is being stocked',
           description: 'Fresh products are on their way. Pull down to refresh in a moment.',
         );
       } else {
-        body = _HomeContent(
+        bodyContent = _HomeContent(
           categories: categories,
           products: products,
           onOpenProduct: (p) => context.push('/product/${p.id}'),
@@ -85,23 +141,98 @@ class HomeScreen extends ConsumerWidget {
       }
     }
 
+    final surfaceColor = isDark ? AppColors.surfaceDark : AppColors.surface;
+
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
-      body: Column(
-        children: [
-          header,
-          Container(height: 1, color: isDark ? AppColors.dividerDark : AppColors.divider),
-          const _SuperCategoryNav(),
-          Expanded(
-            child: RefreshIndicator(
-              color: AppColors.primary,
-              onRefresh: () async => _refresh(ref),
-              child: body,
+      body: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () async => _refresh(),
+        child: CustomScrollView(
+          controller: _scrollController,
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+          slivers: [
+            // 1. Location Header (Scrolls out of view first when scrolling down)
+            SliverToBoxAdapter(
+              child: Container(
+                color: isFestivalActive && festivalTheme != null
+                    ? festivalTheme.backgroundColor
+                    : surfaceColor,
+                child: locationHeader,
+              ),
             ),
-          ),
-        ],
+
+            // 2. Persistent Sticky Navigation: Search Bar + Super Category Navigation (Pinned at top)
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _HeaderNavSliverDelegate(
+                height: isFestivalHeaderActive ? 106.0 : 107.0,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  color: isFestivalHeaderActive ? festivalTheme?.backgroundColor : surfaceColor,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      stickyHeader,
+                      superCatNav,
+                      if (!isFestivalHeaderActive)
+                        Divider(
+                          height: 1,
+                          thickness: 1,
+                          color: isDark ? AppColors.dividerDark : AppColors.divider,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // 3. Festival Campaign Section (Festival title, banner, Blinkit group cards, scallop arch) — NOT pinned!
+            if (isFestivalActive && festivalTheme != null)
+              SliverToBoxAdapter(
+                child: Container(
+                  color: festivalTheme.backgroundColor,
+                  child: FestivalCampaignSection(
+                    campaign: campaign,
+                    onOpenCategory: (catId) => context.push('/category/$catId'),
+                  ),
+                ),
+              ),
+
+            // 4. Normal Home Sections below festival section
+            SliverToBoxAdapter(
+              child: bodyContent,
+            ),
+          ],
+        ),
       ),
     );
+  }
+}
+
+class _HeaderNavSliverDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+  final double height;
+
+  _HeaderNavSliverDelegate({
+    required this.child,
+    required this.height,
+  });
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return SizedBox.expand(child: child);
+  }
+
+  @override
+  double get maxExtent => height;
+
+  @override
+  double get minExtent => height;
+
+  @override
+  bool shouldRebuild(covariant _HeaderNavSliverDelegate oldDelegate) {
+    return oldDelegate.height != height || oldDelegate.child != child;
   }
 }
 
@@ -125,7 +256,6 @@ class _HomeContent extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final banners = ref.watch(bannersProvider).valueOrNull ?? const [];
     final groups = ref.watch(specialGroupsProvider).valueOrNull ?? const [];
-    final campaign = ref.watch(activeFestivalCampaignProvider).valueOrNull;
 
     // Only look for a live order once the customer is signed in — keeps Home
     // free of the orders API (and its getIt dependency) for guests/tests.
@@ -152,11 +282,10 @@ class _HomeContent extends ConsumerWidget {
           onSeeAll: catId == null ? null : () => onOpenCategory(catId),
         );
 
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-      padding: EdgeInsets.zero,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        if (campaign != null && (campaign['isActive'] ?? true) == true) _FestivalHero(campaign: campaign),
         if (activeOrder != null) _ActiveOrderBanner(order: activeOrder, isDark: isDark),
 
         // Shop by category
@@ -208,74 +337,6 @@ class _HomeContent extends ConsumerWidget {
         const _TrustRow(),
         const SizedBox(height: 32),
       ],
-    );
-  }
-}
-
-Color? _hex(dynamic v) {
-  final s = (v is String) ? v.trim().replaceFirst('#', '') : '';
-  if (s.length == 6) return Color(int.parse('FF$s', radix: 16));
-  if (s.length == 8) return Color(int.parse(s, radix: 16));
-  return null;
-}
-
-class _FestivalHero extends StatelessWidget {
-  final Map<String, dynamic> campaign;
-  const _FestivalHero({required this.campaign});
-
-  @override
-  Widget build(BuildContext context) {
-    final title = (campaign['title'] ?? campaign['name'] ?? '').toString();
-    if (title.isEmpty) return const SizedBox.shrink();
-    final subtitle =
-        (campaign['subtitle'] ?? campaign['featuredBannerTitle'] ?? '').toString();
-    final bgType = (campaign['backgroundType'] ?? 'solid').toString();
-    final imageUrl = (campaign['backgroundImage'] is Map)
-        ? (campaign['backgroundImage']['url'] ?? '').toString()
-        : '';
-
-    final solid = _hex(campaign['backgroundColor']) ?? AppColors.primary;
-    final gStart = _hex(campaign['gradientStart']) ?? solid;
-    final gEnd = _hex(campaign['gradientEnd']) ?? AppColors.primary;
-
-    BoxDecoration deco;
-    if (bgType == 'image' && imageUrl.startsWith('http')) {
-      deco = BoxDecoration(
-        borderRadius: AppRadius.brLg,
-        image: DecorationImage(
-          image: CachedNetworkImageProvider(imageUrl),
-          fit: BoxFit.cover,
-          colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.35), BlendMode.darken),
-        ),
-      );
-    } else if (bgType == 'gradient') {
-      deco = BoxDecoration(
-        borderRadius: AppRadius.brLg,
-        gradient: LinearGradient(colors: [gStart, gEnd], begin: Alignment.topLeft, end: Alignment.bottomRight),
-      );
-    } else {
-      deco = BoxDecoration(borderRadius: AppRadius.brLg, color: solid);
-    }
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Container(
-        width: double.infinity,
-        decoration: deco,
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title,
-                style: AppTypography.h3(Colors.white).copyWith(fontWeight: FontWeight.w900)),
-            if (subtitle.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(subtitle,
-                  style: AppTypography.bodySmall(Colors.white.withValues(alpha: 0.92))),
-            ],
-          ],
-        ),
-      ),
     );
   }
 }
@@ -545,8 +606,8 @@ class _HomeSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      physics: const NeverScrollableScrollPhysics(),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: const [
         SizedBox(height: 24),
         ProductRailSkeleton(),
@@ -558,7 +619,8 @@ class _HomeSkeleton extends StatelessWidget {
 }
 
 class _SuperCategoryNav extends ConsumerWidget {
-  const _SuperCategoryNav();
+  final bool isFestivalActive;
+  const _SuperCategoryNav({this.isFestivalActive = false});
 
   IconData _iconFor(String? name, String? iconKey) {
     final key = '${iconKey ?? ''} ${name ?? ''}'.toLowerCase();
@@ -593,7 +655,9 @@ class _SuperCategoryNav extends ConsumerWidget {
     ];
 
     return Container(
-      color: isDark ? AppColors.surfaceDark : AppColors.surface,
+      color: isFestivalActive
+          ? Colors.transparent
+          : (isDark ? AppColors.surfaceDark : AppColors.surface),
       padding: const EdgeInsets.symmetric(vertical: 8),
       height: 48,
       child: ListView.separated(
@@ -633,11 +697,15 @@ class _SuperCategoryNav extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
                 color: isSelected
-                    ? AppColors.primary.withOpacity(0.12)
-                    : (isDark ? Colors.white.withOpacity(0.06) : Colors.grey.shade100),
+                    ? (isFestivalActive ? Colors.black.withOpacity(0.12) : AppColors.primary.withOpacity(0.12))
+                    : (isFestivalActive
+                        ? Colors.white.withOpacity(0.5)
+                        : (isDark ? Colors.white.withOpacity(0.06) : Colors.grey.shade100)),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: isSelected ? AppColors.primary.withOpacity(0.4) : Colors.transparent,
+                  color: isSelected
+                      ? (isFestivalActive ? Colors.black26 : AppColors.primary.withOpacity(0.4))
+                      : Colors.transparent,
                   width: 1,
                 ),
               ),
@@ -648,7 +716,7 @@ class _SuperCategoryNav extends ConsumerWidget {
                     icon,
                     size: 16,
                     color: isSelected
-                        ? AppColors.primary
+                        ? (isFestivalActive ? Colors.black87 : AppColors.primary)
                         : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondary),
                   ),
                   const SizedBox(width: 6),
@@ -658,7 +726,7 @@ class _SuperCategoryNav extends ConsumerWidget {
                       fontSize: 12,
                       fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                       color: isSelected
-                          ? AppColors.primary
+                          ? (isFestivalActive ? Colors.black : AppColors.primary)
                           : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimary),
                     ),
                   ),

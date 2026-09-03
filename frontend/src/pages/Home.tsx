@@ -486,9 +486,13 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
         schema={faqSchema}
       />
 
-      {/* 0. Festival Campaign Continuous Themed Section (ONLY FOR MOBILE) */}
-      {isMobileDevice && activeFestivalCampaign && activeFestivalCampaign.isActive !== false && (
-        <FestivalCampaignWrapper campaign={activeFestivalCampaign} />
+      {/* 0. Active Festival Campaign Component (STRICTLY MOBILE ONLY) */}
+      {isMobileDevice && activeFestivalCampaign && (
+        <FestivalCampaignWrapper
+          campaign={activeFestivalCampaign}
+          currentSuperCatId={activeSuperCatSlug}
+          onQuickView={onQuickView}
+        />
       )}
 
       {/* Zepto-Style Web Top Category Navigation Bar */}
@@ -746,16 +750,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                       key={item.id}
                       onClick={(e) => {
                         e.preventDefault();
-                        const matchingSec = subCategorySections.find(
-                          (sec) => sec.catSlug.toLowerCase() === item.catSlug.toLowerCase() || sec.subName.toLowerCase().includes(item.name.toLowerCase())
-                        );
-                        const targetId = matchingSec ? `sec-${matchingSec.id}` : `sec-${item.id}`;
-                        const targetEl = document.getElementById(targetId);
-                        if (targetEl) {
-                          targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        } else {
-                          navigate(item.link);
-                        }
+                        navigate(`/products?category=${item.catSlug}&subCategory=All`);
                       }}
                       className="flex flex-col items-center group cursor-pointer text-center bg-transparent border-none p-0 outline-none"
                     >

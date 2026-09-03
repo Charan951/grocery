@@ -130,6 +130,7 @@ class ProductModel {
   ProductModel copyWith({
     double? price,
     double? mrp,
+    String? discountText,
     String? defaultWeight,
     String? subCategory,
     int? stockQuantity,
@@ -144,7 +145,7 @@ class ProductModel {
       reviewsCount: reviewsCount,
       price: price ?? this.price,
       mrp: mrp ?? this.mrp,
-      discountText: discountText,
+      discountText: discountText ?? this.discountText,
       weightOptions: weightOptions,
       defaultWeight: defaultWeight ?? this.defaultWeight,
       description: description,

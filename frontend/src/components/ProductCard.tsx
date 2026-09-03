@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Product } from '../context/CMSContext';
+import { Product, useCMS, getCampaignProductPricing } from '../context/CMSContext';
 import { useCartWishlist, getProductStockQuantity, MAX_CUSTOMER_QTY_LIMIT } from '../context/CartWishlistContext';
 import { Heart, Plus, Minus } from 'lucide-react';
 import { getProductImage } from '../utils/imageUtils';
@@ -12,6 +12,7 @@ interface ProductCardProps {
 
 export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }) => {
   const { cart, addToCart, removeFromCart, updateCartQuantity, toggleWishlist, isInWishlist, showLimitToast } = useCartWishlist();
+  const { activeFestivalCampaign } = useCMS();
 
   const netWeight = product.netQuantity || product.defaultWeight || (product.weightOptions && product.weightOptions[0]) || '500 g';
   const favorited = isInWishlist(product.id);
@@ -22,7 +23,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
 
   const displayImage = getProductImage(product);
 
-  const originalPrice = product.originalPrice || product.mrp || product.price;
+  const pricing = getCampaignProductPricing(product, activeFestivalCampaign);
+  const currentPrice = product.originalPrice ? product.price : pricing.price;
+  const originalPrice = product.originalPrice || product.mrp || pricing.originalPrice;
 
   const stockQty = getProductStockQuantity(product);
   const isOutOfStock = stockQty <= 0;
@@ -153,9 +156,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
         {/* Price Row */}
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="bg-emerald-700 text-white font-black text-xs px-2 py-0.5 rounded-md">
-            ₹{product.price}
+            ₹{currentPrice}
           </span>
-          {originalPrice > product.price && (
+          {originalPrice > currentPrice && (
             <span className="text-xs text-text-secondary line-through font-medium">
               ₹{originalPrice}
             </span>
@@ -163,9 +166,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
         </div>
 
         {/* Discount Amount Tag */}
-        {originalPrice > product.price && (
+        {originalPrice > currentPrice && (
           <div className="text-[10px] font-bold text-emerald-600 uppercase tracking-tight mt-1">
-            ₹{originalPrice - product.price} OFF
+            ₹{originalPrice - currentPrice} OFF
           </div>
         )}
 
