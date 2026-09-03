@@ -96,21 +96,27 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
                   width: 120,
                   height: 120,
                   decoration: BoxDecoration(
-                    gradient: AppColors.primaryGradient,
+                    color: Colors.white,
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withOpacity(0.3),
+                        color: AppColors.primary.withOpacity(0.25),
                         blurRadius: 30,
                         offset: const Offset(0, 10),
                       ),
                     ],
                   ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.shopping_basket_rounded,
-                      size: 60,
-                      color: Colors.white,
+                  child: Center(
+                    child: Image.asset(
+                      'assets/images/logo.png',
+                      width: 90,
+                      height: 90,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => const Icon(
+                        Icons.shopping_basket_rounded,
+                        size: 60,
+                        color: AppColors.primary,
+                      ),
                     ),
                   ),
                 ),

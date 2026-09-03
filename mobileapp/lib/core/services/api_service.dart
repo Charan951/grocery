@@ -137,6 +137,9 @@ class ApiService {
       final res = await _dio.get('/festival-campaigns/active');
       final data = res.data;
       final c = (data is Map) ? data['campaign'] : null;
+      if (c is Map && (c['isActive'] == false || c['isActive'] == 0)) {
+        return null;
+      }
       return c is Map ? Map<String, dynamic>.from(c) : null;
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
@@ -163,6 +166,34 @@ class ApiService {
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
     }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchSuperCategories() async {
+    try {
+      final res = await _dio.get('/super-categories');
+      final data = res.data;
+      final list = (data is Map && data['superCategories'] is List) ? data['superCategories'] as List : const [];
+      if (list.isEmpty) {
+        return _defaultSuperCategories();
+      }
+      return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } catch (_) {
+      return _defaultSuperCategories();
+    }
+  }
+
+  List<Map<String, dynamic>> _defaultSuperCategories() {
+    return const [
+      {'id': 'sc_all', 'name': 'All', 'slug': 'all', 'icon': 'LayoutGrid'},
+      {'id': 'sc_cafe', 'name': 'Cafe', 'slug': 'cafe', 'icon': 'Coffee'},
+      {'id': 'sc_home', 'name': 'Home', 'slug': 'home', 'icon': 'Home'},
+      {'id': 'sc_toys', 'name': 'Toys', 'slug': 'toys', 'icon': 'Gamepad2'},
+      {'id': 'sc_fresh', 'name': 'Fresh', 'slug': 'fresh', 'icon': 'Leaf'},
+      {'id': 'sc_electronics', 'name': 'Electronics', 'slug': 'electronics', 'icon': 'Headphones'},
+      {'id': 'sc_mobiles', 'name': 'Mobiles', 'slug': 'mobiles', 'icon': 'Smartphone'},
+      {'id': 'sc_beauty', 'name': 'Beauty', 'slug': 'beauty', 'icon': 'Sparkles'},
+      {'id': 'sc_fashion', 'name': 'Fashion', 'slug': 'fashion', 'icon': 'Shirt'},
+    ];
   }
 
   /// [sort] maps to the backend: `price-low` | `price-high` | `rating`.

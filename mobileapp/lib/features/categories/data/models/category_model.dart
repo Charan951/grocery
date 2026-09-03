@@ -5,6 +5,7 @@ class CategoryModel {
   final String id;
   final String name;
   final String icon; // Icon asset or keyword for drawing
+  final String imageUrl;
   final Color color;
   final int productCount;
   final List<String> subCategories;
@@ -13,6 +14,7 @@ class CategoryModel {
     required this.id,
     required this.name,
     required this.icon,
+    this.imageUrl = '',
     required this.color,
     required this.productCount,
     this.subCategories = const [],
@@ -31,10 +33,15 @@ class CategoryModel {
         ? asString(json['displayName'])
         : asString(json['name'], fallback: id.isNotEmpty ? id : 'Category');
 
+    final img = (json['image'] is Map)
+        ? asString(json['image']['url'])
+        : asString(json['imageUrl'], fallback: asString(json['image']));
+
     return CategoryModel(
       id: id,
       name: display,
       icon: asString(json['icon'], fallback: 'basket'),
+      imageUrl: img,
       color: asColor(json['color']),
       productCount: asInt(json['productCount']),
       subCategories: subs,

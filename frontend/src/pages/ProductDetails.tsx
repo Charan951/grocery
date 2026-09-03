@@ -923,14 +923,14 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ onQuickView }) =
               
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-2.5 gap-x-4 text-xs font-semibold text-gray-500">
                 <Link to="/products?category=fruits-vegetables" className="hover:text-gray-900">Vegetables & Fruits</Link>
-                <Link to="/products?category=dairy-bread" className="hover:text-gray-900">Dairy, Bread & Eggs</Link>
-                <Link to="/products?category=munchies" className="hover:text-gray-900">Chips & Namkeen</Link>
-                <Link to="/products?category=cold-drinks" className="hover:text-gray-900">Drinks & Juices</Link>
-                <Link to="/products?category=atta-rice" className="hover:text-gray-900">Atta, Rice & Dal</Link>
-                <Link to="/products?category=bakery" className="hover:text-gray-900">Bakery & Biscuits</Link>
-                <Link to="/products?category=instant-food" className="hover:text-gray-900">Instant Food</Link>
-                <Link to="/products?category=sweet-tooth" className="hover:text-gray-900">Sweets & Chocolates</Link>
-                <Link to="/products?category=personal-care" className="hover:text-gray-900">Bath & Body</Link>
+                <Link to="/products?category=dairy-bread-eggs" className="hover:text-gray-900">Dairy, Bread & Eggs</Link>
+                <Link to="/products?category=meats-fish-eggs" className="hover:text-gray-900">Meats, Fish & Eggs</Link>
+                <Link to="/products?category=tea-coffee-health-drinks" className="hover:text-gray-900">Drinks & Juices</Link>
+                <Link to="/products?category=atta-rice-oil-dals" className="hover:text-gray-900">Atta, Rice & Dal</Link>
+                <Link to="/products?category=breakfast-cereals-spreads-sauces" className="hover:text-gray-900">Breakfast & Sauces</Link>
+                <Link to="/products?category=packaged-food" className="hover:text-gray-900">Packaged Food</Link>
+                <Link to="/products?category=chocolates-indian-sweets" className="hover:text-gray-900">Sweets & Chocolates</Link>
+                <Link to="/products?category=masala-dry-fruits-more" className="hover:text-gray-900">Masala & Dry Fruits</Link>
               </div>
             </div>
           </div>

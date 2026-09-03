@@ -38,16 +38,23 @@ export const employeeController = {
         status: 'Active'
       });
 
-      // Email the login credentials to a newly-created delivery partner.
-      // Non-blocking — a mail hiccup must not fail account creation.
-      if ((role || '') === 'Delivery' && email) {
-        sendDeliveryCredentials({
-          to: email,
-          name,
-          email,
-          password: plainPassword,
-          mode: 'created',
-        }).catch((e) => console.error('[mail] createEmployee credentials:', e?.message || e));
+      // Create DeliveryPartner doc immediately so it shows up in delivery partner management lists
+      if ((role || '') === 'Delivery') {
+        await DeliveryPartner.findOneAndUpdate(
+          { userId: employee._id },
+          { userId: employee._id, phone: employee.phone || '' },
+          { upsert: true, new: true }
+        ).catch((e) => console.warn('[DeliveryPartner] create note:', e?.message || e));
+
+        if (email) {
+          sendDeliveryCredentials({
+            to: email,
+            name,
+            email,
+            password: plainPassword,
+            mode: 'created',
+          }).catch((e) => console.error('[mail] createEmployee credentials:', e?.message || e));
+        }
       }
 
       res.status(201).json({ success: true, employee });

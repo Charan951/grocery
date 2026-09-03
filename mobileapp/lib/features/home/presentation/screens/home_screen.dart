@@ -28,6 +28,7 @@ class HomeScreen extends ConsumerWidget {
     ref.invalidate(specialGroupsProvider);
     ref.invalidate(allProductsProvider);
     ref.invalidate(activeFestivalCampaignProvider);
+    ref.invalidate(superCategoriesProvider);
   }
 
   @override
@@ -90,6 +91,7 @@ class HomeScreen extends ConsumerWidget {
         children: [
           header,
           Container(height: 1, color: isDark ? AppColors.dividerDark : AppColors.divider),
+          const _SuperCategoryNav(),
           Expanded(
             child: RefreshIndicator(
               color: AppColors.primary,
@@ -154,7 +156,7 @@ class _HomeContent extends ConsumerWidget {
       physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
       padding: EdgeInsets.zero,
       children: [
-        if (campaign != null) _FestivalHero(campaign: campaign),
+        if (campaign != null && (campaign['isActive'] ?? true) == true) _FestivalHero(campaign: campaign),
         if (activeOrder != null) _ActiveOrderBanner(order: activeOrder, isDark: isDark),
 
         // Shop by category
@@ -551,6 +553,121 @@ class _HomeSkeleton extends StatelessWidget {
         ProductRailSkeleton(),
         ProductRailSkeleton(),
       ],
+    );
+  }
+}
+
+class _SuperCategoryNav extends ConsumerWidget {
+  const _SuperCategoryNav();
+
+  IconData _iconFor(String? name, String? iconKey) {
+    final key = '${iconKey ?? ''} ${name ?? ''}'.toLowerCase();
+    if (key.contains('grid') || key.contains('all')) return Icons.grid_view_rounded;
+    if (key.contains('coffee') || key.contains('cafe')) return Icons.local_cafe_outlined;
+    if (key.contains('home')) return Icons.home_outlined;
+    if (key.contains('toy') || key.contains('game')) return Icons.sports_esports_outlined;
+    if (key.contains('leaf') || key.contains('fresh')) return Icons.eco_outlined;
+    if (key.contains('headphone') || key.contains('electronic')) return Icons.headphones_outlined;
+    if (key.contains('phone') || key.contains('mobile')) return Icons.smartphone_outlined;
+    if (key.contains('sparkle') || key.contains('beauty')) return Icons.auto_awesome_outlined;
+    if (key.contains('shirt') || key.contains('fashion')) return Icons.checkroom_outlined;
+    return Icons.category_outlined;
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final superCatsAsync = ref.watch(superCategoriesProvider);
+    final selectedSlug = ref.watch(selectedSuperCategoryProvider);
+
+    final superCats = superCatsAsync.valueOrNull ?? const [
+      {'id': 'sc_all', 'name': 'All', 'slug': 'all', 'icon': 'LayoutGrid'},
+      {'id': 'sc_cafe', 'name': 'Cafe', 'slug': 'cafe', 'icon': 'Coffee'},
+      {'id': 'sc_home', 'name': 'Home', 'slug': 'home', 'icon': 'Home'},
+      {'id': 'sc_toys', 'name': 'Toys', 'slug': 'toys', 'icon': 'Gamepad2'},
+      {'id': 'sc_fresh', 'name': 'Fresh', 'slug': 'fresh', 'icon': 'Leaf'},
+      {'id': 'sc_electronics', 'name': 'Electronics', 'slug': 'electronics', 'icon': 'Headphones'},
+      {'id': 'sc_mobiles', 'name': 'Mobiles', 'slug': 'mobiles', 'icon': 'Smartphone'},
+      {'id': 'sc_beauty', 'name': 'Beauty', 'slug': 'beauty', 'icon': 'Sparkles'},
+      {'id': 'sc_fashion', 'name': 'Fashion', 'slug': 'fashion', 'icon': 'Shirt'},
+    ];
+
+    return Container(
+      color: isDark ? AppColors.surfaceDark : AppColors.surface,
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      height: 48,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        physics: const BouncingScrollPhysics(),
+        itemCount: superCats.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final sc = superCats[i];
+          final name = (sc['name'] ?? 'Category') as String;
+          final slug = (sc['slug'] ?? sc['id'] ?? name.toLowerCase()) as String;
+          final iconKey = sc['icon'] as String?;
+          final isSelected = selectedSlug == slug || (selectedSlug == '' && slug == 'all');
+          final icon = _iconFor(name, iconKey);
+
+          return InkWell(
+            onTap: () {
+              ref.read(selectedSuperCategoryProvider.notifier).state = slug;
+              if (slug != 'all') {
+                final catList = (sc['categories'] is List) ? (sc['categories'] as List) : const [];
+                if (catList.isNotEmpty) {
+                  final firstCat = catList.first.toString();
+                  context.push('/category/$firstCat');
+                } else if (slug == 'cafe') {
+                  context.push('/category/dairy-bread-eggs');
+                } else if (slug == 'home') {
+                  context.push('/category/atta-rice-oil-dals');
+                } else if (slug == 'fresh') {
+                  context.push('/category/fruits-vegetables');
+                }
+              }
+            },
+            borderRadius: BorderRadius.circular(20),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.primary.withOpacity(0.12)
+                    : (isDark ? Colors.white.withOpacity(0.06) : Colors.grey.shade100),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected ? AppColors.primary.withOpacity(0.4) : Colors.transparent,
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    icon,
+                    size: 16,
+                    color: isSelected
+                        ? AppColors.primary
+                        : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondary),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    name,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      color: isSelected
+                          ? AppColors.primary
+                          : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimary),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }

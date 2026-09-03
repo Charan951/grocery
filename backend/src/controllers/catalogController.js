@@ -252,12 +252,18 @@ export const categoryController = {
 
   createCategory: async (req, res) => {
     try {
-      const catData = req.body;
+      const catData = { ...req.body };
+      delete catData._id;
       if (!catData.slug && catData.name) {
         catData.slug = catData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
       }
       if (!catData.id) {
         catData.id = catData.slug || 'cat_' + Date.now();
+      }
+      const imgVal = catData.imageUrl || catData.image || (typeof catData.icon === 'string' && catData.icon.startsWith('http') ? catData.icon : '');
+      if (imgVal) {
+        catData.imageUrl = imgVal;
+        catData.image = imgVal;
       }
       const cat = await Category.create(catData);
       res.status(201).json({ success: true, category: cat });
@@ -268,9 +274,16 @@ export const categoryController = {
 
   updateCategory: async (req, res) => {
     try {
+      const catData = { ...req.body };
+      delete catData._id;
+      const imgVal = catData.imageUrl || catData.image || (typeof catData.icon === 'string' && catData.icon.startsWith('http') ? catData.icon : '');
+      if (imgVal) {
+        catData.imageUrl = imgVal;
+        catData.image = imgVal;
+      }
       const cat = await Category.findOneAndUpdate(
         { $or: [{ id: req.params.id }, { slug: req.params.id }] },
-        req.body,
+        { $set: catData },
         { new: true }
       );
       if (!cat) return res.status(404).json({ success: false, message: 'Category not found' });

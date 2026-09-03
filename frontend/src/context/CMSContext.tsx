@@ -944,7 +944,7 @@ const defaultCategories: Category[] = [
 const defaultProducts: Product[] = [
   // Fresh Vegetables
   { id: 'p_fv_v1', name: 'Farm Fresh Red Tomatoes', brand: 'Earth Greens', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Fresh Vegetables', rating: 4.8, reviewsCount: 290, price: 45, mrp: 60, discountText: '25% OFF', weightOptions: ['1kg'], defaultWeight: '1kg', description: 'Ripe vine tomatoes bursting with natural flavor.', imageUrl: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=800&auto=format&fit=crop' },
-  { id: 'p_fv_v2', name: 'Sweet Orange Carrots', brand: 'Natures Direct', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Fresh Vegetables', rating: 4.8, reviewsCount: 220, price: 65, mrp: 80, discountText: '18% OFF', weightOptions: ['1kg'], defaultWeight: '1kg', description: 'Fresh farm-cut carrots rich in beta-carotene.', imageUrl: 'https://images.unsplash.com/photo-1598170845058-12ef4a457939?w=800&auto=format&fit=crop' },
+  { id: 'p_fv_v2', name: 'Sweet Orange Carrots', brand: 'Natures Direct', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Fresh Vegetables', rating: 4.8, reviewsCount: 220, price: 65, mrp: 80, discountText: '18% OFF', weightOptions: ['1kg'], defaultWeight: '1kg', description: 'Fresh farm-cut carrots rich in beta-carotene.', imageUrl: 'https://images.unsplash.com/photo-1582515073490-39981397c445?w=800&auto=format&fit=crop' },
   { id: 'p_fv_v3', name: 'Fresh White Cauliflower', brand: 'FarmFresh', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Fresh Vegetables', rating: 4.7, reviewsCount: 180, price: 40, mrp: 55, discountText: '27% OFF', weightOptions: ['1 pc'], defaultWeight: '1 pc', description: 'Compact white cauliflower head directly harvested.', imageUrl: 'https://images.unsplash.com/photo-1568584711075-3d021a7c3ca3?w=800&auto=format&fit=crop' },
   { id: 'p_fv_v4', name: 'Green Bell Pepper Capsicum', brand: 'Earth Greens', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Fresh Vegetables', rating: 4.6, reviewsCount: 150, price: 50, mrp: 65, discountText: '23% OFF', weightOptions: ['500g'], defaultWeight: '500g', description: 'Crisp green Shimla mirch peppers.', imageUrl: 'https://images.unsplash.com/photo-1563565375-f3fdfdbefa83?w=800&auto=format&fit=crop' },
   { id: 'p_fv_v5', name: 'Fresh Lady Finger Bhindi', brand: 'FarmFresh', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Fresh Vegetables', rating: 4.7, reviewsCount: 195, price: 42, mrp: 55, discountText: '₹13 OFF', weightOptions: ['500g'], defaultWeight: '500g', description: 'Tender green okra for stir frying.', imageUrl: 'https://images.unsplash.com/photo-1425543103986-22413b10d829?w=800&auto=format&fit=crop' },
@@ -960,28 +960,28 @@ const defaultProducts: Product[] = [
   { id: 'p_fv_e1', name: 'Organic Hass Avocados', brand: 'Natures Choice', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Exotics & Premium', rating: 4.9, reviewsCount: 412, price: 249, mrp: 299, discountText: '₹50 OFF', weightOptions: ['2 pcs'], defaultWeight: '2 pcs', description: 'Rich, creamy Hass avocados high in healthy fats.', imageUrl: 'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=800&auto=format&fit=crop' },
   { id: 'p_fv_e2', name: 'Fresh Imported Blueberries', brand: 'BerryFresh', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Exotics & Premium', rating: 4.9, reviewsCount: 310, price: 299, mrp: 350, discountText: '14% OFF', weightOptions: ['125g'], defaultWeight: '125g', description: 'Plump blue berries packed with antioxidants.', imageUrl: 'https://images.unsplash.com/photo-1498557850523-fd3d118b962e?w=800&auto=format&fit=crop' },
   { id: 'p_fv_e3', name: 'Sweet Red Strawberries', brand: 'BerryFresh', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Exotics & Premium', rating: 4.8, reviewsCount: 520, price: 160, mrp: 200, discountText: '20% OFF', weightOptions: ['200g'], defaultWeight: '200g', description: 'Fresh Mahabaleshwar red strawberries.', imageUrl: 'https://images.unsplash.com/photo-1464965911861-746a04b4bca6?w=800&auto=format&fit=crop' },
-  { id: 'p_fv_e4', name: 'Exotic Red Dragon Fruit', brand: 'ExoFruit', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Exotics & Premium', rating: 4.7, reviewsCount: 190, price: 120, mrp: 150, discountText: '₹30 OFF', weightOptions: ['1 pc'], defaultWeight: '1 pc', description: 'Vibrant pink dragon fruit with sweet speckled flesh.', imageUrl: 'https://images.unsplash.com/photo-1527325678964-549216468488?w=800&auto=format&fit=crop' },
-  { id: 'p_fv_e5', name: 'New Zealand Green Kiwi', brand: 'Zespri', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Exotics & Premium', rating: 4.8, reviewsCount: 280, price: 135, mrp: 160, discountText: '15% OFF', weightOptions: ['3 pcs'], defaultWeight: '3 pcs', description: 'Tangy sweet Zespri green kiwis.', imageUrl: 'https://images.unsplash.com/photo-1585059819970-072f24d7764a?w=800&auto=format&fit=crop' },
+  { id: 'p_fv_e4', name: 'Exotic Red Dragon Fruit', brand: 'ExoFruit', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Exotics & Premium', rating: 4.7, reviewsCount: 190, price: 120, mrp: 150, discountText: '₹30 OFF', weightOptions: ['1 pc'], defaultWeight: '1 pc', description: 'Vibrant pink dragon fruit with sweet speckled flesh.', imageUrl: 'https://images.unsplash.com/photo-1550258987-190a2d41a8ba?w=800&auto=format&fit=crop' },
+  { id: 'p_fv_e5', name: 'New Zealand Green Kiwi', brand: 'Zespri', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Exotics & Premium', rating: 4.8, reviewsCount: 280, price: 135, mrp: 160, discountText: '15% OFF', weightOptions: ['3 pcs'], defaultWeight: '3 pcs', description: 'Tangy sweet Zespri green kiwis.', imageUrl: 'https://images.unsplash.com/photo-1618897996318-5a901fa6ca71?w=800&auto=format&fit=crop' },
 
   // Organics & Hydroponics
   { id: 'p_fv_o1', name: 'Hydroponic Butterhead Lettuce', brand: 'UrbanGreens', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Organics & Hydroponics', rating: 4.9, reviewsCount: 150, price: 89, mrp: 110, discountText: '19% OFF', weightOptions: ['200g'], defaultWeight: '200g', description: 'Pesticide-free hydroponically grown tender lettuce.', imageUrl: 'https://images.unsplash.com/photo-1622206151226-18ca2c9ab4a1?w=800&auto=format&fit=crop' },
   { id: 'p_fv_o2', name: 'Organic Tender Baby Spinach', brand: 'Earth Greens', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Organics & Hydroponics', rating: 4.9, reviewsCount: 410, price: 55, mrp: 75, discountText: '₹20 OFF', weightOptions: ['250g'], defaultWeight: '250g', description: 'Certified organic baby spinach.', imageUrl: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=800&auto=format&fit=crop' },
   { id: 'p_fv_o3', name: 'Organic Cherry Tomatoes', brand: 'Earth Greens', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Organics & Hydroponics', rating: 4.8, reviewsCount: 210, price: 79, mrp: 99, discountText: '20% OFF', weightOptions: ['250g'], defaultWeight: '250g', description: 'Sweet vine organic cherry tomatoes.', imageUrl: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=800&auto=format&fit=crop' },
-  { id: 'p_fv_o4', name: 'Hydroponic English Cucumber', brand: 'UrbanGreens', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Organics & Hydroponics', rating: 4.7, reviewsCount: 175, price: 65, mrp: 85, discountText: '23% OFF', weightOptions: ['500g'], defaultWeight: '500g', description: 'Crisp seedless hydroponic cucumber.', imageUrl: 'https://images.unsplash.com/photo-1447175008436-08417090e4b0?w=800&auto=format&fit=crop' },
-  { id: 'p_fv_o5', name: 'Organic Zucchini Green', brand: 'Earth Greens', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Organics & Hydroponics', rating: 4.8, reviewsCount: 130, price: 95, mrp: 120, discountText: '20% OFF', weightOptions: ['500g'], defaultWeight: '500g', description: 'Tender organic green zucchini.', imageUrl: 'https://images.unsplash.com/photo-1598170845058-12ef4a457939?w=800&auto=format&fit=crop' },
+  { id: 'p_fv_o4', name: 'Hydroponic English Cucumber', brand: 'UrbanGreens', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Organics & Hydroponics', rating: 4.7, reviewsCount: 175, price: 65, mrp: 85, discountText: '23% OFF', weightOptions: ['500g'], defaultWeight: '500g', description: 'Crisp seedless hydroponic cucumber.', imageUrl: 'https://images.unsplash.com/photo-1604977042946-1eecc30f269e?w=800&auto=format&fit=crop' },
+  { id: 'p_fv_o5', name: 'Organic Zucchini Green', brand: 'Earth Greens', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Organics & Hydroponics', rating: 4.8, reviewsCount: 130, price: 95, mrp: 120, discountText: '20% OFF', weightOptions: ['500g'], defaultWeight: '500g', description: 'Tender organic green zucchini.', imageUrl: 'https://images.unsplash.com/photo-1597362925123-77861d3fbac7?w=800&auto=format&fit=crop' },
 
   // Leafy, Herbs & Seasonings
-  { id: 'p_fv_lh1', name: 'Fresh Green Coriander Dhania', brand: 'FarmFresh', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Leafy, Herbs & Seasonings', rating: 4.8, reviewsCount: 650, price: 18, mrp: 25, discountText: '28% OFF', weightOptions: ['1 Bunch'], defaultWeight: '1 Bunch', description: 'Aromatic fresh coriander leaves.', imageUrl: 'https://images.unsplash.com/photo-1588879460417-af2b369527f5?w=800&auto=format&fit=crop' },
+  { id: 'p_fv_lh1', name: 'Fresh Green Coriander Dhania', brand: 'FarmFresh', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Leafy, Herbs & Seasonings', rating: 4.8, reviewsCount: 650, price: 18, mrp: 25, discountText: '28% OFF', weightOptions: ['1 Bunch'], defaultWeight: '1 Bunch', description: 'Aromatic fresh coriander leaves.', imageUrl: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=800&auto=format&fit=crop' },
   { id: 'p_fv_lh2', name: 'Fresh Mint Pudina Leaves', brand: 'FarmFresh', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Leafy, Herbs & Seasonings', rating: 4.8, reviewsCount: 420, price: 15, mrp: 20, discountText: '25% OFF', weightOptions: ['100g'], defaultWeight: '100g', description: 'Cooling mint leaves for chutneys & drinks.', imageUrl: 'https://images.unsplash.com/photo-1608686207856-001b95cf60ca?w=800&auto=format&fit=crop' },
   { id: 'p_fv_lh3', name: 'Fresh Methi Fenugreek Bunch', brand: 'FarmFresh', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Leafy, Herbs & Seasonings', rating: 4.7, reviewsCount: 310, price: 25, mrp: 35, discountText: '₹10 OFF', weightOptions: ['250g'], defaultWeight: '250g', description: 'Fresh green methi leaves for parathas.', imageUrl: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=800&auto=format&fit=crop' },
-  { id: 'p_fv_lh4', name: 'Fresh Fragrant Curry Leaves', brand: 'FarmFresh', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Leafy, Herbs & Seasonings', rating: 4.9, reviewsCount: 540, price: 12, mrp: 18, discountText: '33% OFF', weightOptions: ['100g'], defaultWeight: '100g', description: 'Fresh curry leaves for tempering.', imageUrl: 'https://images.unsplash.com/photo-1588879460417-af2b369527f5?w=800&auto=format&fit=crop' },
+  { id: 'p_fv_lh4', name: 'Fresh Fragrant Curry Leaves', brand: 'FarmFresh', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Leafy, Herbs & Seasonings', rating: 4.9, reviewsCount: 540, price: 12, mrp: 18, discountText: '33% OFF', weightOptions: ['100g'], defaultWeight: '100g', description: 'Fresh curry leaves for tempering.', imageUrl: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=800&auto=format&fit=crop' },
   { id: 'p_fv_lh5', name: 'Fresh Italian Basil Leaves', brand: 'UrbanGreens', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Leafy, Herbs & Seasonings', rating: 4.8, reviewsCount: 190, price: 45, mrp: 60, discountText: '25% OFF', weightOptions: ['50g'], defaultWeight: '50g', description: 'Aromatic sweet basil for pasta and pesto.', imageUrl: 'https://images.unsplash.com/photo-1608686207856-001b95cf60ca?w=800&auto=format&fit=crop' },
 
   // Mangoes & Melons
   { id: 'p_fv_m1', name: 'Ratnagiri Alphonso Hapus Mangoes', brand: 'MangoKing', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Mangoes & Melons', rating: 4.9, reviewsCount: 1890, price: 699, mrp: 850, discountText: '₹151 OFF', weightOptions: ['6 pcs box'], defaultWeight: '6 pcs box', description: 'Original GI tagged Ratnagiri Alphonso mangoes.', imageUrl: 'https://images.unsplash.com/photo-1553279768-865429fa0078?w=800&auto=format&fit=crop' },
   { id: 'p_fv_m2', name: 'Devgad Kesar Mangoes', brand: 'MangoKing', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Mangoes & Melons', rating: 4.8, reviewsCount: 920, price: 450, mrp: 550, discountText: '18% OFF', weightOptions: ['1kg'], defaultWeight: '1kg', description: 'Sweet saffron scented Kesar mangoes.', imageUrl: 'https://images.unsplash.com/photo-1553279768-865429fa0078?w=800&auto=format&fit=crop' },
   { id: 'p_fv_m3', name: 'Striped Red Watermelon', brand: 'FarmFresh', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Mangoes & Melons', rating: 4.7, reviewsCount: 610, price: 85, mrp: 110, discountText: '22% OFF', weightOptions: ['1 pc ~2kg'], defaultWeight: '1 pc ~2kg', description: 'Juicy sweet dark red watermelon.', imageUrl: 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=800&auto=format&fit=crop' },
-  { id: 'p_fv_m4', name: 'Sweet Muskmelon Kharbooza', brand: 'FarmFresh', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Mangoes & Melons', rating: 4.8, reviewsCount: 420, price: 65, mrp: 85, discountText: '23% OFF', weightOptions: ['1 pc'], defaultWeight: '1 pc', description: 'Aromatic orange muskmelon.', imageUrl: 'https://images.unsplash.com/photo-1598170845058-12ef4a457939?w=800&auto=format&fit=crop' },
+  { id: 'p_fv_m4', name: 'Sweet Muskmelon Kharbooza', brand: 'FarmFresh', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Mangoes & Melons', rating: 4.8, reviewsCount: 420, price: 65, mrp: 85, discountText: '23% OFF', weightOptions: ['1 pc'], defaultWeight: '1 pc', description: 'Aromatic orange muskmelon.', imageUrl: 'https://images.unsplash.com/photo-1553279768-865429fa0078?w=800&auto=format&fit=crop' },
   { id: 'p_fv_m5', name: 'Banganapalli Safeda Mangoes', brand: 'MangoKing', categoryId: 'fruits-vegetables', category: 'Fruits & Vegetables', subCategory: 'Mangoes & Melons', rating: 4.8, reviewsCount: 780, price: 299, mrp: 360, discountText: '17% OFF', weightOptions: ['1kg'], defaultWeight: '1kg', description: 'Large sweet Banganapalli mangoes.', imageUrl: 'https://images.unsplash.com/photo-1553279768-865429fa0078?w=800&auto=format&fit=crop' },
 
   // Cuts & Sprouts
@@ -1009,7 +1009,47 @@ const defaultProducts: Product[] = [
   { id: 'p_dbe_e1', name: 'Eggoz Herbal Brown Eggs', brand: 'Eggoz', categoryId: 'dairy-bread-eggs', category: 'Dairy, Bread & Eggs', subCategory: 'Eggs', rating: 4.9, reviewsCount: 880, price: 115, mrp: 140, discountText: '₹25 OFF', weightOptions: ['12 pcs'], defaultWeight: '12 pcs', description: 'Cage-free organic brown eggs.', imageUrl: 'https://images.unsplash.com/photo-1516467508483-a7212febe31a?w=800&auto=format&fit=crop' },
   { id: 'p_dbe_e2', name: 'Fresh Farm Table White Eggs', brand: 'FreshFarm', categoryId: 'dairy-bread-eggs', category: 'Dairy, Bread & Eggs', subCategory: 'Eggs', rating: 4.8, reviewsCount: 1540, price: 195, mrp: 220, discountText: '₹25 OFF', weightOptions: ['30 pcs tray'], defaultWeight: '30 pcs tray', description: 'Clean farm white eggs.', imageUrl: 'https://images.unsplash.com/photo-1506976785307-8732e854ad03?w=800&auto=format&fit=crop' },
   { id: 'p_dbe_e3', name: 'UPF Omega-3 Enriched Eggs', brand: 'UPF', categoryId: 'dairy-bread-eggs', category: 'Dairy, Bread & Eggs', subCategory: 'Eggs', rating: 4.8, reviewsCount: 420, price: 75, mrp: 90, discountText: '16% OFF', weightOptions: ['6 pcs'], defaultWeight: '6 pcs', description: 'Omega-3 enriched eggs.', imageUrl: 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=800&auto=format&fit=crop' },
-  { id: 'p_dbe_e5', name: 'Quail Eggs Specialty Pack', brand: 'ExoFarm', categoryId: 'dairy-bread-eggs', category: 'Dairy, Bread & Eggs', subCategory: 'Eggs', rating: 4.7, reviewsCount: 190, price: 85, mrp: 105, discountText: '19% OFF', weightOptions: ['12 pcs'], defaultWeight: '12 pcs', description: 'Nutritious specialty quail eggs.', imageUrl: 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=800&auto=format&fit=crop' }
+  { id: 'p_dbe_e5', name: 'Quail Eggs Specialty Pack', brand: 'ExoFarm', categoryId: 'dairy-bread-eggs', category: 'Dairy, Bread & Eggs', subCategory: 'Eggs', rating: 4.7, reviewsCount: 190, price: 85, mrp: 105, discountText: '19% OFF', weightOptions: ['12 pcs'], defaultWeight: '12 pcs', description: 'Nutritious specialty quail eggs.', imageUrl: 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=800&auto=format&fit=crop' },
+
+  // Meats, Fish & Eggs
+  { id: 'p_mfe_m1', name: 'Fresh Tender Mutton Curry Cut', brand: 'FreshMeats', categoryId: 'meats-fish-eggs', category: 'Meats, Fish & Eggs', subCategory: 'Mutton', rating: 4.9, reviewsCount: 450, price: 425, mrp: 499, discountText: '15% OFF', weightOptions: ['500g'], defaultWeight: '500g', description: 'Freshly cut juicy goat mutton pieces for delicious curry.', imageUrl: 'https://images.unsplash.com/photo-1603048588665-791ca8aea617?w=800&auto=format&fit=crop' },
+  { id: 'p_mfe_m2', name: 'Premium Mutton Biryani Cut', brand: 'FreshMeats', categoryId: 'meats-fish-eggs', category: 'Meats, Fish & Eggs', subCategory: 'Mutton', rating: 4.9, reviewsCount: 380, price: 460, mrp: 520, discountText: '₹60 OFF', weightOptions: ['500g'], defaultWeight: '500g', description: 'Large bone-in mutton pieces handpicked for biryani.', imageUrl: 'https://images.unsplash.com/photo-1603048588665-791ca8aea617?w=800&auto=format&fit=crop' },
+  { id: 'p_mfe_m3', name: 'Boneless Mutton Chunks', brand: 'FreshMeats', categoryId: 'meats-fish-eggs', category: 'Meats, Fish & Eggs', subCategory: 'Mutton', rating: 4.8, reviewsCount: 290, price: 540, mrp: 620, discountText: '13% OFF', weightOptions: ['500g'], defaultWeight: '500g', description: 'Lean, tender boneless mutton cuts.', imageUrl: 'https://images.unsplash.com/photo-1603048588665-791ca8aea617?w=800&auto=format&fit=crop' },
+  { id: 'p_mfe_c1', name: 'Fresh Tender Farm Chicken Curry Cut', brand: 'FreshMeats', categoryId: 'meats-fish-eggs', category: 'Meats, Fish & Eggs', subCategory: 'Chicken', rating: 4.8, reviewsCount: 920, price: 165, mrp: 199, discountText: '17% OFF', weightOptions: ['500g'], defaultWeight: '500g', description: 'Hygienically prepped skinless chicken curry cut.', imageUrl: 'https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=800&auto=format&fit=crop' },
+  { id: 'p_mfe_c2', name: 'Boneless Chicken Breast Fillet', brand: 'FreshMeats', categoryId: 'meats-fish-eggs', category: 'Meats, Fish & Eggs', subCategory: 'Chicken', rating: 4.9, reviewsCount: 1100, price: 185, mrp: 220, discountText: '16% OFF', weightOptions: ['500g'], defaultWeight: '500g', description: 'High protein lean boneless chicken breast.', imageUrl: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=800&auto=format&fit=crop' },
+  { id: 'p_mfe_c3', name: 'Fresh Chicken Drumsticks', brand: 'FreshMeats', categoryId: 'meats-fish-eggs', category: 'Meats, Fish & Eggs', subCategory: 'Chicken', rating: 4.8, reviewsCount: 640, price: 195, mrp: 230, discountText: '15% OFF', weightOptions: ['500g'], defaultWeight: '500g', description: 'Juicy chicken leg drumsticks ideal for grilling and frying.', imageUrl: 'https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=800&auto=format&fit=crop' },
+  { id: 'p_mfe_f1', name: 'Fresh Rohu Fish Curry Cut', brand: 'OceanFresh', categoryId: 'meats-fish-eggs', category: 'Meats, Fish & Eggs', subCategory: 'Fish & Seafood', rating: 4.8, reviewsCount: 310, price: 210, mrp: 250, discountText: '16% OFF', weightOptions: ['500g'], defaultWeight: '500g', description: 'Cleaned freshwater Rohu fish steaks.', imageUrl: 'https://images.unsplash.com/photo-1534604973900-c43ab4c2e0ab?w=800&auto=format&fit=crop' },
+  { id: 'p_mfe_f2', name: 'Fresh Tiger Prawns Cleaned & Deveined', brand: 'OceanFresh', categoryId: 'meats-fish-eggs', category: 'Meats, Fish & Eggs', subCategory: 'Fish & Seafood', rating: 4.9, reviewsCount: 420, price: 340, mrp: 399, discountText: '15% OFF', weightOptions: ['250g'], defaultWeight: '250g', description: 'Succulent juicy tiger prawns ready to cook.', imageUrl: 'https://images.unsplash.com/photo-1565680018434-b513d5e5fd47?w=800&auto=format&fit=crop' },
+
+  // Atta, Rice, Oil & Dals
+  { id: 'p_aro_a1', name: 'Aashirvaad Shuddh Chakki Atta', brand: 'Aashirvaad', categoryId: 'atta-rice-oil-dals', category: 'Atta, Rice, Oil & Dals', subCategory: 'Atta', rating: 4.9, reviewsCount: 3400, price: 265, mrp: 290, discountText: '₹25 OFF', weightOptions: ['5kg'], defaultWeight: '5kg', description: '100% pure whole wheat chakki flour.', imageUrl: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=800&auto=format&fit=crop' },
+  { id: 'p_aro_r1', name: 'India Gate Super Basmati Rice', brand: 'India Gate', categoryId: 'atta-rice-oil-dals', category: 'Atta, Rice, Oil & Dals', subCategory: 'Rice', rating: 4.9, reviewsCount: 2800, price: 499, mrp: 580, discountText: '14% OFF', weightOptions: ['5kg'], defaultWeight: '5kg', description: 'Long grain aromatic aged basmati rice.', imageUrl: 'https://images.unsplash.com/photo-1536304929831-ee1ca9d44906?w=800&auto=format&fit=crop' },
+  { id: 'p_aro_o1', name: 'Fortune Sunlite Refined Sunflower Oil', brand: 'Fortune', categoryId: 'atta-rice-oil-dals', category: 'Atta, Rice, Oil & Dals', subCategory: 'Edible Oils', rating: 4.8, reviewsCount: 1900, price: 145, mrp: 165, discountText: '12% OFF', weightOptions: ['1L pouch'], defaultWeight: '1L pouch', description: 'Light healthy cooking oil.', imageUrl: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=800&auto=format&fit=crop' },
+  { id: 'p_aro_d1', name: 'Tata Sampann Unpolished Toor Dal', brand: 'Tata Sampann', categoryId: 'atta-rice-oil-dals', category: 'Atta, Rice, Oil & Dals', subCategory: 'Dals & Pulses', rating: 4.9, reviewsCount: 1500, price: 165, mrp: 185, discountText: '₹20 OFF', weightOptions: ['1kg'], defaultWeight: '1kg', description: 'Protein-rich unpolished arhar dal.', imageUrl: 'https://images.unsplash.com/photo-1585994191611-726a88060c2d?w=800&auto=format&fit=crop' },
+  { id: 'p_aro_g1', name: 'Amul Pure Cow Ghee Tin', brand: 'Amul', categoryId: 'atta-rice-oil-dals', category: 'Atta, Rice, Oil & Dals', subCategory: 'Ghee', rating: 4.9, reviewsCount: 2900, price: 615, mrp: 650, discountText: 'Best Value', weightOptions: ['1L tin'], defaultWeight: '1L tin', description: 'Aromatic pure granular cow ghee.', imageUrl: 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=800&auto=format&fit=crop' },
+
+  // Chocolates & Indian Sweets
+  { id: 'p_cis_c1', name: 'Cadbury Dairy Milk Silk Chocolate', brand: 'Cadbury', categoryId: 'chocolates-indian-sweets', category: 'Chocolates & Indian Sweets', subCategory: 'Chocolates', rating: 4.9, reviewsCount: 5200, price: 175, mrp: 190, discountText: '₹15 OFF', weightOptions: ['150g'], defaultWeight: '150g', description: 'Rich, smooth & creamy milk chocolate.', imageUrl: 'https://images.unsplash.com/photo-1549007994-cb92caebd54b?w=800&auto=format&fit=crop' },
+  { id: 'p_cis_c2', name: 'Amul Dark Chocolate 55% Cocoa', brand: 'Amul', categoryId: 'chocolates-indian-sweets', category: 'Chocolates & Indian Sweets', subCategory: 'Chocolates', rating: 4.8, reviewsCount: 1800, price: 110, mrp: 125, discountText: '12% OFF', weightOptions: ['150g'], defaultWeight: '150g', description: 'Rich dark chocolate bar made with fine cocoa.', imageUrl: 'https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?w=800&auto=format&fit=crop' },
+  { id: 'p_cis_c3', name: 'Ferrero Rocher Premium Chocolates Box', brand: 'Ferrero Rocher', categoryId: 'chocolates-indian-sweets', category: 'Chocolates & Indian Sweets', subCategory: 'Chocolates', rating: 4.9, reviewsCount: 3100, price: 525, mrp: 599, discountText: '12% OFF', weightOptions: ['16 pcs box'], defaultWeight: '16 pcs box', description: 'Whole crunchy hazelnut in milk chocolate shell.', imageUrl: 'https://images.unsplash.com/photo-1549007994-cb92caebd54b?w=800&auto=format&fit=crop' },
+  { id: 'p_cis_s1', name: 'Bikano Pure Ghee Gulab Jamun', brand: 'Bikano', categoryId: 'chocolates-indian-sweets', category: 'Chocolates & Indian Sweets', subCategory: 'Indian Sweets', rating: 4.9, reviewsCount: 1400, price: 240, mrp: 280, discountText: '14% OFF', weightOptions: ['1kg tin'], defaultWeight: '1kg tin', description: 'Soft golden fried gulab jamun soaked in sugar syrup.', imageUrl: 'https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?w=800&auto=format&fit=crop' },
+  { id: 'p_cis_s2', name: 'Haldiram\'s Kaju Katli Premium Gift Box', brand: 'Haldiram\'s', categoryId: 'chocolates-indian-sweets', category: 'Chocolates & Indian Sweets', subCategory: 'Indian Sweets', rating: 4.9, reviewsCount: 2200, price: 345, mrp: 390, discountText: '11% OFF', weightOptions: ['250g'], defaultWeight: '250g', description: 'Traditional cashew fudge topped with silver foil.', imageUrl: 'https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?w=800&auto=format&fit=crop' },
+
+  // Masala & Dry Fruits
+  { id: 'p_mdf_s1', name: 'Everest Green Cardamom Elaichi', brand: 'Everest', categoryId: 'masala-dry-fruits-more', category: 'Masala & Dry Fruits', subCategory: 'Whole Spices', rating: 4.8, reviewsCount: 650, price: 160, mrp: 185, discountText: '13% OFF', weightOptions: ['50g'], defaultWeight: '50g', description: 'Aromatic green cardamom pods.', imageUrl: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=800&auto=format&fit=crop' },
+  { id: 'p_mdf_n1', name: 'Nutraj California Almonds Badam', brand: 'Nutraj', categoryId: 'masala-dry-fruits-more', category: 'Masala & Dry Fruits', subCategory: 'Almonds & Cashews', rating: 4.9, reviewsCount: 1900, price: 265, mrp: 320, discountText: '17% OFF', weightOptions: ['250g'], defaultWeight: '250g', description: 'Crunchy premium California almonds.', imageUrl: 'https://images.unsplash.com/photo-1599599810769-bcde5a160d32?w=800&auto=format&fit=crop' },
+
+  // Breakfast & Sauces
+  { id: 'p_bss_c1', name: 'Kellogg\'s Real Almond Honey Corn Flakes', brand: 'Kellogg\'s', categoryId: 'breakfast-cereals-spreads-sauces', category: 'Breakfast & Sauces', subCategory: 'Cereals & Oats', rating: 4.8, reviewsCount: 1200, price: 215, mrp: 245, discountText: '12% OFF', weightOptions: ['300g'], defaultWeight: '300g', description: 'Crunchy corn flakes with real almond slices.', imageUrl: 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=800&auto=format&fit=crop' },
+  { id: 'p_bss_k1', name: 'Heinz Tomato Ketchup Squeezy Bottle', brand: 'Heinz', categoryId: 'breakfast-cereals-spreads-sauces', category: 'Breakfast & Sauces', subCategory: 'Ketchup & Sauces', rating: 4.9, reviewsCount: 2300, price: 135, mrp: 150, discountText: '10% OFF', weightOptions: ['450g'], defaultWeight: '450g', description: 'Classic thick tomato ketchup.', imageUrl: 'https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=800&auto=format&fit=crop' },
+
+  // Packaged Food & Snacks
+  { id: 'p_pkf_n1', name: 'Maggi 2-Minute Masala Instant Noodles', brand: 'Maggi', categoryId: 'packaged-food', category: 'Packaged Food', subCategory: 'Noodles & Pasta', rating: 4.9, reviewsCount: 8900, price: 56, mrp: 60, discountText: 'Best Seller', weightOptions: ['4-Pack (280g)'], defaultWeight: '4-Pack (280g)', description: 'Classic Indian masala instant noodles.', imageUrl: 'https://images.unsplash.com/photo-1612927601601-6638404737ce?w=800&auto=format&fit=crop' },
+  { id: 'p_pkf_c1', name: 'Lay\'s India\'s Magic Masala Chips', brand: 'Lay\'s', categoryId: 'packaged-food', category: 'Packaged Food', subCategory: 'Chips & Namkeen', rating: 4.8, reviewsCount: 4100, price: 20, mrp: 20, discountText: 'Hot Pick', weightOptions: ['50g'], defaultWeight: '50g', description: 'Crispy spicy potato chips.', imageUrl: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=800&auto=format&fit=crop' },
+
+  // Beverages
+  { id: 'p_bev_t1', name: 'Tata Tea Gold Premium Leaf Tea', brand: 'Tata Tea', categoryId: 'tea-coffee-health-drinks', category: 'Beverages', subCategory: 'Tea', rating: 4.9, reviewsCount: 3100, price: 285, mrp: 310, discountText: '₹25 OFF', weightOptions: ['500g'], defaultWeight: '500g', description: 'Rich aroma tea leaves blend.', imageUrl: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=800&auto=format&fit=crop' },
+  { id: 'p_bev_c1', name: 'Nescafé Classic Instant Coffee Glass Jar', brand: 'Nescafé', categoryId: 'tea-coffee-health-drinks', category: 'Beverages', subCategory: 'Coffee', rating: 4.9, reviewsCount: 4500, price: 320, mrp: 360, discountText: '11% OFF', weightOptions: ['100g jar'], defaultWeight: '100g jar', description: '100% pure instant coffee powder.', imageUrl: 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=800&auto=format&fit=crop' }
 ];
 
 const defaultCoupons: Coupon[] = [
@@ -1116,70 +1156,70 @@ export const defaultSpecialGroups: SpecialCategoryGroup[] = [
       {
         id: 'sgi_1',
         name: 'Fruits & Vegetables',
-        categoryId: 'cat_organic',
+        categoryId: 'fruits-vegetables',
         subCategoryName: 'Fruits & Vegetables',
         image: 'https://cdn.zeptonow.com/production/tr:w-420,ar-486-333,pr-true,f-auto,q-40/cms/category/2b5f2be5-cada-4cd7-b0af-e46c0c065f71.png',
-        link: '/products?category=cat_organic',
+        link: '/products?category=fruits-vegetables',
         isFeatured: true,
         displayOrder: 0,
       },
       {
         id: 'sgi_2',
         name: 'Dairy, Bread & Eggs',
-        categoryId: 'cat_dairy',
+        categoryId: 'dairy-bread-eggs',
         subCategoryName: 'Dairy, Bread & Eggs',
         image: 'https://cdn.zeptonow.com/production/tr:w-210,ar-225-333,pr-true,f-auto,q-40/cms/category/474e6e58-1894-4378-86f1-168cc7266d1a.png',
-        link: '/products?category=cat_dairy',
+        link: '/products?category=dairy-bread-eggs',
         isFeatured: false,
         displayOrder: 1,
       },
       {
         id: 'sgi_3',
         name: 'Atta, Rice, Oil & Dals',
-        categoryId: 'cat_grains',
+        categoryId: 'atta-rice-oil-dals',
         subCategoryName: 'Atta, Rice, Oil & Dals',
         image: 'https://cdn.zeptonow.com/production/tr:w-210,ar-225-333,pr-true,f-auto,q-40/cms/category/dc4a299d-521f-4a64-8205-c5ba8e1d13e3.png',
-        link: '/products?category=cat_grains',
+        link: '/products?category=atta-rice-oil-dals',
         isFeatured: false,
         displayOrder: 2,
       },
       {
         id: 'sgi_4',
         name: 'Meats, Fish & Eggs',
-        categoryId: 'cat_meat',
+        categoryId: 'meats-fish-eggs',
         subCategoryName: 'Meats, Fish & Eggs',
         image: 'https://cdn.zeptonow.com/production/tr:w-210,ar-225-333,pr-true,f-auto,q-40/cms/category/229a0614-71cc-410d-9242-88bcc1b4d0e7.png',
-        link: '/products?category=cat_meat',
+        link: '/products?category=meats-fish-eggs',
         isFeatured: false,
         displayOrder: 3,
       },
       {
         id: 'sgi_5',
         name: 'Masala, Dry Fruits & More',
-        categoryId: 'cat_spices',
+        categoryId: 'masala-dry-fruits-more',
         subCategoryName: 'Masala & Spices',
         image: 'https://cdn.zeptonow.com/production/tr:w-210,ar-225-333,pr-true,f-auto,q-40/cms/category/8d4d3977-5197-49d9-9867-8a670524e48b.png',
-        link: '/products?category=cat_spices',
+        link: '/products?category=masala-dry-fruits-more',
         isFeatured: false,
         displayOrder: 4,
       },
       {
         id: 'sgi_6',
         name: 'Breakfast & Sauces',
-        categoryId: 'cat_bakery',
+        categoryId: 'breakfast-cereals-spreads-sauces',
         subCategoryName: 'Breakfast & Sauces',
         image: 'https://cdn.zeptonow.com/production/tr:w-210,ar-225-333,pr-true,f-auto,q-40/cms/category/ab241d87-da5b-4830-b38f-1a6cd30d0d41.png',
-        link: '/products?category=cat_bakery',
+        link: '/products?category=breakfast-cereals-spreads-sauces',
         isFeatured: false,
         displayOrder: 5,
       },
       {
         id: 'sgi_7',
         name: 'Packaged Food',
-        categoryId: 'cat_snacks',
+        categoryId: 'packaged-food',
         subCategoryName: 'Packaged Food',
         image: 'https://cdn.zeptonow.com/production/tr:w-210,ar-225-333,pr-true,f-auto,q-40/cms/category/3b0ce887-3b38-4450-b7da-9da0ad8b799d.png',
-        link: '/products?category=cat_snacks',
+        link: '/products?category=packaged-food',
         isFeatured: false,
         displayOrder: 6,
       },

@@ -2048,8 +2048,8 @@ export const DeliveryModule: React.FC = () => {
 
   const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
-    const token = localStorage.getItem('admin_token');
-    return token ? { 'Authorization': `Bearer ${token}` } : {};
+    const token = localStorage.getItem('admin_token') || localStorage.getItem('token') || 'mock_sandbox_token_123456789';
+    return { 'Authorization': `Bearer ${token}` };
   };
 
   const fetchPartners = async () => {

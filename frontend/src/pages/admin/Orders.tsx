@@ -59,20 +59,77 @@ export const Orders: React.FC = () => {
   // MERN API Connection
   const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
-    const token = localStorage.getItem('admin_token');
+    const token = localStorage.getItem('admin_token') || localStorage.getItem('token') || localStorage.getItem('freshcart_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
   };
 
-
   const fetchOrders = async () => {
+    let apiOrders: any[] = [];
+
     try {
       const res = await fetch(`${API_URL}/orders`, { headers: getAuthHeader() });
       const data = await res.json();
-      if (data.success && data.orders) {
-        setOrders(data.orders);
+      if (data.success && Array.isArray(data.orders)) {
+        apiOrders = data.orders;
       }
     } catch (e) {
-      // Mock Data fallback
+      console.warn('Failed to fetch orders from API:', e);
+    }
+
+    // Merge any customer orders saved in local storage
+    let localOrders: any[] = [];
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('customer_orders_')) {
+          const parsed = JSON.parse(localStorage.getItem(key) || '[]');
+          if (Array.isArray(parsed)) localOrders.push(...parsed);
+        }
+      }
+    } catch (_) {}
+
+    const allRaw = [...apiOrders];
+    localOrders.forEach(loc => {
+      if (!allRaw.some(o => o.orderId === loc.orderId)) {
+        allRaw.push(loc);
+      }
+    });
+
+    if (allRaw.length > 0) {
+      const normalized: Order[] = allRaw.map((o: any) => ({
+        orderId: o.orderId || o.id || 'ORD-' + Math.floor(10000 + Math.random() * 90000),
+        customerId: o.customerId || 'cust_01',
+        customerName: o.customerName || 'Valued Customer',
+        customerPhone: o.customerPhone || 'N/A',
+        items: Array.isArray(o.items) ? o.items.map((it: any) => ({
+          productId: it.productId || it.id || 'p_1',
+          name: it.name || 'Grocery Item',
+          quantity: Number(it.quantity || it.qty || 1),
+          price: Number(it.price || 0),
+          weight: it.weight || it.weightSpec || '500g'
+        })) : [],
+        subTotal: Number(o.subTotal ?? o.itemTotal ?? o.totalAmount ?? 0),
+        discount: Number(o.discount ?? 0),
+        deliveryCharges: Number(o.deliveryCharges ?? o.deliveryFee ?? 0),
+        grandTotal: Number(o.grandTotal ?? o.totalAmount ?? o.itemTotal ?? 0),
+        paymentStatus: o.paymentStatus || 'Paid',
+        paymentMethod: o.paymentMethod || 'UPI',
+        status: o.status || 'Pending',
+        deliveryPartnerName: o.deliveryPartnerName,
+        deliveryPartnerUserId: o.deliveryPartnerUserId,
+        assignmentStalled: o.assignmentStalled,
+        createdAt: o.createdAt || new Date().toISOString(),
+        deliveryAddress: typeof o.deliveryAddress === 'object' && o.deliveryAddress !== null
+          ? o.deliveryAddress
+          : { type: 'Home', street: String(o.deliveryAddress || o.address || 'Selected Delivery Address'), city: 'Bengaluru', pincode: '560001' },
+        trackingTimeline: Array.isArray(o.trackingTimeline) ? o.trackingTimeline : [
+          { status: o.status || 'Pending', note: 'Order placed by customer.', timestamp: o.createdAt || new Date().toISOString() }
+        ]
+      }));
+
+      setOrders(normalized);
+    } else {
+      // Mock Data fallback if no orders exist at all
       const mockOrders: Order[] = [
         {
           orderId: 'ORD-74912',
@@ -93,54 +150,6 @@ export const Orders: React.FC = () => {
           createdAt: new Date().toISOString(),
           deliveryAddress: { type: 'Home', street: 'Fl 405, Block B, Green Heights, HSR Layout', city: 'Bengaluru', pincode: '560102' },
           trackingTimeline: [{ status: 'Pending', note: 'Order placed by customer.', timestamp: new Date().toISOString() }]
-        },
-        {
-          orderId: 'ORD-20412',
-          customerId: 'cust_02',
-          customerName: 'Priya Nair',
-          customerPhone: '8765432109',
-          items: [
-            { productId: 'prod_org_3', name: 'Organic Raw Honey', quantity: 1, price: 199, weight: '250g' }
-          ],
-          subTotal: 199,
-          discount: 0,
-          deliveryCharges: 40,
-          grandTotal: 239,
-          paymentStatus: 'Paid',
-          paymentMethod: 'Card',
-          status: 'Accepted',
-          createdAt: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
-          deliveryAddress: { type: 'Office', street: '4th Floor, Tech Park, Whitefield', city: 'Bengaluru', pincode: '560066' },
-          trackingTimeline: [
-            { status: 'Pending', note: 'Order placed.', timestamp: new Date(Date.now() - 1000 * 60 * 60).toISOString() },
-            { status: 'Accepted', note: 'Order accepted by Dark Store.', timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString() }
-          ]
-        },
-        {
-          orderId: 'ORD-10924',
-          customerId: 'cust_03',
-          customerName: 'Rohan Deshmukh',
-          customerPhone: '7654321098',
-          items: [
-            { productId: 'prod_veg_1', name: 'Fresh Cherry Tomatoes', quantity: 3, price: 59, weight: '250g' },
-            { productId: 'prod_veg_2', name: 'Organic Broccoli Crowns', quantity: 1, price: 89, weight: '250g' }
-          ],
-          subTotal: 266,
-          discount: 0,
-          deliveryCharges: 40,
-          grandTotal: 306,
-          paymentStatus: 'Paid',
-          paymentMethod: 'Wallet',
-          status: 'Delivered',
-          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
-          deliveryAddress: { type: 'Home', street: 'Building 12, Indiranagar', city: 'Bengaluru', pincode: '560038' },
-          trackingTimeline: [
-            { status: 'Pending', note: 'Order placed.', timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString() },
-            { status: 'Accepted', note: 'Accepted.', timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2.8).toISOString() },
-            { status: 'Packed', note: 'Packed.', timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2.5).toISOString() },
-            { status: 'Out For Delivery', note: 'Out for delivery.', timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString() },
-            { status: 'Delivered', note: 'Order delivered successfully.', timestamp: new Date(Date.now() - 1000 * 60 * 60 * 1.8).toISOString() }
-          ]
         }
       ];
       setOrders(mockOrders);

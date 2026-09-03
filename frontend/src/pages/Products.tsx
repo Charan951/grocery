@@ -6,7 +6,7 @@ import { SEO } from '../components/SEO';
 import { BannerCarousel } from '../components/BannerCarousel';
 import { SubcategoryCardImage } from '../components/SubcategoryCardImage';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowUpDown, ChevronRight, SearchX } from 'lucide-react';
+import { ArrowUpDown, ChevronRight, SearchX, PackageX } from 'lucide-react';
 
 interface ProductsProps {
   onQuickView: (product: Product) => void;
@@ -345,9 +345,35 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
         const pCat = (p.category || '').toLowerCase().trim();
 
         if (pCatId === catTarget || pCat === catTarget || (curId && pCatId === curId) || (curSlug && pCatId === curSlug) || (curName && pCat === curName)) return true;
-        if (catTarget === 'fruits-vegetables' && (pCatId.includes('fruit') || pCatId.includes('veg') || pCat.includes('fruit') || pCat.includes('veg'))) return true;
-        if (catTarget === 'dairy-bread-eggs' && (pCatId.includes('dairy') || pCat.includes('dairy') || pCat.includes('bread') || pCat.includes('egg'))) return true;
-        if (catTarget === 'atta-rice-oil-dals' && (pCatId.includes('atta') || pCat.includes('rice') || pCat.includes('oil') || pCat.includes('dal'))) return true;
+
+        // Alias & Keyword mappings
+        if ((catTarget === 'meats-fish-eggs' || catTarget === 'cat_meat' || catTarget === 'meat' || catTarget === 'mutton' || catTarget === 'chicken') &&
+            (pCatId.includes('meat') || pCatId.includes('fish') || pCat.includes('meat') || pCat.includes('fish') || pCat.includes('poultry') || pCat.includes('mutton') || pCat.includes('chicken'))) return true;
+
+        if ((catTarget === 'fruits-vegetables' || catTarget === 'cat_organic' || catTarget === 'cat_veg' || catTarget === 'cat_fruits') &&
+            (pCatId.includes('fruit') || pCatId.includes('veg') || pCat.includes('fruit') || pCat.includes('veg') || pCatId.includes('organic'))) return true;
+
+        if ((catTarget === 'dairy-bread-eggs' || catTarget === 'cat_dairy' || catTarget === 'dairy') &&
+            (pCatId.includes('dairy') || pCat.includes('dairy') || pCat.includes('bread') || pCat.includes('milk'))) return true;
+
+        if ((catTarget === 'atta-rice-oil-dals' || catTarget === 'cat_grains' || catTarget === 'atta-rice') &&
+            (pCatId.includes('atta') || pCat.includes('rice') || pCat.includes('oil') || pCat.includes('dal') || pCat.includes('grain'))) return true;
+
+        if ((catTarget === 'chocolates-indian-sweets' || catTarget === 'sweet-tooth' || catTarget === 'sweets') &&
+            (pCatId.includes('chocolate') || pCatId.includes('sweet') || pCat.includes('chocolate') || pCat.includes('sweet') || pCat.includes('mithai'))) return true;
+
+        if ((catTarget === 'masala-dry-fruits-more' || catTarget === 'cat_spices' || catTarget === 'masala') &&
+            (pCatId.includes('masala') || pCatId.includes('spice') || pCat.includes('spice') || pCat.includes('dry fruit') || pCat.includes('nut'))) return true;
+
+        if ((catTarget === 'breakfast-cereals-spreads-sauces' || catTarget === 'cat_bakery' || catTarget === 'bakery') &&
+            (pCatId.includes('breakfast') || pCatId.includes('cereal') || pCat.includes('cereal') || pCat.includes('sauce') || pCat.includes('spread') || pCat.includes('bakery'))) return true;
+
+        if ((catTarget === 'packaged-food' || catTarget === 'cat_snacks' || catTarget === 'munchies' || catTarget === 'instant-food') &&
+            (pCatId.includes('snack') || pCatId.includes('package') || pCat.includes('snack') || pCat.includes('chip') || pCat.includes('biscuit') || pCat.includes('noodle'))) return true;
+
+        if ((catTarget === 'tea-coffee-health-drinks' || catTarget === 'cold-drinks' || catTarget === 'beverages') &&
+            (pCatId.includes('tea') || pCatId.includes('coffee') || pCat.includes('tea') || pCat.includes('coffee') || pCat.includes('drink') || pCat.includes('beverage') || pCat.includes('juice'))) return true;
+
         if (catTarget.includes(pCatId) || pCatId.includes(catTarget) || catTarget.includes(pCat) || pCat.includes(catTarget)) return true;
 
         return false;
@@ -645,10 +671,10 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
 
                 {/* Products Grid */}
                 {paginatedProducts.length === 0 ? (
-                  <div className="bg-surface border border-divider rounded-2xl p-12 text-center shadow-card flex flex-col items-center justify-center gap-3">
-                    <SearchX size={36} className="text-text-tertiary" />
-                    <h3 className="text-base font-bold text-text-primary">No matching products found</h3>
-                    <p className="text-xs text-text-secondary leading-normal">Try selecting another subcategory or clearing search queries.</p>
+                  <div className="bg-surface border border-divider rounded-2xl p-10 text-center shadow-card flex flex-col items-center justify-center gap-3">
+                    <PackageX size={42} className="text-amber-500/80 mb-1" />
+                    <h3 className="text-base font-extrabold text-text-primary">No products available in this category currently.</h3>
+                    <p className="text-xs text-text-secondary leading-normal max-w-sm">We are actively restocking fresh items for this selection. Try selecting another subcategory or resetting filters.</p>
                     <button onClick={handleClearAll} className="text-xs font-bold bg-emerald-600 text-white py-2.5 px-6 rounded-full mt-2 hover:bg-emerald-700 transition-colors">Reset All Filters</button>
                   </div>
                 ) : (
@@ -759,8 +785,10 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
               </div>
 
               {filteredProducts.length === 0 ? (
-                <div className="bg-surface border border-divider rounded-2xl p-8 text-center text-xs text-text-tertiary font-bold">
-                  No products available in this category currently.
+                <div className="bg-surface border border-divider rounded-2xl p-10 text-center shadow-card flex flex-col items-center justify-center gap-3 my-4">
+                  <PackageX size={42} className="text-amber-500/80 mb-1" />
+                  <h4 className="text-base font-extrabold text-text-primary">No products available in this category currently.</h4>
+                  <p className="text-xs text-text-secondary leading-normal max-w-sm">We are actively restocking fresh items for this category. Please check back soon or browse other catalog categories.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
