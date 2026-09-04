@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -34,7 +35,7 @@ class FestivalCampaignSection extends ConsumerWidget {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
           child: Column(
             children: [
               // Blinkit Style Header Header: — CELEBRATE — Festival Name
@@ -43,47 +44,48 @@ class FestivalCampaignSection extends ConsumerWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(theme.emoji, style: const TextStyle(fontSize: 16)),
-                      const SizedBox(width: 6),
+                      Text(theme.emoji, style: const TextStyle(fontSize: 15)),
+                      const SizedBox(width: 5),
                       Text(
                         'CELEBRATE',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 10.5,
                           fontWeight: FontWeight.w900,
-                          letterSpacing: 2.2,
+                          letterSpacing: 2.0,
                           color: theme.accentColor,
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      Text(theme.emoji, style: const TextStyle(fontSize: 16)),
+                      const SizedBox(width: 5),
+                      Text(theme.emoji, style: const TextStyle(fontSize: 15)),
                     ],
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 1),
                   Text(
                     campaign.name,
                     textAlign: TextAlign.center,
-                    style: AppTypography.h2(theme.textColor).copyWith(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 22,
+                    style: AppTypography.festivalCalligraphy(
+                      theme.textColor,
+                      fontSize: 28,
+                      fontPreset: theme.fontPreset,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 6),
 
               // Optional Banner
               if (campaign.enableBanner && campaign.bannerImage.trim().isNotEmpty) ...[
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(14),
                   child: CachedNetworkImage(
                     imageUrl: campaign.bannerImage,
-                    height: 120,
+                    height: 110,
                     width: double.infinity,
                     fit: BoxFit.cover,
                     errorWidget: (context, url, error) => const SizedBox.shrink(),
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 6),
               ],
 
               // Group Cards Layout Logic based on Count
@@ -110,29 +112,19 @@ class FestivalCampaignSection extends ConsumerWidget {
   ) {
     final count = groups.length;
 
-    // > 5 cards (up to 10): Horizontal Scrollable Row
-    if (count > 5) {
-      return SizedBox(
-        height: 180,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          physics: const BouncingScrollPhysics(),
-          itemCount: count,
-          separatorBuilder: (context, index) => const SizedBox(width: 12),
-          itemBuilder: (context, index) {
-            return SizedBox(
-              width: 140,
-              child: _buildSingleGroupCard(context, groups[index], allProducts, theme),
-            );
-          },
-        ),
+    // > 4 cards (5 up to 10): Auto-scrolling horizontal row every 3 seconds
+    if (count > 4) {
+      return _AutoScrollGroupCardsList(
+        groups: groups,
+        allProducts: allProducts,
+        theme: theme,
+        cardBuilder: _buildSingleGroupCard,
       );
     }
 
-    // <= 5 cards: Grid / Row arrangement
     if (count == 1) {
       return SizedBox(
-        height: 180,
+        height: 140,
         width: double.infinity,
         child: _buildSingleGroupCard(context, groups[0], allProducts, theme),
       );
@@ -141,9 +133,9 @@ class FestivalCampaignSection extends ConsumerWidget {
     if (count == 2) {
       return Row(
         children: [
-          Expanded(child: SizedBox(height: 180, child: _buildSingleGroupCard(context, groups[0], allProducts, theme))),
-          const SizedBox(width: 12),
-          Expanded(child: SizedBox(height: 180, child: _buildSingleGroupCard(context, groups[1], allProducts, theme))),
+          Expanded(child: SizedBox(height: 135, child: _buildSingleGroupCard(context, groups[0], allProducts, theme))),
+          const SizedBox(width: 8),
+          Expanded(child: SizedBox(height: 135, child: _buildSingleGroupCard(context, groups[1], allProducts, theme))),
         ],
       );
     }
@@ -152,54 +144,31 @@ class FestivalCampaignSection extends ConsumerWidget {
       return Row(
         children: [
           for (int i = 0; i < 3; i++) ...[
-            if (i > 0) const SizedBox(width: 10),
-            Expanded(child: SizedBox(height: 170, child: _buildSingleGroupCard(context, groups[i], allProducts, theme))),
+            if (i > 0) const SizedBox(width: 6),
+            Expanded(child: SizedBox(height: 130, child: _buildSingleGroupCard(context, groups[i], allProducts, theme))),
           ],
         ],
       );
     }
 
-    if (count == 4) {
-      return Column(
-        children: [
-          Row(
-            children: [
-              Expanded(child: SizedBox(height: 160, child: _buildSingleGroupCard(context, groups[0], allProducts, theme))),
-              const SizedBox(width: 10),
-              Expanded(child: SizedBox(height: 160, child: _buildSingleGroupCard(context, groups[1], allProducts, theme))),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(child: SizedBox(height: 160, child: _buildSingleGroupCard(context, groups[2], allProducts, theme))),
-              const SizedBox(width: 10),
-              Expanded(child: SizedBox(height: 160, child: _buildSingleGroupCard(context, groups[3], allProducts, theme))),
-            ],
-          ),
-        ],
-      );
-    }
-
-    // count == 5
-    return Column(
+    // count == 4: Fit all 4 cards in a single row without increasing theme height!
+    return Row(
       children: [
-        Row(
-          children: [
-            Expanded(child: SizedBox(height: 160, child: _buildSingleGroupCard(context, groups[0], allProducts, theme))),
-            const SizedBox(width: 10),
-            Expanded(child: SizedBox(height: 160, child: _buildSingleGroupCard(context, groups[1], allProducts, theme))),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            for (int i = 2; i < 5; i++) ...[
-              if (i > 2) const SizedBox(width: 10),
-              Expanded(child: SizedBox(height: 160, child: _buildSingleGroupCard(context, groups[i], allProducts, theme))),
-            ],
-          ],
-        ),
+        for (int i = 0; i < 4; i++) ...[
+          if (i > 0) const SizedBox(width: 5),
+          Expanded(
+            child: SizedBox(
+              height: 125,
+              child: _buildSingleGroupCard(
+                context,
+                groups[i],
+                allProducts,
+                theme,
+                isCompact: true,
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -208,8 +177,9 @@ class FestivalCampaignSection extends ConsumerWidget {
     BuildContext context,
     FestivalGroupModel group,
     List<ProductModel> allProducts,
-    ResolvedFestivalTheme theme,
-  ) {
+    ResolvedFestivalTheme theme, {
+    bool isCompact = false,
+  }) {
     // Resolve group image
     String? cardImage = group.imageUrl;
     String targetCatId = 'all';
@@ -231,9 +201,9 @@ class FestivalCampaignSection extends ConsumerWidget {
       }
     }
 
-    final displayImg = (cardImage != null && cardImage.isNotEmpty)
-        ? cardImage
-        : 'https://images.unsplash.com/photo-1608686207856-001b95cf60ca?w=400&auto=format&fit=crop';
+    final displayImg = (cardImage != null && cardImage.trim().isNotEmpty)
+        ? cardImage.trim()
+        : null;
 
     return GestureDetector(
       onTap: () {
@@ -244,21 +214,29 @@ class FestivalCampaignSection extends ConsumerWidget {
         }
       },
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(isCompact ? 14 : 20),
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // Background Category Image filling the card cleanly
-            CachedNetworkImage(
-              imageUrl: displayImg,
-              fit: BoxFit.cover,
-              errorWidget: (context, url, error) => Container(
+            // Background Category Image filling the card cleanly from Database
+            if (displayImg != null && displayImg.startsWith('http'))
+              CachedNetworkImage(
+                imageUrl: displayImg,
+                fit: BoxFit.cover,
+                errorWidget: (context, url, error) => Container(
+                  color: theme.cardBackground,
+                  child: Center(
+                    child: Icon(Icons.shopping_bag_outlined, color: theme.accentColor, size: isCompact ? 24 : 36),
+                  ),
+                ),
+              )
+            else
+              Container(
                 color: theme.cardBackground,
                 child: Center(
-                  child: Icon(Icons.shopping_bag_outlined, color: theme.accentColor, size: 36),
+                  child: Icon(Icons.shopping_bag_outlined, color: theme.accentColor, size: isCompact ? 24 : 36),
                 ),
               ),
-            ),
 
             // Dark gradient overlay at bottom for crisp title text legibility
             Positioned.fill(
@@ -268,11 +246,11 @@ class FestivalCampaignSection extends ConsumerWidget {
                     colors: [
                       Colors.transparent,
                       Colors.black.withOpacity(0.2),
-                      Colors.black.withOpacity(0.85),
+                      Colors.black.withOpacity(0.88),
                     ],
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    stops: const [0.3, 0.65, 1.0],
+                    stops: const [0.25, 0.6, 1.0],
                   ),
                 ),
               ),
@@ -281,19 +259,22 @@ class FestivalCampaignSection extends ConsumerWidget {
             // Optional Discount Badge at Top Right
             if (group.discountPercent > 0)
               Positioned(
-                top: 8,
-                right: 8,
+                top: isCompact ? 4 : 8,
+                right: isCompact ? 4 : 8,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isCompact ? 4 : 6,
+                    vertical: isCompact ? 1 : 2,
+                  ),
                   decoration: BoxDecoration(
                     color: theme.buttonColor,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(isCompact ? 6 : 8),
                   ),
                   child: Text(
                     '${group.discountPercent.toInt()}% OFF',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white,
-                      fontSize: 9,
+                      fontSize: isCompact ? 8 : 9,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -302,45 +283,39 @@ class FestivalCampaignSection extends ConsumerWidget {
 
             // Content at Bottom Left & Chevron Action Button on Bottom Right
             Positioned(
-              left: 10,
-              right: 10,
-              bottom: 10,
+              left: isCompact ? 6 : 10,
+              right: isCompact ? 6 : 10,
+              bottom: isCompact ? 6 : 10,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          group.displayName,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w900,
-                            height: 1.1,
-                            shadows: [Shadow(color: Colors.black45, blurRadius: 4)],
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      group.displayName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: isCompact ? 10 : 13,
+                        fontWeight: FontWeight.w900,
+                        height: 1.1,
+                        shadows: const [Shadow(color: Colors.black45, blurRadius: 4)],
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 4),
+                  SizedBox(width: isCompact ? 2 : 4),
 
                   // Circular Chevron Button matching Blinkit design
                   Container(
-                    width: 24,
-                    height: 24,
+                    width: isCompact ? 18 : 24,
+                    height: isCompact ? 18 : 24,
                     decoration: const BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.chevron_right_rounded,
-                      size: 18,
+                      size: isCompact ? 12 : 18,
                       color: Colors.black87,
                     ),
                   ),
@@ -400,3 +375,88 @@ class _ScallopPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
+
+class _AutoScrollGroupCardsList extends StatefulWidget {
+  final List<FestivalGroupModel> groups;
+  final List<ProductModel> allProducts;
+  final ResolvedFestivalTheme theme;
+  final Widget Function(
+    BuildContext context,
+    FestivalGroupModel group,
+    List<ProductModel> allProducts,
+    ResolvedFestivalTheme theme, {
+    bool isCompact,
+  }) cardBuilder;
+
+  const _AutoScrollGroupCardsList({
+    required this.groups,
+    required this.allProducts,
+    required this.theme,
+    required this.cardBuilder,
+  });
+
+  @override
+  State<_AutoScrollGroupCardsList> createState() =>
+      _AutoScrollGroupCardsListState();
+}
+
+class _AutoScrollGroupCardsListState extends State<_AutoScrollGroupCardsList> {
+  late final ScrollController _scrollController;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+    _timer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (_scrollController.hasClients) {
+        final maxScroll = _scrollController.position.maxScrollExtent;
+        final currentOffset = _scrollController.offset;
+        const step = 133.0; // 125 width + 8 spacing
+        double target = currentOffset + step;
+        if (target >= maxScroll + 10) {
+          target = 0;
+        }
+        _scrollController.animateTo(
+          target,
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 150,
+      child: ListView.separated(
+        controller: _scrollController,
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        itemCount: widget.groups.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          return SizedBox(
+            width: 125,
+            child: widget.cardBuilder(
+              context,
+              widget.groups[index],
+              widget.allProducts,
+              widget.theme,
+              isCompact: true,
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+

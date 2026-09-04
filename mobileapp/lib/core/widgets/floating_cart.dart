@@ -1,13 +1,9 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:freshcart/core/constants/app_colors.dart';
-import 'package:freshcart/core/theme/app_typography.dart';
 import 'package:freshcart/features/cart/presentation/controllers/cart_controller.dart';
-import 'package:freshcart/features/cart/presentation/controllers/commerce_providers.dart';
 
-/// Slim cart bar shown above the bottom nav when the cart has items. Flat,
-/// tokenised, full-width. The free-delivery hint reads the real threshold from
-/// `PricingConfig` (was a hardcoded ₹400).
+/// Blinkit-style floating green active cart pill button shown above bottom nav.
 class FloatingCart extends ConsumerWidget {
   final VoidCallback onTap;
   const FloatingCart({super.key, required this.onTap});
@@ -18,62 +14,98 @@ class FloatingCart extends ConsumerWidget {
     final count = cart.totalItemsCount;
     if (count == 0) return const SizedBox.shrink();
 
-    final config = ref.watch(pricingConfigProvider);
-    final remaining = config.freeDeliveryThreshold - cart.subtotal;
-    final freeUnlocked = remaining <= 0;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final firstItem = cart.items.isNotEmpty ? cart.items.first.product : null;
+    final firstImg = firstItem?.imageUrl ?? '';
 
-    return Material(
-      color: isDark ? AppColors.surfaceDark : AppColors.surface,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border(top: BorderSide(color: isDark ? AppColors.dividerDark : AppColors.divider)),
-          ),
-          padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
-          child: Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-                child: const Icon(Icons.shopping_bag_rounded, color: Colors.white, size: 18),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '$count ${count == 1 ? 'item' : 'items'} · ₹${cart.totalPayableAmount.toStringAsFixed(0)}',
-                      style: AppTypography.labelLarge(
-                        isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                      ),
-                    ),
-                    Text(
-                      freeUnlocked
-                          ? 'Free delivery unlocked'
-                          : 'Add ₹${remaining.toStringAsFixed(0)} more for free delivery',
-                      style: AppTypography.bodySmall(
-                        freeUnlocked
-                            ? AppColors.primaryText
-                            : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondary),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Row(
-                mainAxisSize: MainAxisSize.min,
+    return Align(
+      alignment: Alignment.bottomCenter,
+      heightFactor: 1.0,
+      child: SizedBox(
+        width: 210,
+        child: Material(
+          color: const Color(0xFF0C831F),
+          borderRadius: BorderRadius.circular(26),
+          elevation: 6,
+          shadowColor: const Color(0xFF0C831F).withOpacity(0.4),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(26),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              child: Row(
                 children: [
-                  Text('View cart', style: AppTypography.labelLarge(AppColors.primaryText)),
-                  const Icon(Icons.chevron_right_rounded, color: AppColors.primaryText, size: 20),
+                  // Item Image Preview / Bag Icon Badge
+                  Container(
+                    width: 32,
+                    height: 32,
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white24, width: 1.2),
+                    ),
+                    child: firstImg.startsWith('http')
+                        ? CachedNetworkImage(
+                            imageUrl: firstImg,
+                            fit: BoxFit.cover,
+                            errorWidget: (context, url, error) => const Icon(
+                              Icons.shopping_bag_rounded,
+                              color: Color(0xFF0C831F),
+                              size: 16,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.shopping_bag_rounded,
+                            color: Color(0xFF0C831F),
+                            size: 16,
+                          ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Title & Count Info
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'View cart',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w800,
+                            height: 1.1,
+                          ),
+                        ),
+                        const SizedBox(height: 1),
+                        Text(
+                          '$count ${count == 1 ? 'item' : 'items'} · ₹${cart.totalPayableAmount.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Right arrow badge
+                  Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: const BoxDecoration(
+                      color: Colors.white24,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.arrow_forward_rounded,
+                      color: Colors.white,
+                      size: 13,
+                    ),
+                  ),
                 ],
               ),
-            ],
+            ),
           ),
         ),
       ),

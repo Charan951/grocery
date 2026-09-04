@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:freshcart/features/authentication/presentation/controllers/auth_controller.dart';
@@ -31,6 +31,9 @@ import 'package:freshcart/features/wishlist/presentation/screens/wishlist_screen
 import 'package:freshcart/features/legal/presentation/screens/legal_screen.dart';
 import 'package:freshcart/features/app_gate/presentation/screens/app_gate_screens.dart';
 
+/// Global key to access the root navigator outside the StatefulShellRoute.
+final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
+
 /// Bridges Riverpod auth changes to go_router's [GoRouter.refreshListenable].
 class _AuthRouterRefresh extends ChangeNotifier {
   _AuthRouterRefresh(Ref ref) {
@@ -49,6 +52,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   ref.onDispose(refresh.dispose);
 
   return GoRouter(
+    navigatorKey: _rootNavigatorKey,
     initialLocation: '/splash',
     refreshListenable: refresh,
     redirect: (context, state) {
@@ -65,18 +69,44 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      // ---- Full-screen routes (above the tab shell, no bottom nav) ----
-      GoRoute(path: '/splash', builder: (c, s) => const SplashScreen()),
-      GoRoute(path: '/maintenance', builder: (c, s) => const MaintenanceScreen()),
-      GoRoute(path: '/force_update', builder: (c, s) => const ForceUpdateScreen()),
-      GoRoute(path: '/onboarding', builder: (c, s) => const OnboardingScreen()),
-      GoRoute(path: '/login', builder: (c, s) => const LoginScreen()),
+      // ---- Full-screen routes (pushed to root navigator, completely outside the tab shell) ----
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/splash',
+        builder: (c, s) => const SplashScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/maintenance',
+        builder: (c, s) => const MaintenanceScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/force_update',
+        builder: (c, s) => const ForceUpdateScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/onboarding',
+        builder: (c, s) => const OnboardingScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/login',
+        builder: (c, s) => const LoginScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: '/otp',
         builder: (c, s) => OtpScreen(phone: s.uri.queryParameters['phone'] ?? ''),
       ),
-      GoRoute(path: '/location_select', builder: (c, s) => const LocationSelectScreen()),
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/location_select',
+        builder: (c, s) => const LocationSelectScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: '/category/:id',
         builder: (c, s) => CategoryCatalogScreen(
           categoryId: s.pathParameters['id'] ?? '',
@@ -84,40 +114,89 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: '/product/:id',
         builder: (c, s) => ProductDetailsScreen(productId: s.pathParameters['id'] ?? ''),
       ),
-      GoRoute(path: '/wishlist', builder: (c, s) => const WishlistScreen()),
-      GoRoute(path: '/cart', builder: (c, s) => const CartScreen()),
-      GoRoute(path: '/checkout', builder: (c, s) => const CheckoutScreen()),
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/wishlist',
+        builder: (c, s) => const WishlistScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/cart',
+        builder: (c, s) => const CartScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/checkout',
+        builder: (c, s) => const CheckoutScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: '/order-placed/:id',
         builder: (c, s) => OrderPlacedScreen(orderId: s.pathParameters['id'] ?? ''),
       ),
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: '/order/:id',
         builder: (c, s) => OrderDetailScreen(orderId: s.pathParameters['id'] ?? ''),
       ),
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: '/tracking/:orderId',
         builder: (c, s) => TrackingScreen(orderId: s.pathParameters['orderId'] ?? ''),
       ),
-      GoRoute(path: '/wallet', builder: (c, s) => const WalletScreen()),
-      GoRoute(path: '/membership', builder: (c, s) => const MembershipScreen()),
-      GoRoute(path: '/support', builder: (c, s) => const SupportScreen()),
-      GoRoute(path: '/addresses', builder: (c, s) => const AddressesScreen()),
-      GoRoute(path: '/stores', builder: (c, s) => const StoresScreen()),
-      GoRoute(path: '/notifications', builder: (c, s) => const NotificationsScreen()),
-      GoRoute(path: '/account/edit', builder: (c, s) => const ProfileEditScreen()),
-      GoRoute(path: '/search_detail', builder: (c, s) => const SearchDetailScreen()),
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/wallet',
+        builder: (c, s) => const WalletScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/membership',
+        builder: (c, s) => const MembershipScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/support',
+        builder: (c, s) => const SupportScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/addresses',
+        builder: (c, s) => const AddressesScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/stores',
+        builder: (c, s) => const StoresScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/notifications',
+        builder: (c, s) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/account/edit',
+        builder: (c, s) => const ProfileEditScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/search_detail',
+        builder: (c, s) => const SearchDetailScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: '/legal',
         builder: (c, s) => LegalScreen(initialTab: s.uri.queryParameters['tab'] ?? 'terms'),
       ),
       // Legacy alias — Profile is the Account tab now.
       GoRoute(path: '/profile', redirect: (c, s) => '/account'),
 
-      // ---- Bottom-nav tab shell: each branch keeps its own stack ----
+      // ---- Bottom-nav tab shell: strictly wraps ONLY the 5 main tab routes ----
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             MainScaffold(navigationShell: navigationShell),

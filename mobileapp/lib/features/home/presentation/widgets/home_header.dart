@@ -1,6 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
-import 'package:freshcart/core/constants/app_radius.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
 
 class LocationHeader extends StatelessWidget {
@@ -96,7 +96,7 @@ class LocationHeader extends StatelessWidget {
   }
 }
 
-class SearchBarHeader extends StatelessWidget {
+class SearchBarHeader extends StatefulWidget {
   final int cartCount;
   final VoidCallback onSearchTap;
   final VoidCallback onCartTap;
@@ -111,76 +111,114 @@ class SearchBarHeader extends StatelessWidget {
   });
 
   @override
+  State<SearchBarHeader> createState() => _SearchBarHeaderState();
+}
+
+class _SearchBarHeaderState extends State<SearchBarHeader> {
+  static const List<String> _placeholders = [
+    'Search "atta, dal, coke and more"',
+    'Search "fresh milk, bread & eggs"',
+    'Search "chips, snacks & cold drinks"',
+    'Search "fresh fruits & vegetables"',
+    'Search "rice, cooking oil & spices"',
+    'Search "chocolates, biscuits & ice cream"',
+    'Search "soaps, shampoo & personal care"',
+  ];
+
+  Timer? _timer;
+  int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (mounted) {
+        setState(() {
+          _currentIndex = (_currentIndex + 1) % _placeholders.length;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surface = backgroundColor ?? (isDark ? AppColors.surfaceDark : AppColors.surface);
-    final subColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondary;
+    final surface = widget.backgroundColor ?? (isDark ? AppColors.surfaceDark : AppColors.surface);
+    final subColor = isDark ? AppColors.textSecondaryDark : Colors.grey.shade600;
 
     return Container(
       color: surface,
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
       child: Row(
         children: [
           Expanded(
             child: Semantics(
               button: true,
-              label: 'Search for atta, dal, coke and more',
+              label: _placeholders[_currentIndex],
               child: Material(
-                color: isDark ? Colors.white10 : AppColors.background,
-                borderRadius: AppRadius.brPill,
+                color: isDark ? Colors.white10 : Colors.white,
+                borderRadius: BorderRadius.circular(14),
                 child: InkWell(
-                  onTap: onSearchTap,
-                  borderRadius: AppRadius.brPill,
+                  onTap: widget.onSearchTap,
+                  borderRadius: BorderRadius.circular(14),
                   child: Container(
                     height: 44,
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                     decoration: BoxDecoration(
-                      borderRadius: AppRadius.brPill,
-                      border: Border.all(color: isDark ? AppColors.dividerDark : AppColors.divider),
+                      color: isDark ? Colors.white10 : Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: isDark ? AppColors.dividerDark : Colors.grey.shade300),
+                      boxShadow: [
+                        if (!isDark)
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                      ],
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.search_rounded, size: 20, color: subColor),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Search for atta, dal, coke and more',
-                          style: AppTypography.bodySmall(subColor),
+                        Icon(Icons.search_rounded, size: 20, color: isDark ? Colors.white70 : Colors.black87),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 350),
+                            transitionBuilder: (Widget child, Animation<double> animation) {
+                              return FadeTransition(
+                                opacity: animation,
+                                child: child,
+                              );
+                            },
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              key: ValueKey<int>(_currentIndex),
+                              child: Text(
+                                _placeholders[_currentIndex],
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: subColor,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
                         ),
+                        Icon(Icons.mic_none_rounded, size: 20, color: isDark ? Colors.white70 : Colors.black87),
                       ],
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 10),
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              _CircleIcon(
-                icon: Icons.shopping_bag_outlined,
-                onTap: onCartTap,
-                isDark: isDark,
-                label: cartCount > 0 ? 'Cart, $cartCount items' : 'Cart',
-              ),
-              if (cartCount > 0)
-                Positioned(
-                  right: -2,
-                  top: -2,
-                  child: IgnorePointer(
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
-                      decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-                      child: Text(
-                        '$cartCount',
-                        textAlign: TextAlign.center,
-                        style: AppTypography.labelSmall(Colors.white).copyWith(fontSize: 10),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
           ),
         ],
       ),

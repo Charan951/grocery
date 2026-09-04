@@ -5,9 +5,10 @@ import 'package:freshcart/core/widgets/bottom_nav.dart';
 import 'package:freshcart/core/widgets/floating_cart.dart';
 import 'package:freshcart/features/cart/presentation/controllers/cart_controller.dart';
 
-/// Hosts the five bottom-nav branches ([StatefulNavigationShell]). The bottom
-/// nav is always visible (a persistent full-width bar). The cart bar, when the
-/// cart is non-empty, sits directly above it.
+/// Hosts the five main tab branches ([StatefulNavigationShell]).
+/// The bottom navigation bar and floating cart are rendered persistent and static
+/// ONLY for the 5 main tab pages (Home, Categories, Search, Orders, Account).
+/// Detail routes are pushed to the root navigator outside this shell.
 class MainScaffold extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
   const MainScaffold({super.key, required this.navigationShell});
@@ -20,7 +21,6 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
   DateTime? _lastBackPress;
 
   void _onTabTap(int index) {
-    // Tapping the active tab again pops it to its root.
     widget.navigationShell.goBranch(
       index,
       initialLocation: index == widget.navigationShell.currentIndex,
@@ -34,11 +34,14 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
       return false;
     }
     final now = DateTime.now();
-    if (_lastBackPress == null || now.difference(_lastBackPress!) > const Duration(seconds: 2)) {
+    if (_lastBackPress == null ||
+        now.difference(_lastBackPress!) > const Duration(seconds: 2)) {
       _lastBackPress = now;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Press back again to exit')));
+        ..showSnackBar(
+          const SnackBar(content: Text('Press back again to exit')),
+        );
       return false;
     }
     return true;
@@ -57,14 +60,29 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
         }
       },
       child: Scaffold(
-        body: widget.navigationShell,
-        bottomNavigationBar: Column(
-          mainAxisSize: MainAxisSize.min,
+        resizeToAvoidBottomInset: false,
+        body: Stack(
           children: [
-            if (cartCount > 0) FloatingCart(onTap: () => context.push('/cart')),
-            CustomBottomNavBar(
-              currentIndex: widget.navigationShell.currentIndex,
-              onTap: _onTabTap,
+            widget.navigationShell,
+
+            // Floating Cart: Visible ONLY on 5 main tabs when cart has items
+            if (cartCount > 0)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 70.0,
+                child: FloatingCart(onTap: () => context.push('/cart')),
+              ),
+
+            // Bottom Navigation Bar: Static & persistent on the 5 main tabs
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: CustomBottomNavBar(
+                currentIndex: widget.navigationShell.currentIndex,
+                onTap: _onTabTap,
+              ),
             ),
           ],
         ),

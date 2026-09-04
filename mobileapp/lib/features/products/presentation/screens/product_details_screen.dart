@@ -11,6 +11,7 @@ import 'package:freshcart/core/widgets/app_toast.dart';
 import 'package:freshcart/core/widgets/qty_stepper.dart';
 import 'package:freshcart/core/widgets/badges.dart';
 import 'package:freshcart/core/widgets/buttons.dart';
+import 'package:freshcart/core/widgets/floating_cart.dart';
 import 'package:freshcart/core/widgets/feedback_states.dart';
 import 'package:freshcart/core/widgets/glass_card.dart';
 import 'package:freshcart/core/widgets/skeletons.dart';
@@ -87,169 +88,182 @@ class _ProductDetailsViewState extends ConsumerState<_ProductDetailsView> {
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 300,
-            pinned: true,
-            backgroundColor: isDark ? AppColors.surfaceDark : AppColors.surface,
-            surfaceTintColor: Colors.transparent,
-            leading: _RoundBtn(
-              icon: Icons.arrow_back_rounded,
-              tooltip: 'Back',
-              onTap: () => context.pop(),
-            ),
-            actions: [
-              _RoundBtn(
-                icon: isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                tooltip: isFav ? 'Remove from wishlist' : 'Add to wishlist',
-                color: isFav ? AppColors.error : null,
-                onTap: () {
-                  ref.read(wishlistProvider.notifier).toggleWishlist(_p.id);
-                  AppToast.success(isFav ? 'Removed from wishlist' : 'Added to wishlist');
-                },
-              ),
-              _RoundBtn(icon: Icons.ios_share_rounded, tooltip: 'Share', onTap: _share),
-              const SizedBox(width: 4),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              background: _Gallery(urls: gallery, heroId: _p.id),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 140),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      if (_p.isOrganic) ...[
-                        _Pill(icon: Icons.eco_rounded, label: 'Organic', color: AppColors.primary),
-                        const SizedBox(width: 8),
-                      ],
-                      const DeliveryBadge(durationText: 'Express delivery'),
-                      const Spacer(),
-                      if (lowStock)
-                        Text('Only ${_p.stockQuantity} left',
-                            style: AppTypography.labelSmall(AppColors.warningText)),
-                    ],
+      body: Stack(
+        children: [
+          CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              SliverAppBar(
+                expandedHeight: 300,
+                pinned: true,
+                backgroundColor: isDark ? AppColors.surfaceDark : AppColors.surface,
+                surfaceTintColor: Colors.transparent,
+                leading: _RoundBtn(
+                  icon: Icons.arrow_back_rounded,
+                  tooltip: 'Back',
+                  onTap: () => context.pop(),
+                ),
+                actions: [
+                  _RoundBtn(
+                    icon: isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                    tooltip: isFav ? 'Remove from wishlist' : 'Add to wishlist',
+                    color: isFav ? AppColors.error : null,
+                    onTap: () {
+                      ref.read(wishlistProvider.notifier).toggleWishlist(_p.id);
+                      AppToast.success(isFav ? 'Removed from wishlist' : 'Added to wishlist');
+                    },
                   ),
-                  const SizedBox(height: 14),
-                  Text(_p.brand.toUpperCase(),
-                      style: AppTypography.labelMedium(subColor).copyWith(letterSpacing: 1)),
-                  const SizedBox(height: 4),
-                  Text(_p.name, style: AppTypography.h1(textColor)),
-                  const SizedBox(height: 8),
-                  RatingWidget(rating: _p.rating, reviewsCount: _p.reviewsCount, iconSize: 16, fontSize: 13),
-                  const SizedBox(height: 16),
-
-                  // Price
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text('₹${_p.price.toStringAsFixed(0)}', style: AppTypography.h1(textColor)),
-                      const SizedBox(width: 8),
-                      if (_p.hasDiscount) ...[
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: Text('₹${_p.mrp.toStringAsFixed(0)}',
-                              style: AppTypography.bodyMedium(subColor)
-                                  .copyWith(decoration: TextDecoration.lineThrough)),
-                        ),
-                        const SizedBox(width: 8),
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: Text('${_p.discountPercent.toStringAsFixed(0)}% OFF',
-                              style: AppTypography.labelMedium(AppColors.primaryText)),
-                        ),
-                      ],
-                    ],
-                  ),
-                  Text('Inclusive of all taxes', style: AppTypography.labelSmall(subColor).copyWith(fontWeight: FontWeight.w400)),
-                  const SizedBox(height: 20),
-
-                  if (_p.weightOptions.length > 1) ...[
-                    Text('Select size', style: AppTypography.title(textColor)),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: _p.weightOptions.map((w) {
-                        final sel = _weight == w;
-                        return GestureDetector(
-                          onTap: () => setState(() => _weight = w),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: sel ? AppColors.primary.withOpacity(0.1) : (isDark ? Colors.white10 : AppColors.surface),
-                              borderRadius: AppRadius.brMd,
-                              border: Border.all(
-                                color: sel ? AppColors.primary : (isDark ? AppColors.dividerDark : AppColors.divider),
-                                width: sel ? 1.5 : 1,
-                              ),
-                            ),
-                            child: Text(w, style: AppTypography.labelLarge(
-                              sel ? AppColors.primary : textColor,
-                            )),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-
-                  if (_p.description.trim().isNotEmpty) ...[
-                    Text('About this item', style: AppTypography.title(textColor)),
-                    const SizedBox(height: 6),
-                    Text(_p.description, style: AppTypography.bodyMedium(subColor).copyWith(height: 1.5)),
-                    const SizedBox(height: 24),
-                  ],
-
-                  // Key info
-                  GlassCard(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        _InfoRow('Unit', _p.defaultWeight, isDark),
-                        if (_p.subCategory != null) _InfoRow('Type', _p.subCategory!, isDark),
-                        _InfoRow('Organic', _p.isOrganic ? 'Yes' : 'No', isDark),
-                        _InfoRow('In stock', _p.inStock ? 'Yes' : 'No', isDark, last: _p.nutritionFacts.isEmpty),
-                        if (_p.nutritionFacts.isNotEmpty)
-                          for (final e in _p.nutritionFacts.entries)
-                            _InfoRow(e.key, e.value, isDark, last: e.key == _p.nutritionFacts.entries.last.key),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  ProductReviewsSection(productId: _p.id, isDark: isDark),
-                  const SizedBox(height: 24),
-
-                  _TrustBlock(isDark: isDark),
-
-                  if (similar.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: ProductRail(
-                        title: 'You might also like',
-                        products: similar,
-                        onOpen: (p) => context.push('/product/${p.id}'),
-                        onAdd: (p) {
-                          ref.read(cartProvider.notifier).addToCart(p)
-                              ? AppToast.success('${p.name} added to cart')
-                              : AppToast.info('You can add up to $kMaxQtyPerItem of an item');
-                        },
-                      ),
-                    ),
+                  _RoundBtn(icon: Icons.ios_share_rounded, tooltip: 'Share', onTap: _share),
+                  const SizedBox(width: 4),
                 ],
+                flexibleSpace: FlexibleSpaceBar(
+                  background: _Gallery(urls: gallery, heroId: _p.id),
+                ),
               ),
-            ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 140),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          if (_p.isOrganic) ...[
+                            _Pill(icon: Icons.eco_rounded, label: 'Organic', color: AppColors.primary),
+                            const SizedBox(width: 8),
+                          ],
+                          const DeliveryBadge(durationText: 'Express delivery'),
+                          const Spacer(),
+                          if (lowStock)
+                            Text('Only ${_p.stockQuantity} left',
+                                style: AppTypography.labelSmall(AppColors.warningText)),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Text(_p.brand.toUpperCase(),
+                          style: AppTypography.labelMedium(subColor).copyWith(letterSpacing: 1)),
+                      const SizedBox(height: 4),
+                      Text(_p.name, style: AppTypography.h1(textColor)),
+                      const SizedBox(height: 8),
+                      RatingWidget(rating: _p.rating, reviewsCount: _p.reviewsCount, iconSize: 16, fontSize: 13),
+                      const SizedBox(height: 16),
+
+                      // Price
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text('₹${_p.price.toStringAsFixed(0)}', style: AppTypography.h1(textColor)),
+                          const SizedBox(width: 8),
+                          if (_p.hasDiscount) ...[
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: Text('₹${_p.mrp.toStringAsFixed(0)}',
+                                  style: AppTypography.bodyMedium(subColor)
+                                      .copyWith(decoration: TextDecoration.lineThrough)),
+                            ),
+                            const SizedBox(width: 8),
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: Text('${_p.discountPercent.toStringAsFixed(0)}% OFF',
+                                  style: AppTypography.labelMedium(AppColors.primaryText)),
+                            ),
+                          ],
+                        ],
+                      ),
+                      Text('Inclusive of all taxes', style: AppTypography.labelSmall(subColor).copyWith(fontWeight: FontWeight.w400)),
+                      const SizedBox(height: 20),
+
+                      if (_p.weightOptions.length > 1) ...[
+                        Text('Select size', style: AppTypography.title(textColor)),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: _p.weightOptions.map((w) {
+                            final sel = _weight == w;
+                            return GestureDetector(
+                              onTap: () => setState(() => _weight = w),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: sel ? AppColors.primary.withOpacity(0.1) : (isDark ? Colors.white10 : AppColors.surface),
+                                  borderRadius: AppRadius.brMd,
+                                  border: Border.all(
+                                    color: sel ? AppColors.primary : (isDark ? AppColors.dividerDark : AppColors.divider),
+                                    width: sel ? 1.5 : 1,
+                                  ),
+                                ),
+                                child: Text(w, style: AppTypography.labelLarge(
+                                  sel ? AppColors.primary : textColor,
+                                )),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+
+                      if (_p.description.trim().isNotEmpty) ...[
+                        Text('About this item', style: AppTypography.title(textColor)),
+                        const SizedBox(height: 6),
+                        Text(_p.description, style: AppTypography.bodyMedium(subColor).copyWith(height: 1.5)),
+                        const SizedBox(height: 24),
+                      ],
+
+                      // Key info
+                      GlassCard(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            _InfoRow('Unit', _p.defaultWeight, isDark),
+                            if (_p.subCategory != null) _InfoRow('Type', _p.subCategory!, isDark),
+                            _InfoRow('Organic', _p.isOrganic ? 'Yes' : 'No', isDark),
+                            _InfoRow('In stock', _p.inStock ? 'Yes' : 'No', isDark, last: _p.nutritionFacts.isEmpty),
+                            if (_p.nutritionFacts.isNotEmpty)
+                              for (final e in _p.nutritionFacts.entries)
+                                _InfoRow(e.key, e.value, isDark, last: e.key == _p.nutritionFacts.entries.last.key),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      ProductReviewsSection(productId: _p.id, isDark: isDark),
+                      const SizedBox(height: 24),
+
+                      _TrustBlock(isDark: isDark),
+
+                      if (similar.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: ProductRail(
+                            title: 'You might also like',
+                            products: similar,
+                            onOpen: (p) => context.push('/product/${p.id}'),
+                            onAdd: (p) {
+                              ref.read(cartProvider.notifier).addToCart(p)
+                                  ? AppToast.success('${p.name} added to cart')
+                                  : AppToast.info('You can add up to $kMaxQtyPerItem of an item');
+                            },
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
+
+          // Floating View Cart button floating right above the bottom sticky bar
+          if (cart.totalItemsCount > 0)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 12,
+              child: FloatingCart(onTap: () => context.push('/cart')),
+            ),
         ],
       ),
-      bottomSheet: _StickyBar(
+      bottomNavigationBar: _StickyBar(
         isDark: isDark,
         price: _p.price,
         qty: qty,
@@ -486,6 +500,7 @@ class _StickyBar extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Column(
                 mainAxisSize: MainAxisSize.min,
@@ -501,13 +516,21 @@ class _StickyBar extends StatelessWidget {
               const Spacer(),
               if (!inStock)
                 SizedBox(
-                  width: 200,
+                  width: 180,
+                  height: 48,
                   child: PrimaryButton(text: 'Out of stock', onPressed: null),
                 )
               else if (qty == 0)
-                SizedBox(width: 200, child: PrimaryButton(text: 'Add to cart', onPressed: onAdd))
+                SizedBox(
+                  width: 180,
+                  height: 48,
+                  child: PrimaryButton(text: 'Add to cart', onPressed: onAdd),
+                )
               else
-                QtyStepper(quantity: qty, onIncrement: onInc, onDecrement: onDec, large: true),
+                SizedBox(
+                  height: 48,
+                  child: QtyStepper(quantity: qty, onIncrement: onInc, onDecrement: onDec, large: true),
+                ),
             ],
           ),
         ),

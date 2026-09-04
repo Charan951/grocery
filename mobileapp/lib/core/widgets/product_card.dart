@@ -11,13 +11,15 @@ class ProductCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onAdd;
   final double width;
+  final String? heroTag;
 
   const ProductCard({
     super.key,
     required this.product,
     required this.onTap,
     required this.onAdd,
-    this.width = 165.0,
+    this.width = 135.0,
+    this.heroTag,
   });
 
   @override
@@ -25,11 +27,39 @@ class ProductCard extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
+    final imageWidget = product.imageUrl.startsWith('http')
+        ? CachedNetworkImage(
+            imageUrl: product.imageUrl,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: 76,
+            fadeInDuration: const Duration(milliseconds: 200),
+            placeholder: (context, _) => Container(
+              color: isDark ? Colors.white10 : Colors.black.withOpacity(0.04),
+            ),
+            errorWidget: (context, _, _) => Center(
+              child: Icon(
+                _getProductIcon(product.imageUrl),
+                size: 32,
+                color: product.isOrganic ? AppColors.primary : AppColors.accent,
+              ),
+            ),
+          )
+        : Center(
+            child: Icon(
+              _getProductIcon(product.imageUrl),
+              size: 32,
+              color: product.isOrganic
+                  ? AppColors.primary
+                  : AppColors.accent,
+            ),
+          );
+
     return GestureDetector(
       onTap: onTap,
       child: GlassCard(
         width: width,
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -39,52 +69,25 @@ class ProductCard extends StatelessWidget {
               clipBehavior: Clip.none,
               children: [
                 Container(
-                  height: 100,
+                  height: 76,
                   width: double.infinity,
                   decoration: BoxDecoration(
                     color: isDark
                         ? Colors.white.withOpacity(0.03)
                         : Colors.black.withOpacity(0.02),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Hero(
-                      tag: 'product_image_${product.id}',
-                      child: product.imageUrl.startsWith('http')
-                          ? CachedNetworkImage(
-                              imageUrl: product.imageUrl,
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                              height: 100,
-                              fadeInDuration: const Duration(milliseconds: 200),
-                              placeholder: (context, _) => Container(
-                                color: isDark ? Colors.white10 : Colors.black.withOpacity(0.04),
-                              ),
-                              errorWidget: (context, _, _) => Center(
-                                child: Icon(
-                                  _getProductIcon(product.imageUrl),
-                                  size: 40,
-                                  color: product.isOrganic ? AppColors.primary : AppColors.accent,
-                                ),
-                              ),
-                            )
-                          : Center(
-                              child: Icon(
-                                _getProductIcon(product.imageUrl),
-                                size: 48,
-                                color: product.isOrganic
-                                    ? AppColors.primary
-                                    : AppColors.accent,
-                              ),
-                            ),
-                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    child: heroTag != null
+                        ? Hero(tag: heroTag!, child: imageWidget)
+                        : imageWidget,
                   ),
                 ),
                 if (product.hasDiscount)
                   Positioned(
-                    top: -6,
-                    left: -6,
+                    top: -4,
+                    left: -4,
                     child: DiscountBadge(
                       text:
                           '${product.discountPercent.toStringAsFixed(0)}% OFF',
@@ -92,24 +95,24 @@ class ProductCard extends StatelessWidget {
                   ),
                 if (product.isOrganic)
                   Positioned(
-                    top: 6,
-                    right: 6,
+                    top: 4,
+                    right: 4,
                     child: Container(
-                      padding: const EdgeInsets.all(4),
+                      padding: const EdgeInsets.all(3),
                       decoration: const BoxDecoration(
                         color: Color(0xE634C759),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
                         Icons.eco_rounded,
-                        size: 10,
+                        size: 9,
                         color: Colors.white,
                       ),
                     ),
                   ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 2),
 
             // Brand & Rating
             Row(
@@ -124,7 +127,7 @@ class ProductCard extends StatelessWidget {
                       isDark
                           ? AppColors.textSecondaryDark
                           : AppColors.textSecondary,
-                    ).copyWith(letterSpacing: 0.6, fontSize: 9),
+                    ).copyWith(letterSpacing: 0.5, fontSize: 8),
                   ),
                 ),
                 RatingWidget(rating: product.rating),
@@ -134,14 +137,14 @@ class ProductCard extends StatelessWidget {
 
             // Title
             SizedBox(
-              height: 34,
+              height: 26,
               child: Text(
                 product.name,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: AppTypography.title(
                   isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                ).copyWith(fontSize: 12, height: 1.2),
+                ).copyWith(fontSize: 10.5, height: 1.15),
               ),
             ),
             const SizedBox(height: 2),
@@ -150,14 +153,14 @@ class ProductCard extends StatelessWidget {
             Text(
               product.defaultWeight,
               style: TextStyle(
-                fontSize: 10,
+                fontSize: 9,
                 color: isDark
                     ? AppColors.textSecondaryDark
                     : AppColors.textSecondary,
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 2),
 
             // Pricing & Add Button
             Row(
@@ -172,7 +175,7 @@ class ProductCard extends StatelessWidget {
                       Text(
                         '₹${product.mrp.toStringAsFixed(0)}',
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: 9,
                           color: isDark
                               ? AppColors.textSecondaryDark
                               : AppColors.textSecondary,
@@ -185,22 +188,35 @@ class ProductCard extends StatelessWidget {
                         isDark
                             ? AppColors.textPrimaryDark
                             : AppColors.textPrimary,
-                      ).copyWith(fontSize: 14, fontWeight: FontWeight.bold),
+                      ).copyWith(fontSize: 12, fontWeight: FontWeight.w800),
                     ),
                   ],
                 ),
                 GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: onAdd,
                   child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: const BoxDecoration(
-                      gradient: AppColors.primaryGradient,
-                      shape: BoxShape.circle,
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0C831F),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF15803D), width: 1),
                     ),
-                    child: const Icon(
-                      Icons.add_rounded,
-                      color: Colors.white,
-                      size: 18,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.add_rounded, color: Colors.white, size: 12),
+                        SizedBox(width: 2),
+                        Text(
+                          'ADD',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),

@@ -182,6 +182,8 @@ export const AdminCMS: React.FC = () => {
   const [groupDiscountInput, setGroupDiscountInput] = useState(20);
   const [groupOrderInput, setGroupOrderInput] = useState(1);
   const [groupProductsInput, setGroupProductsInput] = useState<string[]>([]);
+  const [groupImageInput, setGroupImageInput] = useState('');
+  const [isUploadingGroupImg, setIsUploadingGroupImg] = useState(false);
   const [showProductPickerModal, setShowProductPickerModal] = useState(false);
   const [productPickerSearch, setProductPickerSearch] = useState('');
   const [productPickerCategory, setProductPickerCategory] = useState('');
@@ -234,6 +236,7 @@ export const AdminCMS: React.FC = () => {
     setGroupDiscountInput(20);
     setGroupOrderInput(1);
     setGroupProductsInput([]);
+    setGroupImageInput('');
     setShowProductPickerModal(false);
 
     setFcApplicableScopes(['all']);
@@ -310,6 +313,29 @@ export const AdminCMS: React.FC = () => {
     }
   };
 
+  const handleGroupImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingGroupImg(true);
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = async () => {
+        const base64 = reader.result as string;
+        try {
+          const cUrl = await uploadImage(base64, 'freshcart/festival-group');
+          setGroupImageInput(cUrl);
+        } catch (err) {
+          setGroupImageInput(base64);
+        } finally {
+          setIsUploadingGroupImg(false);
+        }
+      };
+    } catch (err) {
+      setIsUploadingGroupImg(false);
+    }
+  };
+
   const handleSaveGroup = () => {
     if (!groupNameInput.trim()) {
       alert('Please enter group display name');
@@ -326,6 +352,7 @@ export const AdminCMS: React.FC = () => {
       displayName: groupNameInput.trim(),
       discountPercent: Number(groupDiscountInput) || 0,
       displayOrder: Number(groupOrderInput) || 1,
+      imageUrl: groupImageInput.trim(),
       products: groupProductsInput,
       isActive: true
     };
@@ -341,6 +368,7 @@ export const AdminCMS: React.FC = () => {
     setGroupDiscountInput(20);
     setGroupOrderInput(fcGroups.length + 2);
     setGroupProductsInput([]);
+    setGroupImageInput('');
   };
 
   const handleEditGroup = (grp: any) => {
@@ -348,6 +376,7 @@ export const AdminCMS: React.FC = () => {
     setGroupNameInput(grp.displayName || '');
     setGroupDiscountInput(grp.discountPercent ?? 20);
     setGroupOrderInput(grp.displayOrder ?? 1);
+    setGroupImageInput(grp.imageUrl || '');
     setGroupProductsInput(grp.products || []);
   };
 
@@ -356,6 +385,7 @@ export const AdminCMS: React.FC = () => {
     if (editingGroupId === groupId) {
       setEditingGroupId(null);
       setGroupNameInput('');
+      setGroupImageInput('');
       setGroupProductsInput([]);
     }
   };
@@ -1995,7 +2025,7 @@ export const AdminCMS: React.FC = () => {
                             {editingGroupId ? `Edit Group "${groupNameInput}"` : '+ Add New Festival Group'}
                           </h5>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                             <div>
                               <label className="block text-[11px] font-bold text-text-primary mb-1">Group Display Name</label>
                               <input
@@ -2028,6 +2058,24 @@ export const AdminCMS: React.FC = () => {
                                 onChange={(e) => setGroupOrderInput(Number(e.target.value))}
                                 className="w-full px-3 py-2 text-xs rounded-xl bg-background border border-divider outline-none"
                               />
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-bold text-text-primary mb-1">Group Image (Upload or URL)</label>
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="text"
+                                  placeholder="https://... or upload"
+                                  value={groupImageInput}
+                                  onChange={(e) => setGroupImageInput(e.target.value)}
+                                  className="w-full px-2.5 py-2 text-xs rounded-xl bg-background border border-divider outline-none min-w-0"
+                                />
+                                <label className="px-2.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl cursor-pointer text-xs font-bold shrink-0 flex items-center gap-1">
+                                  <Upload size={12} />
+                                  <span>{isUploadingGroupImg ? '...' : 'Upload'}</span>
+                                  <input type="file" accept="image/*" onChange={handleGroupImageUpload} className="hidden" />
+                                </label>
+                              </div>
                             </div>
                           </div>
 

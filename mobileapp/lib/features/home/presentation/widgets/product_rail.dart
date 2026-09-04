@@ -58,17 +58,18 @@ class ProductRail extends StatelessWidget {
           ),
         ),
         SizedBox(
-          height: 262,
+          height: 198,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             physics: const BouncingScrollPhysics(),
             itemCount: products.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 12),
+            separatorBuilder: (_, _) => const SizedBox(width: 10),
             itemBuilder: (context, i) {
               final p = products[i];
               return ProductCard(
                 product: p,
+                width: 135.0,
                 onTap: () => onOpen(p),
                 onAdd: () => onAdd(p),
               );
@@ -98,7 +99,7 @@ class ProductRailSkeleton extends StatelessWidget {
             child: SkeletonLine(widthFactor: 0.4, height: 18),
           ),
           SizedBox(
-            height: 262,
+            height: 200,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),

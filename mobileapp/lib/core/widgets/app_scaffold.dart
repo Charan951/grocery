@@ -37,7 +37,7 @@ class AppScaffold extends StatelessWidget {
     this.onBack,
     this.bottomNavigationBar,
     this.floatingActionButton,
-    this.resizeToAvoidBottomInset = true,
+    this.resizeToAvoidBottomInset = false,
     this.padded = false,
     this.useSafeArea = true,
     this.safeAreaTop = true,

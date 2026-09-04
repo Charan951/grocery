@@ -228,13 +228,14 @@ class _CategoryCatalogScreenState extends ConsumerState<CategoryCatalogScreen> {
                             crossAxisCount: 2,
                             crossAxisSpacing: 12,
                             mainAxisSpacing: 12,
-                            childAspectRatio: 0.62,
+                            childAspectRatio: 0.70,
                           ),
                           delegate: SliverChildBuilderDelegate(
                             (context, i) {
                               final p = products[i];
                               return ProductCard(
                                 product: p,
+                                heroTag: 'product_image_${p.id}',
                                 width: double.infinity,
                                 onTap: () => context.push('/product/${p.id}'),
                                 onAdd: () {

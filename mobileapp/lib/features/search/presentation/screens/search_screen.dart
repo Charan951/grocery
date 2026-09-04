@@ -11,6 +11,7 @@ import 'package:freshcart/core/widgets/product_card.dart';
 import 'package:freshcart/core/widgets/search_bar.dart';
 import 'package:freshcart/core/widgets/skeletons.dart';
 import 'package:freshcart/features/cart/presentation/controllers/cart_controller.dart';
+import 'package:freshcart/features/cart/presentation/widgets/catalog_cart_bar.dart';
 import 'package:freshcart/features/home/presentation/controllers/catalog_providers.dart';
 import 'package:freshcart/features/search/presentation/controllers/search_controller.dart';
 
@@ -64,6 +65,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           child: Container(height: 1, color: isDark ? AppColors.dividerDark : AppColors.divider),
         ),
       ),
+      bottomNavigationBar: const CatalogCartBar(),
       body: SafeArea(
         child: Column(
           children: [
@@ -200,13 +202,14 @@ class _Results extends ConsumerWidget {
                   crossAxisCount: 2,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
-                  childAspectRatio: 0.62,
+                  childAspectRatio: 0.70,
                 ),
                 delegate: SliverChildBuilderDelegate(
                   (context, i) {
                     final p = results[i];
                     return ProductCard(
                       product: p,
+                      heroTag: 'product_image_${p.id}',
                       width: double.infinity,
                       onTap: () => context.push('/product/${p.id}'),
                       onAdd: () {

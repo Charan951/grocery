@@ -15,8 +15,6 @@ import 'package:freshcart/features/categories/data/models/category_model.dart';
 import 'package:freshcart/features/home/presentation/controllers/catalog_providers.dart';
 import 'package:freshcart/features/home/presentation/widgets/home_header.dart';
 import 'package:freshcart/features/home/presentation/widgets/product_rail.dart';
-import 'package:freshcart/features/orders/data/models/order_model.dart';
-import 'package:freshcart/features/orders/presentation/controllers/orders_controller.dart';
 import 'package:freshcart/features/products/data/models/product_model.dart';
 import '../utils/festival_theme_resolver.dart';
 import '../widgets/festival_campaign_section.dart';
@@ -77,7 +75,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final selectedSuperCat = ref.watch(selectedSuperCategoryProvider);
     final campaign = ref.watch(activeFestivalCampaignProvider).valueOrNull;
 
-    final isFestivalActive = campaign != null &&
+    final isFestivalActive =
+        campaign != null &&
         campaign.isCurrentlyActive &&
         campaign.appliesToSuperCategory(selectedSuperCat);
 
@@ -85,7 +84,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ? FestivalThemeResolver.resolve(campaign)
         : null;
 
-    final address = auth.user?.selectedAddress?['addressLine'] as String? ??
+    final superCats =
+        ref.watch(superCategoriesProvider).valueOrNull ?? const [];
+
+    final (
+      filteredCategories,
+      filteredProducts,
+      currentSuperCat,
+    ) = _filterCatalog(
+      selectedSuperCat,
+      superCats,
+      categoriesAsync.valueOrNull ?? const <CategoryModel>[],
+      productsAsync.valueOrNull ?? const <ProductModel>[],
+    );
+
+    final address =
+        auth.user?.selectedAddress?['addressLine'] as String? ??
         'Select a delivery address';
 
     final isFestivalHeaderActive = isFestivalActive && !_isScrolledPastFestival;
@@ -115,18 +129,56 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     } else if (categoriesAsync.hasError && productsAsync.hasError) {
       bodyContent = ErrorState(onRetry: _refresh);
     } else {
-      final categories = categoriesAsync.valueOrNull ?? const <CategoryModel>[];
-      final products = productsAsync.valueOrNull ?? const <ProductModel>[];
-      if (categories.isEmpty && products.isEmpty) {
-        bodyContent = const EmptyState(
-          icon: Icons.storefront_outlined,
-          title: 'Store is being stocked',
-          description: 'Fresh products are on their way. Pull down to refresh in a moment.',
+      if (filteredCategories.isEmpty && filteredProducts.isEmpty) {
+        bodyContent = Padding(
+          padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+          child: Column(
+            children: [
+              const Icon(Icons.grid_off_rounded, size: 56, color: Colors.grey),
+              const SizedBox(height: 12),
+              Text(
+                filteredCategories.isEmpty && filteredProducts.isEmpty
+                    ? 'Store is being stocked'
+                    : 'No products in ${currentSuperCat?['name'] ?? selectedSuperCat}',
+                style: AppTypography.h3(
+                  isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Admin is adding new items and categories here. Check back soon or view all products.',
+                textAlign: TextAlign.center,
+                style: AppTypography.bodySmall(
+                  isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () {
+                  ref.read(selectedSuperCategoryProvider.notifier).state =
+                      'all';
+                },
+                icon: const Icon(Icons.grid_view_rounded, size: 18),
+                label: const Text('View All Categories'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+              ),
+            ],
+          ),
         );
       } else {
         bodyContent = _HomeContent(
-          categories: categories,
-          products: products,
+          categories: filteredCategories,
+          products: filteredProducts,
+          selectedSuperCategory: currentSuperCat,
+          selectedSlug: selectedSuperCat,
           onOpenProduct: (p) => context.push('/product/${p.id}'),
           onOpenCategory: (id) => context.push('/category/$id'),
           onAdd: (p) {
@@ -143,21 +195,53 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     final surfaceColor = isDark ? AppColors.surfaceDark : AppColors.surface;
 
+    LinearGradient? locationGradient;
+    LinearGradient? headerNavGradient;
+    LinearGradient? festivalSectionGradient;
+
+    if (isFestivalActive && festivalTheme != null) {
+      final bg = festivalTheme.backgroundGradient;
+      final gStart = bg.colors.first;
+      final gEnd = bg.colors.last;
+
+      locationGradient = LinearGradient(
+        colors: [gStart, Color.lerp(gStart, gEnd, 0.15)!],
+        begin: bg.begin,
+        end: bg.end,
+      );
+      headerNavGradient = LinearGradient(
+        colors: [
+          Color.lerp(gStart, gEnd, 0.15)!,
+          Color.lerp(gStart, gEnd, 0.38)!,
+        ],
+        begin: bg.begin,
+        end: bg.end,
+      );
+      festivalSectionGradient = LinearGradient(
+        colors: [Color.lerp(gStart, gEnd, 0.38)!, gEnd],
+        begin: bg.begin,
+        end: bg.end,
+      );
+    }
+
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
       body: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: () async => _refresh(),
         child: CustomScrollView(
           controller: _scrollController,
-          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
           slivers: [
             // 1. Location Header (Scrolls out of view first when scrolling down)
             SliverToBoxAdapter(
               child: Container(
-                color: isFestivalActive && festivalTheme != null
-                    ? festivalTheme.backgroundColor
-                    : surfaceColor,
+                decoration: isFestivalActive && locationGradient != null
+                    ? BoxDecoration(gradient: locationGradient)
+                    : BoxDecoration(color: surfaceColor),
                 child: locationHeader,
               ),
             ),
@@ -166,10 +250,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             SliverPersistentHeader(
               pinned: true,
               delegate: _HeaderNavSliverDelegate(
-                height: isFestivalHeaderActive ? 106.0 : 107.0,
+                height: 120.0,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  color: isFestivalHeaderActive ? festivalTheme?.backgroundColor : surfaceColor,
+                  decoration:
+                      isFestivalHeaderActive && headerNavGradient != null
+                      ? BoxDecoration(gradient: headerNavGradient)
+                      : BoxDecoration(color: surfaceColor),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -179,7 +266,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         Divider(
                           height: 1,
                           thickness: 1,
-                          color: isDark ? AppColors.dividerDark : AppColors.divider,
+                          color: isDark
+                              ? AppColors.dividerDark
+                              : AppColors.divider,
                         ),
                     ],
                   ),
@@ -191,7 +280,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             if (isFestivalActive && festivalTheme != null)
               SliverToBoxAdapter(
                 child: Container(
-                  color: festivalTheme.backgroundColor,
+                  decoration: BoxDecoration(gradient: festivalSectionGradient),
                   child: FestivalCampaignSection(
                     campaign: campaign,
                     onOpenCategory: (catId) => context.push('/category/$catId'),
@@ -200,13 +289,138 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
 
             // 4. Normal Home Sections below festival section
-            SliverToBoxAdapter(
-              child: bodyContent,
-            ),
+            SliverToBoxAdapter(child: bodyContent),
           ],
         ),
       ),
     );
+  }
+
+  (List<CategoryModel>, List<ProductModel>, Map<String, dynamic>?)
+  _filterCatalog(
+    String selectedSlug,
+    List<Map<String, dynamic>> superCats,
+    List<CategoryModel> allCategories,
+    List<ProductModel> allProducts,
+  ) {
+    if (selectedSlug == 'all' || selectedSlug.isEmpty) {
+      return (allCategories, allProducts, null);
+    }
+
+    Map<String, dynamic>? currentSc;
+    for (final sc in superCats) {
+      final slug = (sc['slug'] ?? sc['id'] ?? '').toString().toLowerCase();
+      final id = (sc['id'] ?? '').toString().toLowerCase();
+      final sel = selectedSlug.toLowerCase();
+      if (slug == sel || id == sel || id == 'sc_$sel' || slug == 'sc_$sel') {
+        currentSc = sc;
+        break;
+      }
+    }
+
+    final scCats =
+        (currentSc?['categories'] as List?)
+            ?.map((e) => e.toString().toLowerCase())
+            .toSet() ??
+        {};
+    final scSubCats =
+        (currentSc?['subCategories'] as List?)
+            ?.map((e) => e.toString().toLowerCase())
+            .toSet() ??
+        {};
+    final scProds =
+        (currentSc?['products'] as List?)?.map((e) => e.toString()).toSet() ??
+        {};
+
+    final matchedCategories = allCategories.where((c) {
+      final catId = c.id.toLowerCase();
+      final catName = c.name.toLowerCase();
+
+      // Explicit Admin mapping
+      if (scCats.contains(catId) || scCats.contains(catName)) return true;
+
+      if (scSubCats.isNotEmpty) {
+        final hasSub = c.subCategories.any(
+          (sub) => scSubCats.contains(sub.toLowerCase()),
+        );
+        if (hasSub) return true;
+      }
+
+      if (scProds.isNotEmpty) {
+        final hasProd = allProducts.any(
+          (p) =>
+              scProds.contains(p.id) && (p.categoryId.toLowerCase() == catId),
+        );
+        if (hasProd) return true;
+      }
+
+      // Predefined slug keyword matchers
+      final sel = selectedSlug.toLowerCase();
+      if (sel == 'cafe' || sel == 'sc_cafe') {
+        return catId.contains('dairy') ||
+            catId.contains('bread') ||
+            catId.contains('egg') ||
+            catId.contains('bakery') ||
+            catId.contains('biscuit') ||
+            catId.contains('snack') ||
+            catId.contains('beverage') ||
+            catId.contains('tea') ||
+            catId.contains('coffee') ||
+            catId.contains('drink');
+      } else if (sel == 'decor' || sel == 'sc_decor' || sel == 'home' || sel == 'sc_home') {
+        return catId.contains('decor') ||
+            catId.contains('home') ||
+            catId.contains('cleaning') ||
+            catId.contains('household') ||
+            catId.contains('kitchen') ||
+            catId.contains('atta') ||
+            catId.contains('rice') ||
+            catId.contains('oil') ||
+            catId.contains('dals') ||
+            catId.contains('grocery');
+      } else if (sel == 'pharmacy' || sel == 'sc_pharmacy') {
+        return catId.contains('pharmacy') ||
+            catId.contains('medicine') ||
+            catId.contains('health') ||
+            catId.contains('care') ||
+            catId.contains('wellness') ||
+            catId.contains('baby');
+      } else if (sel == 'electronics' || sel == 'sc_electronics') {
+        return catId.contains('electronic') ||
+            catId.contains('gadget') ||
+            catId.contains('appliance') ||
+            catId.contains('audio');
+      } else if (sel == 'fresh' || sel == 'sc_fresh') {
+        return catId.contains('fruit') ||
+            catId.contains('veg') ||
+            catId.contains('fresh') ||
+            catId.contains('meat') ||
+            catId.contains('fish');
+      } else if (sel == 'beauty' || sel == 'sc_beauty') {
+        return catId.contains('beauty') ||
+            catId.contains('personal') ||
+            catId.contains('care') ||
+            catId.contains('skincare');
+      } else if (sel == 'fashion' || sel == 'sc_fashion') {
+        return catId.contains('fashion') ||
+            catId.contains('clothing') ||
+            catId.contains('wear');
+      }
+
+      return false;
+    }).toList();
+
+    final matchedCatIds = matchedCategories
+        .map((c) => c.id.toLowerCase())
+        .toSet();
+
+    final matchedProducts = allProducts.where((p) {
+      if (scProds.contains(p.id)) return true;
+      final pCat = p.categoryId.toLowerCase();
+      return matchedCatIds.contains(pCat);
+    }).toList();
+
+    return (matchedCategories, matchedProducts, currentSc);
   }
 }
 
@@ -214,13 +428,14 @@ class _HeaderNavSliverDelegate extends SliverPersistentHeaderDelegate {
   final Widget child;
   final double height;
 
-  _HeaderNavSliverDelegate({
-    required this.child,
-    required this.height,
-  });
+  _HeaderNavSliverDelegate({required this.child, required this.height});
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
     return SizedBox.expand(child: child);
   }
 
@@ -239,6 +454,8 @@ class _HeaderNavSliverDelegate extends SliverPersistentHeaderDelegate {
 class _HomeContent extends ConsumerWidget {
   final List<CategoryModel> categories;
   final List<ProductModel> products;
+  final Map<String, dynamic>? selectedSuperCategory;
+  final String selectedSlug;
   final ValueChanged<ProductModel> onOpenProduct;
   final ValueChanged<String> onOpenCategory;
   final ValueChanged<ProductModel> onAdd;
@@ -246,6 +463,8 @@ class _HomeContent extends ConsumerWidget {
   const _HomeContent({
     required this.categories,
     required this.products,
+    this.selectedSuperCategory,
+    this.selectedSlug = 'all',
     required this.onOpenProduct,
     required this.onOpenCategory,
     required this.onAdd,
@@ -257,45 +476,60 @@ class _HomeContent extends ConsumerWidget {
     final banners = ref.watch(bannersProvider).valueOrNull ?? const [];
     final groups = ref.watch(specialGroupsProvider).valueOrNull ?? const [];
 
-    // Only look for a live order once the customer is signed in — keeps Home
-    // free of the orders API (and its getIt dependency) for guests/tests.
-    OrderModel? activeOrder;
-    if (ref.watch(authProvider.select((s) => s.isAuthenticated))) {
-      for (final o in ref.watch(ordersProvider).valueOrNull ?? const <OrderModel>[]) {
-        if (o.isActive) {
-          activeOrder = o;
-          break;
-        }
-      }
-    }
-
     final fresh = products.where((p) => p.isFreshPick).take(10).toList();
     final organic = products.where((p) => p.isOrganic).take(10).toList();
     final bestSellers = products.where((p) => p.isBestSeller).take(10).toList();
 
-    ProductRail rail(String title, String? sub, List<ProductModel> items, [String? catId]) => ProductRail(
-          title: title,
-          subtitle: sub,
-          products: items,
-          onOpen: onOpenProduct,
-          onAdd: onAdd,
-          onSeeAll: catId == null ? null : () => onOpenCategory(catId),
-        );
+    ProductRail rail(
+      String title,
+      String? sub,
+      List<ProductModel> items, [
+      String? catId,
+    ]) => ProductRail(
+      title: title,
+      subtitle: sub,
+      products: items,
+      onOpen: onOpenProduct,
+      onAdd: onAdd,
+      onSeeAll: catId == null ? null : () => onOpenCategory(catId),
+    );
+
+    final bannerUrl = selectedSuperCategory?['banner'] as String?;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (activeOrder != null) _ActiveOrderBanner(order: activeOrder, isDark: isDark),
+        // Optional Super Category Banner when admin uploads a banner for a super category
+        if (bannerUrl != null && bannerUrl.trim().isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: ClipRRect(
+              borderRadius: AppRadius.brLg,
+              child: CachedNetworkImage(
+                imageUrl: bannerUrl,
+                height: 130,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorWidget: (context, url, error) => const SizedBox.shrink(),
+              ),
+            ),
+          ),
+        ],
 
         // Shop by category
         if (categories.isNotEmpty) ...[
           const SizedBox(height: 16),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text('Shop by category', style: AppTypography.h3(
-              isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-            )),
+            child: Text(
+              selectedSlug == 'all'
+                  ? 'Shop by category'
+                  : '${selectedSuperCategory?['name'] ?? selectedSlug} Categories',
+              style: AppTypography.h3(
+                isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+              ),
+            ),
           ),
           const SizedBox(height: 12),
           SizedBox(
@@ -314,82 +548,44 @@ class _HomeContent extends ConsumerWidget {
           ),
         ],
 
-        // Promotional banners
-        if (banners.isNotEmpty) _BannerCarousel(banners: banners),
+        // Promotional banners (Only on All tab or when banners exist)
+        if (selectedSlug == 'all' && banners.isNotEmpty)
+          _BannerCarousel(banners: banners),
 
-        // Special groups (real images from the CMS)
-        for (final g in groups) _SpecialGroup(group: Map<String, dynamic>.from(g as Map)),
+        // Special groups (Only on All tab or relevant)
+        if (selectedSlug == 'all')
+          for (final g in groups)
+            _SpecialGroup(group: Map<String, dynamic>.from(g as Map)),
 
         // Curated shelves
-        rail('Fresh today', 'Picked this morning, delivered in minutes', fresh),
-        rail('Organic collection', 'Certified chemical-free', organic),
-        rail('Best sellers', 'What customers are buying this week', bestSellers),
+        if (fresh.isNotEmpty)
+          rail(
+            'Fresh today',
+            'Picked this morning, delivered in minutes',
+            fresh,
+          ),
+        if (organic.isNotEmpty)
+          rail('Organic collection', 'Certified chemical-free', organic),
+        if (bestSellers.isNotEmpty)
+          rail(
+            'Best sellers',
+            'What customers are buying this week',
+            bestSellers,
+          ),
 
         // Per-category shelves
         for (final c in categories)
-          rail(
-            c.name,
-            null,
-            products.where((p) => p.categoryId == c.id).take(12).toList(),
-            c.id,
-          ),
+          if (products.any((p) => p.categoryId == c.id))
+            rail(
+              c.name,
+              null,
+              products.where((p) => p.categoryId == c.id).take(12).toList(),
+              c.id,
+            ),
 
         const _TrustRow(),
         const SizedBox(height: 32),
       ],
-    );
-  }
-}
-
-class _ActiveOrderBanner extends StatelessWidget {
-  final OrderModel order;
-  final bool isDark;
-  const _ActiveOrderBanner({required this.order, required this.isDark});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Material(
-        color: AppColors.primary.withValues(alpha: isDark ? 0.16 : 0.08),
-        borderRadius: AppRadius.brLg,
-        child: InkWell(
-          borderRadius: AppRadius.brLg,
-          onTap: () => context.push('/tracking/${order.id}'),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(9),
-                  decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-                  child: const Icon(Icons.delivery_dining_rounded, color: Colors.white, size: 18),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(order.statusText,
-                          style: AppTypography.labelLarge(
-                            isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                          )),
-                      const SizedBox(height: 2),
-                      Text('Order #${order.id} · tap to track',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypography.bodySmall(
-                            isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                          )),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.chevron_right_rounded, color: AppColors.primary),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
@@ -414,6 +610,17 @@ class _BannerCarouselState extends State<_BannerCarousel> {
 
   @override
   Widget build(BuildContext context) {
+    final activeBanners = widget.banners.where((item) {
+      if (item is! Map) return false;
+      final b = Map<String, dynamic>.from(item);
+      final active = b['active'] ?? b['isActive'];
+      if (active == false || active == 0) return false;
+      final img = (b['imageUrl'] ?? b['image'] ?? '').toString().trim();
+      return img.isNotEmpty && img.startsWith('http');
+    }).toList();
+
+    if (activeBanners.isEmpty) return const SizedBox.shrink();
+
     return Padding(
       padding: const EdgeInsets.only(top: 16),
       child: Column(
@@ -423,9 +630,9 @@ class _BannerCarouselState extends State<_BannerCarousel> {
             child: PageView.builder(
               controller: _controller,
               onPageChanged: (i) => setState(() => _page = i),
-              itemCount: widget.banners.length,
+              itemCount: activeBanners.length,
               itemBuilder: (context, i) {
-                final b = Map<String, dynamic>.from(widget.banners[i] as Map);
+                final b = Map<String, dynamic>.from(activeBanners[i] as Map);
                 final img = (b['imageUrl'] ?? b['image'] ?? '') as String;
                 final route = resolveAppRoute((b['linkUrl'] ?? '') as String);
                 return GestureDetector(
@@ -437,19 +644,17 @@ class _BannerCarouselState extends State<_BannerCarousel> {
                       borderRadius: AppRadius.brLg,
                       color: Colors.black12,
                     ),
-                    child: img.startsWith('http')
-                        ? CachedNetworkImage(imageUrl: img, fit: BoxFit.cover)
-                        : const SizedBox.shrink(),
+                    child: CachedNetworkImage(imageUrl: img, fit: BoxFit.cover),
                   ),
                 );
               },
             ),
           ),
-          if (widget.banners.length > 1) ...[
+          if (activeBanners.length > 1) ...[
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(widget.banners.length, (i) {
+              children: List.generate(activeBanners.length, (i) {
                 final active = i == _page;
                 return AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
@@ -487,14 +692,19 @@ class _SpecialGroup extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDark : AppColors.surface,
         borderRadius: AppRadius.brLg,
-        border: Border.all(color: isDark ? AppColors.dividerDark : AppColors.divider),
+        border: Border.all(
+          color: isDark ? AppColors.dividerDark : AppColors.divider,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: AppTypography.title(
-            isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-          )),
+          Text(
+            title,
+            style: AppTypography.title(
+              isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+            ),
+          ),
           const SizedBox(height: 12),
           GridView.builder(
             shrinkWrap: true,
@@ -530,8 +740,11 @@ class _SpecialGroup extends StatelessWidget {
                                 child: CachedNetworkImage(
                                   imageUrl: img,
                                   fit: BoxFit.contain,
-                                  errorWidget: (_, _, _) =>
-                                      const Icon(Icons.category_outlined, size: 20),
+                                  // ignore: unnecessary_underscores
+                                  errorWidget: (_, _, ___) => const Icon(
+                                    Icons.category_outlined,
+                                    size: 20,
+                                  ),
                                 ),
                               )
                             : const Icon(Icons.category_outlined, size: 20),
@@ -544,7 +757,9 @@ class _SpecialGroup extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
                       style: AppTypography.labelSmall(
-                        isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                        isDark
+                            ? AppColors.textPrimaryDark
+                            : AppColors.textPrimary,
                       ),
                     ),
                   ],
@@ -575,7 +790,9 @@ class _TrustRow extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDark : AppColors.surface,
         borderRadius: AppRadius.brLg,
-        border: Border.all(color: isDark ? AppColors.dividerDark : AppColors.divider),
+        border: Border.all(
+          color: isDark ? AppColors.dividerDark : AppColors.divider,
+        ),
       ),
       child: Row(
         children: [
@@ -585,13 +802,25 @@ class _TrustRow extends StatelessWidget {
                 children: [
                   Icon(icon, color: AppColors.primary, size: 22),
                   const SizedBox(height: 6),
-                  Text(title, textAlign: TextAlign.center, style: AppTypography.labelMedium(
-                    isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                  )),
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: AppTypography.labelMedium(
+                      isDark
+                          ? AppColors.textPrimaryDark
+                          : AppColors.textPrimary,
+                    ),
+                  ),
                   const SizedBox(height: 2),
-                  Text(sub, textAlign: TextAlign.center, style: AppTypography.labelSmall(
-                    isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                  ).copyWith(fontWeight: FontWeight.w400)),
+                  Text(
+                    sub,
+                    textAlign: TextAlign.center,
+                    style: AppTypography.labelSmall(
+                      isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondary,
+                    ).copyWith(fontWeight: FontWeight.w400),
+                  ),
                 ],
               ),
             ),
@@ -618,123 +847,193 @@ class _HomeSkeleton extends StatelessWidget {
   }
 }
 
-class _SuperCategoryNav extends ConsumerWidget {
+class _SuperCategoryNav extends ConsumerStatefulWidget {
   final bool isFestivalActive;
   const _SuperCategoryNav({this.isFestivalActive = false});
 
+  @override
+  ConsumerState<_SuperCategoryNav> createState() => _SuperCategoryNavState();
+}
+
+class _SuperCategoryNavState extends ConsumerState<_SuperCategoryNav> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   IconData _iconFor(String? name, String? iconKey) {
     final key = '${iconKey ?? ''} ${name ?? ''}'.toLowerCase();
-    if (key.contains('grid') || key.contains('all')) return Icons.grid_view_rounded;
-    if (key.contains('coffee') || key.contains('cafe')) return Icons.local_cafe_outlined;
-    if (key.contains('home')) return Icons.home_outlined;
-    if (key.contains('toy') || key.contains('game')) return Icons.sports_esports_outlined;
-    if (key.contains('leaf') || key.contains('fresh')) return Icons.eco_outlined;
-    if (key.contains('headphone') || key.contains('electronic')) return Icons.headphones_outlined;
-    if (key.contains('phone') || key.contains('mobile')) return Icons.smartphone_outlined;
-    if (key.contains('sparkle') || key.contains('beauty')) return Icons.auto_awesome_outlined;
-    if (key.contains('shirt') || key.contains('fashion')) return Icons.checkroom_outlined;
-    return Icons.category_outlined;
+    if (key.contains('grid') || key.contains('all')) {
+      return Icons.grid_view_rounded;
+    }
+    if (key.contains('coffee') || key.contains('cafe')) {
+      return Icons.local_cafe_rounded;
+    }
+    if (key.contains('decor') || key.contains('chair') || key.contains('home')) {
+      return Icons.chair_rounded;
+    }
+    if (key.contains('pharmacy') || key.contains('medicine') || key.contains('health')) {
+      return Icons.local_pharmacy_rounded;
+    }
+    if (key.contains('leaf') || key.contains('fresh')) {
+      return Icons.eco_rounded;
+    }
+    if (key.contains('headphone') || key.contains('electronic')) {
+      return Icons.headphones_rounded;
+    }
+    if (key.contains('sparkle') || key.contains('beauty')) {
+      return Icons.auto_awesome_rounded;
+    }
+    if (key.contains('shirt') || key.contains('fashion')) {
+      return Icons.checkroom_rounded;
+    }
+    return Icons.category_rounded;
+  }
+
+  void _scrollToIndex(int index, double itemWidth, double screenWidth) {
+    if (!_scrollController.hasClients) return;
+    final targetOffset = (index * itemWidth) - (screenWidth / 2) + (itemWidth / 2) + 16;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final minScroll = _scrollController.position.minScrollExtent;
+    final clampedOffset = targetOffset.clamp(minScroll, maxScroll);
+    _scrollController.animateTo(
+      clampedOffset,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final superCatsAsync = ref.watch(superCategoriesProvider);
     final selectedSlug = ref.watch(selectedSuperCategoryProvider);
 
-    final superCats = superCatsAsync.valueOrNull ?? const [
-      {'id': 'sc_all', 'name': 'All', 'slug': 'all', 'icon': 'LayoutGrid'},
-      {'id': 'sc_cafe', 'name': 'Cafe', 'slug': 'cafe', 'icon': 'Coffee'},
-      {'id': 'sc_home', 'name': 'Home', 'slug': 'home', 'icon': 'Home'},
-      {'id': 'sc_toys', 'name': 'Toys', 'slug': 'toys', 'icon': 'Gamepad2'},
-      {'id': 'sc_fresh', 'name': 'Fresh', 'slug': 'fresh', 'icon': 'Leaf'},
-      {'id': 'sc_electronics', 'name': 'Electronics', 'slug': 'electronics', 'icon': 'Headphones'},
-      {'id': 'sc_mobiles', 'name': 'Mobiles', 'slug': 'mobiles', 'icon': 'Smartphone'},
-      {'id': 'sc_beauty', 'name': 'Beauty', 'slug': 'beauty', 'icon': 'Sparkles'},
-      {'id': 'sc_fashion', 'name': 'Fashion', 'slug': 'fashion', 'icon': 'Shirt'},
-    ];
+    final rawSuperCats =
+        superCatsAsync.valueOrNull ??
+        const [
+          {'id': 'sc_all', 'name': 'All', 'slug': 'all', 'icon': 'LayoutGrid'},
+          {'id': 'sc_cafe', 'name': 'Cafe', 'slug': 'cafe', 'icon': 'Coffee'},
+          {'id': 'sc_decor', 'name': 'Decor', 'slug': 'decor', 'icon': 'Chair'},
+          {'id': 'sc_pharmacy', 'name': 'Pharmacy', 'slug': 'pharmacy', 'icon': 'Pharmacy'},
+          {'id': 'sc_fresh', 'name': 'Fresh', 'slug': 'fresh', 'icon': 'Leaf'},
+          {
+            'id': 'sc_electronics',
+            'name': 'Electronics',
+            'slug': 'electronics',
+            'icon': 'Headphones',
+          },
+          {
+            'id': 'sc_beauty',
+            'name': 'Beauty',
+            'slug': 'beauty',
+            'icon': 'Sparkles',
+          },
+          {
+            'id': 'sc_fashion',
+            'name': 'Fashion',
+            'slug': 'fashion',
+            'icon': 'Shirt',
+          },
+        ];
+
+    final superCats = rawSuperCats.take(10).toList();
+    final screenWidth = MediaQuery.of(context).size.width;
+    // Show 5 super categories in view + 6th icon peeking (~25% of width)
+    final itemWidth = (screenWidth - 32) / 5.25;
 
     return Container(
-      color: isFestivalActive
+      color: widget.isFestivalActive
           ? Colors.transparent
           : (isDark ? AppColors.surfaceDark : AppColors.surface),
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      height: 48,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        physics: const BouncingScrollPhysics(),
-        itemCount: superCats.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (context, i) {
-          final sc = superCats[i];
-          final name = (sc['name'] ?? 'Category') as String;
-          final slug = (sc['slug'] ?? sc['id'] ?? name.toLowerCase()) as String;
-          final iconKey = sc['icon'] as String?;
-          final isSelected = selectedSlug == slug || (selectedSlug == '' && slug == 'all');
-          final icon = _iconFor(name, iconKey);
-
-          return InkWell(
-            onTap: () {
-              ref.read(selectedSuperCategoryProvider.notifier).state = slug;
-              if (slug != 'all') {
-                final catList = (sc['categories'] is List) ? (sc['categories'] as List) : const [];
-                if (catList.isNotEmpty) {
-                  final firstCat = catList.first.toString();
-                  context.push('/category/$firstCat');
-                } else if (slug == 'cafe') {
-                  context.push('/category/dairy-bread-eggs');
-                } else if (slug == 'home') {
-                  context.push('/category/atta-rice-oil-dals');
-                } else if (slug == 'fresh') {
-                  context.push('/category/fruits-vegetables');
-                }
-              }
-            },
-            borderRadius: BorderRadius.circular(20),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? (isFestivalActive ? Colors.black.withOpacity(0.12) : AppColors.primary.withOpacity(0.12))
-                    : (isFestivalActive
-                        ? Colors.white.withOpacity(0.5)
-                        : (isDark ? Colors.white.withOpacity(0.06) : Colors.grey.shade100)),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isSelected
-                      ? (isFestivalActive ? Colors.black26 : AppColors.primary.withOpacity(0.4))
-                      : Colors.transparent,
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    icon,
-                    size: 16,
-                    color: isSelected
-                        ? (isFestivalActive ? Colors.black87 : AppColors.primary)
-                        : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondary),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    name,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                      color: isSelected
-                          ? (isFestivalActive ? Colors.black : AppColors.primary)
-                          : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimary),
-                    ),
-                  ),
-                ],
-              ),
+      height: 58,
+      child: Stack(
+        alignment: Alignment.bottomCenter,
+        children: [
+          // Blinkit-style full-width bottom border line
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              height: 1,
+              color: widget.isFestivalActive
+                  ? Colors.black12
+                  : (isDark ? AppColors.dividerDark : const Color(0xFFE5E7EB)),
             ),
-          );
-        },
+          ),
+          ListView.builder(
+            controller: _scrollController,
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            physics: const BouncingScrollPhysics(),
+            itemCount: superCats.length,
+            itemBuilder: (context, i) {
+              final sc = superCats[i];
+              final name = (sc['name'] ?? sc['displayName'] ?? 'Category') as String;
+              final slug = (sc['slug'] ?? sc['id'] ?? name.toLowerCase()) as String;
+              final iconKey = sc['icon'] as String?;
+              final isSelected =
+                  selectedSlug == slug || (selectedSlug == '' && slug == 'all');
+              final icon = _iconFor(name, iconKey);
+
+              final activeColor =
+                  widget.isFestivalActive ? Colors.black : const Color(0xFF0C831F);
+
+              return SizedBox(
+                width: itemWidth,
+                child: InkWell(
+                  onTap: () {
+                    ref.read(selectedSuperCategoryProvider.notifier).state = slug;
+                    _scrollToIndex(i, itemWidth, screenWidth);
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        icon,
+                        size: 22,
+                        color: isSelected
+                            ? activeColor
+                            : (isDark ? Colors.white54 : const Color(0xFF757575)),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight:
+                              isSelected ? FontWeight.w800 : FontWeight.w500,
+                          color: isSelected
+                              ? (isDark ? Colors.white : activeColor)
+                              : (isDark ? Colors.white60 : const Color(0xFF666666)),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        height: 2.5,
+                        width: isSelected ? itemWidth * 0.7 : 0,
+                        decoration: BoxDecoration(
+                          color: activeColor,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }

@@ -85,7 +85,7 @@ class WishlistScreen extends ConsumerWidget {
                       crossAxisCount: 2,
                       crossAxisSpacing: 12,
                       mainAxisSpacing: 12,
-                      childAspectRatio: 0.62,
+                      childAspectRatio: 0.70,
                     ),
                     delegate: SliverChildBuilderDelegate(
                       (context, i) {
@@ -94,6 +94,7 @@ class WishlistScreen extends ConsumerWidget {
                           children: [
                             ProductCard(
                               product: p,
+                              heroTag: 'product_image_${p.id}',
                               width: double.infinity,
                               onTap: () => context.push('/product/${p.id}'),
                               onAdd: () {

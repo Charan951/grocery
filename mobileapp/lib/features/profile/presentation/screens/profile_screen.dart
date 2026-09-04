@@ -212,14 +212,17 @@ class _Card extends StatelessWidget {
   const _Card({required this.child, required this.isDark, this.padding = const EdgeInsets.all(16)});
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: padding,
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.surfaceDark : AppColors.surface,
+  Widget build(BuildContext context) => Material(
+        color: isDark ? AppColors.surfaceDark : AppColors.surface,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
           borderRadius: AppRadius.brLg,
-          border: Border.all(color: isDark ? AppColors.dividerDark : AppColors.divider),
+          side: BorderSide(color: isDark ? AppColors.dividerDark : AppColors.divider),
         ),
-        child: child,
+        child: Padding(
+          padding: padding,
+          child: child,
+        ),
       );
 }
 

@@ -71,4 +71,50 @@ class AppTypography {
 
   static TextStyle labelSmall(Color color) => _body(
         fontSize: 11.0, fontWeight: FontWeight.w600, height: 1.2, letterSpacing: 0.3, color: color);
+
+  /// Calligraphy typography for festival campaign names
+  static TextStyle festivalCalligraphy(
+    Color color, {
+    double fontSize = 30.0,
+    FontWeight fontWeight = FontWeight.w700,
+    String fontPreset = 'greatVibes',
+  }) {
+    final baseStyle = TextStyle(
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color,
+      height: 1.2,
+      shadows: const [
+        Shadow(
+          color: Color(0x2E000000),
+          offset: Offset(0, 2),
+          blurRadius: 5,
+        ),
+      ],
+    );
+
+    switch (fontPreset.toLowerCase()) {
+      case 'rozhaone':
+      case 'diwali':
+      case 'ganesh_chaturthi':
+        return GoogleFonts.rozhaOne(textStyle: baseStyle.copyWith(fontSize: fontSize < 26 ? 26 : fontSize));
+      case 'cinzeldecorative':
+      case 'cinzel':
+      case 'navratri':
+      case 'onam':
+        return GoogleFonts.cinzelDecorative(textStyle: baseStyle.copyWith(fontSize: fontSize < 24 ? 24 : fontSize));
+      case 'satisfy':
+      case 'raksha_bandhan':
+        return GoogleFonts.satisfy(textStyle: baseStyle.copyWith(fontSize: fontSize < 28 ? 28 : fontSize));
+      case 'kalam':
+        return GoogleFonts.kalam(textStyle: baseStyle.copyWith(fontSize: fontSize < 26 ? 26 : fontSize));
+      case 'pacifico':
+      case 'holi':
+        return GoogleFonts.pacifico(textStyle: baseStyle.copyWith(fontSize: fontSize < 26 ? 26 : fontSize));
+      case 'greatvibes':
+      case 'krishna':
+      default:
+        return GoogleFonts.greatVibes(textStyle: baseStyle.copyWith(fontSize: fontSize < 32 ? 34 : fontSize + 2));
+    }
+  }
 }

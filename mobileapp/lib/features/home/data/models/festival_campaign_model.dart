@@ -185,15 +185,24 @@ class FestivalCampaignModel {
 
   /// STEP 4: Scope Check (Checks if applicable to current super category slug)
   bool appliesToSuperCategory(String? superCategorySlug) {
-    if (applicableSuperCategories.contains('all') ||
-        applicableSuperCategories.contains('sc_all') ||
-        applicableSuperCategories.contains('All')) {
-      return true;
-    }
-    if (superCategorySlug == null || superCategorySlug.isEmpty || superCategorySlug == 'all') {
-      return true;
-    }
-    return applicableSuperCategories.contains(superCategorySlug) ||
-        applicableSuperCategories.contains('sc_$superCategorySlug');
+    final currentSlug = (superCategorySlug == null || superCategorySlug.isEmpty)
+        ? 'all'
+        : superCategorySlug.toLowerCase().trim();
+
+    // 1. If campaign scope includes 'all_super_categories' or 'all super categories' -> applies EVERYWHERE
+    final containsAllSuper = applicableSuperCategories.any((s) {
+      final l = s.toLowerCase().trim();
+      return l == 'all_super_categories' || l == 'all super categories' || l == 'all_categories';
+    });
+    if (containsAllSuper) return true;
+
+    // 2. Exact or normalized slug matching for the current active page/tab
+    return applicableSuperCategories.any((s) {
+      final scope = s.toLowerCase().trim();
+      if (scope == currentSlug) return true;
+      if (scope == 'sc_$currentSlug') return true;
+      if (currentSlug == 'all' && (scope == 'all' || scope == 'sc_all')) return true;
+      return false;
+    });
   }
 }

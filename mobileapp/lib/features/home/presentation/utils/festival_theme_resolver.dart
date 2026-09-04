@@ -4,6 +4,7 @@ import '../../data/models/festival_campaign_model.dart';
 class ResolvedFestivalTheme {
   final String key;
   final String emoji;
+  final String fontPreset;
   final LinearGradient backgroundGradient;
   final Color backgroundColor;
   final Color cardBackground;
@@ -15,6 +16,7 @@ class ResolvedFestivalTheme {
   const ResolvedFestivalTheme({
     required this.key,
     required this.emoji,
+    required this.fontPreset,
     required this.backgroundGradient,
     required this.backgroundColor,
     required this.cardBackground,
@@ -29,6 +31,7 @@ class FestivalThemeResolver {
   static const Map<String, Map<String, dynamic>> _presets = {
     'krishna': {
       'emoji': '🦚',
+      'fontPreset': 'greatVibes',
       'gStart': Color(0xFFE0F2FE),
       'gEnd': Color(0xFFCFFAFE),
       'cardBg': Color(0xFFFFFBEB),
@@ -39,6 +42,7 @@ class FestivalThemeResolver {
     },
     'diwali': {
       'emoji': '🪔',
+      'fontPreset': 'rozhaOne',
       'gStart': Color(0xFFFFF7ED),
       'gEnd': Color(0xFFFFEDD5),
       'cardBg': Color(0xFFFEF3C7),
@@ -49,6 +53,7 @@ class FestivalThemeResolver {
     },
     'onam': {
       'emoji': '🌸',
+      'fontPreset': 'cinzelDecorative',
       'gStart': Color(0xFFF7FEE7),
       'gEnd': Color(0xFFECFDF5),
       'cardBg': Color(0xFFFAFAF9),
@@ -59,6 +64,7 @@ class FestivalThemeResolver {
     },
     'raksha_bandhan': {
       'emoji': '🧿',
+      'fontPreset': 'satisfy',
       'gStart': Color(0xFFFFF1F2),
       'gEnd': Color(0xFFF3E8FF),
       'cardBg': Color(0xFFFFF1F2),
@@ -69,6 +75,7 @@ class FestivalThemeResolver {
     },
     'ganesh_chaturthi': {
       'emoji': '🌺',
+      'fontPreset': 'rozhaOne',
       'gStart': Color(0xFFFEF3C7),
       'gEnd': Color(0xFFFFEDD5),
       'cardBg': Color(0xFFFFFBEB),
@@ -79,6 +86,7 @@ class FestivalThemeResolver {
     },
     'holi': {
       'emoji': '🎨',
+      'fontPreset': 'pacifico',
       'gStart': Color(0xFFFFF1F2),
       'gEnd': Color(0xFFF0FDF4),
       'cardBg': Color(0xFFFFFFFF),
@@ -89,6 +97,7 @@ class FestivalThemeResolver {
     },
     'navratri': {
       'emoji': '🪷',
+      'fontPreset': 'cinzelDecorative',
       'gStart': Color(0xFFFEF9C3),
       'gEnd': Color(0xFFFAF5FF),
       'cardBg': Color(0xFFFFFBEB),
@@ -119,13 +128,25 @@ class FestivalThemeResolver {
 
     final styling = campaign.cardStyling;
 
+    Alignment begin = Alignment.topCenter;
+    Alignment end = Alignment.bottomCenter;
+    final dir = campaign.gradientDirection.toLowerCase();
+    if (dir.contains('diagonal') || dir.contains('top left') || dir.contains('135') || dir.contains('\\')) {
+      begin = Alignment.topLeft;
+      end = Alignment.bottomRight;
+    } else if (dir.contains('right') || dir.contains('horizontal')) {
+      begin = Alignment.centerLeft;
+      end = Alignment.centerRight;
+    }
+
     return ResolvedFestivalTheme(
       key: key,
       emoji: preset['emoji'],
+      fontPreset: preset['fontPreset'] ?? 'greatVibes',
       backgroundGradient: LinearGradient(
         colors: [gStart, gEnd],
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
+        begin: begin,
+        end: end,
       ),
       backgroundColor: solid,
       cardBackground: styling.cardBackground,
