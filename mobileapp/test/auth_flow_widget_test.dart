@@ -238,14 +238,14 @@ void main() {
       expect(find.textContaining('asha@example.com'), findsWidgets);
     });
 
-    testWidgets('Continue as guest asks for a delivery location before Home', (tester) async {
+    testWidgets('Continue as guest goes straight to Home without signing in', (tester) async {
       final n = AuthNotifier(_FakeStorage(), _FakeApi(), _FakeTokenStore());
       await _pumpAuthApp(tester, n);
 
       await tester.tap(find.text('Guest'));
       await tester.pumpAndSettle();
 
-      expect(find.text('LOCATION'), findsOneWidget);
+      expect(find.text('HOME'), findsOneWidget);
       expect(n.state.isAuthenticated, isFalse);
       expect(n.state.isGuest, isTrue);
     });

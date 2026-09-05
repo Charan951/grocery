@@ -64,9 +64,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
       context.go('/onboarding');
     } else if (!authState.isAuthenticated) {
       context.go('/login');
-    } else if (!authState.locationPermissionGranted || authState.user?.selectedAddress == null) {
-      context.go('/location_select');
     } else {
+      // Straight to Home — HomeScreen's own `_maybeAskLocation()` prompts for
+      // the real OS permission in place if it's off, instead of a separate
+      // location-picker screen blocking the way in.
       context.go('/');
     }
   }

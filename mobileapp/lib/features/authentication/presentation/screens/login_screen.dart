@@ -74,9 +74,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // Calling `go` synchronously right alongside that can race go_router's
     // internal route-match bookkeeping (a `'index != -1'` assertion); wait a
     // frame so the redirect pass settles before we navigate explicitly.
+    //
+    // Straight to Home (not a location-picker screen) — HomeScreen's own
+    // `_maybeAskLocation()` prompts for the real OS permission in place, the
+    // same as it does for a signed-in user.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      context.go('/location_select');
+      context.go('/');
     });
   }
 
