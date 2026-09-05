@@ -6,18 +6,11 @@ import 'package:mapcn_flutter/mapcn_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:dio/dio.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
+import 'package:freshcart/core/constants/app_radius.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
 import 'package:freshcart/core/services/location_permission.dart';
 import 'package:freshcart/core/widgets/app_toast.dart';
-import 'package:freshcart/core/widgets/buttons.dart';
 import 'package:freshcart/features/authentication/presentation/controllers/auth_controller.dart';
-
-final List<Map<String, dynamic>> popularLocations = [
-  {'name': 'HITEC City (Hyderabad)', 'lat': 17.4474, 'lng': 78.3762, 'area': 'HITEC CITY', 'pin': '500081'},
-  {'name': 'Kukatpally (Hyderabad)', 'lat': 17.4842, 'lng': 78.3888, 'area': 'KPHB COLONY', 'pin': '500072'},
-  {'name': 'Indiranagar (Bengaluru)', 'lat': 12.9784, 'lng': 77.6408, 'area': 'INDIRANAGAR', 'pin': '560038'},
-  {'name': 'HSR Layout (Bengaluru)', 'lat': 12.9121, 'lng': 77.6446, 'area': 'HSR LAYOUT', 'pin': '560102'},
-];
 
 class LocationSelectScreen extends ConsumerStatefulWidget {
   const LocationSelectScreen({super.key});
@@ -29,6 +22,8 @@ class LocationSelectScreen extends ConsumerStatefulWidget {
 class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> with TickerProviderStateMixin {
   late final MapcnController _mapController;
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _houseNoController = TextEditingController();
   final TextEditingController _landmarkController = TextEditingController();
 
@@ -37,6 +32,7 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
   String _pincode = '500072';
   String _fullAddressText = 'Balaji Nagar, KPHB Colony, Kukatpally mandal, Hyderabad, Telangana, 500072, India';
   String _selectedLabel = 'Home';
+  String? _nameError;
 
   LocationPermState? _permState;
   bool _promptedOnce = false;
@@ -45,6 +41,9 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
   void initState() {
     super.initState();
     _mapController = MapcnController(vsync: this);
+    final user = ref.read(authProvider).user;
+    _nameController.text = user?.name ?? '';
+    _phoneController.text = user?.phone ?? '';
     // Ask for location permission as soon as the screen opens (post-login flow).
     WidgetsBinding.instance.addPostFrameCallback((_) => _ensurePermission(prompt: true));
   }
@@ -71,6 +70,8 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
   @override
   void dispose() {
     _searchController.dispose();
+    _nameController.dispose();
+    _phoneController.dispose();
     _houseNoController.dispose();
     _landmarkController.dispose();
     super.dispose();
@@ -144,7 +145,17 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
 
   Future<void> _confirmAndDeliver() async {
     if (_saving) return;
+    final name = _nameController.text.trim();
     final houseNo = _houseNoController.text.trim();
+    if (name.isEmpty || houseNo.isEmpty) {
+      setState(() => _nameError = name.isEmpty ? 'Enter your name' : null);
+      AppToast.error(houseNo.isEmpty
+          ? 'Please enter your house / flat number.'
+          : 'Please enter your name.');
+      return;
+    }
+    setState(() => _nameError = null);
+
     final landmark = _landmarkController.text.trim();
     final finalFullAddress =
         '${houseNo.isNotEmpty ? '$houseNo, ' : ''}${landmark.isNotEmpty ? '$landmark, ' : ''}$_fullAddressText';
@@ -155,6 +166,8 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
     final body = {
       'label': _selectedLabel,
       'name': _selectedLabel,
+      'receiverName': name,
+      'receiverPhone': _phoneController.text.trim(),
       'houseNo': houseNo,
       'landmark': landmark,
       'area': _areaName,
@@ -165,21 +178,31 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
     };
 
     setState(() => _saving = true);
-    try {
-      // Persist via the real API (POST /customers/me/addresses).
-      await auth.addAddressRemote(body);
-    } catch (_) {
-      // First-run must not be blocked by a transient network error — keep it
-      // locally and let the next profile refresh reconcile.
+    // A guest has no account for `POST /customers/me/addresses` to attach
+    // to — it would always 401. Save locally only, skip the doomed call.
+    if (ref.read(authProvider).isAuthenticated) {
+      try {
+        // Persist via the real API (POST /customers/me/addresses).
+        await auth.addAddressRemote(body);
+      } catch (_) {
+        // First-run must not be blocked by a transient network error — keep
+        // it locally and let the next profile refresh reconcile.
+        auth.addAddress({
+          'id': 'addr_${DateTime.now().millisecondsSinceEpoch}',
+          ...body,
+          'addressLine': finalFullAddress,
+          'isDefault': true,
+        });
+      }
+    } else {
       auth.addAddress({
         'id': 'addr_${DateTime.now().millisecondsSinceEpoch}',
         ...body,
         'addressLine': finalFullAddress,
         'isDefault': true,
       });
-    } finally {
-      if (mounted) setState(() => _saving = false);
     }
+    if (mounted) setState(() => _saving = false);
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -221,7 +244,7 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.warning.withValues(alpha: isDark ? 0.14 : 0.10),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppRadius.brSm,
         border: Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
       ),
       child: Row(
@@ -258,12 +281,68 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
     await _ensurePermission(prompt: false);
   }
 
+  // ---- shared field chrome (mirrors the web storefront's address form) ----
+
+  Widget _fieldLabel(BuildContext context, IconData icon, String text, bool isDark) {
+    final sub = isDark ? AppColors.textSecondaryDark : AppColors.textSecondary;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: sub),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: AppTypography.labelSmall(sub).copyWith(letterSpacing: 0.6, fontWeight: FontWeight.w800),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _field({
+    required TextEditingController controller,
+    required String hint,
+    bool isDark = false,
+    TextInputType? keyboardType,
+    String? errorText,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      style: AppTypography.bodySmall(isDark ? Colors.white : AppColors.textPrimary).copyWith(fontWeight: FontWeight.w700),
+      decoration: InputDecoration(
+        hintText: hint,
+        errorText: errorText,
+        hintStyle: AppTypography.bodySmall(isDark ? AppColors.textSecondaryDark : AppColors.textTertiary),
+        filled: true,
+        fillColor: isDark ? Colors.white.withOpacity(0.05) : AppColors.background,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: AppRadius.brSm,
+          borderSide: BorderSide(color: isDark ? AppColors.dividerDark : AppColors.divider),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: AppRadius.brSm,
+          borderSide: BorderSide(color: isDark ? AppColors.dividerDark : AppColors.divider),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: AppRadius.brSm,
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final authState = ref.watch(authProvider);
     final savedAddresses = authState.user?.addresses ?? [];
+    final sub = isDark ? AppColors.textSecondaryDark : AppColors.textSecondary;
+    final divider = isDark ? AppColors.dividerDark : AppColors.divider;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
@@ -283,22 +362,7 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
         ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: isDark ? AppColors.dividerDark : AppColors.divider),
-        ),
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.surfaceDark : AppColors.surface,
-          border: Border(top: BorderSide(color: isDark ? AppColors.dividerDark : AppColors.divider)),
-        ),
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-        child: SafeArea(
-          top: false,
-          child: PrimaryButton(
-            text: _saving ? 'Saving…' : 'Confirm & deliver here',
-            isLoading: _saving,
-            onPressed: _saving ? null : _confirmAndDeliver,
-          ),
+          child: Container(height: 1, color: divider),
         ),
       ),
       body: SafeArea(
@@ -310,92 +374,78 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (_permState != null && !_permState!.ok) _permissionBanner(isDark),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        height: 48,
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
-                        decoration: BoxDecoration(
-                          color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: isDark ? Colors.white10 : Colors.black.withOpacity(0.08)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.search_rounded, color: Colors.grey, size: 20),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                controller: _searchController,
-                                style: AppTypography.bodyMedium(isDark ? Colors.white : Colors.black),
-                                decoration: const InputDecoration(
-                                  hintText: 'Type area, landmark or street...',
-                                  hintStyle: TextStyle(fontSize: 12, color: Colors.grey),
-                                  border: InputBorder.none,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton.icon(
-                      onPressed: _locateUser,
-                      icon: const Icon(Icons.navigation_rounded, size: 16, color: Colors.white),
-                      label: const Text('Locate Me', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryText,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        elevation: 0,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
 
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
+                // Search bar + Locate Me, in an outer surface card like web.
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.surfaceDark : AppColors.surface,
+                    borderRadius: AppRadius.brMd,
+                    border: Border.all(color: divider),
+                  ),
                   child: Row(
                     children: [
-                      Text('POPULAR:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: isDark ? Colors.white38 : Colors.grey)),
-                      const SizedBox(width: 8),
-                      ...popularLocations.map((loc) {
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 6.0),
-                          child: ActionChip(
-                            avatar: const Text('📍', style: TextStyle(fontSize: 12)),
-                            label: Text(loc['name'] as String, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                            backgroundColor: isDark ? Colors.white10 : Colors.grey.shade100,
-                            onPressed: () {
-                              final latLng = LatLng(loc['lat'] as double, loc['lng'] as double);
-                              setState(() {
-                                _currentCenter = latLng;
-                                _areaName = loc['area'] as String;
-                                _pincode = loc['pin'] as String;
-                                _fullAddressText = '${loc['name']}, India';
-                              });
-                              _mapController.flyTo(latLng, zoom: 15.0);
-                            },
+                      Expanded(
+                        child: Container(
+                          height: 44,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.white.withOpacity(0.05) : AppColors.background,
+                            borderRadius: AppRadius.brSm,
+                            border: Border.all(color: divider),
                           ),
-                        );
-                      }),
+                          child: Row(
+                            children: [
+                              Icon(Icons.search_rounded, color: sub, size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: TextField(
+                                  controller: _searchController,
+                                  style: AppTypography.bodySmall(isDark ? Colors.white : AppColors.textPrimary)
+                                      .copyWith(fontWeight: FontWeight.w600),
+                                  decoration: InputDecoration(
+                                    hintText: 'Type area, landmark or street',
+                                    hintStyle: AppTypography.bodySmall(sub),
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        height: 44,
+                        child: ElevatedButton.icon(
+                          onPressed: _locateUser,
+                          icon: const Icon(Icons.navigation_rounded, size: 15, color: Colors.white),
+                          label: Text('Locate Me', style: AppTypography.labelSmall(Colors.white).copyWith(fontWeight: FontWeight.w800)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            shape: RoundedRectangleBorder(borderRadius: AppRadius.brSm),
+                            elevation: 0,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 16),
 
+                // Interactive map — real draggable map (vs. web's static-iframe
+                // + tap-to-pin hack), so it keeps its own live-position marker
+                // instead of a fixed overlay pin.
                 Container(
-                  height: 180,
+                  height: 224,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: isDark ? Colors.white10 : Colors.black.withOpacity(0.1)),
+                    borderRadius: AppRadius.brMd,
+                    border: Border.all(color: divider),
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: AppRadius.brMd,
                     child: Stack(
                       children: [
                         Mapcn(
@@ -423,14 +473,22 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
                           top: 10,
                           right: 10,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.9),
-                              borderRadius: BorderRadius.circular(12),
+                              color: (isDark ? AppColors.surfaceDark : AppColors.surface).withOpacity(0.95),
+                              borderRadius: AppRadius.brPill,
+                              border: Border.all(color: divider),
                             ),
-                            child: const Text(
-                              '💡 Drag map to select location',
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.info_outline_rounded, size: 13, color: sub),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Drag map to pin location',
+                                  style: AppTypography.labelSmall(sub).copyWith(fontWeight: FontWeight.w700),
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -440,106 +498,157 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
                 ),
                 const SizedBox(height: 16),
 
+                // Address details card — plain surface card like web (no
+                // green tint), receiver name/phone, house/landmark, label.
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE8F5E9).withOpacity(isDark ? 0.1 : 0.6),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                    color: isDark ? AppColors.surfaceDark : AppColors.surface,
+                    borderRadius: AppRadius.brXl,
+                    border: Border.all(color: divider),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.location_on_rounded, color: AppColors.primaryText, size: 18),
-                              const SizedBox(width: 6),
-                              Text(
-                                _areaName,
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primaryText, letterSpacing: 0.5),
-                              ),
-                            ],
-                          ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            width: 32,
+                            height: 32,
+                            margin: const EdgeInsets.only(top: 2),
                             decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: Colors.black12),
+                              color: AppColors.primary.withOpacity(0.1),
+                              borderRadius: AppRadius.brSm,
                             ),
-                            child: Text(
-                              'PIN: $_pincode',
-                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey),
+                            child: const Icon(Icons.location_on_rounded, color: AppColors.primaryText, size: 18),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        _areaName,
+                                        style: AppTypography.labelSmall(AppColors.primaryText)
+                                            .copyWith(fontWeight: FontWeight.w900, letterSpacing: 0.6),
+                                      ),
+                                    ),
+                                    if (_pincode.isNotEmpty)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: isDark ? Colors.white.withOpacity(0.05) : AppColors.background,
+                                          borderRadius: AppRadius.brXs,
+                                          border: Border.all(color: divider),
+                                        ),
+                                        child: Text(
+                                          'PIN: $_pincode',
+                                          style: AppTypography.labelSmall(sub).copyWith(fontWeight: FontWeight.w700),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _fullAddressText,
+                                  style: AppTypography.bodySmall(isDark ? AppColors.textPrimaryDark : AppColors.textPrimary)
+                                      .copyWith(fontWeight: FontWeight.w600, height: 1.35),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        _fullAddressText,
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                      const SizedBox(height: 16),
+                      Divider(height: 1, color: divider),
+                      const SizedBox(height: 16),
+
+                      _fieldLabel(context, Icons.person_outline_rounded, 'YOUR NAME *', isDark),
+                      _field(controller: _nameController, hint: 'e.g. Full name', isDark: isDark, errorText: _nameError),
+                      const SizedBox(height: 14),
+
+                      _fieldLabel(context, Icons.call_outlined, 'MOBILE NUMBER', isDark),
+                      _field(
+                        controller: _phoneController,
+                        hint: 'e.g. 98765 43210',
+                        isDark: isDark,
+                        keyboardType: TextInputType.phone,
                       ),
                       const SizedBox(height: 14),
 
-                      TextField(
-                        controller: _houseNoController,
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black),
-                        decoration: InputDecoration(
-                          labelText: 'HOUSE / FLAT / DOOR NO',
-                          labelStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey),
-                          hintText: 'e.g. Flat 402, Sunshine Apts',
-                          hintStyle: const TextStyle(fontSize: 12, color: Colors.grey),
-                          filled: true,
-                          fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
+                      _fieldLabel(context, Icons.home_work_outlined, 'HOUSE / FLAT / DOOR NO *', isDark),
+                      _field(controller: _houseNoController, hint: 'e.g. Flat 402, Sunshine Apts', isDark: isDark),
+                      const SizedBox(height: 14),
 
-                      TextField(
-                        controller: _landmarkController,
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black),
-                        decoration: InputDecoration(
-                          labelText: 'LANDMARK (OPTIONAL)',
-                          labelStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey),
-                          hintText: 'e.g. Near Metro Station',
-                          hintStyle: const TextStyle(fontSize: 12, color: Colors.grey),
-                          filled: true,
-                          fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
+                      _fieldLabel(context, Icons.signpost_outlined, 'LANDMARK (OPTIONAL)', isDark),
+                      _field(controller: _landmarkController, hint: 'e.g. Near Metro Station', isDark: isDark),
+                      const SizedBox(height: 16),
+                      Divider(height: 1, color: divider),
+                      const SizedBox(height: 14),
 
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            const Text('SAVE AS:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.grey)),
-                            const SizedBox(width: 8),
-                            ...['Home', 'Work', 'Other'].map((lbl) {
-                              final isSelected = _selectedLabel == lbl;
-                              final iconStr = lbl == 'Home' ? '🏠' : (lbl == 'Work' ? '💼' : '📍');
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 6.0),
-                                child: ChoiceChip(
-                                  label: Text('$iconStr $lbl', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isSelected ? Colors.white : Colors.black87)),
-                                  selected: isSelected,
-                                  selectedColor: AppColors.primaryText,
-                                  backgroundColor: Colors.white,
-                                  onSelected: (_) => setState(() => _selectedLabel = lbl),
-                                ),
-                              );
-                            }),
-                          ],
-                        ),
+                      Row(
+                        children: [
+                          Text('SAVE AS', style: AppTypography.labelSmall(sub).copyWith(fontWeight: FontWeight.w800, letterSpacing: 0.6)),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  for (final entry in const {
+                                    'Home': Icons.home_rounded,
+                                    'Work': Icons.work_rounded,
+                                    'Other': Icons.label_rounded,
+                                  }.entries)
+                                    Padding(
+                                      padding: const EdgeInsets.only(right: 8),
+                                      child: _labelChip(entry.key, entry.value, isDark),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          TextButton(
+                            onPressed: _saving ? null : _leave,
+                            child: Text(
+                              'Cancel',
+                              style: AppTypography.labelMedium(sub).copyWith(fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: _saving ? null : _confirmAndDeliver,
+                            icon: _saving
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Icon(Icons.check_rounded, size: 18, color: Colors.white),
+                            label: Text(
+                              _saving ? 'Saving…' : 'Save & Deliver Here',
+                              style: AppTypography.labelMedium(Colors.white).copyWith(fontWeight: FontWeight.w800),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: AppRadius.brPill),
+                              elevation: 0,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -547,12 +656,18 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
                 const SizedBox(height: 16),
 
                 if (savedAddresses.isNotEmpty) ...[
-                  Text('SAVED ADDRESSES', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isDark ? Colors.white38 : Colors.grey, letterSpacing: 0.8)),
+                  Text(
+                    'SAVED ADDRESSES',
+                    style: AppTypography.labelSmall(isDark ? AppColors.textTertiary : AppColors.textTertiary)
+                        .copyWith(fontWeight: FontWeight.w800, letterSpacing: 0.8),
+                  ),
                   const SizedBox(height: 8),
                   ...savedAddresses.map((addr) {
-                    final tag = addr['tag'] ?? 'Home';
-                    final iconStr = tag == 'Home' ? '🏠' : (tag == 'Work' ? '💼' : '📍');
-                    final line = addr['addressLine'] ?? '';
+                    final tag = (addr['tag'] ?? addr['label'] ?? 'Home') as String;
+                    final icon = tag == 'Home'
+                        ? Icons.home_rounded
+                        : (tag == 'Work' ? Icons.work_rounded : Icons.label_rounded);
+                    final line = (addr['addressLine'] ?? '') as String;
                     final isSelected = authState.user?.selectedAddress?['id'] == addr['id'];
 
                     return Container(
@@ -562,13 +677,13 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
                           ref.read(authProvider.notifier).selectAddress(addr['id'] as String);
                           _leave();
                         },
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: AppRadius.brMd,
                         child: Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: isDark ? Colors.white.withOpacity(0.04) : Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: isSelected ? AppColors.primaryText : (isDark ? Colors.white10 : Colors.black.withOpacity(0.06))),
+                            color: isDark ? AppColors.surfaceDark : AppColors.surface,
+                            borderRadius: AppRadius.brMd,
+                            border: Border.all(color: isSelected ? AppColors.primaryText : divider),
                           ),
                           child: Row(
                             children: [
@@ -576,20 +691,25 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
                                 width: 36,
                                 height: 36,
                                 decoration: BoxDecoration(
-                                  color: Colors.grey.shade100,
-                                  borderRadius: BorderRadius.circular(10),
+                                  color: AppColors.primary.withOpacity(0.1),
+                                  borderRadius: AppRadius.brSm,
                                 ),
                                 alignment: Alignment.center,
-                                child: Text(iconStr, style: const TextStyle(fontSize: 16)),
+                                child: Icon(icon, size: 17, color: AppColors.primaryText),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(tag as String, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+                                    Text(tag,
+                                        style: AppTypography.bodySmall(isDark ? Colors.white : AppColors.textPrimary)
+                                            .copyWith(fontWeight: FontWeight.w800)),
                                     const SizedBox(height: 2),
-                                    Text(line as String, style: const TextStyle(fontSize: 11, color: Colors.grey), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                    Text(line,
+                                        style: AppTypography.labelSmall(sub),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis),
                                   ],
                                 ),
                               ),
@@ -601,15 +721,30 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
                       ),
                     );
                   }),
-                  const SizedBox(height: 16),
                 ],
-
-                const SizedBox(height: 8),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _labelChip(String label, IconData icon, bool isDark) {
+    final isSelected = _selectedLabel == label;
+    return ChoiceChip(
+      avatar: Icon(icon, size: 14, color: isSelected ? Colors.white : (isDark ? Colors.white70 : AppColors.textSecondary)),
+      label: Text(
+        label,
+        style: AppTypography.labelSmall(isSelected ? Colors.white : (isDark ? Colors.white70 : AppColors.textSecondary))
+            .copyWith(fontWeight: FontWeight.w700),
+      ),
+      selected: isSelected,
+      selectedColor: AppColors.primary,
+      backgroundColor: isDark ? Colors.white.withOpacity(0.05) : AppColors.background,
+      side: BorderSide(color: isSelected ? AppColors.primary : (isDark ? AppColors.dividerDark : AppColors.divider)),
+      shape: RoundedRectangleBorder(borderRadius: AppRadius.brPill),
+      onSelected: (_) => setState(() => _selectedLabel = label),
     );
   }
 }

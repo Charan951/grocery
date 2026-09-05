@@ -189,11 +189,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
     return _hydrateFuture ??= () async {
       try {
         final customer = await _api.fetchMe();
+        final profile = UserProfile.fromCustomerJson(customer);
         state = state.copyWith(
           isAuthenticated: true,
           isHydrating: false,
-          user: UserProfile.fromCustomerJson(customer),
+          user: profile,
         );
+        unawaited(_storage.syncOwner(profile.phone));
         unawaited(refreshLocationPermission());
         _push?.registerCurrentToken();
       } on ApiException catch (e) {
@@ -252,13 +254,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
       await _tokenStore.save(token);
       final customer = Map<String, dynamic>.from(res['customer'] as Map);
+      final profile = UserProfile.fromCustomerJson(customer);
       state = state.copyWith(
         isLoading: false,
         isAuthenticated: true,
         isGuest: false,
         isHydrating: false,
-        user: UserProfile.fromCustomerJson(customer),
+        user: profile,
       );
+      unawaited(_storage.syncOwner(profile.phone));
       unawaited(refreshLocationPermission());
       _push?.registerCurrentToken();
       return true;
@@ -282,13 +286,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
       await _tokenStore.save(token);
       final customer = Map<String, dynamic>.from(res['customer'] as Map);
+      final profile = UserProfile.fromCustomerJson(customer);
       state = state.copyWith(
         isLoading: false,
         isAuthenticated: true,
         isGuest: false,
         isHydrating: false,
-        user: UserProfile.fromCustomerJson(customer),
+        user: profile,
       );
+      unawaited(_storage.syncOwner(profile.phone));
       unawaited(refreshLocationPermission());
       _push?.registerCurrentToken();
       return 'ok';
@@ -319,13 +325,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
       await _tokenStore.save(token);
       final customer = Map<String, dynamic>.from(res['customer'] as Map);
+      final profile = UserProfile.fromCustomerJson(customer);
       state = state.copyWith(
         isLoading: false,
         isAuthenticated: true,
         isGuest: false,
         isHydrating: false,
-        user: UserProfile.fromCustomerJson(customer),
+        user: profile,
       );
+      unawaited(_storage.syncOwner(profile.phone));
       unawaited(refreshLocationPermission());
       _push?.registerCurrentToken();
       return true;
@@ -383,8 +391,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Local-only insert (used as an offline fallback during first-run location
   /// setup). Prefer [addAddressRemote] everywhere else.
   void addAddress(Map<String, dynamic> newAddress) {
-    final u = state.user;
-    if (u == null) return;
+    // A guest has no server-backed profile (`state.user` is null) — give
+    // them a local-only placeholder instead of silently dropping the
+    // address they just picked.
+    final u = state.user ??
+        UserProfile(name: 'Guest', phone: '', walletBalance: 0, isVip: false, addresses: const []);
     final list = List<Map<String, dynamic>>.from(u.addresses)..add(newAddress);
     state = state.copyWith(
       user: u.copyWith(addresses: list, selectedAddress: newAddress),
@@ -451,6 +462,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       await _storage.clearAll(); // cart + favourites
       await _storage.clearRecentSearches();
+      await _storage.syncOwner(null); // back to guest — no owner to compare against
     } catch (_) {/* best effort */}
     state = AuthState(
       isAuthenticated: false,
@@ -461,6 +473,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   void _forceLogout() {
     if (!mounted) return;
+    // A guest has no session to expire — a 401 here just means a
+    // guest-only action (e.g. saving an address) hit an auth-only endpoint,
+    // which the caller already falls back to a local-only save for. Forcing
+    // a fresh `AuthState` here would reset `isGuest` to its default (false),
+    // which both silently un-guests them and — since that flips a field the
+    // router's redirect reads — fires a router refresh mid-navigation
+    // (a go_router `'index != -1'` crash if a pop is in flight).
+    if (!state.isAuthenticated) return;
     _tokenStore.clear();
     state = AuthState(
       isAuthenticated: false,
