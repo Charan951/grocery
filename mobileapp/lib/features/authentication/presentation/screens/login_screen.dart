@@ -69,7 +69,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   void _continueAsGuest() {
     ref.read(authProvider.notifier).continueAsGuest();
-    context.go('/');
+    context.go('/location_select');
   }
 
   void _back() {

@@ -120,6 +120,16 @@ ProviderScope _app(AuthNotifier notifier, {String initial = '/login'}) {
   );
 }
 
+/// `AuthScaffold` now scrolls the whole screen as one unit (fixing a
+/// bottom-overflow with the keyboard open), so its CTA buttons sit below the
+/// default 800x600 test surface's fold. Give these tests a realistic phone
+/// viewport so the buttons they tap are on-screen without an explicit scroll.
+Future<void> _pumpAuthApp(WidgetTester tester, AuthNotifier n, {String initial = '/login'}) async {
+  await tester.binding.setSurfaceSize(const Size(390, 844));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+  await tester.pumpWidget(_app(n, initial: initial));
+}
+
 void main() {
   group('PhoneField', () {
     testWidgets('groups digits and reports validity', (tester) async {
@@ -223,14 +233,14 @@ void main() {
       expect(find.textContaining('asha@example.com'), findsWidgets);
     });
 
-    testWidgets('Continue as guest goes straight to Home without signing in', (tester) async {
+    testWidgets('Continue as guest asks for a delivery location before Home', (tester) async {
       final n = AuthNotifier(_FakeStorage(), _FakeApi(), _FakeTokenStore());
-      await tester.pumpWidget(_app(n));
+      await _pumpAuthApp(tester, n);
 
       await tester.tap(find.text('Continue as guest'));
       await tester.pumpAndSettle();
 
-      expect(find.text('HOME'), findsOneWidget);
+      expect(find.text('LOCATION'), findsOneWidget);
       expect(n.state.isAuthenticated, isFalse);
       expect(n.state.isGuest, isTrue);
     });
