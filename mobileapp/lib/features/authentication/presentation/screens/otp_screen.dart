@@ -76,6 +76,9 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       AppToast.success('Signed in successfully');
       // Straight to Home only if the customer already has an address AND has
       // granted location — otherwise run address / permission setup first.
+      // (The real-time permission *prompt* itself runs once Home mounts —
+      // see HomeScreen — so it never blocks this navigation or hangs a test
+      // awaiting a real geolocator platform channel.)
       final s = ref.read(authProvider);
       final ready = s.user?.selectedAddress != null && s.locationPermissionGranted;
       context.go(ready ? '/' : '/location_select');

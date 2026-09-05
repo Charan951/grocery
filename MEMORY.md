@@ -130,6 +130,34 @@
 
 ## 5. Completed Major Work
 
+- **2026-09-02 — Mobile: real-time location-permission prompt after every login.**
+  Previously only a first-time customer (no saved `selectedAddress`) got the
+  actual OS permission dialog, via `location_select_screen`'s own
+  `ensureWithUi` call on `initState`; a returning customer whose permission had
+  lapsed (revoked in Settings, fresh reinstall restoring a cached address from
+  the backend) skipped straight to Home and was never re-asked — only a silent
+  `check()` synced state, no system prompt.
+  Fix: `HomeScreen` (`lib/features/home/presentation/screens/home_screen.dart`)
+  now runs `_maybeAskLocation()` from a `WidgetsBinding.addPostFrameCallback` in
+  `initState` — if `authProvider.locationPermissionGranted` is false, it calls
+  `LocationPermissionService.ensureWithUi(context)` (rationale sheet → system
+  dialog → GPS-off / blocked-settings escape hatches) then
+  `refreshLocationPermission()` to sync the result into `AuthState`. Since
+  `HomeScreen` is an `IndexedStack` branch of the tab shell, `initState` fires
+  once per app session (fresh OTP login **or** a resumed/hydrated session) —
+  not on every tab switch — and is fire-and-forget + try/catch-guarded so a
+  slow or unavailable location plugin (e.g. a test host) can never block first
+  paint or hang a widget test.
+  **Rejected approach:** doing this synchronously inside `otp_screen.dart`'s
+  `_verify()` before navigating — `await`ing `Geolocator` there hung
+  `pumpAndSettle` in `auth_flow_widget_test.dart` (same class of issue as the
+  earlier documented `.timeout()` incident) since there's no platform-channel
+  mock in the test host; moved to Home's post-frame callback instead, which no
+  test awaits directly.
+  Verified: `flutter analyze` clean; `flutter test` **120/120** (including the
+  OTP-success test that broke and was fixed by this move); `flutter build apk
+  --debug` OK.
+
 - **2026-09-02 — Admin: Delivery & dispatch settings UI.**
   `SettingsModule` (`frontend/src/pages/admin/Modules.tsx`) gained a second form
   ("Delivery & dispatch") over the existing `GET/PUT /api/settings` — previously

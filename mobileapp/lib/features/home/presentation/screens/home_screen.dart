@@ -9,6 +9,7 @@ import 'package:freshcart/core/theme/app_typography.dart';
 import 'package:freshcart/core/widgets/category_card.dart';
 import 'package:freshcart/core/widgets/feedback_states.dart';
 import 'package:freshcart/core/widgets/app_toast.dart';
+import 'package:freshcart/core/services/location_permission.dart';
 import 'package:freshcart/features/authentication/presentation/controllers/auth_controller.dart';
 import 'package:freshcart/features/cart/presentation/controllers/cart_controller.dart';
 import 'package:freshcart/features/categories/data/models/category_model.dart';
@@ -34,6 +35,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    // Ask for real-time location permission right after login (fresh OTP or
+    // a resumed session) — Home mounts exactly once per app session (it's an
+    // IndexedStack branch), so this fires once, not on every tab switch. Runs
+    // post-frame and is fire-and-forget so a slow/unavailable location plugin
+    // can never block first paint.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeAskLocation());
+  }
+
+  Future<void> _maybeAskLocation() async {
+    if (!mounted) return;
+    if (ref.read(authProvider).locationPermissionGranted) return;
+    try {
+      await LocationPermissionService.ensureWithUi(context);
+    } catch (_) {
+      return; // no location plugin available (e.g. a test host) — stay silent
+    }
+    if (!mounted) return;
+    await ref.read(authProvider.notifier).refreshLocationPermission();
   }
 
   void _onScroll() {
