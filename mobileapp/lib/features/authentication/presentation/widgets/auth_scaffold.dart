@@ -39,59 +39,81 @@ class AuthScaffold extends StatelessWidget {
       backgroundColor: bg,
       resizeToAvoidBottomInset: true,
       body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(24, topGap, 24, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  FadeSlideIn(
-                    child: _CircleBack(
-                      onTap: onBack ?? () => Navigator.of(context).maybePop(),
-                      isDark: isDark,
-                    ),
-                  ),
-                  SizedBox(height: topGap.clamp(16.0, 24.0)),
-                  const FadeSlideIn(delay: Duration(milliseconds: 60), child: _BrandBadge()),
-                  const SizedBox(height: 22),
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 110),
-                    child: Text(
-                      title,
-                      style: AppTypography.h1(
-                        isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // The whole screen scrolls as one unit (instead of pinning `cta`
+            // outside a scroll area) so a shrunk keyboard-visible viewport
+            // never forces the Column to overflow — it scrolls instead. A
+            // min-height constraint keeps the normal, keyboard-closed layout
+            // vertically centred exactly as before.
+            return SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 480),
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(24, topGap, 24, 16),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: FadeSlideIn(
+                              child: _CircleBack(
+                                onTap: onBack ?? () => Navigator.of(context).maybePop(),
+                                isDark: isDark,
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: topGap.clamp(16.0, 24.0)),
+                          const FadeSlideIn(delay: Duration(milliseconds: 60), child: _BrandBadge()),
+                          const SizedBox(height: 22),
+                          FadeSlideIn(
+                            delay: const Duration(milliseconds: 110),
+                            child: Text(
+                              title,
+                              textAlign: TextAlign.center,
+                              style: AppTypography.h1(
+                                isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          FadeSlideIn(
+                            delay: const Duration(milliseconds: 150),
+                            child: Text(
+                              subtitle,
+                              textAlign: TextAlign.center,
+                              style: AppTypography.bodyMedium(
+                                isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                              ).copyWith(height: 1.45),
+                            ),
+                          ),
+                          if (belowTitle != null) ...[
+                            const SizedBox(height: 16),
+                            FadeSlideIn(delay: const Duration(milliseconds: 190), child: belowTitle!),
+                          ],
+                          const SizedBox(height: 28),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 360),
+                            child: FadeSlideIn(delay: const Duration(milliseconds: 220), child: body),
+                          ),
+                          const SizedBox(height: 12),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 360),
+                            child: FadeSlideIn(delay: const Duration(milliseconds: 280), child: cta),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 150),
-                    child: Text(
-                      subtitle,
-                      style: AppTypography.bodyMedium(
-                        isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                      ).copyWith(height: 1.45),
-                    ),
-                  ),
-                  if (belowTitle != null) ...[
-                    const SizedBox(height: 16),
-                    FadeSlideIn(delay: const Duration(milliseconds: 190), child: belowTitle!),
-                  ],
-                  const SizedBox(height: 28),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      physics: const ClampingScrollPhysics(),
-                      child: FadeSlideIn(delay: const Duration(milliseconds: 220), child: body),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  FadeSlideIn(delay: const Duration(milliseconds: 280), child: cta),
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       ),
     );
