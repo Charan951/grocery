@@ -42,75 +42,195 @@ const row4 = [
   { id: 'r4_5', name: 'Fresh Oranges', img: 'https://images.unsplash.com/photo-1611080626919-7cf5a9dbab5b?w=200&auto=format&fit=crop' },
 ];
 
+// 'identifier' — a single "phone or email" field, method auto-detected from
+// what's typed (no manual toggle). 'password' / 'otp' branch from there.
+type Step = 'identifier' | 'password' | 'register' | 'otp' | 'success';
+type Detected = 'phone' | 'email' | null;
+
+const detectMethod = (raw: string): Detected => {
+  const v = raw.trim();
+  if (!v) return null;
+  if (/^\S+@\S+\.\S+$/.test(v)) return 'email';
+  if (/^\d{10}$/.test(v.replace(/\D/g, '')) && !v.includes('@')) return 'phone';
+  return null;
+};
+
 export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
   isOpen,
   onClose,
   onLoginSuccess,
 }) => {
-  const [phone, setPhone] = useState('');
+  const [step, setStep] = useState<Step>('identifier');
+  const [identifier, setIdentifier] = useState('');
+  const [detected, setDetected] = useState<Detected>(null);
+
   const [otp, setOtp] = useState('');
-  const [step, setStep] = useState<'phone' | 'otp' | 'success'>('phone');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [regPhone, setRegPhone] = useState('');
+
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handlePhoneSubmit = (e: React.FormEvent) => {
+  const phoneDigits = identifier.replace(/\D/g, '').slice(-10);
+
+  const finishLogin = (customerData: any) => {
+    localStorage.setItem('customer_user', JSON.stringify(customerData));
+    onLoginSuccess(customerData);
+    setStep('success');
+    setTimeout(() => {
+      resetState();
+      onClose();
+    }, 900);
+  };
+
+  // Step 1: the single identifier field. Phone -> OTP. Email -> password.
+  const handleIdentifierSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (phone.length !== 10) {
-      setError('Please enter a valid 10-digit mobile number');
+    const kind = detectMethod(identifier);
+    if (!kind) {
+      setError('Enter a valid 10-digit phone number or email address');
       return;
     }
     setError('');
-    setStep('otp');
+    setDetected(kind);
+
+    if (kind === 'email') {
+      setStep('password');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch('/api/customers/otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phoneDigits }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        setError(data?.message || 'Could not send the code. Please try again.');
+        return;
+      }
+      setStep('otp');
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleOtpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (otp.length < 4) {
-      setError('Please enter 4-digit OTP (Default: 1234)');
+      setError('Enter the code we sent you');
       return;
     }
     setError('');
-    setStep('success');
-
-    const formattedPhone = `+91 ${phone}`;
-    let customerData: any = {
-      phone: formattedPhone,
-      name: `Customer (${phone.slice(-4)})`,
-      customerId: `cust_${phone}`,
-      email: '',
-      walletBalance: 0,
-    };
-
+    setLoading(true);
     try {
-      const res = await fetch('/api/customers/auth', {
+      const res = await fetch('/api/customers/otp/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: formattedPhone }),
+        body: JSON.stringify({ phone: phoneDigits, code: otp }),
       });
       const data = await res.json().catch(() => null);
-      if (data && data.success && data.customer) {
-        customerData = data.customer;
+      if (!res.ok || !data?.success) {
+        setError(data?.message || 'Incorrect code. Please try again.');
+        return;
       }
-    } catch (err) {
-      console.warn('Backend API offline, using local unique customer record');
+      localStorage.setItem('customer_token', data.token);
+      finishLogin(data.customer);
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setLoading(false);
     }
+  };
 
-    setTimeout(() => {
-      localStorage.setItem('customer_user', JSON.stringify(customerData));
-      onLoginSuccess(customerData);
-      resetState();
-      onClose();
-    }, 1000);
+  // Step 2 (email path): password. A 404 "no account" flips straight into the
+  // registration fields instead of a dead end.
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    try {
+      const res = await fetch('/api/customers/login-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: identifier.trim().toLowerCase(), password }),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.status === 404 && data?.code === 'not_found') {
+        setStep('register');
+        setError('');
+        return;
+      }
+      if (!res.ok || !data?.success) {
+        setError(data?.message || 'Incorrect email or password.');
+        return;
+      }
+      localStorage.setItem('customer_token', data.token);
+      finishLogin(data.customer);
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) { setError('Enter your name'); return; }
+    if (password.length < 6) { setError('Password must be at least 6 characters'); return; }
+    if (regPhone.length !== 10) { setError('Enter a valid 10-digit mobile number'); return; }
+    setError('');
+    setLoading(true);
+    try {
+      const res = await fetch('/api/customers/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email: identifier.trim().toLowerCase(), password, phone: regPhone }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        setError(data?.message || 'Could not create your account.');
+        return;
+      }
+      localStorage.setItem('customer_token', data.token);
+      finishLogin(data.customer);
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const resetState = () => {
-    setPhone('');
+    setStep('identifier');
+    setIdentifier('');
+    setDetected(null);
     setOtp('');
-    setStep('phone');
+    setPassword('');
+    setName('');
+    setRegPhone('');
     setError('');
+    setLoading(false);
   };
 
   const handleModalClose = () => {
+    resetState();
+    onClose();
+  };
+
+  const handleGuest = () => {
+    // Browsing already works without an account — this just dismisses the
+    // sheet so a visitor isn't blocked from continuing to shop.
     resetState();
     onClose();
   };
@@ -213,7 +333,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                     </p>
                   </div>
 
-                  {/* Error Notification */}
+                  {/* Error / info notice */}
                   {error && (
                     <div className="w-[310px] sm:w-[350px] max-w-full bg-rose-50 border border-rose-200 text-rose-700 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shrink-0">
                       <ShieldAlert size={16} className="shrink-0 text-rose-500" />
@@ -221,45 +341,43 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                     </div>
                   )}
 
-                  {/* Form Step 1: Mobile Input */}
-                  {step === 'phone' && (
-                    <form onSubmit={handlePhoneSubmit} className="w-[310px] sm:w-[350px] max-w-full flex flex-col gap-3 shrink-0">
+                  {/* Step 1: one field, method auto-detected on submit */}
+                  {step === 'identifier' && (
+                    <form onSubmit={handleIdentifierSubmit} className="w-[310px] sm:w-[350px] max-w-full flex flex-col gap-3 shrink-0">
                       <div className="w-full border border-gray-300 focus-within:border-[#4CAF50] focus-within:ring-2 focus-within:ring-[#4CAF50]/20 rounded-xl px-4 py-3.5 flex items-center gap-3 transition-all bg-white shadow-2xs">
-                        <span className="text-sm font-extrabold text-gray-900 shrink-0">+91</span>
-                        <div className="h-4 w-[1px] bg-gray-300 shrink-0" />
                         <input
-                          type="tel"
-                          maxLength={10}
-                          placeholder="Enter mobile number"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                          type="text"
+                          placeholder="Phone number or email"
+                          value={identifier}
+                          onChange={(e) => { setIdentifier(e.target.value); if (error) setError(''); }}
                           className="w-full min-w-0 bg-transparent border-none outline-none text-gray-900 font-bold placeholder:text-gray-400 placeholder:font-normal text-sm tracking-wide"
                           autoFocus
+                          autoComplete="username"
                         />
                       </div>
 
                       <button
                         type="submit"
-                        disabled={phone.length !== 10}
+                        disabled={!detectMethod(identifier) || loading}
                         className="w-full block bg-[#9E9E9E] disabled:bg-[#9E9E9E] disabled:opacity-90 disabled:cursor-not-allowed text-white font-extrabold py-3.5 rounded-xl text-sm transition-all shadow-2xs cursor-pointer enabled:bg-[#4CAF50] enabled:hover:bg-[#43A047]"
                       >
-                        Continue
+                        {loading ? 'Sending code…' : 'Continue'}
                       </button>
                     </form>
                   )}
 
-                  {/* Form Step 2: OTP Verification */}
+                  {/* Step 2a (phone): OTP verification */}
                   {step === 'otp' && (
                     <form onSubmit={handleOtpSubmit} className="w-[310px] sm:w-[350px] max-w-full flex flex-col gap-3 shrink-0">
                       <p className="text-xs text-gray-600 font-medium text-center">
-                        OTP sent to <strong className="text-gray-900">+91 {phone}</strong>
+                        Code sent to <strong className="text-gray-900">+91 {phoneDigits}</strong>
                       </p>
 
                       <div className="w-full border border-gray-300 focus-within:border-[#4CAF50] focus-within:ring-2 focus-within:ring-[#4CAF50]/20 rounded-xl px-4 py-3.5 flex items-center gap-3 transition-colors bg-white shadow-2xs">
                         <input
                           type="text"
-                          maxLength={4}
-                          placeholder="Enter 4-digit OTP (Default: 1234)"
+                          maxLength={6}
+                          placeholder="Enter the 6-digit code"
                           value={otp}
                           onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                           className="w-full min-w-0 bg-transparent border-none outline-none text-gray-900 font-bold placeholder:text-gray-400 placeholder:font-normal text-center text-sm tracking-widest"
@@ -269,11 +387,115 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
 
                       <button
                         type="submit"
-                        className="w-full block bg-[#4CAF50] hover:bg-[#43A047] text-white font-extrabold py-3.5 rounded-xl text-sm transition-all shadow-xs cursor-pointer"
+                        disabled={loading}
+                        className="w-full block bg-[#4CAF50] hover:bg-[#43A047] disabled:opacity-70 text-white font-extrabold py-3.5 rounded-xl text-sm transition-all shadow-xs cursor-pointer"
                       >
-                        Verify & Login
+                        {loading ? 'Verifying…' : 'Verify & continue'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setStep('identifier'); setOtp(''); setError(''); }}
+                        className="text-xs font-bold text-gray-500 hover:text-gray-700 cursor-pointer"
+                      >
+                        Use a different number or email
                       </button>
                     </form>
+                  )}
+
+                  {/* Step 2b (email): password */}
+                  {step === 'password' && (
+                    <form onSubmit={handlePasswordSubmit} className="w-[310px] sm:w-[350px] max-w-full flex flex-col gap-3 shrink-0">
+                      <p className="text-xs text-gray-600 font-medium text-center">
+                        Signing in as <strong className="text-gray-900">{identifier}</strong>
+                      </p>
+                      <input
+                        type="password"
+                        placeholder="Password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full border border-gray-300 focus-within:border-[#4CAF50] focus:ring-2 focus:ring-[#4CAF50]/20 rounded-xl px-4 py-3.5 bg-white shadow-2xs outline-none text-gray-900 font-bold placeholder:text-gray-400 placeholder:font-normal text-sm"
+                        autoFocus
+                        autoComplete="current-password"
+                      />
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full block bg-[#4CAF50] hover:bg-[#43A047] disabled:opacity-70 text-white font-extrabold py-3.5 rounded-xl text-sm transition-all shadow-xs cursor-pointer"
+                      >
+                        {loading ? 'Signing in…' : 'Sign in'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setStep('identifier'); setPassword(''); setError(''); }}
+                        className="text-xs font-bold text-gray-500 hover:text-gray-700 cursor-pointer"
+                      >
+                        Use a different number or email
+                      </button>
+                    </form>
+                  )}
+
+                  {/* Step 3 (email, no account found yet): create account */}
+                  {step === 'register' && (
+                    <form onSubmit={handleRegisterSubmit} className="w-[310px] sm:w-[350px] max-w-full flex flex-col gap-3 shrink-0">
+                      <p className="text-xs text-gray-600 font-medium text-center">
+                        No account for <strong className="text-gray-900">{identifier}</strong> yet — let's create one
+                      </p>
+                      <input
+                        type="text"
+                        placeholder="Full name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="w-full border border-gray-300 focus-within:border-[#4CAF50] focus:ring-2 focus:ring-[#4CAF50]/20 rounded-xl px-4 py-3.5 bg-white shadow-2xs outline-none text-gray-900 font-bold placeholder:text-gray-400 placeholder:font-normal text-sm"
+                        autoFocus
+                        autoComplete="name"
+                      />
+                      <input
+                        type="password"
+                        placeholder="Create a password (min 6 characters)"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full border border-gray-300 focus-within:border-[#4CAF50] focus:ring-2 focus:ring-[#4CAF50]/20 rounded-xl px-4 py-3.5 bg-white shadow-2xs outline-none text-gray-900 font-bold placeholder:text-gray-400 placeholder:font-normal text-sm"
+                        autoComplete="new-password"
+                      />
+                      <div className="w-full border border-gray-300 focus-within:border-[#4CAF50] focus-within:ring-2 focus-within:ring-[#4CAF50]/20 rounded-xl px-4 py-3.5 flex items-center gap-3 bg-white shadow-2xs">
+                        <span className="text-sm font-extrabold text-gray-900 shrink-0">+91</span>
+                        <div className="h-4 w-[1px] bg-gray-300 shrink-0" />
+                        <input
+                          type="tel"
+                          maxLength={10}
+                          placeholder="Mobile number"
+                          value={regPhone}
+                          onChange={(e) => setRegPhone(e.target.value.replace(/\D/g, ''))}
+                          className="w-full min-w-0 bg-transparent border-none outline-none text-gray-900 font-bold placeholder:text-gray-400 placeholder:font-normal text-sm tracking-wide"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full block bg-[#4CAF50] hover:bg-[#43A047] disabled:opacity-70 text-white font-extrabold py-3.5 rounded-xl text-sm transition-all shadow-xs cursor-pointer"
+                      >
+                        {loading ? 'Creating account…' : 'Create account'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setStep('password'); setError(''); }}
+                        className="text-xs font-bold text-gray-500 hover:text-gray-700 cursor-pointer"
+                      >
+                        Already have an account? Sign in
+                      </button>
+                    </form>
+                  )}
+
+                  {/* Guest */}
+                  {step !== 'otp' && (
+                    <button
+                      type="button"
+                      onClick={handleGuest}
+                      className="text-xs font-extrabold text-gray-600 hover:text-gray-900 underline underline-offset-2 cursor-pointer shrink-0"
+                    >
+                      Continue as guest
+                    </button>
                   )}
 
                   {/* Terms Footer */}

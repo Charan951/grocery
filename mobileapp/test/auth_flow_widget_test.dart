@@ -13,6 +13,8 @@ import 'package:freshcart/core/widgets/phone_field.dart';
 import 'package:freshcart/features/authentication/presentation/controllers/auth_controller.dart';
 import 'package:freshcart/features/authentication/presentation/screens/login_screen.dart';
 import 'package:freshcart/features/authentication/presentation/screens/otp_screen.dart';
+import 'package:freshcart/features/authentication/presentation/screens/password_screen.dart';
+import 'package:freshcart/features/authentication/presentation/screens/register_screen.dart';
 
 // ---- Fakes (mirrors test/auth_flow_test.dart) --------------------------------
 
@@ -40,8 +42,10 @@ class _FakeStorage extends StorageService {
 class _FakeApi extends ApiService {
   int sendCalls = 0;
   final String? verifyToken; // null => verify fails
+  final bool emailAccountExists;
+  final String? loginEmailToken; // null => wrong password
 
-  _FakeApi({this.verifyToken = 'jwt.token'});
+  _FakeApi({this.verifyToken = 'jwt.token', this.emailAccountExists = true, this.loginEmailToken = 'jwt.token'});
 
   @override
   Future<Map<String, dynamic>> sendOtp(String phone) async {
@@ -59,6 +63,29 @@ class _FakeApi extends ApiService {
   }
 
   @override
+  Future<Map<String, dynamic>> loginEmail(String email, String password) async {
+    if (!emailAccountExists) throw ApiException('No account found for this email.', statusCode: 404);
+    if (loginEmailToken == null) throw ApiException('Incorrect password.', statusCode: 401);
+    return {
+      'token': loginEmailToken,
+      'customer': {'name': 'Asha', 'email': email, 'phone': '+91 9876543210', 'walletBalance': 0},
+    };
+  }
+
+  @override
+  Future<Map<String, dynamic>> register({
+    required String name,
+    required String email,
+    required String password,
+    required String phone,
+  }) async {
+    return {
+      'token': 'jwt.token',
+      'customer': {'name': name, 'email': email, 'phone': '+91 $phone', 'walletBalance': 0},
+    };
+  }
+
+  @override
   Future<Map<String, dynamic>> fetchMe() async => throw ApiException('no', statusCode: 401);
 }
 
@@ -70,6 +97,14 @@ ProviderScope _app(AuthNotifier notifier, {String initial = '/login'}) {
       GoRoute(
         path: '/otp',
         builder: (_, s) => OtpScreen(phone: s.uri.queryParameters['phone'] ?? ''),
+      ),
+      GoRoute(
+        path: '/password',
+        builder: (_, s) => PasswordScreen(email: s.uri.queryParameters['email'] ?? ''),
+      ),
+      GoRoute(
+        path: '/register',
+        builder: (_, s) => RegisterScreen(email: s.uri.queryParameters['email'] ?? ''),
       ),
       GoRoute(path: '/location_select', builder: (_, _) => const Scaffold(body: Text('LOCATION'))),
       GoRoute(path: '/', builder: (_, _) => const Scaffold(body: Text('HOME'))),
@@ -142,13 +177,13 @@ void main() {
   });
 
   group('Login screen', () {
-    testWidgets('rejects a short number with an inline error', (tester) async {
+    testWidgets('rejects an invalid identifier with an inline error', (tester) async {
       final n = AuthNotifier(_FakeStorage(), _FakeApi(), _FakeTokenStore());
       await tester.pumpWidget(_app(n));
       await tester.enterText(find.byType(TextField), '12345');
-      await tester.tap(find.text('Send code'));
+      await tester.tap(find.text('Continue'));
       await tester.pump();
-      expect(find.text('Enter a valid 10-digit mobile number'), findsOneWidget);
+      expect(find.text('Enter a valid 10-digit phone number or email address'), findsOneWidget);
     });
 
     testWidgets('shows the Terms / Privacy consent line', (tester) async {
@@ -158,20 +193,74 @@ void main() {
       expect(find.textContaining('Privacy Policy'), findsOneWidget);
     });
 
-    testWidgets('valid number requests an OTP and routes to the OTP screen',
+    testWidgets('a phone number requests an OTP and routes to the OTP screen',
         (tester) async {
       final api = _FakeApi();
       final n = AuthNotifier(_FakeStorage(), api, _FakeTokenStore());
       await tester.pumpWidget(_app(n));
 
       await tester.enterText(find.byType(TextField), '9876543210');
-      await tester.tap(find.text('Send code'));
+      await tester.tap(find.text('Continue'));
       await tester.pumpAndSettle();
 
       expect(api.sendCalls, 1);
       expect(find.text('Verify your number'), findsOneWidget);
       expect(find.textContaining('98765 43210'), findsOneWidget);
       expect(find.textContaining('use code 000000'), findsOneWidget); // test-mode banner
+    });
+
+    testWidgets('an email routes to the password screen (no OTP sent)', (tester) async {
+      final api = _FakeApi();
+      final n = AuthNotifier(_FakeStorage(), api, _FakeTokenStore());
+      await tester.pumpWidget(_app(n));
+
+      await tester.enterText(find.byType(TextField), 'asha@example.com');
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+
+      expect(api.sendCalls, 0);
+      expect(find.text('Enter your password'), findsOneWidget);
+      expect(find.textContaining('asha@example.com'), findsWidgets);
+    });
+
+    testWidgets('Continue as guest goes straight to Home without signing in', (tester) async {
+      final n = AuthNotifier(_FakeStorage(), _FakeApi(), _FakeTokenStore());
+      await tester.pumpWidget(_app(n));
+
+      await tester.tap(find.text('Continue as guest'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('HOME'), findsOneWidget);
+      expect(n.state.isAuthenticated, isFalse);
+      expect(n.state.isGuest, isTrue);
+    });
+  });
+
+  group('Password screen', () {
+    testWidgets('a correct password signs in and routes onward', (tester) async {
+      final api = _FakeApi(emailAccountExists: true, loginEmailToken: 'jwt.token');
+      final n = AuthNotifier(_FakeStorage(), api, _FakeTokenStore());
+      await tester.pumpWidget(_app(n, initial: '/password?email=asha@example.com'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'secret123');
+      await tester.tap(find.text('Sign in'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('LOCATION'), findsOneWidget);
+    });
+
+    testWidgets('no account for that email routes to registration', (tester) async {
+      final api = _FakeApi(emailAccountExists: false);
+      final n = AuthNotifier(_FakeStorage(), api, _FakeTokenStore());
+      await tester.pumpWidget(_app(n, initial: '/password?email=new@example.com'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'secret123');
+      await tester.tap(find.text('Sign in'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Create your account'), findsOneWidget);
     });
   });
 

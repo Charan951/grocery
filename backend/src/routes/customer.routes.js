@@ -23,6 +23,8 @@ router.get('/customers', protect, customerController.getCustomers);
 // --- Real customer authentication (OTP -> customer JWT) ---
 router.post('/customers/otp/send', customerAuthController.sendOtp);
 router.post('/customers/otp/verify', customerAuthController.verifyOtp);
+router.post('/customers/register', customerAuthController.register);
+router.post('/customers/login-email', customerAuthController.loginEmail);
 router.get('/customers/me', protectCustomer, customerAuthController.getMe);
 
 // Customer-scoped mutations: identity comes from the token, not the URL.

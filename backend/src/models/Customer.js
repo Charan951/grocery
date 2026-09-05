@@ -21,7 +21,8 @@ const addressSchema = new mongoose.Schema({
 const customerSchema = new mongoose.Schema({
   customerId: { type: String, required: true, unique: true, index: true }, // e.g. cust_1234
   name: { type: String, default: 'Customer' },
-  email: { type: String, default: '' },
+  email: { type: String, default: '', index: true },
+  passwordHash: { type: String, default: null, select: false }, // set only for email/password accounts
   phone: { type: String, required: true, unique: true, index: true },
   membershipType: { type: String, enum: ['Normal', 'VIP'], default: 'Normal' },
   referralCode: { type: String },

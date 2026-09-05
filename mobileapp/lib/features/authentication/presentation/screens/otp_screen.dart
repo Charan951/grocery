@@ -2,12 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
 import 'package:freshcart/core/widgets/app_toast.dart';
 import 'package:freshcart/core/widgets/buttons.dart';
 import 'package:freshcart/core/widgets/otp_field.dart';
+import 'package:freshcart/features/authentication/presentation/auth_routing.dart';
 import 'package:freshcart/features/authentication/presentation/controllers/auth_controller.dart';
 import 'package:freshcart/features/authentication/presentation/widgets/auth_scaffold.dart';
 
@@ -74,14 +74,10 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
 
     if (ok) {
       AppToast.success('Signed in successfully');
-      // Straight to Home only if the customer already has an address AND has
-      // granted location — otherwise run address / permission setup first.
-      // (The real-time permission *prompt* itself runs once Home mounts —
-      // see HomeScreen — so it never blocks this navigation or hangs a test
-      // awaiting a real geolocator platform channel.)
-      final s = ref.read(authProvider);
-      final ready = s.user?.selectedAddress != null && s.locationPermissionGranted;
-      context.go(ready ? '/' : '/location_select');
+      // (The real-time location-permission *prompt* itself runs once Home
+      // mounts — see HomeScreen — so it never blocks this navigation or hangs
+      // a test awaiting a real geolocator platform channel.)
+      routeAfterLogin(context, ref.read(authProvider));
     } else {
       setState(() => _error = ref.read(authProvider).error ?? 'Invalid code. Please try again.');
       _otpKey.currentState?.reset();

@@ -8,6 +8,8 @@ import 'package:freshcart/features/splash/presentation/screens/splash_screen.dar
 import 'package:freshcart/features/onboarding/presentation/screens/onboarding_screen.dart';
 import 'package:freshcart/features/authentication/presentation/screens/login_screen.dart';
 import 'package:freshcart/features/authentication/presentation/screens/otp_screen.dart';
+import 'package:freshcart/features/authentication/presentation/screens/password_screen.dart';
+import 'package:freshcart/features/authentication/presentation/screens/register_screen.dart';
 import 'package:freshcart/features/authentication/presentation/screens/location_select_screen.dart';
 import 'package:freshcart/features/categories/presentation/screens/categories_screen.dart';
 import 'package:freshcart/features/categories/presentation/screens/category_catalog_screen.dart';
@@ -43,9 +45,17 @@ class _AuthRouterRefresh extends ChangeNotifier {
 
 /// Routes reachable while signed out.
 const _publicRoutes = {
-  '/splash', '/onboarding', '/login', '/otp', '/legal',
+  '/splash', '/onboarding', '/login', '/otp', '/password', '/register', '/legal',
   '/maintenance', '/force_update',
 };
+
+/// Reachable while browsing as a guest, but not without a *real* account — a
+/// guest hitting one of these is sent to `/login` to sign in first.
+const _authOnlyPrefixes = [
+  '/checkout', '/order-placed', '/order/', '/tracking/',
+  '/wallet', '/membership', '/addresses', '/notifications',
+  '/account/edit', '/orders',
+];
 
 final routerProvider = Provider<GoRouter>((ref) {
   final refresh = _AuthRouterRefresh(ref);
@@ -62,10 +72,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Still resolving a stored token — let the splash screen decide.
       if (auth.isHydrating) return null;
 
-      if (!auth.isAuthenticated) {
+      final canBrowse = auth.isAuthenticated || auth.isGuest;
+      if (!canBrowse) {
         return _publicRoutes.contains(loc) ? null : '/login';
       }
-      if (loc == '/login' || loc == '/otp') return '/';
+      // A guest can browse the shell (Home/Categories/Search/Account) and shop,
+      // but needs a real account for checkout, orders, wallet and settings.
+      if (!auth.isAuthenticated &&
+          _authOnlyPrefixes.any((p) => loc.startsWith(p))) {
+        return '/login';
+      }
+      if (auth.isAuthenticated && (loc == '/login' || loc == '/otp' || loc == '/password' || loc == '/register')) {
+        return '/';
+      }
       return null;
     },
     routes: [
@@ -99,6 +118,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: '/otp',
         builder: (c, s) => OtpScreen(phone: s.uri.queryParameters['phone'] ?? ''),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/password',
+        builder: (c, s) => PasswordScreen(email: s.uri.queryParameters['email'] ?? ''),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/register',
+        builder: (c, s) => RegisterScreen(email: s.uri.queryParameters['email'] ?? ''),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,

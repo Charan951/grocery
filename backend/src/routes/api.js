@@ -16,7 +16,7 @@ router.use((req, res, next) => {
   if (mongoose.connection.readyState !== 1) {
     // Never stub the OTP endpoints — a fake "success" with no token would break
     // real authentication. Let them fall through and fail loudly instead.
-    if (req.path.startsWith('/customers/otp') || req.path.startsWith('/customers/me') || req.path.startsWith('/payment/') || req.path.startsWith('/delivery/') || req.path.startsWith('/admin/delivery')) {
+    if (req.path.startsWith('/customers/otp') || req.path.startsWith('/customers/me') || req.path.startsWith('/customers/register') || req.path.startsWith('/customers/login-email') || req.path.startsWith('/payment/') || req.path.startsWith('/delivery/') || req.path.startsWith('/admin/delivery')) {
       return next();
     }
     if (req.path === '/auth/login' && req.method === 'POST') {

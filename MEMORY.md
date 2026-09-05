@@ -127,6 +127,13 @@
   before coding → analyze → write a feature plan → confirm dependencies; after
   coding → test → fix → update docs (`KNOWLEDGE_BASE.md` / `CHANGELOG.md` /
   `MOBILE_FUNCTIONALITY_AUDIT.md` as relevant) → update `MEMORY.md`.
+- **Reaffirmed (user, 2026-09-05):** every UI fix/change from here on must be
+  applied to **both** the web frontend's mobile-responsive layout (`frontend/`,
+  Tailwind breakpoints / `isMobile` checks) **and** the Flutter `mobileapp/` —
+  not just one. Applies to bug fixes too, not only new features. If a change is
+  genuinely web-only (e.g. an admin-only desktop screen) or mobile-only (native
+  permission flow), say so explicitly instead of silently skipping the other
+  side.
 
 ## 5. Completed Major Work
 

@@ -73,8 +73,11 @@ class ProfileScreen extends ConsumerWidget {
                   ),
                 ),
                 TextButton(
-                  onPressed: () => context.push('/account/edit'),
-                  child: Text('Edit', style: AppTypography.labelMedium(AppColors.primaryText)),
+                  onPressed: () => auth.isAuthenticated ? context.push('/account/edit') : context.push('/login'),
+                  child: Text(
+                    auth.isAuthenticated ? 'Edit' : 'Sign in',
+                    style: AppTypography.labelMedium(AppColors.primaryText),
+                  ),
                 ),
               ],
             ),
@@ -145,50 +148,56 @@ class ProfileScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 28),
 
-          SecondaryButton(
-            text: 'Log out',
-            onPressed: () async {
-              final ok = await AppModal.confirm(
-                context,
-                title: 'Log out?',
-                message: 'You can sign back in any time with your phone number.',
-                confirmLabel: 'Log out',
-                destructive: true,
-              );
-              if (ok && context.mounted) {
-                await ref.read(authProvider.notifier).logout();
-                if (context.mounted) context.go('/login');
-              }
-            },
-          ),
-          const SizedBox(height: 8),
-          TextButton(
-            onPressed: () async {
-              final ok = await AppModal.confirm(
-                context,
-                title: 'Delete account?',
-                message: 'This permanently removes your profile, wallet balance '
-                    'and reviews. Past orders are kept as records but no longer '
-                    'linked to you. This cannot be undone.',
-                confirmLabel: 'Delete account',
-                cancelLabel: 'Keep account',
-                destructive: true,
-                icon: Icons.delete_forever_outlined,
-              );
-              if (!ok || !context.mounted) return;
-              try {
-                await ref.read(authProvider.notifier).deleteAccount();
-                if (context.mounted) context.go('/login');
-                AppToast.success('Your account has been deleted');
-              } on ApiException catch (e) {
-                AppToast.error(e.message);
-              } catch (_) {
-                AppToast.error('Could not delete your account. Please try again.');
-              }
-            },
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Delete account'),
-          ),
+          if (auth.isAuthenticated) ...[
+            SecondaryButton(
+              text: 'Log out',
+              onPressed: () async {
+                final ok = await AppModal.confirm(
+                  context,
+                  title: 'Log out?',
+                  message: 'You can sign back in any time with your phone number.',
+                  confirmLabel: 'Log out',
+                  destructive: true,
+                );
+                if (ok && context.mounted) {
+                  await ref.read(authProvider.notifier).logout();
+                  if (context.mounted) context.go('/login');
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () async {
+                final ok = await AppModal.confirm(
+                  context,
+                  title: 'Delete account?',
+                  message: 'This permanently removes your profile, wallet balance '
+                      'and reviews. Past orders are kept as records but no longer '
+                      'linked to you. This cannot be undone.',
+                  confirmLabel: 'Delete account',
+                  cancelLabel: 'Keep account',
+                  destructive: true,
+                  icon: Icons.delete_forever_outlined,
+                );
+                if (!ok || !context.mounted) return;
+                try {
+                  await ref.read(authProvider.notifier).deleteAccount();
+                  if (context.mounted) context.go('/login');
+                  AppToast.success('Your account has been deleted');
+                } on ApiException catch (e) {
+                  AppToast.error(e.message);
+                } catch (_) {
+                  AppToast.error('Could not delete your account. Please try again.');
+                }
+              },
+              style: TextButton.styleFrom(foregroundColor: AppColors.error),
+              child: const Text('Delete account'),
+            ),
+          ] else
+            PrimaryButton(
+              text: 'Sign in',
+              onPressed: () => context.push('/login'),
+            ),
         ],
       ),
     );

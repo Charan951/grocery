@@ -27,6 +27,8 @@ const COUPON = `TEST${stamp}`;
 const ADMIN_EMAIL = `qa+${stamp}@freshcart.test`;
 const REVIEW_PRODUCT_ID = `qa_prod_${stamp}`;
 const RIDER_EMAIL = `qa.rider+${stamp}@freshcart.test`;
+const PHONE_C = `92222${stamp.slice(-5)}`;
+const CUSTOMER_EMAIL = `qa.customer+${stamp}@freshcart.test`;
 
 test.before(async () => {
   process.env.PAYMENTS_TEST_MODE = 'true';
@@ -49,7 +51,7 @@ test.before(async () => {
 test.after(async () => {
   await Promise.allSettled([
     User.deleteMany({ email: { $in: [ADMIN_EMAIL, RIDER_EMAIL] } }),
-    Customer.deleteMany({ phone: new RegExp(`(${PHONE_A}|${PHONE_B})$`) }),
+    Customer.deleteMany({ phone: new RegExp(`(${PHONE_A}|${PHONE_B}|${PHONE_C})$`) }),
     Order.deleteMany({ customerPhone: new RegExp(`(${PHONE_A}|${PHONE_B})$`) }),
     Coupon.deleteMany({ code: COUPON }),
     Otp.deleteMany({ phone: { $in: [PHONE_A, PHONE_B] } }),
@@ -481,6 +483,47 @@ test('wallet debit checks the balance', async () => {
     .set('Authorization', `Bearer ${token}`).send({ amount: 60, orderId: 'QA1' });
   assert.equal(ok.status, 200);
   assert.equal(ok.body.walletBalance, 40);
+});
+
+test('POST /api/customers/register creates an email/password account and logs them in', async () => {
+  const reg = await api().post('/api/customers/register').send({
+    name: 'QA Email Customer', email: CUSTOMER_EMAIL, password: 'secret123', phone: PHONE_C,
+  });
+  assert.equal(reg.status, 201, JSON.stringify(reg.body));
+  assert.ok(reg.body.token);
+  assert.equal(reg.body.customer.email, CUSTOMER_EMAIL);
+  assert.equal(reg.body.customer.passwordHash, undefined); // never leaked
+
+  // duplicate email/phone rejected
+  const dupEmail = await api().post('/api/customers/register').send({
+    name: 'Dup', email: CUSTOMER_EMAIL, password: 'secret123', phone: `93333${stamp.slice(-5)}`,
+  });
+  assert.equal(dupEmail.status, 409);
+
+  // weak inputs rejected
+  const badPw = await api().post('/api/customers/register').send({
+    name: 'X', email: `x${CUSTOMER_EMAIL}`, password: '123', phone: `94444${stamp.slice(-5)}`,
+  });
+  assert.equal(badPw.status, 400);
+});
+
+test('POST /api/customers/login-email authenticates a registered customer', async () => {
+  const ok = await api().post('/api/customers/login-email').send({ email: CUSTOMER_EMAIL, password: 'secret123' });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.ok(ok.body.token);
+
+  const wrongPw = await api().post('/api/customers/login-email').send({ email: CUSTOMER_EMAIL, password: 'nope' });
+  assert.equal(wrongPw.status, 401);
+
+  const unknown = await api().post('/api/customers/login-email').send({ email: 'nobody@nowhere.test', password: 'whatever' });
+  assert.equal(unknown.status, 404);
+  assert.equal(unknown.body.code, 'not_found');
+
+  // a phone-only (OTP) customer has no password and can't log in via email even if they set one later
+  const phoneOnlyToken = await customerToken(PHONE_A);
+  assert.ok(phoneOnlyToken);
+  const noPw = await api().post('/api/customers/login-email').send({ email: `cust_${PHONE_A}@none.test`, password: 'whatever' });
+  assert.equal(noPw.status, 404);
 });
 
 test('GET /api/super-categories returns list and PUT /api/super-categories/:id updates configuration', async () => {

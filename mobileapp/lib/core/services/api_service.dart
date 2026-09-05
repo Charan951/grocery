@@ -72,6 +72,41 @@ class ApiService {
     }
   }
 
+  /// Email/password sign-in. Returns `{ token, customer }`. Throws
+  /// [ApiException] with `statusCode 404` (`isNotFound`) when no account
+  /// exists for that email — the caller offers registration in that case.
+  Future<Map<String, dynamic>> loginEmail(String email, String password) async {
+    try {
+      final res = await _dio.post(
+        '/customers/login-email',
+        data: {'email': email, 'password': password},
+      );
+      return Map<String, dynamic>.from(res.data as Map);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  /// Creates a new email/password account. Returns `{ token, customer }`.
+  Future<Map<String, dynamic>> register({
+    required String name,
+    required String email,
+    required String password,
+    required String phone,
+  }) async {
+    try {
+      final res = await _dio.post('/customers/register', data: {
+        'name': name,
+        'email': email,
+        'password': password,
+        'phone': phone,
+      });
+      return Map<String, dynamic>.from(res.data as Map);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
   /// Loads the signed-in customer (requires a stored token).
   Future<Map<String, dynamic>> fetchMe() async {
     try {

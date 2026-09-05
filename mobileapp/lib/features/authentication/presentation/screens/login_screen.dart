@@ -4,13 +4,26 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
+import 'package:freshcart/core/widgets/app_text_field.dart';
 import 'package:freshcart/core/widgets/buttons.dart';
 import 'package:freshcart/core/widgets/app_toast.dart';
-import 'package:freshcart/core/widgets/phone_field.dart';
 import 'package:freshcart/features/authentication/presentation/controllers/auth_controller.dart';
 import 'package:freshcart/features/authentication/presentation/widgets/auth_scaffold.dart';
 
-/// Step 1 of sign-in: collect the phone number and request an OTP.
+enum _Detected { none, phone, email }
+
+_Detected _detect(String raw) {
+  final v = raw.trim();
+  if (v.isEmpty) return _Detected.none;
+  if (RegExp(r'^\S+@\S+\.\S+$').hasMatch(v)) return _Detected.email;
+  final digits = v.replaceAll(RegExp(r'\D'), '');
+  if (digits.length == 10 && !v.contains('@')) return _Detected.phone;
+  return _Detected.none;
+}
+
+/// Step 1 of sign-in: a single "phone or email" field. No manual method
+/// toggle — the next screen (OTP for a phone, password for an email) is
+/// inferred from what was typed, mirroring the web storefront's sign-in.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -19,32 +32,44 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _phone = PhoneFieldController();
+  final _identifier = TextEditingController();
   String? _error;
 
   @override
   void dispose() {
-    _phone.dispose();
+    _identifier.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
-    if (!_phone.isValid) {
-      setState(() => _error = 'Enter a valid 10-digit mobile number');
+    final kind = _detect(_identifier.text);
+    if (kind == _Detected.none) {
+      setState(() => _error = 'Enter a valid 10-digit phone number or email address');
       return;
     }
     setState(() => _error = null);
 
-    final ok = await ref.read(authProvider.notifier).sendOtp(_phone.digits);
+    if (kind == _Detected.email) {
+      context.push('/password?email=${Uri.encodeComponent(_identifier.text.trim().toLowerCase())}');
+      return;
+    }
+
+    final digits = _identifier.text.replaceAll(RegExp(r'\D'), '');
+    final ok = await ref.read(authProvider.notifier).sendOtp(digits);
     if (!mounted) return;
     if (ok) {
-      context.push('/otp?phone=${_phone.digits}');
+      context.push('/otp?phone=$digits');
     } else {
       final msg = ref.read(authProvider).error ?? 'Could not send the code. Please try again.';
       setState(() => _error = msg);
       AppToast.error(msg);
     }
+  }
+
+  void _continueAsGuest() {
+    ref.read(authProvider.notifier).continueAsGuest();
+    context.go('/');
   }
 
   void _back() {
@@ -62,21 +87,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     return AuthScaffold(
       onBack: _back,
-      title: 'Enter your number',
-      subtitle: "We'll send a 6-digit verification code to confirm it's you.",
+      title: 'Log in or sign up',
+      subtitle: "India's 10-minute app — enter your phone number or email to continue.",
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          PhoneField(
-            controller: _phone,
+          AppTextField(
+            controller: _identifier,
+            label: 'Phone number or email',
+            hintText: '98765 43210 or you@example.com',
             autofocus: true,
             errorText: _error,
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.done,
             onChanged: (_) {
               if (_error != null) setState(() => _error = null);
             },
-            onSubmitted: _submit,
+            onSubmitted: (_) => _submit(),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           Row(
             children: [
               Icon(Icons.lock_outline_rounded,
@@ -84,7 +113,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  'Your number stays private and is only used to secure your account.',
+                  'Your details stay private and are only used to secure your account.',
                   style: AppTypography.bodySmall(
                     isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
                   ),
@@ -97,11 +126,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       cta: Column(
         children: [
           PrimaryButton(
-            text: 'Send code',
+            text: 'Continue',
             isLoading: loading,
             onPressed: _submit,
           ),
           const SizedBox(height: 12),
+          TextButton(
+            onPressed: _continueAsGuest,
+            child: Text(
+              'Continue as guest',
+              style: AppTypography.labelMedium(
+                isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+              ).copyWith(decoration: TextDecoration.underline),
+            ),
+          ),
+          const SizedBox(height: 4),
           _TermsLine(isDark: isDark),
         ],
       ),

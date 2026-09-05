@@ -115,5 +115,81 @@ export const customerAuthController = {
   // GET /api/customers/me  (protectCustomer)
   getMe: async (req, res) => {
     res.json({ success: true, customer: req.customer });
-  }
+  },
+
+  // POST /api/customers/register  { name, email, password, phone }
+  // Email/password account creation — the OTP path above stays the phone-only
+  // fast path; this is the alternative sign-up when the customer chooses email.
+  register: async (req, res) => {
+    try {
+      const name = String(req.body.name || '').trim();
+      const email = String(req.body.email || '').trim().toLowerCase();
+      const password = String(req.body.password || '');
+      const phone = normalizePhone(req.body.phone);
+
+      if (!name) return res.status(400).json({ success: false, message: 'Name is required' });
+      if (!/^\S+@\S+\.\S+$/.test(email)) {
+        return res.status(400).json({ success: false, message: 'Enter a valid email address' });
+      }
+      if (password.length < 6) {
+        return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+      }
+      if (phone.length !== 10) {
+        return res.status(400).json({ success: false, message: 'Enter a valid 10-digit phone number' });
+      }
+
+      const formattedPhone = `+91 ${phone}`;
+      const [emailTaken, phoneTaken] = await Promise.all([
+        Customer.findOne({ email }),
+        Customer.findOne({ $or: [{ phone: formattedPhone }, { phone }, { phone: new RegExp(phone + '$') }] }),
+      ]);
+      if (emailTaken) return res.status(409).json({ success: false, message: 'An account with this email already exists. Try signing in.' });
+      if (phoneTaken) return res.status(409).json({ success: false, message: 'An account with this phone number already exists. Try signing in.' });
+
+      const passwordHash = await bcrypt.hash(password, 10);
+      const customer = await Customer.create({
+        customerId: 'cust_' + phone,
+        phone: formattedPhone,
+        name,
+        email,
+        passwordHash,
+        referralCode: 'REF_' + Math.random().toString(36).substring(2, 8).toUpperCase(),
+        addresses: [],
+      });
+
+      const token = signCustomerToken(customer.customerId);
+      const safe = customer.toObject();
+      delete safe.passwordHash;
+      return res.status(201).json({ success: true, token, customer: safe });
+    } catch (err) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // POST /api/customers/login-email  { email, password }
+  loginEmail: async (req, res) => {
+    try {
+      const email = String(req.body.email || '').trim().toLowerCase();
+      const password = String(req.body.password || '');
+      if (!email || !password) {
+        return res.status(400).json({ success: false, message: 'Email and password are required' });
+      }
+
+      const customer = await Customer.findOne({ email }).select('+passwordHash');
+      if (!customer || !customer.passwordHash) {
+        return res.status(404).json({ success: false, code: 'not_found', message: 'No account found for this email.' });
+      }
+      const ok = await bcrypt.compare(password, customer.passwordHash);
+      if (!ok) {
+        return res.status(401).json({ success: false, message: 'Incorrect password.' });
+      }
+
+      const token = signCustomerToken(customer.customerId);
+      const safe = customer.toObject();
+      delete safe.passwordHash;
+      return res.json({ success: true, token, customer: safe });
+    } catch (err) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  },
 };

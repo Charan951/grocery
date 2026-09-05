@@ -100,6 +100,7 @@ class UserProfile {
 
 class AuthState {
   final bool isAuthenticated;
+  final bool isGuest;
   final bool isOnboardingCompleted;
   final bool locationPermissionGranted;
   final UserProfile? user;
@@ -115,6 +116,7 @@ class AuthState {
 
   AuthState({
     required this.isAuthenticated,
+    this.isGuest = false,
     required this.isOnboardingCompleted,
     required this.locationPermissionGranted,
     this.user,
@@ -127,6 +129,7 @@ class AuthState {
 
   AuthState copyWith({
     bool? isAuthenticated,
+    bool? isGuest,
     bool? isOnboardingCompleted,
     bool? locationPermissionGranted,
     UserProfile? user,
@@ -140,6 +143,7 @@ class AuthState {
   }) {
     return AuthState(
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
+      isGuest: isGuest ?? this.isGuest,
       isOnboardingCompleted: isOnboardingCompleted ?? this.isOnboardingCompleted,
       locationPermissionGranted:
           locationPermissionGranted ?? this.locationPermissionGranted,
@@ -251,6 +255,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(
         isLoading: false,
         isAuthenticated: true,
+        isGuest: false,
         isHydrating: false,
         user: UserProfile.fromCustomerJson(customer),
       );
@@ -261,6 +266,80 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(isLoading: false, error: e.message);
       return false;
     }
+  }
+
+  /// Email/password sign-in. Returns `'ok'`, `'not_found'` (no account for
+  /// that email — caller offers registration), or `'error'` (message in
+  /// `state.error`).
+  Future<String> loginEmail(String email, String password) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final res = await _api.loginEmail(email, password);
+      final token = res['token'] as String?;
+      if (token == null || token.isEmpty) {
+        state = state.copyWith(isLoading: false, error: 'Sign-in failed. Please try again.');
+        return 'error';
+      }
+      await _tokenStore.save(token);
+      final customer = Map<String, dynamic>.from(res['customer'] as Map);
+      state = state.copyWith(
+        isLoading: false,
+        isAuthenticated: true,
+        isGuest: false,
+        isHydrating: false,
+        user: UserProfile.fromCustomerJson(customer),
+      );
+      unawaited(refreshLocationPermission());
+      _push?.registerCurrentToken();
+      return 'ok';
+    } on ApiException catch (e) {
+      if (e.isNotFound) {
+        state = state.copyWith(isLoading: false, clearError: true);
+        return 'not_found';
+      }
+      state = state.copyWith(isLoading: false, error: e.message);
+      return 'error';
+    }
+  }
+
+  /// Creates a new email/password account. Returns true on success.
+  Future<bool> register({
+    required String name,
+    required String email,
+    required String password,
+    required String phone,
+  }) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final res = await _api.register(name: name, email: email, password: password, phone: phone);
+      final token = res['token'] as String?;
+      if (token == null || token.isEmpty) {
+        state = state.copyWith(isLoading: false, error: 'Could not create your account.');
+        return false;
+      }
+      await _tokenStore.save(token);
+      final customer = Map<String, dynamic>.from(res['customer'] as Map);
+      state = state.copyWith(
+        isLoading: false,
+        isAuthenticated: true,
+        isGuest: false,
+        isHydrating: false,
+        user: UserProfile.fromCustomerJson(customer),
+      );
+      unawaited(refreshLocationPermission());
+      _push?.registerCurrentToken();
+      return true;
+    } on ApiException catch (e) {
+      state = state.copyWith(isLoading: false, error: e.message);
+      return false;
+    }
+  }
+
+  /// Browse without an account. Gated screens (checkout, orders, wallet,
+  /// account settings, …) still redirect to `/login` — see the router.
+  void continueAsGuest() {
+    _storage.completeOnboarding();
+    state = state.copyWith(isGuest: true, isOnboardingCompleted: true);
   }
 
   Future<void> refreshProfile() async {
