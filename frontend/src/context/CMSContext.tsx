@@ -478,7 +478,7 @@ interface CMSContextProps extends CMSState {
     label?: string;
     houseNo?: string;
     fullAddress?: string;
-  };
+  } | null;
   updateUserLocation: (loc: any) => void;
   addBanner: (banner: Banner) => void;
   updateBanner: (id: string, updated: Partial<Banner>) => void;
@@ -1499,19 +1499,16 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (saved) {
       try { return JSON.parse(saved); } catch (e) { }
     }
-    return {
-      address: 'Indiranagar 100ft Road, Bengaluru, KA 560038',
-      area: 'Indiranagar',
-      city: 'Bengaluru',
-      pincode: '560038',
-      lat: 12.9716,
-      lng: 77.5946
-    };
+    return null;
   });
 
   const updateUserLocation = (loc: any) => {
     setUserLocationState(loc);
-    localStorage.setItem('freshcart_delivery_location', JSON.stringify(loc));
+    if (loc) {
+      localStorage.setItem('freshcart_delivery_location', JSON.stringify(loc));
+    } else {
+      localStorage.removeItem('freshcart_delivery_location');
+    }
   };
 
   const [homeSelectedSubCategories, setHomeSelectedSubCategories] = useState<string[]>(() => {

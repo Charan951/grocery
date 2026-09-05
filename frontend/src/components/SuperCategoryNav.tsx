@@ -35,7 +35,7 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
   activeSuperCategory,
   onSelectSuperCategory,
 }) => {
-  const { superCategories, activeFestivalCampaign } = useCMS();
+  const { superCategories } = useCMS();
 
   // Use super categories list sorted by displayOrder
   const items = React.useMemo(() => {
@@ -98,29 +98,9 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
     return () => window.removeEventListener('resize', onResize);
   }, [syncIndicator]);
 
-  const [isMobile, setIsMobile] = React.useState<boolean>(() => typeof window !== 'undefined' ? window.innerWidth < 640 : false);
-  React.useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 640);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const isFestivalActive = React.useMemo(() => {
-    if (!isMobile) return false;
-    if (!activeFestivalCampaign || activeFestivalCampaign.isActive === false || activeFestivalCampaign.status === 'draft') return false;
-    const now = new Date();
-    const start = new Date(activeFestivalCampaign.startDate);
-    const end = new Date(activeFestivalCampaign.endDate);
-    return now >= start && now <= end;
-  }, [isMobile, activeFestivalCampaign]);
-
   return (
     <nav
-      className={`w-full sticky z-30 transition-colors ${
-        isFestivalActive
-          ? 'bg-transparent border-none shadow-none'
-          : 'bg-white dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800 shadow-2xs'
-      }`}
+      className="w-full sticky z-30 transition-colors bg-white dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800 shadow-2xs"
       style={{ top: 'var(--sticky-header-h, 64px)' }}
     >
       <div className="max-w-[1280px] mx-auto px-2 sm:px-4 lg:px-8 relative flex items-center group">
@@ -142,9 +122,7 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
           {/* Sliding active-tab underline */}
           <span
             aria-hidden
-            className={`pointer-events-none absolute bottom-0 h-[3px] rounded-t-full ${
-              isFestivalActive ? 'bg-white' : 'bg-emerald-600 dark:bg-emerald-500'
-            }`}
+            className="pointer-events-none absolute bottom-0 h-[3px] rounded-t-full bg-emerald-600 dark:bg-emerald-500"
             style={{
               left: indicator.left + 14,
               width: Math.max(indicator.width - 28, 0),
@@ -169,11 +147,7 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
                   onSelectSuperCategory(catSlug); // parent routes (wrapped in a transition)
                 }}
                 className={`relative group inline-flex items-center gap-2 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 shrink-0 select-none ${
-                  isFestivalActive
-                    ? isActive
-                      ? 'text-white bg-white/20 shadow-xs'
-                      : 'text-white/80 hover:text-white hover:bg-white/10'
-                    : isActive
+                  isActive
                     ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50/80 dark:bg-emerald-950/40 shadow-xs'
                     : 'text-gray-600 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-gray-100/70 dark:hover:bg-zinc-800/60'
                 }`}
@@ -189,9 +163,7 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
                   <IconComponent
                     size={17}
                     className={`transition-transform duration-200 group-hover:scale-110 ${
-                      isFestivalActive
-                        ? 'text-white'
-                        : isActive
+                      isActive
                         ? 'text-emerald-600 dark:text-emerald-400'
                         : 'text-gray-500 dark:text-gray-400 group-hover:text-emerald-600'
                     }`}

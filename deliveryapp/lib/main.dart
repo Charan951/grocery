@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:freshcart_delivery/core/config/app_config.dart';
 import 'package:freshcart_delivery/core/routes/app_router.dart';
 import 'package:freshcart_delivery/core/providers.dart';
 import 'package:freshcart_delivery/core/theme.dart';
@@ -16,6 +17,10 @@ Future<void> _fcmBackgroundHandler(RemoteMessage message) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Figure out which of emulator/USB-reverse/LAN-WiFi actually reaches the
+  // dev backend before anything builds an API/socket client off of
+  // AppConfig's URLs — a no-op in production or with an explicit override.
+  await AppConfig.autoDetectDevHost();
   try {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
     FirebaseMessaging.onBackgroundMessage(_fcmBackgroundHandler);

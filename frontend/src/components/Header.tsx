@@ -210,6 +210,7 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
   const handleCustomerLogout = () => {
     setCustomerUser(null);
     localStorage.removeItem('customer_user');
+    updateUserLocation(null);
     setIsCustomerProfileOpen(false);
     setShowProfileMenu(false);
   };
@@ -367,7 +368,12 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
 
   // On mobile these pages carry their own minimal "back + title" bar — the full
   // location / search / profile app header would just stack on top of it.
-  if (isMobile && (isProductDetailPage || isCategoriesPage || isOrdersPage)) {
+  const isAddressesPage =
+    location.pathname.startsWith('/locations') ||
+    location.pathname.startsWith('/saved-addresses') ||
+    location.pathname.startsWith('/account/addresses');
+
+  if (isMobile && (isProductDetailPage || isCategoriesPage || isOrdersPage || isAddressesPage)) {
     return null;
   }
 
@@ -736,7 +742,37 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
         onLoginSuccess={(user) => {
           setCustomerUser(user);
           setIsCustomerAuthOpen(false);
-          setIsCustomerProfileOpen(true);
+
+          // Restore this customer's own saved address if they have one;
+          // otherwise clear any address left behind by a previous user/guest
+          // on this browser so a new user is prompted to add their own.
+          const phoneKey = user?.phone ? String(user.phone).replace(/\D/g, '') : '';
+          const cachedAddresses = phoneKey ? localStorage.getItem(`saved_addresses_${phoneKey}`) : null;
+          if (cachedAddresses) {
+            try {
+              const parsed = JSON.parse(cachedAddresses);
+              const defaultAddr = Array.isArray(parsed) ? parsed[0] : null;
+              if (defaultAddr) {
+                updateUserLocation({
+                  label: defaultAddr.label,
+                  houseNo: defaultAddr.houseNo || '',
+                  landmark: defaultAddr.landmark || '',
+                  area: defaultAddr.area,
+                  address: defaultAddr.fullAddress,
+                  fullAddress: defaultAddr.fullAddress,
+                  pincode: defaultAddr.pincode,
+                });
+              } else {
+                updateUserLocation(null);
+              }
+            } catch {
+              updateUserLocation(null);
+            }
+          } else {
+            updateUserLocation(null);
+          }
+
+          navigate('/');
         }}
       />
 

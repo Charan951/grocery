@@ -28,6 +28,34 @@ class StorageService {
     await _settingsBox.put('dark_mode', value);
   }
 
+  // Scope cart/favourites/recent-searches to whichever customer they belong
+  // to. Local data is only ever written for the "current owner"; if a
+  // different customer becomes the current session (a fresh login, or an
+  // app restart that silently drops an expired token and then logs a
+  // different person in) whatever was left behind by the previous owner is
+  // wiped first, so one customer's cart/wishlist/searches can never leak
+  // into another's session on a shared device.
+  static const _ownerKey = 'local_data_owner';
+
+  Future<void> syncOwner(String? userKey) async {
+    // Best-effort: a test double or a StorageService used before init() has
+    // no live Hive boxes yet — never let that take down auth/hydrate.
+    try {
+      final current = _settingsBox.get(_ownerKey) as String?;
+      if (current == userKey) return;
+      // Only wipe when handing off between two *different* real identities —
+      // a guest's cart (current == null) is allowed to carry into their first
+      // login. Logout already clears local data itself (see AuthNotifier.logout),
+      // so this just needs to stop a stale owner's leftovers from surviving
+      // into someone else's fresh login.
+      if (current != null && userKey != null) {
+        await clearAll();
+        await clearRecentSearches();
+      }
+      await _settingsBox.put(_ownerKey, userKey);
+    } catch (_) {/* best effort */}
+  }
+
   // Cart operations
   List<dynamic> getCartItems() {
     return _cartBox.values.toList();

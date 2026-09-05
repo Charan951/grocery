@@ -5,6 +5,58 @@
 > backend functionality. Reuse existing APIs and business logic. No mock/fake data
 > in the shipped app. No static UI prototypes. Real backend, real dynamic data.
 
+Audit date: 2026-09-05 (supersedes the 2026-08-31 "hybrid prototype" snapshot below,
+which is preserved for history in §0.1). See `MEMORY.md` for the authoritative,
+continuously-updated log of what shipped since.
+Authoritative source of truth for "what exists": `KNOWLEDGE_BASE.md` (re-derive from code if it diverges).
+
+---
+
+## 0. Executive Summary (current state, 2026-09-05)
+
+The mobile app is **no longer a prototype** — Phase P0, P1, and most of P2 (per
+`MEMORY.md` §5) have shipped since the 0.1 snapshot below. Current reality:
+
+- **Real customer auth**: phone OTP (`/customers/otp/send|verify`), customer JWT,
+  `protectCustomer`-gated `/customers/me/*`. No mocked/demo user anywhere.
+- **All catalog/browse screens are live** — Home, Categories, Category catalog,
+  Product details, Search, Wishlist all hit real `/api/*` via Riverpod providers.
+  `MockDataService` is deleted from the codebase.
+- **Real order lifecycle**: settings-driven pricing, server-validated coupons,
+  real Razorpay payment (test keys, real HMAC verify + webhook), `POST /orders`
+  tied to the customer identity, `GET /orders/mine`, order cancel + wallet refund,
+  live Socket.IO `order_status_update` + a real OSM/OSRM tracking map (rider
+  marker + route polyline) on both mobile and web.
+- **Full delivery-partner subsystem** now exists end to end: a separate
+  `deliveryapp/` Flutter app, `DeliveryPartner`/`Assignment`/`DeliveryEarning`/
+  `DeliveryZone` backend models, automatic + manual dispatch, admin live fleet
+  map + partner detail/performance/zones/returns UI, FCM push for offers, partner
+  notifications, delivery-partner ratings surfaced to admin + customer.
+- **Push notifications (FCM)** wired for both apps (order-status pushes to
+  customers, offer pushes to partners) via `firebase-admin` + `PushService`.
+- **Offline resilience**: `GET /api/app/config` (maintenance/force-update gate),
+  `connectivity_plus` offline banner, `flutter_secure_storage` token handling.
+- **Design system**: mobile aligned to the web's flat system (P0-5) and then
+  consolidated onto one shared `core/widgets/` library (2026-08-31) — no glass,
+  no shadow stacks, one bottom nav / stepper / section header / icon button.
+- **Navigation**: `go_router` `StatefulShellRoute.indexedStack`, 5 tabs
+  (Home/Categories/Search/Orders/Account), auth-guarded via `redirect` +
+  `refreshListenable` — the flat single-`IndexedStack` shell described in §13.1
+  below is superseded.
+
+**What's still genuinely open** (see `MEMORY.md` §6 "Current Work" and §7 "Known
+Issues" for the current list — do not rely on the P0-era gaps listed further down
+in this document, most are closed): iOS APNs key, per-request retry-with-backoff,
+delivery call-masking, some P2 delivery items (drop-sequencing UX), and a newly
+reported **category-tap-shows-no-products** issue — diagnosed but not fixed in
+this pass (see `MEMORY.md` Known Issues → Mobile). No full alignment/layout
+regression was found across Home/Category/PDP/Cart/Checkout/Orders/Profile in
+this pass — all are on `AppScaffold`/shared widgets per the P0-5 + 2026-08-31
+design-system consolidation; a live-device visual pass (not available in this
+audit environment) is still recommended before calling it fully closed.
+
+### 0.1 Original audit snapshot (2026-08-31, historical — see above for current state)
+
 Audit date: 2026-08-31
 Authoritative source of truth for "what exists": `KNOWLEDGE_BASE.md` (re-derive from code if it diverges).
 
@@ -620,3 +672,112 @@ New/expanded:
 - Replacing working backend controllers/models wholesale.
 - Building multi-tenant infrastructure now (design contracts so as not to block it).
 - Shipping with mock data, static prototypes, or fake OTP/payment in a production build.
+
+---
+
+## 19. Implementation Roadmap — P0/P1/P2 (2026-09-05, approved-pending)
+
+Supersedes §17 for planning purposes — §17's P0–P3 phases were the *original*
+0→1 build plan (2026-08-31) and are almost entirely shipped (see §0 Executive
+Summary / `MEMORY.md` §5). This section is the **current gap-closing roadmap**:
+what's actually left, not what it took to get here. Not yet implemented —
+awaiting user approval per the request that produced it.
+
+### P0 — Essential functionality (broken or unverified today)
+
+**P0.1 — Category tap shows no products** ✅ **DONE (2026-09-05)**
+- **Screen**: `CategoriesScreen`, `CategoryCatalogScreen` (mobileapp)
+- **Functionality**: tapping any category with real products must reliably render them; empty state only for a genuinely empty category/subcategory
+- **API required**: none new — `GET /api/categories`, `GET /api/products?categoryId=` already existed and were confirmed correctly wired; no backend call changed
+- **Components required**: none new — reuses existing product grid/list + `EmptyState`; new pure function `availableSubCategoriesFor()` in `categories_screen.dart`
+- **Backend changes**: **none** — a live read-only DB diagnostic (temporary scripts, run once, deleted) proved the category level was already healthy (every category had real products); the admin bulk-importer `categoryId` validation and orphan-repair items from the original plan turned out unnecessary once the real root cause was found
+- **Dependencies**: live MongoDB read access (used, via `backend/.env`'s `MONGO_URI`) — this is what actually found the root cause, confirming the audit's note that this needed a live-DB session
+- **Root cause (confirmed, not the original three hypotheses)**: several `Category.subCategories[].name` entries (e.g. "Powdered Spices", "Eggs & Poultry") had **zero** matching `Product.subCategory` — tapping those chips/tiles was a guaranteed dead end
+- **Fix**: hide subcategory chips/tiles with no real products behind them (client-side only), computed from the already-loaded `allProductsProvider` catalog
+- **Testing**: `flutter analyze` clean; `flutter test` 124/124 (fixed `category_screens_test.dart`'s fake catalog to tag products with real subcategories, matching the shape that exposed this bug in the first place). **Live-device pass DONE**: physical Android device over USB (`adb reverse tcp:5000 tcp:5000`) against the real local backend — confirmed empty subcategories are hidden (Beverages/Packaged Food/etc.) while populated ones show and correctly navigate to a real, non-empty product grid. **Status: fully closed.**
+
+**P0.2 — Live-device visual/alignment QA pass**
+- **Screen**: Home, Category listing, Product details, Cart, Checkout, Orders list/detail, Profile (every screen already flagged as design-system-conformant by static analysis, but never visually confirmed on a device this session)
+- **Functionality**: consistent padding/spacing/safe-area handling, no overflow banners, correct light/dark rendering, no leftover one-off styling outside the shared design system
+- **API required**: none (UI-only pass)
+- **Components required**: none new — audits usage of existing `AppScaffold`/`GlassCard`/`QtyStepper`/`SectionHeader`/`AppIconButton`; fixes any deviation found in place
+- **Backend changes**: none
+- **Dependencies**: a connected device/emulator (already available — `adb` confirmed working this session) and, ideally, a WiFi + a USB pass since the app now auto-detects either
+- **Testing**: manual QA checklist per screen (portrait + a couple of common screen sizes); keep the existing repo-wide `design_flat_test` green; add a golden test for any widget touched during fixes
+- **Status (2026-09-05): partial spot-check done, paused by user request** — live-device screenshots confirmed Home, Categories (incl. the P0.1 fix), and Search + results render cleanly (flat design, no overflow, legible text, correct card layout) on the real device over USB. Product details/Cart/Checkout/Orders/Profile were not reached before the pass was paused (a concurrent session was editing these same files at the time). User has since said no further manual testing is needed — treating this item as closed at the spot-check level reached; revisit only if a specific screen issue is reported.
+
+### P1 — Important production functionality
+
+**P1.1 — iOS push notifications (APNs)**
+- **Screen**: none directly — affects `NotificationsScreen` + order-status/offer push delivery on iOS only (Android already receives FCM pushes)
+- **Functionality**: iOS devices actually receive push notifications (currently Android-only in practice)
+- **API required**: none new — existing `POST /customers/me/devices` / `/delivery/devices` registration already handles iOS tokens once APNs is configured
+- **Components required**: none
+- **Backend changes**: none — `firebase-admin`/`PushService` already send via FCM, which relays to APNs once Apple's side is configured
+- **Dependencies**: an Apple Developer Program account + APNs auth key (user-provided, external — this has been blocked on the user since P1-D4)
+- **Testing**: manual push-delivery test on a real iOS device/TestFlight build (APNs doesn't work in the iOS Simulator)
+
+**P1.2 — Per-request retry-with-backoff**
+- **Screen**: none directly — cross-cutting network layer, most visible on Home/catalog/orders during flaky connectivity
+- **Functionality**: a transient network failure (timeout, 502/503) retries automatically with backoff instead of surfacing an error immediately
+- **API required**: none — client-side only
+- **Components required**: a `Dio` interceptor (`RetryInterceptor` or equivalent) added in `ApiService`
+- **Backend changes**: none
+- **Dependencies**: none
+- **Testing**: unit test simulating a failing-then-succeeding request asserts the eventual success and the retry count/backoff timing; regression test that a genuine 4xx does *not* retry
+
+**P1.3 — Security: auth on banner/special-group mutation routes + legacy customer routes**
+- **Screen**: none (backend/admin-web only; not mobile-blocking but a real production exposure)
+- **Functionality**: `special-groups`/`banners` create/update/delete require an authenticated admin session; legacy tokenless `/customers/:id/*` routes are closed once the web storefront has real customer auth to replace them
+- **API required**: existing routes, gated with `protect`/`authorize('Admin','Manager')` (banners/special-groups) and `protectCustomer` (legacy customer routes)
+- **Components required**: none (backend + web-admin token plumbing only)
+- **Backend changes**: add auth middleware to the currently-open banner/special-group mutation routes; migrate web's customer-data calls onto the existing customer JWT before closing the legacy `/customers/:id/*` routes (web currently has no real customer session — this is the harder half of this item)
+- **Dependencies**: a decision + scope on shipping real web customer auth (currently phone-only + fake OTP `1234` on web) — this is a bigger cross-app item, not a quick gate
+- **Testing**: backend auth tests (401/403 without a valid admin/customer token), full regression on web admin banner/special-group editing and web customer profile/address flows after the change
+
+**P1.4 — Remaining delivery-app P2 items**
+- **Screen**: `deliveryapp` dashboard / order-detail screens
+- **Functionality**: (a) a dedicated multi-order "stack" view when a partner is carrying >1 active delivery (today only per-card display on the dashboard); (b) a decision + implementation on call-masking between customer and partner
+- **API required**: (a) none new — existing `GET /delivery/orders/active` already returns multiple; (b) a new backend integration endpoint once a telephony provider is chosen (e.g. Exotel/Twilio proxy-connect)
+- **Components required**: (a) new stack/list widget on the delivery dashboard; (b) call-initiation UI change (masked number/in-app call button) on both delivery and customer tracking screens
+- **Backend changes**: (a) none; (b) new masking-provider integration + a `POST` endpoint to initiate a masked call, plus provider credentials/env config
+- **Dependencies**: (b) choice of telephony/masking provider (external decision, has cost implications) — blocked on the user
+- **Testing**: (a) widget test rendering 2+ concurrent orders in the stack view; (b) backend test for the masking endpoint (mocked provider) once a provider is chosen
+
+### P2 — Polish and enhancements
+
+**P2.1 — Festival-theme web/mobile parity**
+- **Screen**: mobile Home (`_FestivalHero`) vs web's full festival theme engine
+- **Functionality**: mobile festival campaigns match every visual option the web theme engine supports (currently a subset — title/subtitle over solid/gradient/image background only)
+- **API required**: existing `GET /festival-campaigns` already returns full campaign config; mobile just doesn't render every field yet
+- **Components required**: extend `_FestivalHero` (and the category-nav contrast fix already shipped this session) to cover any remaining web-only styling options
+- **Backend changes**: none
+- **Dependencies**: none
+- **Testing**: widget tests per campaign background type; visual comparison against the web campaign preview
+
+**P2.2 — Analytics / crash reporting**
+- **Screen**: none (cross-cutting)
+- **Functionality**: crash reports and basic usage analytics for both Flutter apps
+- **API required**: none (third-party SDK, e.g. Firebase Crashlytics/Analytics — `firebase_core` is already a dependency)
+- **Components required**: SDK initialization in `main.dart` for both apps
+- **Backend changes**: none
+- **Dependencies**: decision on analytics provider/consent-banner requirements (privacy policy already exists, may need an update)
+- **Testing**: manual verification a forced test crash appears in the dashboard; opt-out toggle (if added) actually suppresses reporting
+
+**P2.3 — Accessibility & low-end performance pass**
+- **Screen**: all
+- **Functionality**: screen-reader labels on icon-only buttons, adequate tap targets (≥44dp, already a stated design-system rule — verify it's actually followed), acceptable frame times on a low-end Android device
+- **API required**: none
+- **Components required**: audit `AppIconButton`/interactive widgets for semantic labels
+- **Backend changes**: none
+- **Dependencies**: a genuinely low-end test device (or Android's low-end emulator profile)
+- **Testing**: `flutter test` accessibility guideline checks (`meetsGuideline`), manual screen-reader pass (TalkBack/VoiceOver), a profiled run on the low-end target
+
+**P2.4 — Repo hygiene / CI**
+- **Screen**: n/a
+- **Functionality**: `.gitignore` covers `node_modules`/Flutter `build`/`.dart_tool`; CI runs `flutter analyze` + `flutter test` (both apps) + backend `npm test` on every push
+- **API required**: none
+- **Components required**: none
+- **Backend changes**: none
+- **Dependencies**: none
+- **Testing**: CI pipeline itself is the test — verify it fails on an intentionally broken PR

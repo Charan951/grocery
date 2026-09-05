@@ -272,7 +272,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ onQuickView }) =
             <img
               src={currentImage}
               alt={product.name}
-              className="max-h-full max-w-full object-contain filter drop-shadow-xs transition-all duration-300"
+              className="w-full h-full object-contain filter drop-shadow-xs transition-all duration-300"
             />
 
             {/* Discount Badge */}
@@ -555,7 +555,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ onQuickView }) =
                     <img
                       src={currentImage}
                       alt={product.name}
-                      className="max-h-full max-w-full object-contain filter drop-shadow-sm transition-transform duration-200"
+                      className="w-full h-full object-contain filter drop-shadow-sm transition-transform duration-200"
                     />
 
                     {/* Translucent Amazon-style Zoom Lens Rect */}

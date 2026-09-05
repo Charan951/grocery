@@ -315,17 +315,18 @@ class _GalleryState extends State<_Gallery> {
             onPageChanged: (v) => setState(() => _i = v),
             itemCount: widget.urls.length,
             itemBuilder: (context, i) {
-              final img = Padding(
-                padding: const EdgeInsets.all(24),
-                child: widget.urls[i].startsWith('http')
-                    ? CachedNetworkImage(
-                        imageUrl: widget.urls[i],
-                        fit: BoxFit.contain,
-                        errorWidget: (_, _, _) =>
-                            const Icon(Icons.image_not_supported_outlined, size: 80),
-                      )
-                    : const Icon(Icons.shopping_bag_rounded, size: 120, color: AppColors.accent),
-              );
+              final img = widget.urls[i].startsWith('http')
+                  ? CachedNetworkImage(
+                      imageUrl: widget.urls[i],
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: double.infinity,
+                      errorWidget: (_, _, _) =>
+                          const Icon(Icons.image_not_supported_outlined, size: 80),
+                    )
+                  : const Center(
+                      child: Icon(Icons.shopping_bag_rounded, size: 120, color: AppColors.accent),
+                    );
               return i == 0 ? Hero(tag: 'product_image_${widget.heroId}', child: img) : img;
             },
           ),

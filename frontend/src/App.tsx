@@ -118,7 +118,10 @@ const AppContent: React.FC = () => {
   const isBottomNavHidden =
     location.pathname.startsWith('/product/') ||
     location.pathname.startsWith('/prn/') ||
-    location.pathname.startsWith('/products');
+    location.pathname.startsWith('/products') ||
+    location.pathname.startsWith('/locations') ||
+    location.pathname.startsWith('/saved-addresses') ||
+    location.pathname.startsWith('/account/addresses');
 
   const [isMobile, setIsMobile] = useState<boolean>(() => typeof window !== 'undefined' ? window.innerWidth < 640 : false);
   useEffect(() => {
@@ -130,6 +133,10 @@ const AppContent: React.FC = () => {
   const isPDP = location.pathname.startsWith('/product/') || location.pathname.startsWith('/prn/');
   const isCategoriesPage = location.pathname === '/categories' || location.pathname.startsWith('/categories/');
   const isOrdersPage = location.pathname === '/orders' || location.pathname.startsWith('/orders/') || location.pathname.startsWith('/account/orders');
+  const isAddressesPage =
+    location.pathname.startsWith('/locations') ||
+    location.pathname.startsWith('/saved-addresses') ||
+    location.pathname.startsWith('/account/addresses');
   const { activeFestivalCampaign } = useCMS();
   const isFestivalMobileHome = isMobile && location.pathname === '/' && !!activeFestivalCampaign && activeFestivalCampaign.isActive !== false;
 
@@ -146,7 +153,7 @@ const AppContent: React.FC = () => {
       {/* Main Pages */}
       <main
         className="flex-grow"
-        style={{ paddingTop: isMobile && (isPDP || isCategoriesPage || isOrdersPage || isFestivalMobileHome) ? 0 : 'var(--sticky-header-h, 140px)' }}
+        style={{ paddingTop: isMobile && (isPDP || isCategoriesPage || isOrdersPage || isFestivalMobileHome || isAddressesPage) ? 0 : 'var(--sticky-header-h, 140px)' }}
       >
         <Routes>
           <Route path="/" element={<Home onQuickView={setQuickViewProduct} />} />

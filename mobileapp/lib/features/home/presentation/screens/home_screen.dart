@@ -964,6 +964,12 @@ class _SuperCategoryNavState extends ConsumerState<_SuperCategoryNav> {
     // Show 5 super categories in view + 6th icon peeking (~25% of width)
     final itemWidth = (screenWidth - 32) / 5.25;
 
+    // The festival nav sits transparently over a light pastel gradient
+    // (see FestivalThemeResolver) regardless of the app's own light/dark
+    // setting, so it must never fall back to dark-mode (white/light) text —
+    // that would be invisible against the light festival background.
+    final useDarkPalette = isDark && !widget.isFestivalActive;
+
     return Container(
       color: widget.isFestivalActive
           ? Colors.transparent
@@ -1019,7 +1025,7 @@ class _SuperCategoryNavState extends ConsumerState<_SuperCategoryNav> {
                         size: 22,
                         color: isSelected
                             ? activeColor
-                            : (isDark ? Colors.white54 : const Color(0xFF757575)),
+                            : (useDarkPalette ? Colors.white54 : const Color(0xFF757575)),
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -1032,8 +1038,8 @@ class _SuperCategoryNavState extends ConsumerState<_SuperCategoryNav> {
                           fontWeight:
                               isSelected ? FontWeight.w800 : FontWeight.w500,
                           color: isSelected
-                              ? (isDark ? Colors.white : activeColor)
-                              : (isDark ? Colors.white60 : const Color(0xFF666666)),
+                              ? (useDarkPalette ? Colors.white : activeColor)
+                              : (useDarkPalette ? Colors.white60 : const Color(0xFF666666)),
                         ),
                       ),
                       const SizedBox(height: 2),

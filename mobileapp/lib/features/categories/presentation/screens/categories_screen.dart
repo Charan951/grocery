@@ -9,6 +9,23 @@ import 'package:freshcart/core/widgets/feedback_states.dart';
 import 'package:freshcart/core/widgets/skeletons.dart';
 import 'package:freshcart/features/categories/data/models/category_model.dart';
 import 'package:freshcart/features/home/presentation/controllers/catalog_providers.dart';
+import 'package:freshcart/features/products/data/models/product_model.dart';
+
+/// A subcategory is only worth showing/tapping when the live catalog actually
+/// has a product behind it — some categories advertise subcategories the
+/// seeded catalog never populated (e.g. "Powdered Spices" with zero products),
+/// which otherwise leads straight to a guaranteed-empty screen. Mirrors the
+/// backend's case-insensitive substring match (`catalogController.getProducts`
+/// subCategory regex) closely enough to hide only the genuinely-empty ones.
+List<String> availableSubCategoriesFor(CategoryModel category, List<ProductModel> products) {
+  if (products.isEmpty) return category.subCategories; // still loading — don't hide, avoid a flicker
+  return category.subCategories.where((sub) {
+    final subLower = sub.toLowerCase();
+    return products.any((p) =>
+        p.categoryId == category.id &&
+        (p.subCategory ?? '').toLowerCase().contains(subLower));
+  }).toList();
+}
 
 /// Categories tab — a directory of every category and its subcategories, plus a
 /// trending-terms cloud built from the live catalog.
@@ -63,6 +80,7 @@ class CategoriesScreen extends ConsumerWidget {
             );
           }
           final trending = _trendingTerms(categories, products);
+
           return RefreshIndicator(
             color: AppColors.primary,
             onRefresh: () async {
@@ -73,7 +91,7 @@ class CategoriesScreen extends ConsumerWidget {
               physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
-                for (final c in categories) _CategorySection(category: c, isDark: isDark),
+                for (final c in categories) _CategorySection(category: c, isDark: isDark, products: products),
                 if (trending.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text('Trending searches', style: AppTypography.h3(
@@ -106,11 +124,11 @@ class CategoriesScreen extends ConsumerWidget {
     );
   }
 
-  List<_Term> _trendingTerms(List<CategoryModel> cats, List<dynamic> products) {
+  List<_Term> _trendingTerms(List<CategoryModel> cats, List<ProductModel> products) {
     final terms = <_Term>[];
     for (final c in cats) {
       terms.add(_Term(c.name, '/category/${c.id}'));
-      for (final s in c.subCategories.take(3)) {
+      for (final s in availableSubCategoriesFor(c, products).take(3)) {
         terms.add(_Term(s, '/category/${c.id}?sub=${Uri.encodeComponent(s)}'));
       }
     }
@@ -127,11 +145,12 @@ class _Term {
 class _CategorySection extends StatelessWidget {
   final CategoryModel category;
   final bool isDark;
-  const _CategorySection({required this.category, required this.isDark});
+  final List<ProductModel> products;
+  const _CategorySection({required this.category, required this.isDark, required this.products});
 
   @override
   Widget build(BuildContext context) {
-    final subs = category.subCategories;
+    final subs = availableSubCategoriesFor(category, products);
     final textColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimary;
     final hasCategoryHeaderImage = category.imageUrl.trim().startsWith(RegExp(r'https?://'));
 

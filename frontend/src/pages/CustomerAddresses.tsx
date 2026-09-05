@@ -60,7 +60,7 @@ export const CustomerAddresses: React.FC = () => {
     const cached = localStorage.getItem('customer_user');
     return cached ? JSON.parse(cached) : null;
   })();
-  const userPhoneKey = customerUser?.phone ? customerUser.phone.replace(/\D/g, '') : 'default';
+  const userPhoneKey = customerUser?.phone ? customerUser.phone.replace(/\D/g, '') : '';
 
   const initialAddressText = typeof userLocation === 'string'
     ? userLocation
@@ -88,11 +88,22 @@ export const CustomerAddresses: React.FC = () => {
   const [isSavingDB, setIsSavingDB] = useState(false);
 
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>(() => {
+    if (!userPhoneKey) return [];
     const cached = localStorage.getItem(`saved_addresses_${userPhoneKey}`);
     if (cached) return JSON.parse(cached);
     if (customerUser?.addresses && customerUser.addresses.length > 0) return customerUser.addresses;
     return [];
   });
+
+  // Self-heal a dangling delivery location left over from before addresses
+  // were cleared/deleted elsewhere (e.g. an older session) — a location with
+  // no backing saved address should not keep showing on the header.
+  useEffect(() => {
+    if (savedAddresses.length === 0 && userLocation) {
+      updateUserLocation(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Reverse geocoding helper via OpenStreetMap Nominatim API
   const fetchAddressForCoords = async (lat: number, lng: number) => {
@@ -229,9 +240,9 @@ export const CustomerAddresses: React.FC = () => {
     setHouseNo('');
     setLandmark('');
     setLabel('Home');
-    setFullAddressText(initialAddressText);
-    setDetectedArea('KPHB COLONY');
-    setDetectedPincode('500072');
+    setFullAddressText('');
+    setDetectedArea('SELECT LOCATION ON MAP');
+    setDetectedPincode('');
     setPosition([17.4842, 78.3888]);
     setViewMode('form');
   };
@@ -274,6 +285,10 @@ export const CustomerAddresses: React.FC = () => {
       alert('Please enter your Name and House/Flat Number.');
       return;
     }
+    if (!fullAddressText.trim()) {
+      alert('Please pin your location on the map, search for it, or use Locate Me.');
+      return;
+    }
 
     setIsSavingDB(true);
     const finalAddressString = `${houseNo ? houseNo + ', ' : ''}${landmark ? landmark + ', ' : ''}${fullAddressText}`;
@@ -300,7 +315,8 @@ export const CustomerAddresses: React.FC = () => {
     }
 
     setSavedAddresses(updated);
-    localStorage.setItem(`saved_addresses_${userPhoneKey}`, JSON.stringify(updated));
+    const saveKey = userPhoneKey || receiverPhone.replace(/\D/g, '');
+    if (saveKey) localStorage.setItem(`saved_addresses_${saveKey}`, JSON.stringify(updated));
 
     // Save Customer Profile & Address to Backend MongoDB Database
     try {
@@ -367,9 +383,26 @@ export const CustomerAddresses: React.FC = () => {
   const handleDeleteAddress = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (window.confirm('Delete this saved address?')) {
+      const deletedAddr = savedAddresses.find((a) => a.id === id);
       const updated = savedAddresses.filter((a) => a.id !== id);
       setSavedAddresses(updated);
-      localStorage.setItem(`saved_addresses_${userPhoneKey}`, JSON.stringify(updated));
+      if (userPhoneKey) localStorage.setItem(`saved_addresses_${userPhoneKey}`, JSON.stringify(updated));
+
+      // If the deleted address was the active delivery location (or no
+      // addresses remain), clear it instead of leaving a dangling location
+      // that no longer has a matching saved address.
+      const isActiveLocation = deletedAddr && userLocation && (userLocation as any).fullAddress === deletedAddr.fullAddress;
+      if (updated.length === 0 || isActiveLocation) {
+        updateUserLocation(updated.length > 0 ? {
+          label: updated[0].label,
+          houseNo: updated[0].houseNo || '',
+          landmark: updated[0].landmark || '',
+          area: updated[0].area,
+          address: updated[0].fullAddress,
+          fullAddress: updated[0].fullAddress,
+          pincode: updated[0].pincode,
+        } : null);
+      }
     }
   };
 
@@ -425,119 +458,126 @@ export const CustomerAddresses: React.FC = () => {
 
         {/* VIEW MODE 1: SAVED ADDRESSES LIST (Default View) */}
         {viewMode === 'list' && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-5">
 
-            {/* Top Add New Address Card Banner */}
-            <div
+            {/* Add New Address — compact action row (Blinkit/Zepto style) */}
+            <button
+              type="button"
               onClick={handleOpenAddNew}
-              className="bg-surface border-2 border-dashed border-primary/30 hover:border-primary p-5 rounded-3xl flex items-center justify-between cursor-pointer transition-all group shadow-2xs"
+              className="w-full bg-surface hover:bg-primary/5 border border-divider hover:border-primary/40 rounded-2xl px-4 py-3.5 flex items-center gap-3 transition-colors group cursor-pointer text-left"
             >
-              <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                  <Plus size={22} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-extrabold text-text-primary group-hover:text-primary transition-colors">
-                    Add New Delivery Address
-                  </h3>
-                  <p className="text-xs font-medium text-text-secondary mt-0.5">
-                    Pin your location on OpenStreetMap & save house/flat details
-                  </p>
-                </div>
+              <div className="w-9 h-9 rounded-full border-2 border-dashed border-primary/50 text-primary flex items-center justify-center shrink-0">
+                <Plus size={18} />
               </div>
-
-              <span className="bg-primary text-white font-extrabold text-xs px-4 py-2 rounded-full shadow-2xs">
-                Open Map
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-extrabold text-primary">
+                  Add a new address
+                </h3>
+                <p className="text-[11px] font-medium text-text-secondary truncate">
+                  Pin an exact location on the map
+                </p>
+              </div>
+              <span className="text-text-tertiary group-hover:text-primary transition-colors">
+                <ArrowLeft size={16} className="rotate-180" />
               </span>
-            </div>
+            </button>
 
             {/* Saved Addresses List */}
-            <div className="bg-surface border border-divider rounded-3xl p-5 md:p-6 shadow-2xs flex flex-col gap-4">
-              <h2 className="text-xs font-black text-text-secondary uppercase tracking-wider">
-                Your Saved Addresses ({savedAddresses.length})
-              </h2>
-
-              {savedAddresses.length === 0 ? (
-                <div className="text-center py-8 text-text-secondary font-medium text-xs">
-                  No saved addresses found. Click "Open Map" to pin your address on map.
+            {savedAddresses.length === 0 ? (
+              <div className="flex flex-col items-center justify-center text-center py-14 px-6 bg-surface border border-divider rounded-3xl gap-2">
+                <div className="w-14 h-14 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-1">
+                  <MapPin size={26} />
                 </div>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  {savedAddresses.map((addr, index) => {
-                    const LabelIcon = labelIcon(addr.label);
-                    return (
-                      <div
-                        key={addr.id || `addr_${index}`}
-                        onClick={() => handleSelectSavedAddress(addr)}
-                        className="bg-background hover:bg-primary/5 border border-divider hover:border-primary p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer transition-all group"
-                      >
-                        <div className="flex items-start gap-3.5">
-                          <div className="w-10 h-10 rounded-xl bg-surface text-primary flex items-center justify-center shrink-0 shadow-2xs mt-0.5 border border-divider">
-                            <LabelIcon size={18} />
-                          </div>
-                          <div className="flex flex-col">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-xs sm:text-sm font-black text-text-primary group-hover:text-primary">
-                                {addr.label}
-                              </span>
-                              {addr.name && (
-                                <span className="text-xs font-bold text-text-secondary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-md">
-                                  {addr.name}
-                                </span>
-                              )}
-                              {addr.houseNo && (
-                                <span className="text-[11px] font-bold text-text-secondary bg-surface px-2 py-0.5 rounded-md border border-divider">
-                                  {addr.houseNo}
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-xs font-medium text-text-secondary leading-snug mt-1">
-                              {addr.fullAddress}
+                <h3 className="text-sm font-black text-text-primary">No saved addresses yet</h3>
+                <p className="text-xs font-medium text-text-secondary max-w-[240px]">
+                  Add your home, work, or any other address to speed up checkout.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <h2 className="text-[11px] font-black text-text-tertiary uppercase tracking-wider px-1">
+                  Saved Addresses ({savedAddresses.length})
+                </h2>
+
+                {savedAddresses.map((addr, index) => {
+                  const LabelIcon = labelIcon(addr.label);
+                  const labelColors: Record<string, string> = {
+                    Home: 'bg-emerald-50 text-emerald-600',
+                    Work: 'bg-blue-50 text-blue-600',
+                    Other: 'bg-amber-50 text-amber-600',
+                  };
+                  return (
+                    <div
+                      key={addr.id || `addr_${index}`}
+                      onClick={() => handleSelectSavedAddress(addr)}
+                      className="bg-surface border border-divider hover:border-primary/50 hover:shadow-md rounded-2xl p-4 flex gap-3 cursor-pointer transition-all group"
+                    >
+                      <div className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 ${labelColors[addr.label] || labelColors.Other}`}>
+                        <LabelIcon size={20} />
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-sm font-black text-text-primary">
+                              {addr.label}
                             </span>
-                            {addr.receiverPhone && (
-                              <span className="text-[11px] font-semibold text-text-tertiary mt-1 flex items-center gap-1">
-                                <Phone size={11} />
-                                {addr.receiverPhone}
+                            {addr.name && (
+                              <span className="text-[11px] font-bold text-text-secondary truncate">
+                                {addr.name}
                               </span>
                             )}
                           </div>
+
+                          {/* Icon-only Action Buttons */}
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={(e) => handleOpenEdit(addr, e)}
+                              className="w-8 h-8 rounded-full hover:bg-divider/50 text-text-tertiary hover:text-primary flex items-center justify-center transition-colors cursor-pointer"
+                              title="Edit Address"
+                              aria-label="Edit Address"
+                            >
+                              <Edit3 size={15} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteAddress(addr.id, e)}
+                              className="w-8 h-8 rounded-full hover:bg-error/10 text-text-tertiary hover:text-error flex items-center justify-center transition-colors cursor-pointer"
+                              title="Delete Address"
+                              aria-label="Delete Address"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
                         </div>
 
-                        {/* Action Buttons */}
-                        <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                          <button
-                            type="button"
-                            onClick={(e) => handleOpenEdit(addr, e)}
-                            className="bg-surface hover:bg-divider/40 border border-divider text-text-secondary font-bold text-xs px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
-                            title="Edit Address"
-                          >
-                            <Edit3 size={14} className="text-text-tertiary" />
-                            <span>Edit</span>
-                          </button>
+                        <p className="text-xs font-medium text-text-secondary leading-snug mt-1 line-clamp-2">
+                          {addr.fullAddress}
+                        </p>
 
-                          <button
-                            type="button"
-                            onClick={(e) => handleDeleteAddress(addr.id, e)}
-                            className="bg-surface hover:bg-error/10 border border-divider text-text-tertiary hover:text-error p-1.5 rounded-lg transition-colors cursor-pointer"
-                            title="Delete Address"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                        <div className="flex items-center justify-between gap-2 mt-2.5">
+                          {addr.receiverPhone ? (
+                            <span className="text-[11px] font-semibold text-text-tertiary flex items-center gap-1 min-w-0">
+                              <Phone size={11} className="shrink-0" />
+                              <span className="truncate">{addr.receiverPhone}</span>
+                            </span>
+                          ) : <span />}
 
                           <button
                             type="button"
                             onClick={() => handleSelectSavedAddress(addr)}
-                            className="bg-primary hover:bg-secondary text-white font-extrabold text-xs px-4 py-1.5 rounded-full shadow-2xs cursor-pointer transition-colors"
+                            className="bg-primary hover:bg-secondary text-white font-extrabold text-xs px-4 py-1.5 rounded-full shadow-2xs cursor-pointer transition-colors shrink-0"
                           >
                             Deliver Here
                           </button>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
           </div>
         )}
@@ -709,12 +749,14 @@ export const CustomerAddresses: React.FC = () => {
                     <h3 className="text-xs font-black text-primary uppercase tracking-wider">
                       {detectedArea}
                     </h3>
-                    <span className="text-[11px] font-bold text-text-secondary bg-background px-2.5 py-0.5 rounded-md border border-divider">
-                      PIN: {detectedPincode}
-                    </span>
+                    {detectedPincode && (
+                      <span className="text-[11px] font-bold text-text-secondary bg-background px-2.5 py-0.5 rounded-md border border-divider">
+                        PIN: {detectedPincode}
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs sm:text-sm font-semibold text-text-primary leading-snug mt-1">
-                    {fullAddressText}
+                    {fullAddressText || 'Search above, use Locate Me, or tap the map to pin your address'}
                   </p>
                 </div>
               </div>

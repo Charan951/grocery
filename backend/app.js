@@ -11,6 +11,37 @@ import apiRouter from './src/routes/api.js';
 import { User } from './src/models/User.js';
 import { setIo as setAssignmentIo } from './src/services/assignmentService.js';
 
+// Native apps (the Flutter customer/delivery apps via Dio, curl, Postman,
+// server-to-server calls) don't send an `Origin` header at all, so they are
+// never subject to CORS — this allowlist only matters for browser callers
+// (the web storefront + admin console, and anyone testing the API from a
+// browser at a LAN IP). Configure via CORS_ORIGINS in .env (comma-separated,
+// e.g. "https://app.freshcart.com,https://admin.freshcart.com"); every
+// localhost/127.0.0.1 port and any private LAN IP (192.168.x.x / 10.x.x.x /
+// 172.16-31.x.x, any port) are always allowed so a phone browser or a
+// teammate's machine on the same network can hit a dev server without
+// editing this list each time.
+const LAN_ORIGIN_RE = /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?$/;
+
+function buildCorsOptions() {
+  const configured = (process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  return {
+    origin(origin, callback) {
+      // No Origin header at all → not a browser request (native app / curl /
+      // server-to-server). Always allow.
+      if (!origin) return callback(null, true);
+      if (LAN_ORIGIN_RE.test(origin)) return callback(null, true);
+      if (configured.includes(origin)) return callback(null, true);
+      callback(new Error(`CORS: origin "${origin}" is not allowed`));
+    },
+    credentials: true,
+  };
+}
+
 /**
  * Builds the Express app + HTTP server + Socket.IO instance without starting to
  * listen. `index.js` wires DB + `listen()`; tests import this directly.
@@ -19,11 +50,11 @@ export function createApp({ logRequests = true } = {}) {
   const app = express();
   const httpServer = createServer(app);
   const io = new Server(httpServer, {
-    cors: { origin: '*', methods: ['GET', 'POST'] }
+    cors: buildCorsOptions()
   });
 
   app.use(helmet({ contentSecurityPolicy: false }));
-  app.use(cors());
+  app.use(cors(buildCorsOptions()));
   if (logRequests) app.use(morgan('dev'));
   // Razorpay webhook needs the raw body for signature verification — must run
   // before the JSON body parser.

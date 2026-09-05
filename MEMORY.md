@@ -1272,6 +1272,44 @@
 
 ## 6. Current Work
 
+- **Session status as of 2026-09-05 (latest, supersedes the stale P0/P1 entries
+  below which are from 2026-08-31):**
+  - **P0.1 (category-tap-shows-no-products) — ✅ DONE, fully closed and
+    live-device verified.** See §5/§7 for detail.
+  - **P0.2 (live-device visual/alignment QA) — paused at a partial spot-check
+    by user request**, not because of a defect. Home, Categories, and Search
+    (+ results) were confirmed clean on a real device. Product details, Cart,
+    Checkout, Orders, and Profile were **not** visually checked this session.
+    User said no further manual testing is needed for now — don't re-open this
+    unprompted, only if a specific screen issue is reported.
+  - **P1 not started** — all 4 P1 items are either blocked on an external
+    dependency the user hasn't provided (Apple APNs key; telephony/call-masking
+    provider choice) or are a larger cross-app auth item (locking legacy
+    customer routes needs real web customer auth shipped first, see §7).
+  - **P2 — about to start, essentially nothing landed yet.** Was mid-investigation
+    of P2.4 (repo hygiene: confirmed **259 build-cache files are actually
+    tracked in git** under a root `.dart_tool/` despite `.gitignore` already
+    listing that pattern — needs `git rm -r --cached` to untrack; not yet done)
+    when the user said to stop. **No repo/file changes were made for P2** —
+    investigation only.
+  - **⚠ Concurrent editing observed this session**: another process (a
+    different Claude Code session, or the user directly) was actively editing
+    `mobileapp/` files at the same time as this session — `auth_scaffold.dart`
+    (full redesign), `category_catalog_screen.dart` (chip row → left icon
+    rail), `category_screens_test.dart`, `auth_controller.dart`, and
+    `core/widgets/product_card.dart` all changed on disk mid-session without
+    this session doing it. One of those changes (`product_card.dart` reading
+    `StorageService` from `GetIt` directly) briefly broke 8 tests; it was
+    since fixed by whoever made it — `flutter test` is back to 124/124 as of
+    the last check. **If picking this up in a new session: re-verify current
+    file contents before assuming anything below in this doc about specific
+    file states is still accurate for `mobileapp/lib/features/authentication/`
+    and `mobileapp/lib/features/categories/` — they were a moving target.**
+  - **Next when resumed**: user said to proceed into P2 without further manual
+    testing gating. Reasonable P2 entry point is still §19's P2.1 (festival
+    theme parity) or finishing P2.4 (the `git rm -r --cached` cleanup) —
+    neither was started.
+
 - **✅ Phase P0 COMPLETE** — P0-1…P0-8 done (see §5). The mobile app runs entirely
   on real backend APIs with real customer auth: OTP login, live catalog,
   5-tab nav, flat design system, settings-driven cart pricing + server-validated
@@ -1321,8 +1359,48 @@ Mobile:
 - ~~Auth fully mocked~~ **FIXED in P0-2** — real OTP + customer JWT, no demo user.
 - ~~Cart/order data not tied to server identity~~ **FIXED (P0-6/P0-7)** — orders
   POST with the customer token; history via `GET /orders/mine`; detail ownership-checked.
-- Socket listens for `order_status_update` / `rider_location_update` but nothing
-  emits them server-side.
+- ~~Socket listens for `order_status_update`/`rider_location_update` but nothing
+  emits them~~ **FIXED (P1-2)** — server emits both.
+- ~~**Category-tap-shows-no-products**~~ **FIXED (P0.1, 2026-09-05).** Root cause
+  confirmed via a live-DB diagnostic (temporary read-only scripts, deleted after
+  use): the category-level path was always healthy — every real `Category.id`
+  had ≥1 matching `Product` (2–35 products each; hypotheses (a) orphaned
+  categoryId and (b) stale cached id were both ruled out for the current data).
+  The actual bug was one level down: several **subcategories** that the UI
+  advertised as tappable chips/tiles (`Category.subCategories[].name`, e.g.
+  "Powdered Spices", "Raisins & Walnuts", "Eggs & Poultry", "Biscuits &
+  Cookies", "Popcorn & Snacks", "Fruit Juices & Soft Drinks", "Spreads &
+  Peanut Butter") had **zero** real products tagged with a matching
+  `Product.subCategory` — tapping one was a guaranteed dead-end empty grid,
+  which read as "the category has no products" since these tiles sit directly
+  under each category on the Categories tab.
+  **Fix**: `categories_screen.dart` — new public `availableSubCategoriesFor(category,
+  products)` cross-references the live `allProductsProvider` catalog and only
+  returns subcategories with ≥1 real matching product (mirrors the backend's
+  case-insensitive substring match closely enough to hide only genuinely-empty
+  ones; returns the full unfiltered list while `products` hasn't loaded yet, to
+  avoid a flicker). Used to filter: the subcategory tile grid + "See all"
+  fallback tile, the trending-searches chip cloud, and (in
+  `category_catalog_screen.dart`) the in-catalog subcategory filter-chip row.
+  A category whose *every* subcategory turns out empty now falls back to one
+  tile linking to the full category listing (`/category/:id`, no `?sub=`),
+  which is always populated per the diagnostic above.
+  **Not changed**: no backend/data change made — this is a client-side
+  presentation fix (never advertise a filter that resolves to nothing), not a
+  data backfill. The underlying sparse subcategory-level catalog data is a
+  separate, lower-priority content/seeding gap, not a code defect.
+  Verified: `flutter analyze` clean; `flutter test` **124/124** (updated
+  `category_screens_test.dart`'s fake catalog to tag products with real
+  `subCategory` values, since the old fixture had none — that gap is exactly
+  what let this bug ship unnoticed). **Live-device pass DONE** (physical
+  Android device via USB + `adb reverse tcp:5000 tcp:5000`, hitting the real
+  local backend): confirmed on-device that `Beverages` shows only `Tea`/
+  `Coffee` (the empty `Fruit Juices & Soft Drinks` is hidden), `Packaged Food`
+  shows only `Chips & Namkeen`/`Noodles & Pasta`, trending-search chips
+  exclude every empty subcategory, and tapping a populated subcategory
+  (`Fresh Vegetables`) correctly opens the catalog with real live products
+  (prices/ratings/images from the real DB) and the correct chip pre-selected.
+  **P0.1 fully closed.**
 
 Repo hygiene:
 - `.gitignore` doesn't exclude `node_modules/`, `build/`, `.dart_tool/` (already
@@ -1491,6 +1569,8 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
   117/117, `flutter build apk --debug` succeeded.
 
 ## 13. Last Updated
+
+2026-09-05 — Audit-only pass (no app code changed): re-verified MEMORY.md/MOBILE_APP_IMPLEMENTATION.md against real backend (app.js + 8 domain route modules), mobileapp (go_router/StatefulShellRoute, ~35+ screens), frontend, deliveryapp. Confirmed prior P0-P2 completions still hold in code. Diagnosed the "tap category -> no products" report as most likely a data-consistency issue (category with zero tagged products / stale categoriesProvider cache / subcategory-string drift), NOT a code-path bug -- the route -> query-param -> backend $or/regex chain is wired correctly end to end. See Known Issues (Mobile) for detail. MOBILE_APP_IMPLEMENTATION.md rewritten to current-state (was still describing the pre-P0 "hybrid prototype").
 
 2026-09-01 — Live delivery tracking: real map + OSRM rider→drop route on BOTH clients. Mobile tracking_screen swapped the schematic painter for mapcn_flutter (OSM tiles, rider+drop markers, route polyline); TrackingNotifier fetches an OSRM road path (straight-line fallback) + recenters. Web TrackOrder gained the route polyline, a gliding rider marker (rAF tween), a store marker, follow-cam. flutter test 117 + APK; vite build clean.
 2026-09-01 — `/impeccable audit` findings on Home (web+mobile) implemented: a11y h1 + Semantics labels, broken CSS class, off-brand hex→tokens, Android back-icon conformance (4 files), hardcoded delivery-time copy. See §6 above.
