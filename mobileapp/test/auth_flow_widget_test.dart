@@ -112,10 +112,15 @@ ProviderScope _app(AuthNotifier notifier, {String initial = '/login'}) {
   );
   return ProviderScope(
     overrides: [authProvider.overrideWith((ref) => notifier)],
-    child: MaterialApp.router(
-      theme: AppTheme.lightTheme,
-      scaffoldMessengerKey: AppToast.messengerKey,
-      routerConfig: router,
+    // `disableAnimations: true` so the auth screens' infinite marquee
+    // animation doesn't keep `pumpAndSettle` from ever returning.
+    child: MediaQuery(
+      data: const MediaQueryData(disableAnimations: true),
+      child: MaterialApp.router(
+        theme: AppTheme.lightTheme,
+        scaffoldMessengerKey: AppToast.messengerKey,
+        routerConfig: router,
+      ),
     ),
   );
 }
@@ -189,7 +194,7 @@ void main() {
   group('Login screen', () {
     testWidgets('rejects an invalid identifier with an inline error', (tester) async {
       final n = AuthNotifier(_FakeStorage(), _FakeApi(), _FakeTokenStore());
-      await tester.pumpWidget(_app(n));
+      await _pumpAuthApp(tester, n);
       await tester.enterText(find.byType(TextField), '12345');
       await tester.tap(find.text('Continue'));
       await tester.pump();
@@ -198,7 +203,7 @@ void main() {
 
     testWidgets('shows the Terms / Privacy consent line', (tester) async {
       final n = AuthNotifier(_FakeStorage(), _FakeApi(), _FakeTokenStore());
-      await tester.pumpWidget(_app(n));
+      await _pumpAuthApp(tester, n);
       expect(find.textContaining('Terms of Service'), findsOneWidget);
       expect(find.textContaining('Privacy Policy'), findsOneWidget);
     });
@@ -207,7 +212,7 @@ void main() {
         (tester) async {
       final api = _FakeApi();
       final n = AuthNotifier(_FakeStorage(), api, _FakeTokenStore());
-      await tester.pumpWidget(_app(n));
+      await _pumpAuthApp(tester, n);
 
       await tester.enterText(find.byType(TextField), '9876543210');
       await tester.tap(find.text('Continue'));
@@ -222,7 +227,7 @@ void main() {
     testWidgets('an email routes to the password screen (no OTP sent)', (tester) async {
       final api = _FakeApi();
       final n = AuthNotifier(_FakeStorage(), api, _FakeTokenStore());
-      await tester.pumpWidget(_app(n));
+      await _pumpAuthApp(tester, n);
 
       await tester.enterText(find.byType(TextField), 'asha@example.com');
       await tester.tap(find.text('Continue'));
@@ -250,7 +255,7 @@ void main() {
     testWidgets('a correct password signs in and routes onward', (tester) async {
       final api = _FakeApi(emailAccountExists: true, loginEmailToken: 'jwt.token');
       final n = AuthNotifier(_FakeStorage(), api, _FakeTokenStore());
-      await tester.pumpWidget(_app(n, initial: '/password?email=asha@example.com'));
+      await _pumpAuthApp(tester, n, initial: '/password?email=asha@example.com');
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField), 'secret123');
@@ -263,7 +268,7 @@ void main() {
     testWidgets('no account for that email routes to registration', (tester) async {
       final api = _FakeApi(emailAccountExists: false);
       final n = AuthNotifier(_FakeStorage(), api, _FakeTokenStore());
-      await tester.pumpWidget(_app(n, initial: '/password?email=new@example.com'));
+      await _pumpAuthApp(tester, n, initial: '/password?email=new@example.com');
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField), 'secret123');
@@ -278,7 +283,7 @@ void main() {
     testWidgets('completing a wrong code shows an error and clears the boxes',
         (tester) async {
       final n = AuthNotifier(_FakeStorage(), _FakeApi(verifyToken: null), _FakeTokenStore());
-      await tester.pumpWidget(_app(n, initial: '/otp?phone=9876543210'));
+      await _pumpAuthApp(tester, n, initial: '/otp?phone=9876543210');
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField).first, '111111');
@@ -293,7 +298,7 @@ void main() {
         (tester) async {
       final store = _FakeTokenStore();
       final n = AuthNotifier(_FakeStorage(), _FakeApi(), store);
-      await tester.pumpWidget(_app(n, initial: '/otp?phone=9876543210'));
+      await _pumpAuthApp(tester, n, initial: '/otp?phone=9876543210');
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField).first, '000000');

@@ -87,8 +87,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     return AuthScaffold(
       onBack: _back,
-      title: 'Log in or sign up',
-      subtitle: "India's 10-minute app — enter your phone number or email to continue.",
+      title: "India's 10 minute app",
+      subtitle: 'Log in or Sign up',
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

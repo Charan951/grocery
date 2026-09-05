@@ -131,11 +131,15 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
           ),
           const SizedBox(height: 20),
           Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                "Didn't get it? ",
-                style: AppTypography.bodySmall(
-                  isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+              Flexible(
+                child: Text(
+                  "Didn't get it? ",
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.bodySmall(
+                    isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                  ),
                 ),
               ),
               GestureDetector(

@@ -36,6 +36,25 @@ import 'package:freshcart/features/app_gate/presentation/screens/app_gate_screen
 /// Global key to access the root navigator outside the StatefulShellRoute.
 final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 
+/// Slide-in-from-the-right page, matching the web storefront's sign-in
+/// drawer (which slides in from the right edge) for the auth flow screens.
+CustomTransitionPage<void> _slideFromRight(GoRouterState state, Widget child) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 320),
+    reverseTransitionDuration: const Duration(milliseconds: 260),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      return SlideTransition(
+        position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero)
+            .chain(CurveTween(curve: Curves.easeOutCubic))
+            .animate(animation),
+        child: child,
+      );
+    },
+  );
+}
+
 /// Bridges Riverpod auth changes to go_router's [GoRouter.refreshListenable].
 class _AuthRouterRefresh extends ChangeNotifier {
   _AuthRouterRefresh(Ref ref) {
@@ -112,22 +131,22 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
         path: '/login',
-        builder: (c, s) => const LoginScreen(),
+        pageBuilder: (c, s) => _slideFromRight(s, const LoginScreen()),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
         path: '/otp',
-        builder: (c, s) => OtpScreen(phone: s.uri.queryParameters['phone'] ?? ''),
+        pageBuilder: (c, s) => _slideFromRight(s, OtpScreen(phone: s.uri.queryParameters['phone'] ?? '')),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
         path: '/password',
-        builder: (c, s) => PasswordScreen(email: s.uri.queryParameters['email'] ?? ''),
+        pageBuilder: (c, s) => _slideFromRight(s, PasswordScreen(email: s.uri.queryParameters['email'] ?? '')),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
         path: '/register',
-        builder: (c, s) => RegisterScreen(email: s.uri.queryParameters['email'] ?? ''),
+        pageBuilder: (c, s) => _slideFromRight(s, RegisterScreen(email: s.uri.queryParameters['email'] ?? '')),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
