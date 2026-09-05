@@ -1,7 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
-import 'package:freshcart/core/constants/app_radius.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
 import 'package:freshcart/core/widgets/fade_slide_in.dart';
 
@@ -19,6 +18,11 @@ class AuthScaffold extends StatelessWidget {
   final VoidCallback? onBack;
   final Widget? belowTitle;
 
+  /// When set, shows a "Guest" pill in the top-right corner of the marquee
+  /// panel (mirrors [onBack] on the top-left) — only the login screen passes
+  /// this; other steps in the flow (OTP/password/register) omit it.
+  final VoidCallback? onGuest;
+
   const AuthScaffold({
     super.key,
     required this.title,
@@ -27,6 +31,7 @@ class AuthScaffold extends StatelessWidget {
     required this.cta,
     this.onBack,
     this.belowTitle,
+    this.onGuest,
   });
 
   @override
@@ -47,7 +52,7 @@ class AuthScaffold extends StatelessWidget {
           SizedBox(
             height: marqueeHeight,
             width: double.infinity,
-            child: _MarqueePanel(onBack: onBack),
+            child: _MarqueePanel(onBack: onBack, onGuest: onGuest),
           ),
           Expanded(
             child: SafeArea(
@@ -67,8 +72,6 @@ class AuthScaffold extends StatelessWidget {
                               mainAxisSize: MainAxisSize.min,
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                const FadeSlideIn(delay: Duration(milliseconds: 60), child: _BrandBadge()),
-                                const SizedBox(height: 14),
                                 FadeSlideIn(
                                   delay: const Duration(milliseconds: 110),
                                   child: Text(
@@ -126,7 +129,8 @@ class AuthScaffold extends StatelessWidget {
 /// bottom, with a floating circular back button over the top-left.
 class _MarqueePanel extends StatelessWidget {
   final VoidCallback? onBack;
-  const _MarqueePanel({this.onBack});
+  final VoidCallback? onGuest;
+  const _MarqueePanel({this.onBack, this.onGuest});
 
   static const _row1 = [
     'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=200&auto=format&fit=crop',
@@ -224,6 +228,15 @@ class _MarqueePanel extends StatelessWidget {
             child: FadeSlideIn(child: _CircleBack(onTap: onBack ?? () => Navigator.of(context).maybePop())),
           ),
         ),
+        if (onGuest != null)
+          Positioned(
+            top: 12,
+            right: 16,
+            child: SafeArea(
+              bottom: false,
+              child: FadeSlideIn(delay: const Duration(milliseconds: 40), child: _GuestPill(onTap: onGuest!)),
+            ),
+          ),
       ],
     );
   }
@@ -333,6 +346,32 @@ class _MarqueeTile extends StatelessWidget {
   }
 }
 
+class _GuestPill extends StatelessWidget {
+  final VoidCallback onTap;
+  const _GuestPill({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      shape: const StadiumBorder(),
+      elevation: 3,
+      shadowColor: Colors.black26,
+      child: InkWell(
+        customBorder: const StadiumBorder(),
+        onTap: onTap,
+        child: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Text(
+            'Guest',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _CircleBack extends StatelessWidget {
   final VoidCallback onTap;
   const _CircleBack({required this.onTap});
@@ -350,42 +389,6 @@ class _CircleBack extends StatelessWidget {
         child: const Padding(
           padding: EdgeInsets.all(10),
           child: Icon(Icons.arrow_back_rounded, size: 18, color: AppColors.textPrimary),
-        ),
-      ),
-    );
-  }
-}
-
-/// The "fresh/cart" wordmark badge, matching the web sign-in drawer exactly.
-class _BrandBadge extends StatelessWidget {
-  const _BrandBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 64,
-      height: 64,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.primary, AppColors.primaryText],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: AppRadius.brMd,
-        boxShadow: [
-          BoxShadow(color: AppColors.primary.withOpacity(0.25), blurRadius: 16, offset: const Offset(0, 6)),
-        ],
-      ),
-      child: Center(
-        child: RichText(
-          textAlign: TextAlign.center,
-          text: const TextSpan(
-            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, height: 1.15, color: Colors.white),
-            children: [
-              TextSpan(text: 'fresh\n'),
-              TextSpan(text: 'cart', style: TextStyle(color: Color(0xFFA5D6A7))),
-            ],
-          ),
         ),
       ),
     );

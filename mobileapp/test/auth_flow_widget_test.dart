@@ -242,7 +242,7 @@ void main() {
       final n = AuthNotifier(_FakeStorage(), _FakeApi(), _FakeTokenStore());
       await _pumpAuthApp(tester, n);
 
-      await tester.tap(find.text('Continue as guest'));
+      await tester.tap(find.text('Guest'));
       await tester.pumpAndSettle();
 
       expect(find.text('LOCATION'), findsOneWidget);

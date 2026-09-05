@@ -69,7 +69,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   void _continueAsGuest() {
     ref.read(authProvider.notifier).continueAsGuest();
-    context.go('/location_select');
+    // Setting isGuest also flips the router's `refreshListenable`, which
+    // re-runs `redirect` for the *current* location on this same frame.
+    // Calling `go` synchronously right alongside that can race go_router's
+    // internal route-match bookkeeping (a `'index != -1'` assertion); wait a
+    // frame so the redirect pass settles before we navigate explicitly.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.go('/location_select');
+    });
   }
 
   void _back() {
@@ -87,41 +95,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     return AuthScaffold(
       onBack: _back,
+      onGuest: _continueAsGuest,
       title: "India's 10 minute app",
       subtitle: 'Log in or Sign up',
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AppTextField(
-            controller: _identifier,
-            label: 'Phone number or email',
-            hintText: '98765 43210 or you@example.com',
-            autofocus: true,
-            errorText: _error,
-            keyboardType: TextInputType.emailAddress,
-            textInputAction: TextInputAction.done,
-            onChanged: (_) {
-              if (_error != null) setState(() => _error = null);
-            },
-            onSubmitted: (_) => _submit(),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Icon(Icons.lock_outline_rounded,
-                  size: 15, color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'Your details stay private and are only used to secure your account.',
-                  style: AppTypography.bodySmall(
-                    isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
+      body: AppTextField(
+        controller: _identifier,
+        label: 'Phone number or email',
+        autofocus: true,
+        errorText: _error,
+        keyboardType: TextInputType.emailAddress,
+        textInputAction: TextInputAction.done,
+        onChanged: (_) {
+          if (_error != null) setState(() => _error = null);
+        },
+        onSubmitted: (_) => _submit(),
       ),
       cta: Column(
         children: [
@@ -143,16 +130,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             child: Text(
               'New here? Create an account',
               style: AppTypography.labelMedium(AppColors.primaryText).copyWith(decoration: TextDecoration.underline),
-            ),
-          ),
-          const SizedBox(height: 4),
-          TextButton(
-            onPressed: _continueAsGuest,
-            child: Text(
-              'Continue as guest',
-              style: AppTypography.labelMedium(
-                isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-              ).copyWith(decoration: TextDecoration.underline),
             ),
           ),
           const SizedBox(height: 4),

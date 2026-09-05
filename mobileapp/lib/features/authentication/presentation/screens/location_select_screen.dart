@@ -195,7 +195,13 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
   /// This screen is opened both as a step in the sign-in flow (via `go`, no
   /// back stack) and later from inside the app (via `push`). Pop when we can,
   /// otherwise land on Home.
+  ///
+  /// Guarded with `mounted` because this can be reached twice in a row (the
+  /// AppBar back button plus a saved-address tap, or a fast double-tap) —
+  /// popping an already-popped route throws a go_router assertion
+  /// (`'index != -1'`) since its match is no longer on the stack.
   void _leave() {
+    if (!mounted) return;
     if (context.canPop()) {
       context.pop();
     } else {
