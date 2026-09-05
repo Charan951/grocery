@@ -18,6 +18,7 @@ import 'package:freshcart/features/categories/data/models/category_model.dart';
 import 'package:freshcart/features/home/presentation/controllers/catalog_providers.dart';
 import 'package:freshcart/features/home/presentation/screens/home_screen.dart';
 import 'package:freshcart/features/products/data/models/product_model.dart';
+import 'package:freshcart/features/wishlist/presentation/controllers/wishlist_controller.dart';
 
 class _FakeStorage extends StorageService {
   @override
@@ -28,6 +29,10 @@ class _FakeStorage extends StorageService {
   List<dynamic> getCartItems() => const [];
   @override
   Future<void> saveCartItems(List<Map<String, dynamic>> items) async {}
+  @override
+  List<String> getFavoriteIds() => const [];
+  @override
+  Future<void> toggleFavorite(String id) async {}
 }
 
 class _FakeTokenStore extends TokenStore {
@@ -93,6 +98,7 @@ Widget _host({
       pricingConfigProvider.overrideWithValue(const PricingConfig()),
       authProvider.overrideWith((ref) => _auth()),
       cartProvider.overrideWith((ref) => CartNotifier(_FakeStorage(), ref)),
+      wishlistProvider.overrideWith((ref) => WishlistNotifier(_FakeStorage())),
       ...overrides,
     ],
     child: MaterialApp.router(

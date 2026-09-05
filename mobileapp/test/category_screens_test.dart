@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -13,6 +14,7 @@ import 'package:freshcart/features/categories/data/models/category_model.dart';
 import 'package:freshcart/features/categories/presentation/screens/categories_screen.dart';
 import 'package:freshcart/features/categories/presentation/screens/category_catalog_screen.dart';
 import 'package:freshcart/features/home/presentation/controllers/catalog_providers.dart';
+import 'package:freshcart/features/wishlist/presentation/controllers/wishlist_controller.dart';
 import 'package:freshcart/features/products/data/models/product_model.dart';
 
 class _FakeStorage extends StorageService {
@@ -22,13 +24,18 @@ class _FakeStorage extends StorageService {
   List<dynamic> getCartItems() => const [];
   @override
   Future<void> saveCartItems(List<Map<String, dynamic>> items) async {}
+  @override
+  List<String> getFavoriteIds() => const [];
+  @override
+  Future<void> toggleFavorite(String id) async {}
 }
 
-ProductModel _p(String id, {bool organic = false}) => ProductModel(
+ProductModel _p(String id, {bool organic = false, String? subCategory}) => ProductModel(
       id: id,
       name: 'Product $id',
       brand: 'Acme',
       categoryId: 'veg',
+      subCategory: subCategory,
       rating: 4.5,
       reviewsCount: 3,
       price: 40,
@@ -72,6 +79,7 @@ Widget _host(List<Override> overrides, {String start = '/categories'}) => Provid
         settingsProvider.overrideWith((ref) async => <String, dynamic>{}),
         pricingConfigProvider.overrideWithValue(const PricingConfig()),
         cartProvider.overrideWith((ref) => CartNotifier(_FakeStorage(), ref)),
+        wishlistProvider.overrideWith((ref) => WishlistNotifier(_FakeStorage())),
         ...overrides,
       ],
       child: MaterialApp.router(
@@ -86,7 +94,10 @@ List<Override> _base({
   List<ProductModel>? categoryProducts,
 }) =>
     [
-      allProductsProvider.overrideWith((ref) async => [_p('1'), _p('2', organic: true)]),
+      allProductsProvider.overrideWith((ref) async => [
+            _p('1', subCategory: 'Leafy greens'),
+            _p('2', organic: true, subCategory: 'Root veg'),
+          ]),
       categoriesProvider.overrideWith((ref) => switch (categories ?? const AsyncData([_veg])) {
             AsyncData(:final value) => Future.value(value),
             AsyncError(:final error) => Future.error(error),
@@ -140,11 +151,11 @@ void main() {
     });
 
     testWidgets('respects the initial subcategory from the route', (tester) async {
+      final handle = tester.ensureSemantics();
       await _boot(tester, _host(_base(), start: '/category/veg?sub=Root%20veg'));
-      final chip = tester.widget<ChoiceChip>(
-        find.widgetWithText(ChoiceChip, 'Root veg'),
-      );
-      expect(chip.selected, isTrue);
+      final node = tester.getSemantics(find.bySemanticsLabel('Root veg'));
+      expect(node.hasFlag(SemanticsFlag.isSelected), isTrue);
+      handle.dispose();
     });
 
     testWidgets('empty result shows a clear-filters affordance', (tester) async {

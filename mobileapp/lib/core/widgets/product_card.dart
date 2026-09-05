@@ -1,17 +1,30 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
-import 'package:freshcart/core/widgets/glass_card.dart';
 import 'package:freshcart/core/widgets/badges.dart';
+import 'package:freshcart/core/widgets/app_toast.dart';
+import 'package:freshcart/features/cart/data/models/cart_item_model.dart';
+import 'package:freshcart/features/cart/presentation/controllers/cart_controller.dart';
 import 'package:freshcart/features/products/data/models/product_model.dart';
+import 'package:freshcart/features/wishlist/presentation/controllers/wishlist_controller.dart';
 
-class ProductCard extends StatelessWidget {
+/// Product grid/rail card — matches the web storefront's card: a square
+/// image tile (heart button top-right, floating ADD/qty-stepper bottom-right
+/// over the image), then a green price pill + discount line, title, weight,
+/// and a brand pill + rating row underneath.
+class ProductCard extends ConsumerWidget {
   final ProductModel product;
   final VoidCallback onTap;
   final VoidCallback onAdd;
   final double width;
   final String? heroTag;
+
+  /// Set false where the caller already renders its own wishlist affordance
+  /// over the card (e.g. the Wishlist screen's "remove" ✕ button in the same
+  /// corner) so the two don't overlap.
+  final bool showWishlistButton;
 
   const ProductCard({
     super.key,
@@ -20,19 +33,31 @@ class ProductCard extends StatelessWidget {
     required this.onAdd,
     this.width = 135.0,
     this.heroTag,
+    this.showWishlistButton = true,
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+
+    final favorited = showWishlistButton && ref.watch(wishlistProvider).contains(product.id);
+
+    CartItemModel? cartItem;
+    for (final item in ref.watch(cartProvider).items) {
+      if (item.product.id == product.id) {
+        cartItem = item;
+        break;
+      }
+    }
+    final qty = cartItem?.quantity ?? 0;
+    final isOutOfStock = !product.inStock;
+    final hasOptions = product.weightOptions.length > 1;
 
     final imageWidget = product.imageUrl.startsWith('http')
         ? CachedNetworkImage(
             imageUrl: product.imageUrl,
-            fit: BoxFit.cover,
-            width: double.infinity,
-            height: 76,
+            fit: BoxFit.contain,
             fadeInDuration: const Duration(milliseconds: 200),
             placeholder: (context, _) => Container(
               color: isDark ? Colors.white10 : Colors.black.withOpacity(0.04),
@@ -49,177 +74,168 @@ class ProductCard extends StatelessWidget {
             child: Icon(
               _getProductIcon(product.imageUrl),
               size: 32,
-              color: product.isOrganic
-                  ? AppColors.primary
-                  : AppColors.accent,
+              color: product.isOrganic ? AppColors.primary : AppColors.accent,
             ),
           );
 
     return GestureDetector(
       onTap: onTap,
-      child: GlassCard(
+      child: SizedBox(
         width: width,
-        padding: const EdgeInsets.all(8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Image area with discount badge
-            Stack(
-              clipBehavior: Clip.none,
+            AspectRatio(
+              aspectRatio: 1,
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white.withOpacity(0.03) : const Color(0xFFF9FAFB),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: isDark ? AppColors.dividerDark : AppColors.divider),
+                      ),
+                      child: heroTag != null ? Hero(tag: heroTag!, child: imageWidget) : imageWidget,
+                    ),
+                  ),
+                  if (isOutOfStock)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(color: AppColors.error, borderRadius: BorderRadius.circular(20)),
+                        child: Text(
+                          'OUT OF STOCK',
+                          style: AppTypography.labelSmall(Colors.white).copyWith(fontSize: 8, fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                    ),
+                  if (showWishlistButton)
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: _CircleIconButton(
+                        icon: favorited ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                        color: favorited ? AppColors.error : (isDark ? Colors.white70 : AppColors.textSecondary),
+                        isDark: isDark,
+                        onTap: () => ref.read(wishlistProvider.notifier).toggleWishlist(product.id),
+                      ),
+                    ),
+                  Positioned(
+                    bottom: 6,
+                    right: 6,
+                    child: isOutOfStock
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: isDark ? Colors.white10 : Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: isDark ? AppColors.dividerDark : AppColors.divider),
+                            ),
+                            child: Text(
+                              'Sold Out',
+                              style: AppTypography.labelSmall(
+                                isDark ? AppColors.textSecondaryDark : AppColors.textTertiary,
+                              ).copyWith(fontWeight: FontWeight.w700),
+                            ),
+                          )
+                        : qty > 0
+                            ? _QtyStepper(
+                                qty: qty,
+                                onIncrement: () {
+                                  final ok = ref.read(cartProvider.notifier).addToCart(product);
+                                  if (!ok) AppToast.info('You can add up to $kMaxQtyPerItem of an item');
+                                },
+                                onDecrement: () => ref.read(cartProvider.notifier).removeFromCart(product),
+                              )
+                            : _AddChip(onTap: onAdd, optionsCount: hasOptions ? product.weightOptions.length : null),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Price row: green pill + strikethrough MRP.
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Container(
-                  height: 76,
-                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                   decoration: BoxDecoration(
-                    color: isDark
-                        ? Colors.white.withOpacity(0.03)
-                        : Colors.black.withOpacity(0.02),
-                    borderRadius: BorderRadius.circular(12),
+                    color: AppColors.primaryText,
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: heroTag != null
-                        ? Hero(tag: heroTag!, child: imageWidget)
-                        : imageWidget,
-                  ),
-                ),
-                if (product.hasDiscount)
-                  Positioned(
-                    top: -4,
-                    left: -4,
-                    child: DiscountBadge(
-                      text:
-                          '${product.discountPercent.toStringAsFixed(0)}% OFF',
-                    ),
-                  ),
-                if (product.isOrganic)
-                  Positioned(
-                    top: 4,
-                    right: 4,
-                    child: Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: const BoxDecoration(
-                        color: Color(0xE634C759),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.eco_rounded,
-                        size: 9,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 2),
-
-            // Brand & Rating
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
                   child: Text(
-                    product.brand.toUpperCase(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTypography.labelSmall(
-                      isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondary,
-                    ).copyWith(letterSpacing: 0.5, fontSize: 8),
+                    '₹${product.price.toStringAsFixed(0)}',
+                    style: AppTypography.labelMedium(Colors.white).copyWith(fontWeight: FontWeight.w900, fontSize: 11),
                   ),
                 ),
-                RatingWidget(rating: product.rating),
+                if (product.hasDiscount) ...[
+                  const SizedBox(width: 6),
+                  Text(
+                    '₹${product.mrp.toStringAsFixed(0)}',
+                    style: AppTypography.bodySmall(
+                      isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                    ).copyWith(decoration: TextDecoration.lineThrough, fontSize: 11),
+                  ),
+                ],
               ],
             ),
-            const SizedBox(height: 2),
+            if (product.hasDiscount)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  '₹${(product.mrp - product.price).toStringAsFixed(0)} OFF',
+                  style: AppTypography.labelSmall(AppColors.primaryText).copyWith(fontWeight: FontWeight.w800, fontSize: 9),
+                ),
+              ),
+            const SizedBox(height: 3),
 
             // Title
-            SizedBox(
-              height: 26,
-              child: Text(
-                product.name,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: AppTypography.title(
-                  isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                ).copyWith(fontSize: 10.5, height: 1.15),
-              ),
+            Text(
+              product.name,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.title(
+                isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+              ).copyWith(fontSize: 11, height: 1.2, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 2),
 
             // Weight label
             Text(
               product.defaultWeight,
-              style: TextStyle(
-                fontSize: 9,
-                color: isDark
-                    ? AppColors.textSecondaryDark
-                    : AppColors.textSecondary,
-                fontWeight: FontWeight.w600,
-              ),
+              style: AppTypography.bodySmall(
+                isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+              ).copyWith(fontSize: 10, fontWeight: FontWeight.w500),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 4),
 
-            // Pricing & Add Button
+            // Brand tag & rating
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (product.hasDiscount)
-                      Text(
-                        '₹${product.mrp.toStringAsFixed(0)}',
-                        style: TextStyle(
-                          fontSize: 9,
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondary,
-                          decoration: TextDecoration.lineThrough,
-                        ),
+                if (product.brand.isNotEmpty)
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
                       ),
-                    Text(
-                      '₹${product.price.toStringAsFixed(0)}',
-                      style: AppTypography.h3(
-                        isDark
-                            ? AppColors.textPrimaryDark
-                            : AppColors.textPrimary,
-                      ).copyWith(fontSize: 12, fontWeight: FontWeight.w800),
-                    ),
-                  ],
-                ),
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: onAdd,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0C831F),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFF15803D), width: 1),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(Icons.add_rounded, color: Colors.white, size: 12),
-                        SizedBox(width: 2),
-                        Text(
-                          'ADD',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ],
+                      child: Text(
+                        product.brand,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.labelSmall(AppColors.primaryText).copyWith(fontWeight: FontWeight.w700, fontSize: 9),
+                      ),
                     ),
                   ),
-                ),
+                const Spacer(),
+                RatingWidget(rating: product.rating, iconSize: 11, fontSize: 9.5),
               ],
             ),
           ],
@@ -261,5 +277,119 @@ class ProductCard extends StatelessWidget {
       default:
         return Icons.shopping_bag_rounded;
     }
+  }
+}
+
+class _CircleIconButton extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _CircleIconButton({required this.icon, required this.color, required this.isDark, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: (isDark ? Colors.black : Colors.white).withOpacity(0.92),
+      shape: const CircleBorder(),
+      elevation: 0.5,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(5),
+          child: Icon(icon, size: 13, color: color),
+        ),
+      ),
+    );
+  }
+}
+
+class _AddChip extends StatelessWidget {
+  final VoidCallback onTap;
+  final int? optionsCount;
+
+  const _AddChip({required this.onTap, this.optionsCount});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.error, width: 1.5),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 4, offset: const Offset(0, 1))],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.add_rounded, color: AppColors.error, size: 13),
+                const SizedBox(width: 2),
+                Text(
+                  'ADD',
+                  style: AppTypography.labelSmall(AppColors.error).copyWith(fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 0.5),
+                ),
+              ],
+            ),
+            if (optionsCount != null)
+              Text(
+                '$optionsCount options',
+                style: AppTypography.labelSmall(AppColors.error).copyWith(fontSize: 7, fontWeight: FontWeight.w500),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QtyStepper extends StatelessWidget {
+  final int qty;
+  final VoidCallback onIncrement;
+  final VoidCallback onDecrement;
+
+  const _QtyStepper({required this.qty, required this.onIncrement, required this.onDecrement});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.primaryText,
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 4, offset: const Offset(0, 1))],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _stepperButton(Icons.remove_rounded, onDecrement),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              '$qty',
+              style: AppTypography.labelSmall(Colors.white).copyWith(fontWeight: FontWeight.w900, fontSize: 11),
+            ),
+          ),
+          _stepperButton(Icons.add_rounded, onIncrement),
+        ],
+      ),
+    );
+  }
+
+  Widget _stepperButton(IconData icon, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.all(6),
+        child: Icon(icon, size: 12, color: Colors.white),
+      ),
+    );
   }
 }

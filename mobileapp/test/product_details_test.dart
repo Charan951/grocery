@@ -111,11 +111,14 @@ void main() {
 
   testWidgets('wishlist toggle flips the icon and toasts', (tester) async {
     await _boot(tester, _host('1'));
-    expect(find.byIcon(Icons.favorite_border_rounded), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.favorite_border_rounded));
+    // Scoped by tooltip, not bare icon type: a "related products" rail
+    // elsewhere in the (kept-alive) tab tree now also renders a wishlist
+    // heart icon per card via the shared ProductCard widget.
+    expect(find.byTooltip('Add to wishlist'), findsOneWidget);
+    await tester.tap(find.byTooltip('Add to wishlist'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.byIcon(Icons.favorite_rounded), findsOneWidget);
+    expect(find.byTooltip('Remove from wishlist'), findsOneWidget);
     expect(find.text('Added to wishlist'), findsOneWidget);
   });
 

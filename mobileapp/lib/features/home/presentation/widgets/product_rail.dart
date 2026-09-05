@@ -58,7 +58,7 @@ class ProductRail extends StatelessWidget {
           ),
         ),
         SizedBox(
-          height: 198,
+          height: 258,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -99,7 +99,7 @@ class ProductRailSkeleton extends StatelessWidget {
             child: SkeletonLine(widthFactor: 0.4, height: 18),
           ),
           SizedBox(
-            height: 200,
+            height: 258,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),

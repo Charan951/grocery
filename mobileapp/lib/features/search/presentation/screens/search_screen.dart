@@ -171,7 +171,7 @@ class _Results extends ConsumerWidget {
     final resultsAsync = ref.watch(searchProductsProvider(query));
 
     return resultsAsync.when(
-      loading: () => const SkeletonGrid(itemCount: 6),
+      loading: () => const SkeletonGrid(itemCount: 6, childAspectRatio: 0.62),
       error: (e, _) => ErrorState(onRetry: () => ref.invalidate(searchProductsProvider(query))),
       data: (results) {
         if (results.isEmpty) {
@@ -202,7 +202,7 @@ class _Results extends ConsumerWidget {
                   crossAxisCount: 2,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
-                  childAspectRatio: 0.70,
+                  childAspectRatio: 0.62,
                 ),
                 delegate: SliverChildBuilderDelegate(
                   (context, i) {
