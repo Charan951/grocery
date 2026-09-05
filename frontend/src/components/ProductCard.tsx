@@ -82,7 +82,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
   return (
     <div className="bg-transparent flex flex-col h-full group border-0 shadow-none">
       {/* 1. Image Container Wrapper (Outline Border ONLY around Image Box) */}
-      <div className="relative w-full aspect-square bg-[#f9fafb] dark:bg-emerald-950/20 rounded-2xl border border-divider overflow-hidden flex items-center justify-center p-2 group/img shadow-2xs">
+      <div className="relative w-full aspect-square bg-[#f9fafb] dark:bg-emerald-950/20 rounded-2xl border border-divider overflow-hidden flex items-center justify-center group/img shadow-2xs">
 
         {/* Wishlist Heart Icon */}
         <button
@@ -106,11 +106,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
         )}
 
         {/* Product Image */}
-        <Link to={`/product/${product.id}`} className="w-full h-full flex items-center justify-center p-1">
+        <Link to={`/product/${product.id}`} className="w-full h-full flex items-center justify-center">
           <img
             src={displayImage}
             alt={product.name}
-            className={`w-full h-full object-contain transition-transform duration-200 group-hover/img:scale-105 ${isOutOfStock ? 'opacity-50 grayscale' : ''}`}
+            className={`w-full h-full object-cover transition-transform duration-200 group-hover/img:scale-105 ${isOutOfStock ? 'opacity-50 grayscale' : ''}`}
             loading="lazy"
           />
         </Link>

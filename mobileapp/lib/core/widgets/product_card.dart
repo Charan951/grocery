@@ -57,7 +57,9 @@ class ProductCard extends ConsumerWidget {
     final imageWidget = product.imageUrl.startsWith('http')
         ? CachedNetworkImage(
             imageUrl: product.imageUrl,
-            fit: BoxFit.contain,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
             fadeInDuration: const Duration(milliseconds: 200),
             placeholder: (context, _) => Container(
               color: isDark ? Colors.white10 : Colors.black.withOpacity(0.04),
@@ -92,13 +94,15 @@ class ProductCard extends ConsumerWidget {
                 children: [
                   Positioned.fill(
                     child: Container(
-                      padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         color: isDark ? Colors.white.withOpacity(0.03) : const Color(0xFFF9FAFB),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: isDark ? AppColors.dividerDark : AppColors.divider),
                       ),
-                      child: heroTag != null ? Hero(tag: heroTag!, child: imageWidget) : imageWidget,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(15),
+                        child: heroTag != null ? Hero(tag: heroTag!, child: imageWidget) : imageWidget,
+                      ),
                     ),
                   ),
                   if (isOutOfStock)

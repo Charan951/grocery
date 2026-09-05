@@ -137,6 +137,30 @@
 
 ## 5. Completed Major Work
 
+- **2026-09-05 — Product images not filling their frame (mobile + web + web-responsive).**
+  Grid/list product cards and the Product Details hero image used
+  `object-contain`/`BoxFit.contain` with extra container padding, so a photo
+  whose aspect ratio didn't exactly match its square/rect frame showed visible
+  empty space around it. Since `frontend/` serves both desktop and mobile
+  breakpoints from the same components, this only needed two codebases:
+  **Web** (`frontend/src/components/ProductCard.tsx` grid tile,
+  `frontend/src/pages/ProductDetails.tsx` — both the mobile `block md:hidden`
+  viewport and the desktop `hidden md:block` zoom-lens viewport) — removed the
+  inner `p-1`/`p-2`/`p-4`/`p-6` padding and switched `object-contain` →
+  `object-cover`. The desktop zoom-lens preview uses a separate
+  `backgroundSize`-based magnify panel, unrelated to the base image's
+  `object-fit`, so this didn't risk breaking that feature.
+  **Mobile** (`mobileapp/lib/core/widgets/product_card.dart`, the shared grid
+  card) — removed the `EdgeInsets.all(8)` padding, wrapped the image in a
+  `ClipRRect` (needed once the image reaches the container's rounded corners),
+  `BoxFit.contain` → `BoxFit.cover` with explicit `width/height:
+  double.infinity`. The PDP gallery (`product_details_screen.dart`) had this
+  same fix applied earlier in this session.
+  Verified: frontend `tsc --noEmit` clean; mobile `flutter analyze` clean,
+  `flutter test` 124/124. **Not yet visually re-confirmed on a device** (none
+  connected when this landed) — worth a quick look next time a device's
+  available, though the fix mirrors the already-verified PDP gallery pattern.
+
 - **2026-09-02 — Mobile: real-time location-permission prompt after every login.**
   Previously only a first-time customer (no saved `selectedAddress`) got the
   actual OS permission dialog, via `location_select_screen`'s own

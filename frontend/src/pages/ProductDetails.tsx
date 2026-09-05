@@ -268,11 +268,11 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ onQuickView }) =
           </AnimatePresence>
 
           {/* Main Image Viewport */}
-          <div className="relative w-full h-[310px] sm:h-[360px] flex items-center justify-center p-6 bg-white">
+          <div className="relative w-full h-[310px] sm:h-[360px] flex items-center justify-center bg-white">
             <img
               src={currentImage}
               alt={product.name}
-              className="w-full h-full object-contain filter drop-shadow-xs transition-all duration-300"
+              className="w-full h-full object-cover filter drop-shadow-xs transition-all duration-300"
             />
 
             {/* Discount Badge */}
@@ -543,7 +543,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ onQuickView }) =
               <div className="lg:col-span-5 flex flex-col gap-4">
                 
                 {/* Main Product Image Frame */}
-                <div className="relative w-full aspect-square bg-[#FAFAFA] rounded-2xl border border-gray-200/80 overflow-hidden flex items-center justify-center p-4 group">
+                <div className="relative w-full aspect-square bg-[#FAFAFA] rounded-2xl border border-gray-200/80 overflow-hidden flex items-center justify-center group">
                   
                   {/* Image Container with Mouse Tracking for Zoom Lens */}
                   <div
@@ -555,7 +555,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ onQuickView }) =
                     <img
                       src={currentImage}
                       alt={product.name}
-                      className="w-full h-full object-contain filter drop-shadow-sm transition-transform duration-200"
+                      className="w-full h-full object-cover filter drop-shadow-sm transition-transform duration-200"
                     />
 
                     {/* Translucent Amazon-style Zoom Lens Rect */}
