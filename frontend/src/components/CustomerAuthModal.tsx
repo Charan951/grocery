@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ShieldAlert, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface CustomerAuthModalProps {
@@ -66,6 +66,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
 
   const [otp, setOtp] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [regPhone, setRegPhone] = useState('');
 
@@ -217,6 +218,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
     setDetected(null);
     setOtp('');
     setPassword('');
+    setShowPassword(false);
     setName('');
     setRegPhone('');
     setError('');
@@ -363,6 +365,20 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                       >
                         {loading ? 'Sending code…' : 'Continue'}
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (detectMethod(identifier) === 'email') {
+                            setError('');
+                            setStep('register');
+                          } else {
+                            setError('Enter your email above, then tap Create account');
+                          }
+                        }}
+                        className="text-xs font-bold text-gray-500 hover:text-gray-700 cursor-pointer"
+                      >
+                        New here? Create an account
+                      </button>
                     </form>
                   )}
 
@@ -408,15 +424,25 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                       <p className="text-xs text-gray-600 font-medium text-center">
                         Signing in as <strong className="text-gray-900">{identifier}</strong>
                       </p>
-                      <input
-                        type="password"
-                        placeholder="Password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="w-full border border-gray-300 focus-within:border-[#4CAF50] focus:ring-2 focus:ring-[#4CAF50]/20 rounded-xl px-4 py-3.5 bg-white shadow-2xs outline-none text-gray-900 font-bold placeholder:text-gray-400 placeholder:font-normal text-sm"
-                        autoFocus
-                        autoComplete="current-password"
-                      />
+                      <div className="w-full border border-gray-300 focus-within:border-[#4CAF50] focus-within:ring-2 focus-within:ring-[#4CAF50]/20 rounded-xl px-4 py-3.5 flex items-center gap-2 bg-white shadow-2xs">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder="Password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="w-full min-w-0 bg-transparent border-none outline-none text-gray-900 font-bold placeholder:text-gray-400 placeholder:font-normal text-sm"
+                          autoFocus
+                          autoComplete="current-password"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword((v) => !v)}
+                          className="shrink-0 text-gray-400 hover:text-gray-600 cursor-pointer"
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                        </button>
+                      </div>
                       <button
                         type="submit"
                         disabled={loading}
@@ -449,14 +475,24 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                         autoFocus
                         autoComplete="name"
                       />
-                      <input
-                        type="password"
-                        placeholder="Create a password (min 6 characters)"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="w-full border border-gray-300 focus-within:border-[#4CAF50] focus:ring-2 focus:ring-[#4CAF50]/20 rounded-xl px-4 py-3.5 bg-white shadow-2xs outline-none text-gray-900 font-bold placeholder:text-gray-400 placeholder:font-normal text-sm"
-                        autoComplete="new-password"
-                      />
+                      <div className="w-full border border-gray-300 focus-within:border-[#4CAF50] focus-within:ring-2 focus-within:ring-[#4CAF50]/20 rounded-xl px-4 py-3.5 flex items-center gap-2 bg-white shadow-2xs">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder="Create a password (min 6 characters)"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="w-full min-w-0 bg-transparent border-none outline-none text-gray-900 font-bold placeholder:text-gray-400 placeholder:font-normal text-sm"
+                          autoComplete="new-password"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword((v) => !v)}
+                          className="shrink-0 text-gray-400 hover:text-gray-600 cursor-pointer"
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                        </button>
+                      </div>
                       <div className="w-full border border-gray-300 focus-within:border-[#4CAF50] focus-within:ring-2 focus-within:ring-[#4CAF50]/20 rounded-xl px-4 py-3.5 flex items-center gap-3 bg-white shadow-2xs">
                         <span className="text-sm font-extrabold text-gray-900 shrink-0">+91</span>
                         <div className="h-4 w-[1px] bg-gray-300 shrink-0" />

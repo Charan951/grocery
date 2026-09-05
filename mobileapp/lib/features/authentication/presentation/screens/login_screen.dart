@@ -132,6 +132,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
           const SizedBox(height: 12),
           TextButton(
+            onPressed: () {
+              if (_detect(_identifier.text) == _Detected.email) {
+                setState(() => _error = '');
+                context.push('/register?email=${Uri.encodeComponent(_identifier.text.trim().toLowerCase())}');
+              } else {
+                setState(() => _error = 'Enter your email above, then tap Create account');
+              }
+            },
+            child: Text(
+              'New here? Create an account',
+              style: AppTypography.labelMedium(AppColors.primaryText).copyWith(decoration: TextDecoration.underline),
+            ),
+          ),
+          const SizedBox(height: 4),
+          TextButton(
             onPressed: _continueAsGuest,
             child: Text(
               'Continue as guest',

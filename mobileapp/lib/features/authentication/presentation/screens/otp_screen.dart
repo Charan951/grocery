@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
 import 'package:freshcart/core/widgets/app_toast.dart';
@@ -150,10 +151,24 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
           ),
         ],
       ),
-      cta: PrimaryButton(
-        text: 'Verify & continue',
-        isLoading: busy,
-        onPressed: _verify,
+      cta: Column(
+        children: [
+          PrimaryButton(
+            text: 'Verify & continue',
+            isLoading: busy,
+            onPressed: _verify,
+          ),
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: busy ? null : () => context.canPop() ? context.pop() : context.go('/login'),
+            child: Text(
+              'Use a different number or email',
+              style: AppTypography.labelMedium(
+                isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+              ).copyWith(decoration: TextDecoration.underline),
+            ),
+          ),
+        ],
       ),
     );
   }

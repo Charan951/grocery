@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:freshcart/core/constants/app_colors.dart';
+import 'package:freshcart/core/theme/app_typography.dart';
 import 'package:freshcart/core/widgets/app_text_field.dart';
 import 'package:freshcart/core/widgets/app_toast.dart';
 import 'package:freshcart/core/widgets/buttons.dart';
@@ -116,10 +118,24 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           ),
         ],
       ),
-      cta: PrimaryButton(
-        text: 'Create account',
-        isLoading: loading,
-        onPressed: _submit,
+      cta: Column(
+        children: [
+          PrimaryButton(
+            text: 'Create account',
+            isLoading: loading,
+            onPressed: _submit,
+          ),
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: loading
+                ? null
+                : () => context.pushReplacement('/password?email=${Uri.encodeComponent(widget.email)}'),
+            child: Text(
+              'Already have an account? Sign in',
+              style: AppTypography.labelMedium(AppColors.primaryText).copyWith(decoration: TextDecoration.underline),
+            ),
+          ),
+        ],
       ),
     );
   }

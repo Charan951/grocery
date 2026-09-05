@@ -104,10 +104,24 @@ class _PasswordScreenState extends ConsumerState<PasswordScreen> {
           ),
         ],
       ),
-      cta: PrimaryButton(
-        text: 'Sign in',
-        isLoading: loading,
-        onPressed: _submit,
+      cta: Column(
+        children: [
+          PrimaryButton(
+            text: 'Sign in',
+            isLoading: loading,
+            onPressed: _submit,
+          ),
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: loading ? null : _back,
+            child: Text(
+              'Use a different number or email',
+              style: AppTypography.labelMedium(
+                isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+              ).copyWith(decoration: TextDecoration.underline),
+            ),
+          ),
+        ],
       ),
     );
   }
