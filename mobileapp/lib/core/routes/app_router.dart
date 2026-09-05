@@ -56,9 +56,27 @@ CustomTransitionPage<void> _slideFromRight(GoRouterState state, Widget child) {
 }
 
 /// Bridges Riverpod auth changes to go_router's [GoRouter.refreshListenable].
+///
+/// Only notifies when a field the `redirect` callback actually reads
+/// changes — not on every [AuthState] update. `authProvider` also carries
+/// loading spinners, error messages, location-permission flags and profile
+/// edits that mutate mid-screen (e.g. `location_select_screen.dart` calls
+/// `grantLocationPermission()` / `addAddressRemote()` while a push is still
+/// in flight). Notifying on those too regenerates go_router's whole
+/// `RouteMatchList` mid-navigation, which can invalidate an in-flight
+/// imperative route match and crash with `'index != -1'` in match.dart on
+/// the next `pop()`.
 class _AuthRouterRefresh extends ChangeNotifier {
   _AuthRouterRefresh(Ref ref) {
-    ref.listen(authProvider, (prev, next) => notifyListeners());
+    ref.listen(authProvider, (prev, next) {
+      if (prev == null ||
+          prev.isAuthenticated != next.isAuthenticated ||
+          prev.isGuest != next.isGuest ||
+          prev.isOnboardingCompleted != next.isOnboardingCompleted ||
+          prev.isHydrating != next.isHydrating) {
+        notifyListeners();
+      }
+    });
   }
 }
 
