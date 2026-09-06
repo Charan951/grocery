@@ -1,12 +1,39 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Home, History, Grid3x3 } from 'lucide-react';
+import { Home, LayoutGrid, Search, Receipt, User } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const NAV_ITEMS = [
-  { label: 'Home', path: '/', icon: Home, match: (p: string) => p === '/' },
-  { label: 'Order Again', path: '/orders', icon: History, match: (p: string) => p.startsWith('/orders') || p.startsWith('/account/orders') },
-  { label: 'Categories', path: '/categories', icon: Grid3x3, match: (p: string) => p.startsWith('/categories') || p.startsWith('/products') },
+  { 
+    label: 'Home', 
+    path: '/', 
+    icon: Home, 
+    match: (p: string) => p === '/' 
+  },
+  { 
+    label: 'Categories', 
+    path: '/categories', 
+    icon: LayoutGrid, 
+    match: (p: string) => p.startsWith('/categories') || p.startsWith('/category/') 
+  },
+  { 
+    label: 'Search', 
+    path: '/search', 
+    icon: Search, 
+    match: (p: string) => p === '/search' || p.startsWith('/search?') 
+  },
+  { 
+    label: 'Orders', 
+    path: '/orders', 
+    icon: Receipt, 
+    match: (p: string) => p.startsWith('/orders') || p.startsWith('/account/orders') || p.startsWith('/track/') 
+  },
+  { 
+    label: 'Account', 
+    path: '/profile', 
+    icon: User, 
+    match: (p: string) => p.startsWith('/profile') || p.startsWith('/account/profile') || p.startsWith('/account/edit') 
+  },
 ];
 
 export const BottomNav: React.FC = () => {
@@ -15,8 +42,7 @@ export const BottomNav: React.FC = () => {
   const [hidden, setHidden] = useState(false);
   const lastScrollY = useRef(0);
 
-  // Auto-hide on scroll down, reveal on scroll up — rAF-throttled so it does at
-  // most one cheap read per frame (raw scroll events fire far more often).
+  // Auto-hide on scroll down, reveal on scroll up
   useEffect(() => {
     let raf = 0;
     const handleScroll = () => {
@@ -42,20 +68,28 @@ export const BottomNav: React.FC = () => {
     setHidden(false);
   }, [location.pathname]);
 
-  // Hide BottomNav on product details and subcategories routes
-  if (location.pathname.startsWith('/product/') || location.pathname.startsWith('/products')) {
+  // Hide BottomNav on detail routes (PDP, Products catalog, Checkout, Locations)
+  if (
+    location.pathname.startsWith('/product/') ||
+    location.pathname.startsWith('/prn/') ||
+    location.pathname.startsWith('/products') ||
+    location.pathname.startsWith('/checkout') ||
+    location.pathname.startsWith('/locations') ||
+    location.pathname.startsWith('/saved-addresses') ||
+    location.pathname.startsWith('/account/addresses')
+  ) {
     return null;
   }
 
   return (
     <motion.nav
-      className="sm:hidden fixed bottom-0 left-0 right-0 z-[998] bg-surface border-t border-divider shadow-lg"
-      style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 10px)' }}
+      className="sm:hidden fixed bottom-0 left-0 right-0 z-[998] bg-white border-t border-gray-200/80 shadow-lg"
+      style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 6px)' }}
       initial={false}
       animate={{ y: hidden ? '100%' : '0%' }}
       transition={{ duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
     >
-      <div className="flex items-center justify-around px-2 py-2.5">
+      <div className="grid grid-cols-5 items-center px-1 py-1.5 min-h-[58px]">
         {NAV_ITEMS.map((item) => {
           const isActive = item.match(location.pathname);
           const Icon = item.icon;
@@ -65,20 +99,21 @@ export const BottomNav: React.FC = () => {
               onClick={() => navigate(item.path)}
               aria-label={item.label}
               aria-current={isActive ? 'page' : undefined}
-              className={`flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
-                isActive ? 'bg-primary/10 rounded-full px-4 py-2' : 'p-2'
-              }`}
+              className="flex flex-col items-center justify-center py-1 px-0.5 cursor-pointer transition-colors border-none bg-transparent"
             >
               <Icon
                 size={22}
-                strokeWidth={isActive ? 2.5 : 2}
-                className={isActive ? 'text-primary' : 'text-text-tertiary'}
+                strokeWidth={isActive ? 2.2 : 1.8}
+                fill={isActive && item.label === 'Home' ? '#0C831F' : 'none'}
+                className={isActive ? 'text-[#0C831F]' : 'text-gray-500'}
               />
-              {isActive && (
-                <span className="text-xs font-black text-primary leading-none whitespace-nowrap">
-                  {item.label}
-                </span>
-              )}
+              <span
+                className={`text-[11px] leading-tight mt-1 transition-colors ${
+                  isActive ? 'font-extrabold text-[#0C831F]' : 'font-medium text-gray-600'
+                }`}
+              >
+                {item.label}
+              </span>
             </button>
           );
         })}

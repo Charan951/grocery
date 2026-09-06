@@ -2,13 +2,14 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useCartWishlist } from '../context/CartWishlistContext';
 import { useCMS, getCategoryImage, hexToRgba, hexToTintOnWhite, hexToDarkShade } from '../context/CMSContext';
+import { resolveFestivalTheme } from '../utils/festivalThemeResolver';
 import { LocationModal } from './LocationModal';
 import { CustomerAuthModal } from './CustomerAuthModal';
 import { CustomerProfileDrawer } from './CustomerProfileDrawer';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getProductImage } from '../utils/imageUtils';
 import {
-  Search, Heart, MapPin, Menu, X,
+  Search, Heart, MapPin, Menu, X, Mic,
   ChevronDown, Leaf, Settings, Percent, User, Zap, LogOut, Shield, LayoutGrid, ShoppingCart
 } from 'lucide-react';
 
@@ -329,40 +330,42 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
     return false;
   };
 
+  const festivalTheme = useMemo(() => {
+    return resolveFestivalTheme(activeFestivalCampaign);
+  }, [activeFestivalCampaign]);
+
+  const isScrolledPastFestival = useMemo(() => {
+    return isScrolledDown && lastScrollY.current > 140;
+  }, [isScrolledDown]);
+
   const dynamicHeaderBg = useMemo(() => {
-    if (isScrolledDown) {
+    if (isMobile) {
+      if (isFestivalActive) {
+        if (isScrolledPastFestival) {
+          return '#ffffff';
+        }
+        return festivalTheme.gStart;
+      }
       return '#ffffff';
-    }
-    if (isFestivalActive) {
-      return 'transparent';
-    }
-    // Dynamic banner color matching ONLY applies on mobile home page
-    if (isMobile && isHomePage && campaignBgColor) {
-      return campaignBgColor;
     }
     if (activeCategory && activeCategory.color) {
       return hexToTintOnWhite(activeCategory.color, 0.14);
     }
     return '#ffffff';
-  }, [isScrolledDown, isFestivalActive, isMobile, isHomePage, campaignBgColor, activeCategory]);
+  }, [isMobile, isFestivalActive, isScrolledPastFestival, festivalTheme, activeCategory]);
 
   const isDarkHeader = useMemo(() => {
     if (isScrolledDown) return false;
     if (!isMobile) return false;
-    if (isFestivalActive) return true; // Crisp white text over continuous campaign background on mobile
     if (campaignTextColor) return !getIsDarkColor(campaignTextColor);
     return getIsDarkColor(dynamicHeaderBg);
-  }, [isScrolledDown, isMobile, isFestivalActive, dynamicHeaderBg, campaignTextColor]);
+  }, [isScrolledDown, isMobile, dynamicHeaderBg, campaignTextColor]);
 
   const headerTextColor = isDarkHeader ? 'text-white' : 'text-text-primary';
   const headerSubTextColor = isDarkHeader ? 'text-white/90 hover:text-white' : 'text-text-secondary hover:text-primary';
   const iconColorClass = isDarkHeader ? 'text-white fill-white' : 'text-text-primary fill-text-primary';
 
-  const festivalHeaderBgStyle: React.CSSProperties = isFestivalActive && !isScrolledDown ? {
-    backgroundColor: 'transparent',
-    backgroundImage: 'none',
-    boxShadow: 'none'
-  } : {
+  const festivalHeaderBgStyle: React.CSSProperties = {
     backgroundColor: dynamicHeaderBg
   };
 
@@ -373,7 +376,10 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
     location.pathname.startsWith('/saved-addresses') ||
     location.pathname.startsWith('/account/addresses');
 
-  if (isMobile && (isProductDetailPage || isCategoriesPage || isOrdersPage || isAddressesPage)) {
+  const isSearchPage =
+    location.pathname === '/search' || location.pathname.startsWith('/search');
+
+  if (isMobile && (isProductDetailPage || isCategoriesPage || isOrdersPage || isAddressesPage || isSearchPage)) {
     return null;
   }
 
@@ -432,19 +438,19 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
             </div>
           </div>
 
-          {/* Mobile Header Row (Compact Delivery & Profile) */}
-          <div className={`flex sm:hidden items-center justify-between w-full gap-2 transition-all duration-300 ease-in-out overflow-hidden ${headerHidden ? 'max-h-0 opacity-0 py-0 pointer-events-none' : 'max-h-16 opacity-100 py-0.5'
+          {/* Mobile Header Row (Compact Delivery, Notifications & Profile matching Flutter) */}
+          <div className={`flex sm:hidden items-center justify-between w-full gap-2 transition-all duration-300 ease-in-out overflow-hidden ${headerHidden ? 'max-h-0 opacity-0 py-0 pointer-events-none' : 'max-h-16 opacity-100 py-1'
             }`}>
             {/* Left: Express delivery badge & location dropdown */}
             <div
-              onClick={() => navigate('/account/addresses')}
+              onClick={() => navigate('/locations')}
               className="flex flex-col cursor-pointer select-none group min-w-0"
             >
-              <div className={`flex items-center gap-1 font-black text-xs tracking-tight leading-tight ${headerTextColor}`}>
-                <Zap size={14} className={`shrink-0 ${iconColorClass}`} />
-                <span>10 minutes</span>
+              <div className="flex items-center gap-1 font-black text-xs tracking-tight leading-tight text-[#0C831F]">
+                <Zap size={14} className="shrink-0 fill-[#0C831F]" />
+                <span>Express delivery</span>
               </div>
-              <div className={`flex items-center gap-0.5 text-[11px] font-extrabold truncate transition-colors ${headerSubTextColor}`}>
+              <div className="flex items-center gap-0.5 text-[11px] font-bold text-gray-600 truncate transition-colors">
                 <span className="truncate max-w-[210px]">
                   {(() => {
                     if (typeof userLocation === 'object' && userLocation !== null && (userLocation.houseNo || userLocation.area || userLocation.address || userLocation.fullAddress)) {
@@ -457,25 +463,36 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
                     if (typeof userLocation === 'string' && (userLocation as string).trim()) {
                       return userLocation;
                     }
-                    return '📍 Select Location';
+                    return 'Bhimavole To Dwaraka Tirumala...';
                   })()}
                 </span>
-                <ChevronDown size={12} className="shrink-0" />
+                <ChevronDown size={12} className="shrink-0 text-gray-500" />
               </div>
             </div>
 
-            {/* Right: Profile Icon Button */}
-            <button
-              onClick={handleProfileClick}
-              className={`w-8 h-8 rounded-full border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${isDarkHeader
-                  ? 'border-white/40 bg-white/10 text-white hover:bg-white/20'
-                  : 'border-divider bg-background text-text-primary hover:border-primary hover:text-primary'
-                }`}
-              title={customerUser ? `Logged in as ${customerUser.phone}` : "Customer Login"}
-              aria-label={customerUser ? `Account menu — logged in as ${customerUser.phone}` : "Customer login"}
-            >
-              <User size={16} />
-            </button>
+            {/* Right: Notifications & Profile Buttons */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={() => navigate('/support')}
+                className="w-8 h-8 rounded-full border border-gray-200 bg-white text-gray-700 flex items-center justify-center transition-colors cursor-pointer shadow-2xs hover:bg-gray-50"
+                aria-label="Notifications"
+              >
+                <div className="relative">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 absolute -top-0.5 -right-0.5" />
+                  <svg className="w-4 h-4 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                </div>
+              </button>
+              <button
+                onClick={handleProfileClick}
+                className="w-8 h-8 rounded-full border border-gray-200 bg-white text-gray-700 flex items-center justify-center transition-colors cursor-pointer shadow-2xs hover:bg-gray-50"
+                title={customerUser ? `Logged in as ${customerUser.phone}` : "Customer Login"}
+                aria-label={customerUser ? `Account menu — logged in as ${customerUser.phone}` : "Customer login"}
+              >
+                <User size={16} />
+              </button>
+            </div>
           </div>
 
           {/* Desktop Search Bar */}
@@ -603,32 +620,34 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
           </div>
         </header>
 
-        {/* Mobile Search bar row (Hidden on Products / Subcategory Page on Mobile).
-            Also collapses on scroll-down so only the category strip stays pinned. */}
+        {/* Mobile Search bar row matching Flutter home_header.dart SearchBarHeader 1:1 */}
         {!isProductListingPage && (
           <div
-            className={`sm:hidden w-full px-3 relative transition-all duration-300 ease-in-out border-none outline-none overflow-hidden ${headerHidden ? 'max-h-0 opacity-0 py-0 pointer-events-none' : 'max-h-20 opacity-100 py-1.5'}`}
+            className={`sm:hidden w-full px-3.5 relative transition-all duration-300 ease-in-out border-none outline-none overflow-hidden ${headerHidden ? 'max-h-0 opacity-0 py-0 pointer-events-none' : 'max-h-20 opacity-100 py-1.5'}`}
             style={{ backgroundColor: dynamicHeaderBg }}
             ref={searchRef}
           >
             <form
               onSubmit={handleSearchSubmit}
-              style={{
-                borderColor: isDarkHeader
-                  ? (campaignAccentColor || 'rgba(255,255,255,0.4)')
-                  : '#CBD5E1'
-              }}
-              className="flex items-center w-full px-3.5 py-1.5 bg-white rounded-full shadow-2xs border"
+              className="flex items-center w-full h-11 px-3.5 bg-white rounded-[14px] shadow-xs border border-gray-300 focus-within:border-[#0C831F]"
             >
-              <Search size={15} className="text-text-tertiary mr-2 shrink-0" />
+              <Search size={20} className="text-gray-800 mr-2.5 shrink-0" />
               <input
                 type="text"
                 placeholder={currentPlaceholder}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={() => searchQuery.length > 1 && setShowSearchResults(true)}
-                className="w-full text-xs bg-transparent border-none outline-none text-text-primary placeholder:text-text-tertiary font-medium"
+                className="w-full text-[13px] bg-transparent border-none outline-none text-gray-900 placeholder:text-gray-500 font-medium"
               />
+              <button
+                type="button"
+                onClick={() => navigate('/search')}
+                className="text-gray-800 hover:text-black p-0.5 ml-1 shrink-0 cursor-pointer"
+                aria-label="Voice Search"
+              >
+                <Mic size={20} />
+              </button>
             </form>
 
             {/* Mobile Real-time search results */}

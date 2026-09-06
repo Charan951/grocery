@@ -486,7 +486,13 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
         schema={faqSchema}
       />
 
-      {/* 0. Active Festival Campaign Component (STRICTLY MOBILE ONLY) */}
+      {/* Top Super Category Navigation Bar (All, Cafe, Home, Toys...) */}
+      <SuperCategoryNav
+        activeSuperCategory={activeSuperCatSlug}
+        onSelectSuperCategory={handleSelectSuperCategory}
+      />
+
+      {/* Active Festival Campaign Component (STRICTLY MOBILE ONLY - Placed below SuperCategoryNav) */}
       {isMobileDevice && activeFestivalCampaign && (
         <FestivalCampaignWrapper
           campaign={activeFestivalCampaign}
@@ -494,12 +500,6 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
           onQuickView={onQuickView}
         />
       )}
-
-      {/* Zepto-Style Web Top Category Navigation Bar */}
-      <SuperCategoryNav
-        activeSuperCategory={activeSuperCatSlug}
-        onSelectSuperCategory={handleSelectSuperCategory}
-      />
 
       {/* Centered Web Container Layout */}
       <div className="w-full max-w-[1280px] mx-auto px-3 sm:px-6 lg:px-8 pt-0 sm:pt-3 pb-8">
@@ -736,12 +736,12 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
               </section>
             )}
 
-            {/* Zepto-Style Homepage Category Grid (Zepto Rounded-2xl Square Cards) */}
+            {/* Shop by Category Grid (Matching Flutter mobileapp circular category cards) */}
             {zeptoCategoryGridItems.length > 0 && (
-              <section className="mb-4 w-full mt-1 sm:mt-2">
-                <div className="flex items-center justify-between mb-2.5">
-                  <h2 className="text-lg sm:text-xl font-black text-text-primary tracking-tight font-display">
-                    Shop by Categories
+              <section className="mb-5 w-full mt-1 sm:mt-2">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-lg sm:text-xl font-black text-gray-900 tracking-tight font-display">
+                    Shop by category
                   </h2>
                 </div>
                 <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-8 lg:grid-cols-10 gap-3 sm:gap-4">
@@ -754,17 +754,17 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                       }}
                       className="flex flex-col items-center group cursor-pointer text-center bg-transparent border-none p-0 outline-none"
                     >
-                      <div className="w-full aspect-square bg-[#f4f4f6] dark:bg-slate-800/80 rounded-2xl p-2 sm:p-3 flex items-center justify-center overflow-hidden border border-slate-200/60 dark:border-slate-700/60 group-hover:scale-105 group-hover:shadow-sm transition-all duration-200">
+                      <div className="w-16 h-16 sm:w-18 sm:h-18 md:w-20 md:h-20 rounded-full bg-[#F3F4F6] p-1.5 flex items-center justify-center overflow-hidden border border-gray-100/90 group-hover:scale-105 group-hover:shadow-sm transition-all duration-200 shadow-2xs mx-auto">
                         <img
                           src={item.image || 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=300'}
                           alt={item.name}
-                          className="w-full h-full object-contain"
+                          className="w-12 h-12 sm:w-14 sm:h-14 md:w-15 md:h-15 object-cover rounded-full"
                           onError={(e) => {
                             (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=300';
                           }}
                         />
                       </div>
-                      <span className="text-[11px] sm:text-xs font-bold text-text-primary line-clamp-2 leading-tight mt-2 group-hover:text-emerald-600 transition-colors">
+                      <span className="text-[11px] sm:text-xs font-extrabold text-gray-800 line-clamp-2 leading-tight mt-1.5 group-hover:text-[#0C831F] transition-colors max-w-[82px]">
                         {item.name}
                       </span>
                     </button>

@@ -23,6 +23,7 @@ const TrackOrder = lazy(() => import('./pages/TrackOrder'));
 import { CustomerProfile } from './pages/CustomerProfile';
 import { CustomerSupport } from './pages/CustomerSupport';
 import { CustomerAddresses } from './pages/CustomerAddresses';
+import { Search } from './pages/Search';
 
 // Admin bundle (code-split — a storefront shopper never loads this)
 const AdminApp = lazy(() => import('./AdminApp'));
@@ -95,33 +96,18 @@ const AppContent: React.FC = () => {
   }
 
 
-  const isStandalonePage =
-    location.pathname.startsWith('/categories') ||
-    location.pathname.startsWith('/product/') ||
-    location.pathname.startsWith('/prn/') ||
-    (location.pathname.startsWith('/products') && productsListView) ||
-    location.pathname.startsWith('/s/') ||
-    location.pathname.startsWith('/terms-of-service') ||
-    location.pathname.startsWith('/privacy-policy') || 
-    location.pathname === '/legal' ||
-    location.pathname.startsWith('/orders') ||
-    location.pathname.startsWith('/account/orders') ||
-    location.pathname.startsWith('/profile') ||
-    location.pathname.startsWith('/account/profile') ||
-    location.pathname.startsWith('/support') ||
-    location.pathname.startsWith('/account/support') ||
-    location.pathname.startsWith('/customer-support') ||
-    location.pathname.startsWith('/locations') ||
-    location.pathname.startsWith('/saved-addresses') ||
-    location.pathname.startsWith('/account/addresses');
+  const isMainTabRoute =
+    location.pathname === '/' ||
+    location.pathname === '/categories' ||
+    location.pathname === '/search' ||
+    location.pathname === '/orders' ||
+    location.pathname === '/account/orders' ||
+    location.pathname === '/profile' ||
+    location.pathname === '/account' ||
+    location.pathname === '/account/profile';
 
-  const isBottomNavHidden =
-    location.pathname.startsWith('/product/') ||
-    location.pathname.startsWith('/prn/') ||
-    location.pathname.startsWith('/products') ||
-    location.pathname.startsWith('/locations') ||
-    location.pathname.startsWith('/saved-addresses') ||
-    location.pathname.startsWith('/account/addresses');
+  const isStandalonePage = !isMainTabRoute;
+  const isBottomNavHidden = !isMainTabRoute;
 
   const [isMobile, setIsMobile] = useState<boolean>(() => typeof window !== 'undefined' ? window.innerWidth < 640 : false);
   useEffect(() => {
@@ -132,6 +118,8 @@ const AppContent: React.FC = () => {
 
   const isPDP = location.pathname.startsWith('/product/') || location.pathname.startsWith('/prn/');
   const isCategoriesPage = location.pathname === '/categories' || location.pathname.startsWith('/categories/');
+  const isSearchPage = location.pathname === '/search' || location.pathname.startsWith('/search');
+  const isProfilePage = location.pathname === '/profile' || location.pathname.startsWith('/account/profile');
   const isOrdersPage = location.pathname === '/orders' || location.pathname.startsWith('/orders/') || location.pathname.startsWith('/account/orders');
   const isAddressesPage =
     location.pathname.startsWith('/locations') ||
@@ -153,12 +141,13 @@ const AppContent: React.FC = () => {
       {/* Main Pages */}
       <main
         className="flex-grow"
-        style={{ paddingTop: isMobile && (isPDP || isCategoriesPage || isOrdersPage || isFestivalMobileHome || isAddressesPage) ? 0 : 'var(--sticky-header-h, 140px)' }}
+        style={{ paddingTop: isMobile && (isPDP || isCategoriesPage || isSearchPage || isProfilePage || isOrdersPage || isAddressesPage) ? 0 : 'var(--sticky-header-h, 140px)' }}
       >
         <Routes>
           <Route path="/" element={<Home onQuickView={setQuickViewProduct} />} />
           <Route path="/about" element={<About />} />
           <Route path="/categories" element={<Categories />} />
+          <Route path="/search" element={<Search />} />
           <Route path="/category/:categorySlug" element={<ShopProducts onQuickView={setQuickViewProduct} onListViewChange={setProductsListView} />} />
           <Route path="/products" element={<ShopProducts onQuickView={setQuickViewProduct} onListViewChange={setProductsListView} />} />
           <Route path="/product/:id" element={<ProductDetails onQuickView={setQuickViewProduct} />} />

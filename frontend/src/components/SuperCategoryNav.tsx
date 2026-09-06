@@ -1,43 +1,48 @@
 import React from 'react';
-import { useCMS, SuperCategory, defaultSuperCategories } from '../context/CMSContext';
+import { useCMS, defaultSuperCategories } from '../context/CMSContext';
+import { resolveFestivalTheme } from '../utils/festivalThemeResolver';
 import {
-  LayoutGrid, Coffee, Leaf, Home, Headphones, Smartphone,
-  Sparkles, Shirt, Gamepad2, Utensils, Gift, ShoppingBag,
-  Apple, Milk, Wheat, IceCream, Candy, ChevronRight, ChevronLeft
+  LayoutGrid, Coffee, Armchair, Shapes, Leaf, Headphones, Smartphone,
+  Sparkles, Shirt, Utensils, ChevronRight, ChevronLeft
 } from 'lucide-react';
 
 interface SuperCategoryNavProps {
-  activeSuperCategory: string; // slug or id, e.g. 'all', 'cafe', 'fresh'
+  activeSuperCategory: string;
   onSelectSuperCategory: (slug: string) => void;
 }
 
-const ICON_MAP: Record<string, React.ElementType> = {
-  LayoutGrid,
-  Coffee,
-  Leaf,
-  Home,
-  Headphones,
-  Smartphone,
-  Sparkles,
-  Shirt,
-  Gamepad2,
-  Utensils,
-  Gift,
-  ShoppingBag,
-  Apple,
-  Milk,
-  Wheat,
-  IceCream,
-  Candy,
-};
+function getSuperCatIcon(name: string, iconKey?: string) {
+  const k = `${iconKey || ''} ${name || ''}`.toLowerCase();
+  if (k.includes('grid') || k.includes('all')) return LayoutGrid;
+  if (k.includes('coffee') || k.includes('cafe')) return Coffee;
+  if (k.includes('decor') || k.includes('chair') || k.includes('home') || k.includes('furniture') || k.includes('sofa')) return Armchair;
+  if (k.includes('toy') || k.includes('shape') || k.includes('game')) return Shapes;
+  if (k.includes('leaf') || k.includes('fresh') || k.includes('eco')) return Leaf;
+  if (k.includes('headphone') || k.includes('electronic')) return Headphones;
+  if (k.includes('mobile') || k.includes('phone') || k.includes('smartphone')) return Smartphone;
+  if (k.includes('sparkle') || k.includes('beauty')) return Sparkles;
+  if (k.includes('shirt') || k.includes('fashion') || k.includes('hanger') || k.includes('cloth')) return Shirt;
+  return LayoutGrid;
+}
 
 export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
   activeSuperCategory,
   onSelectSuperCategory,
 }) => {
-  const { superCategories } = useCMS();
+  const { superCategories, activeFestivalCampaign } = useCMS();
 
-  // Use super categories list sorted by displayOrder
+  const [isMobile, setIsMobile] = React.useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
+
+  React.useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isFestivalActive = isMobile && activeFestivalCampaign && activeFestivalCampaign.isActive !== false && activeFestivalCampaign.status !== 'draft';
+
   const items = React.useMemo(() => {
     const list = superCategories && superCategories.length > 0 ? superCategories : defaultSuperCategories;
     return list
@@ -49,9 +54,6 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
   const btnRefs = React.useRef<(HTMLButtonElement | null)[]>([]);
   const [indicator, setIndicator] = React.useState({ left: 0, width: 0, ready: false });
 
-  // Optimistic selection: highlight + slide the underline the instant a tab is
-  // tapped, without waiting for the parent's route change to re-render and feed
-  // back a new `activeSuperCategory` prop. Cleared once the prop catches up.
   const [pending, setPending] = React.useState<string | null>(null);
   const effectiveActive = pending ?? activeSuperCategory;
   React.useEffect(() => { setPending(null); }, [activeSuperCategory]);
@@ -71,8 +73,6 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
     [items, effectiveActive]
   );
 
-  // Slide the underline to the active tab. Measurement + any scroll is deferred
-  // to the next frame (never in a layout effect) so it can't stall the click.
   const syncIndicator = React.useCallback((scroll: boolean) => {
     const track = navRef.current;
     const el = btnRefs.current[activeIndex];
@@ -98,10 +98,48 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
     return () => window.removeEventListener('resize', onResize);
   }, [syncIndicator]);
 
+  const [isScrolledPastFestival, setIsScrolledPastFestival] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!isMobile || !isFestivalActive) {
+      setIsScrolledPastFestival(false);
+      return;
+    }
+    let raf = 0;
+    const handleScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        setIsScrolledPastFestival(window.scrollY > 140);
+      });
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [isMobile, isFestivalActive]);
+
+  const festivalTheme = React.useMemo(() => resolveFestivalTheme(activeFestivalCampaign), [activeFestivalCampaign]);
+
+  const navBgColor = React.useMemo(() => {
+    if (isFestivalActive && isMobile) {
+      return isScrolledPastFestival ? '#ffffff' : festivalTheme.gStart;
+    }
+    return undefined;
+  }, [isFestivalActive, isMobile, isScrolledPastFestival, festivalTheme]);
+
   return (
     <nav
-      className="w-full sticky z-30 transition-colors bg-white dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800 shadow-2xs"
-      style={{ top: 'var(--sticky-header-h, 64px)' }}
+      className={`w-full sticky z-30 transition-colors border-b shadow-2xs ${
+        isFestivalActive && !isScrolledPastFestival
+          ? 'border-cyan-200/40' 
+          : 'border-gray-200 dark:border-zinc-800'
+      }`}
+      style={{
+        backgroundColor: navBgColor,
+        top: 'var(--sticky-header-h, 64px)'
+      }}
     >
       <div className="max-w-[1280px] mx-auto px-2 sm:px-4 lg:px-8 relative flex items-center group">
         
@@ -117,60 +155,114 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
         {/* Scrollable Container */}
         <div
           ref={navRef}
-          className="relative w-full flex items-center gap-1 sm:gap-2 md:gap-3 overflow-x-auto scrollbar-none py-1.5 sm:py-2 px-1 scroll-smooth"
+          className={`relative w-full flex items-center overflow-x-auto scrollbar-none scroll-smooth ${
+            isMobile ? 'py-1 gap-1 h-[56px]' : 'py-1.5 sm:py-2 px-1 gap-1 sm:gap-2 md:gap-3'
+          }`}
         >
-          {/* Sliding active-tab underline */}
-          <span
-            aria-hidden
-            className="pointer-events-none absolute bottom-0 h-[3px] rounded-t-full bg-emerald-600 dark:bg-emerald-500"
-            style={{
-              left: indicator.left + 14,
-              width: Math.max(indicator.width - 28, 0),
-              opacity: indicator.ready ? 1 : 0,
-              transition: 'left 280ms cubic-bezier(0.4, 0, 0.2, 1), width 280ms cubic-bezier(0.4, 0, 0.2, 1), opacity 150ms ease',
-            }}
-          />
+          {/* Desktop Sliding active-tab underline */}
+          {!isMobile && (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute bottom-0 h-[3px] rounded-t-full bg-emerald-600 dark:bg-emerald-500"
+              style={{
+                left: indicator.left + 14,
+                width: Math.max(indicator.width - 28, 0),
+                opacity: indicator.ready ? 1 : 0,
+                transition: 'left 280ms cubic-bezier(0.4, 0, 0.2, 1), width 280ms cubic-bezier(0.4, 0, 0.2, 1), opacity 150ms ease',
+              }}
+            />
+          )}
+
           {items.map((cat, i) => {
             const catSlug = cat.slug || cat.id || cat.name.toLowerCase();
             const isActive = effectiveActive === catSlug || (effectiveActive === '' && catSlug === 'all');
 
-            // Resolve icon
-            const IconComponent = ICON_MAP[cat.icon] || (catSlug === 'all' ? LayoutGrid : Utensils);
+            // Resolve icon using exact match helper matching images #3 & #4
+            const IconComponent = getSuperCatIcon(cat.name, cat.icon);
 
+            if (isMobile) {
+              const activeColorClass = isFestivalActive ? 'text-black' : 'text-[#0C831F]';
+              const activeBgClass = isFestivalActive ? 'bg-black' : 'bg-[#0C831F]';
+
+              return (
+                <button
+                  key={cat.id || catSlug}
+                  ref={(el) => { btnRefs.current[i] = el; }}
+                  onClick={() => {
+                    if (catSlug === effectiveActive) return;
+                    setPending(catSlug);
+                    onSelectSuperCategory(catSlug);
+                  }}
+                  className="flex flex-col items-center justify-center h-full min-w-[62px] px-1.5 cursor-pointer border-none bg-transparent shrink-0 select-none group"
+                >
+                  {/* Icon on TOP */}
+                  {cat.icon && cat.icon.startsWith('http') ? (
+                    <img
+                      src={cat.icon}
+                      alt={cat.name}
+                      className="w-5 h-5 object-contain"
+                    />
+                  ) : (
+                    <IconComponent
+                      size={20}
+                      fill={isActive && (cat.name.toLowerCase().includes('cafe') || cat.icon === 'Coffee') ? 'currentColor' : 'none'}
+                      className={`transition-colors duration-200 ${
+                        isActive ? activeColorClass : 'text-gray-600 dark:text-gray-400'
+                      }`}
+                    />
+                  )}
+
+                  {/* Name BELOW Icon */}
+                  <span
+                    className={`text-[10.5px] leading-tight mt-0.5 truncate max-w-[68px] text-center ${
+                      isActive
+                        ? `font-extrabold ${activeColorClass}`
+                        : 'font-medium text-gray-700 dark:text-gray-300'
+                    }`}
+                  >
+                    {cat.name}
+                  </span>
+
+                  {/* Active Underline Indicator */}
+                  <span
+                    className={`h-[2.5px] rounded-full mt-0.5 transition-all duration-200 ${
+                      isActive ? `w-7 ${activeBgClass}` : 'w-0 bg-transparent'
+                    }`}
+                  />
+                </button>
+              );
+            }
+
+            // Desktop Layout (Pills)
             return (
               <button
                 key={cat.id || catSlug}
                 ref={(el) => { btnRefs.current[i] = el; }}
                 onClick={() => {
                   if (catSlug === effectiveActive) return;
-                  setPending(catSlug);            // instant highlight + underline
-                  onSelectSuperCategory(catSlug); // parent routes (wrapped in a transition)
+                  setPending(catSlug);
+                  onSelectSuperCategory(catSlug);
                 }}
-                className={`relative group inline-flex items-center gap-2 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 shrink-0 select-none ${
+                className={`relative group inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs font-black transition-all duration-200 shrink-0 select-none cursor-pointer ${
                   isActive
-                    ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50/80 dark:bg-emerald-950/40 shadow-xs'
-                    : 'text-gray-600 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-gray-100/70 dark:hover:bg-zinc-800/60'
+                    ? 'text-white bg-gray-900 shadow-xs'
+                    : 'text-gray-700 bg-gray-100 hover:bg-gray-200 hover:text-gray-900'
                 }`}
               >
-                {/* Icon rendering */}
                 {cat.icon && cat.icon.startsWith('http') ? (
                   <img
                     src={cat.icon}
                     alt={cat.name}
-                    className="w-4 h-4 sm:w-4.5 sm:h-4.5 object-contain"
+                    className="w-3.5 h-3.5 sm:w-4 sm:h-4 object-contain"
                   />
                 ) : (
                   <IconComponent
-                    size={17}
-                    className={`transition-transform duration-200 group-hover:scale-110 ${
-                      isActive
-                        ? 'text-emerald-600 dark:text-emerald-400'
-                        : 'text-gray-500 dark:text-gray-400 group-hover:text-emerald-600'
+                    size={15}
+                    className={`transition-transform duration-200 ${
+                      isActive ? 'text-white' : 'text-gray-600'
                     }`}
                   />
                 )}
-
-                {/* Name */}
                 <span className="tracking-tight whitespace-nowrap">{cat.name}</span>
               </button>
             );

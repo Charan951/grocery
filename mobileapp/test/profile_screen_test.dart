@@ -41,6 +41,7 @@ class _Api extends ApiService {
 }
 
 class _TestAuthNotifier extends AuthNotifier {
+  // ignore: use_super_parameters
   _TestAuthNotifier(StorageService s, ApiService api, TokenStore t) : super(s, api, t) {
     state = AuthState(
       isAuthenticated: true,
