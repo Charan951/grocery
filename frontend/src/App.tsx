@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { CMSProvider, useCMS } from './context/CMSContext';
 import { CartWishlistProvider } from './context/CartWishlistContext';
@@ -125,8 +125,27 @@ const AppContent: React.FC = () => {
     location.pathname.startsWith('/locations') ||
     location.pathname.startsWith('/saved-addresses') ||
     location.pathname.startsWith('/account/addresses');
-  const { activeFestivalCampaign } = useCMS();
-  const isFestivalMobileHome = isMobile && location.pathname === '/' && !!activeFestivalCampaign && activeFestivalCampaign.isActive !== false;
+  const { festivalCampaigns, activeFestivalCampaign } = useCMS();
+  const isFestivalMobileHome = useMemo(() => {
+    if (!isMobile || location.pathname !== '/') return false;
+    const activeList = (festivalCampaigns || []).filter((c) => c.isActive && c.status !== 'draft');
+    if (activeList.length === 0 && activeFestivalCampaign && activeFestivalCampaign.isActive !== false) {
+      activeList.push(activeFestivalCampaign);
+    }
+    if (activeList.length === 0) return false;
+
+    const searchParams = new URLSearchParams(location.search);
+    const superCat = searchParams.get('superCategory') || 'all';
+
+    return activeList.some((camp) => {
+      const scopes = camp.applicableSuperCategories || ['all'];
+      const isAll = superCat === 'all' || superCat === 'sc_all' || superCat === 'All';
+      if (isAll) {
+        return scopes.includes('all') || scopes.includes('sc_all') || scopes.includes('All') || scopes.length === 0;
+      }
+      return scopes.includes(superCat) || scopes.includes(`sc_${superCat}`) || (superCat.startsWith('sc_') && scopes.includes(superCat.replace('sc_', '')));
+    });
+  }, [isMobile, location.pathname, location.search, festivalCampaigns, activeFestivalCampaign]);
 
   return (
     <div className="min-h-screen flex flex-col">

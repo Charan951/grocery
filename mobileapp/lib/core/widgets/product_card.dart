@@ -161,86 +161,98 @@ class ProductCard extends ConsumerWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
+            Flexible(
+              child: SingleChildScrollView(
+                physics: const NeverScrollableScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Price row: green pill + strikethrough MRP.
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryText,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '₹${product.price.toStringAsFixed(0)}',
+                            style: AppTypography.labelMedium(Colors.white).copyWith(fontWeight: FontWeight.w900, fontSize: 11),
+                          ),
+                        ),
+                        if (product.hasDiscount) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            '₹${product.mrp.toStringAsFixed(0)}',
+                            style: AppTypography.bodySmall(
+                              isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                            ).copyWith(decoration: TextDecoration.lineThrough, fontSize: 11),
+                          ),
+                        ],
+                      ],
+                    ),
+                    if (product.hasDiscount)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 1),
+                        child: Text(
+                          '₹${(product.mrp - product.price).toStringAsFixed(0)} OFF',
+                          style: AppTypography.labelSmall(AppColors.primaryText).copyWith(fontWeight: FontWeight.w800, fontSize: 9),
+                        ),
+                      ),
+                    const SizedBox(height: 2),
 
-            // Price row: green pill + strikethrough MRP.
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryText,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    '₹${product.price.toStringAsFixed(0)}',
-                    style: AppTypography.labelMedium(Colors.white).copyWith(fontWeight: FontWeight.w900, fontSize: 11),
-                  ),
-                ),
-                if (product.hasDiscount) ...[
-                  const SizedBox(width: 6),
-                  Text(
-                    '₹${product.mrp.toStringAsFixed(0)}',
-                    style: AppTypography.bodySmall(
-                      isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                    ).copyWith(decoration: TextDecoration.lineThrough, fontSize: 11),
-                  ),
-                ],
-              ],
-            ),
-            if (product.hasDiscount)
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Text(
-                  '₹${(product.mrp - product.price).toStringAsFixed(0)} OFF',
-                  style: AppTypography.labelSmall(AppColors.primaryText).copyWith(fontWeight: FontWeight.w800, fontSize: 9),
+                    // Title
+                    Text(
+                      product.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.title(
+                        isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                      ).copyWith(fontSize: 11, height: 1.15, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 2),
+
+                    // Weight label
+                    Text(
+                      product.defaultWeight,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.bodySmall(
+                        isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                      ).copyWith(fontSize: 10, fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 3),
+
+                    // Brand tag & rating
+                    Row(
+                      children: [
+                        if (product.brand.isNotEmpty)
+                          Flexible(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                product.brand,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTypography.labelSmall(AppColors.primaryText).copyWith(fontWeight: FontWeight.w700, fontSize: 9),
+                              ),
+                            ),
+                          ),
+                        const Spacer(),
+                        RatingWidget(rating: product.rating, iconSize: 11, fontSize: 9.5),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            const SizedBox(height: 3),
-
-            // Title
-            Text(
-              product.name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: AppTypography.title(
-                isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-              ).copyWith(fontSize: 11, height: 1.2, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 2),
-
-            // Weight label
-            Text(
-              product.defaultWeight,
-              style: AppTypography.bodySmall(
-                isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-              ).copyWith(fontSize: 10, fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 4),
-
-            // Brand tag & rating
-            Row(
-              children: [
-                if (product.brand.isNotEmpty)
-                  Flexible(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        product.brand,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTypography.labelSmall(AppColors.primaryText).copyWith(fontWeight: FontWeight.w700, fontSize: 9),
-                      ),
-                    ),
-                  ),
-                const Spacer(),
-                RatingWidget(rating: product.rating, iconSize: 11, fontSize: 9.5),
-              ],
             ),
           ],
         ),

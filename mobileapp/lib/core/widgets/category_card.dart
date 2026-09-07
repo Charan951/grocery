@@ -2,7 +2,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
-import 'package:freshcart/core/widgets/glass_card.dart';
 import 'package:freshcart/features/categories/data/models/category_model.dart';
 
 class CategoryCard extends StatelessWidget {
@@ -29,33 +28,46 @@ class CategoryCard extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            GlassCard(
+            Container(
               width: 72,
               height: 72,
-              borderRadius: 24,
-              color: category.color.withOpacity(isDark ? 0.12 : 0.08),
-              borderColor: category.color.withOpacity(isDark ? 0.25 : 0.15),
-              padding: EdgeInsets.zero,
-              child: Center(
+              decoration: BoxDecoration(
+                color: category.color.withOpacity(isDark ? 0.15 : 0.1),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: (isDark ? Colors.white : Colors.black).withOpacity(0.08),
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(17),
                 child: hasNetworkImage
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: CachedNetworkImage(
-                          imageUrl: category.imageUrl,
-                          width: 48,
-                          height: 48,
-                          fit: BoxFit.cover,
-                          errorWidget: (context, url, error) => Icon(
+                    ? CachedNetworkImage(
+                        imageUrl: category.imageUrl,
+                        width: 72,
+                        height: 72,
+                        fit: BoxFit.cover,
+                        errorWidget: (context, url, error) => Center(
+                          child: Icon(
                             _getCategoryIcon(category.icon, category.name),
                             color: isDark ? AppColors.accent : category.color,
-                            size: 32,
+                            size: 34,
                           ),
                         ),
                       )
-                    : Icon(
-                        _getCategoryIcon(category.icon, category.name),
-                        color: isDark ? AppColors.accent : category.color,
-                        size: 32,
+                    : Center(
+                        child: Icon(
+                          _getCategoryIcon(category.icon, category.name),
+                          color: isDark ? AppColors.accent : category.color,
+                          size: 34,
+                        ),
                       ),
               ),
             ),

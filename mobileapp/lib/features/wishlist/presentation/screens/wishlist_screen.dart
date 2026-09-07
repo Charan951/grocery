@@ -23,7 +23,7 @@ class WishlistScreen extends ConsumerWidget {
     final productsAsync = ref.watch(allProductsProvider);
 
     return productsAsync.when(
-      loading: () => const AppScaffold(title: 'Wishlist', body: SkeletonGrid(itemCount: 6, childAspectRatio: 0.62)),
+      loading: () => const AppScaffold(title: 'Wishlist', body: SkeletonGrid(itemCount: 6, childAspectRatio: 0.53)),
       error: (e, _) => AppScaffold(
         title: 'Wishlist',
         body: ErrorState(onRetry: () => ref.invalidate(allProductsProvider)),
@@ -85,7 +85,7 @@ class WishlistScreen extends ConsumerWidget {
                       crossAxisCount: 2,
                       crossAxisSpacing: 12,
                       mainAxisSpacing: 12,
-                      childAspectRatio: 0.62,
+                      childAspectRatio: 0.53,
                     ),
                     delegate: SliverChildBuilderDelegate(
                       (context, i) {

@@ -31,7 +31,8 @@ const festivalCampaignSchema = new mongoose.Schema({
   // Step 3: Festival Product Groups
   festivalGroups: [festivalGroupSchema],
 
-  // Step 4: Styling Tokens
+  // Step 4: Styling Tokens & Style Choice
+  cardStyle: { type: String, enum: ['style1', 'style2'], default: 'style1' },
   cardStyling: {
     cardBackground: { type: String, default: '#FFFBEB' },
     cardBorder: { type: String, default: '#BAE6FD' },

@@ -9,47 +9,6 @@ const buildIdQuery = (id) => {
   return { id: id };
 };
 
-// Check if campaign date range & super-category scope overlaps with existing published campaigns
-const checkCampaignOverlap = async (startDate, endDate, scopes, excludeId = null) => {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-
-  const query = {
-    isActive: true,
-    status: { $ne: 'draft' },
-    startDate: { $lt: end },
-    endDate: { $gt: start }
-  };
-
-  if (excludeId) {
-    if (mongoose.Types.ObjectId.isValid(excludeId)) {
-      query._id = { $ne: excludeId };
-    } else {
-      query.id = { $ne: excludeId };
-    }
-  }
-
-  const existingCampaigns = await FestivalCampaign.find(query);
-
-  for (const camp of existingCampaigns) {
-    const existingScopes = camp.applicableSuperCategories || ['all'];
-    const newScopes = scopes || ['all'];
-
-    const newHasAll = newScopes.includes('all') || newScopes.includes('sc_all');
-    const existingHasAll = existingScopes.includes('all') || existingScopes.includes('sc_all');
-
-    if (newHasAll || existingHasAll) {
-      return camp;
-    }
-
-    const overlapScope = newScopes.some((s) => existingScopes.includes(s));
-    if (overlapScope) {
-      return camp;
-    }
-  }
-  return null;
-};
-
 export const festivalCampaignController = {
   // Create a new festival campaign
   createCampaign: async (req, res) => {
@@ -57,21 +16,6 @@ export const festivalCampaignController = {
       const campaignData = req.body;
       if (!campaignData.id) {
         campaignData.id = 'fc_' + Date.now();
-      }
-
-      // Overlap validation if publishing active
-      if (campaignData.isActive !== false && campaignData.status !== 'draft') {
-        const overlap = await checkCampaignOverlap(
-          campaignData.startDate,
-          campaignData.endDate,
-          campaignData.applicableSuperCategories
-        );
-        if (overlap) {
-          return res.status(400).json({
-            success: false,
-            message: `Campaign overlap conflict: Campaign "${overlap.name}" is already scheduled for overlapping scope and time window.`
-          });
-        }
       }
 
       const campaign = await FestivalCampaign.create(campaignData);
@@ -100,24 +44,57 @@ export const festivalCampaignController = {
     }
   },
 
-  // Get active festival campaign for customer experience (Strict Date/Time)
+  // Get active festival campaign for customer experience
   getActiveCampaign: async (req, res) => {
     try {
-      const now = new Date();
-      const activeCampaign = await FestivalCampaign.findOne({
+      const { superCategory } = req.query;
+      const targetSlug = (superCategory || 'all').toLowerCase().trim();
+
+      const activeCampaigns = await FestivalCampaign.find({
         isActive: true,
-        status: { $ne: 'draft' },
-        startDate: { $lte: now },
-        endDate: { $gte: now }
+        status: { $ne: 'draft' }
       }).sort({ updatedAt: -1 });
+
+      if (!activeCampaigns || activeCampaigns.length === 0) {
+        return res.json({ success: true, campaign: null, activeCampaigns: [] });
+      }
+
+      const now = new Date();
+      // Filter out campaigns whose date ranges are expired
+      const unexpiredCampaigns = activeCampaigns.filter((camp) => {
+        if (!camp.endDate) return true;
+        const eDate = new Date(camp.endDate);
+        return now <= eDate;
+      });
+
+      const validList = unexpiredCampaigns.length > 0 ? unexpiredCampaigns : activeCampaigns;
+
+      let matchedCampaign = validList.find((camp) => {
+        const scopes = camp.applicableSuperCategories || ['all'];
+        const containsAll = scopes.some((s) => {
+          const l = String(s).toLowerCase().trim();
+          return l === 'all' || l === 'sc_all' || l === 'all_super_categories';
+        });
+        if (containsAll) return true;
+        if (targetSlug === 'all' || targetSlug === 'sc_all') return true;
+        return scopes.some((s) => {
+          const l = String(s).toLowerCase().trim();
+          return l === targetSlug || l === `sc_${targetSlug}` || (targetSlug.startsWith('sc_') && l === targetSlug.replace('sc_', ''));
+        });
+      });
+
+      if (!matchedCampaign) {
+        matchedCampaign = validList[0];
+      }
 
       res.json({
         success: true,
-        campaign: activeCampaign || null
+        campaign: matchedCampaign,
+        activeCampaigns: validList
       });
     } catch (err) {
       console.error('Error fetching active festival campaign:', err);
-      res.json({ success: true, campaign: null });
+      res.json({ success: true, campaign: null, activeCampaigns: [] });
     }
   },
 
@@ -141,21 +118,6 @@ export const festivalCampaignController = {
     try {
       const query = buildIdQuery(req.params.id);
       const payload = req.body;
-
-      if (payload.isActive !== false && payload.status !== 'draft' && payload.startDate && payload.endDate) {
-        const overlap = await checkCampaignOverlap(
-          payload.startDate,
-          payload.endDate,
-          payload.applicableSuperCategories,
-          req.params.id
-        );
-        if (overlap) {
-          return res.status(400).json({
-            success: false,
-            message: `Campaign overlap conflict: Campaign "${overlap.name}" is already scheduled for overlapping scope and time window.`
-          });
-        }
-      }
 
       const campaign = await FestivalCampaign.findOneAndUpdate(
         query,
@@ -186,21 +148,6 @@ export const festivalCampaignController = {
       }
 
       const newIsActive = req.body.isActive !== undefined ? req.body.isActive : !campaign.isActive;
-
-      if (newIsActive && campaign.status !== 'draft') {
-        const overlap = await checkCampaignOverlap(
-          campaign.startDate,
-          campaign.endDate,
-          campaign.applicableSuperCategories,
-          req.params.id
-        );
-        if (overlap) {
-          return res.status(400).json({
-            success: false,
-            message: `Cannot activate: Overlaps with active campaign "${overlap.name}".`
-          });
-        }
-      }
 
       campaign.isActive = newIsActive;
       await campaign.save();

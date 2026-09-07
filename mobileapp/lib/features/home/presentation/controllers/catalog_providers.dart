@@ -29,16 +29,26 @@ final superCategoriesProvider = FutureProvider<List<Map<String, dynamic>>>((ref)
 
 final selectedSuperCategoryProvider = StateProvider<String>((ref) => 'all');
 
+final activeFestivalCampaignsProvider = FutureProvider<List<FestivalCampaignModel>>((ref) async {
+  final rawList = await ref.watch(apiServiceProvider).fetchActiveFestivalCampaigns();
+  return rawList
+      .map((m) => FestivalCampaignModel.fromJson(m))
+      .where((c) => c.isCurrentlyActive)
+      .toList();
+});
+
 final activeFestivalCampaignProvider = FutureProvider<FestivalCampaignModel?>((ref) async {
-  final rawMap = await ref.watch(apiServiceProvider).fetchActiveFestivalCampaign();
-  if (rawMap == null) return null;
+  final activeList = await ref.watch(activeFestivalCampaignsProvider.future);
+  if (activeList.isEmpty) return null;
+  final selectedSuperCat = ref.watch(selectedSuperCategoryProvider);
 
-  final campaign = FestivalCampaignModel.fromJson(rawMap);
-  if (!campaign.isCurrentlyActive) return null;
+  for (final c in activeList) {
+    if (c.appliesToSuperCategory(selectedSuperCat)) {
+      return c;
+    }
+  }
 
-  debugPrint('Active Festival Campaign: ${campaign.name}, Theme: ${campaign.themeKey}, Groups: ${campaign.festivalGroups.length}, Scope: ${campaign.applicableSuperCategories}');
-
-  return campaign;
+  return null;
 });
 
 /// The whole catalog — used by Home rails and the Wishlist (which needs to

@@ -280,6 +280,7 @@ export interface FestivalCampaign {
   festivalGroups?: FestivalGroup[];
 
   // Step 4: Styling Tokens & Scope
+  cardStyle?: 'style1' | 'style2';
   cardStyling?: CardStyling;
   applicableSuperCategories?: string[];
 
@@ -333,9 +334,17 @@ export const getCampaignProductPricing = (
   // Super category scope check if provided
   if (currentSuperCatId) {
     const scopes = campaign.applicableSuperCategories || ['all'];
-    const appliesToAll = scopes.includes('all') || scopes.includes('sc_all') || scopes.includes('All');
-    if (!appliesToAll && !scopes.includes(currentSuperCatId)) {
-      return { price: basePrice, originalPrice: rawOriginal, discountPercent: 0, isDiscounted: false };
+    const isAllCat = currentSuperCatId === 'all' || currentSuperCatId === 'sc_all' || currentSuperCatId === 'All';
+    if (isAllCat) {
+      const appliesToAll = scopes.includes('all') || scopes.includes('sc_all') || scopes.includes('All') || scopes.length === 0;
+      if (!appliesToAll) {
+        return { price: basePrice, originalPrice: rawOriginal, discountPercent: 0, isDiscounted: false };
+      }
+    } else {
+      const appliesToCurrent = scopes.includes(currentSuperCatId) || scopes.includes(`sc_${currentSuperCatId}`);
+      if (!appliesToCurrent) {
+        return { price: basePrice, originalPrice: rawOriginal, discountPercent: 0, isDiscounted: false };
+      }
     }
   }
 
@@ -581,7 +590,7 @@ export const defaultSuperCategories: SuperCategory[] = [
     name: 'Fresh',
     slug: 'fresh',
     icon: 'Leaf',
-    banner: 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=1400&auto=format&fit=crop',
+    banner: 'https://images.unsplash.com/photo-1597362925123-77861d3fbac7?w=1400&auto=format&fit=crop',
     categories: ['fruits-vegetables'],
     subCategories: ['Fresh Vegetables', 'Fresh Fruits', 'Exotics & Premium', 'Mangoes & Melons', 'Leafy, Herbs & Seasonings', 'Cuts & Sprouts'],
     products: ['prod_fv_1', 'prod_fv_2', 'prod_fv_3', 'prod_fv_4', 'prod_fv_5', 'prod_ff_1', 'prod_ff_2', 'prod_ff_3', 'prod_ff_4', 'prod_ff_5'],
@@ -677,7 +686,7 @@ const defaultBanners: Banner[] = [
     subtitle: 'Handpicked organic Hass avocados, berries and fresh Gala apples',
     tag: 'FARM DIRECT',
     gradient: ['#F59E0B', '#D97706'],
-    imageUrl: 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=800&auto=format&fit=crop',
+    imageUrl: 'https://images.unsplash.com/photo-1597362925123-77861d3fbac7?w=800&auto=format&fit=crop',
     buttonText: 'Explore Fruits',
     linkUrl: '/products?category=cat_fruits',
     positionIndex: 3,
@@ -847,7 +856,7 @@ export const hexToDarkShade = (hex: string | undefined, factor: number = 0.55): 
 
 export const getCategoryImage = (category: Category | string): string => {
   if (!category) {
-    return 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=200&auto=format&fit=crop';
+    return 'https://images.unsplash.com/photo-1597362925123-77861d3fbac7?w=200&auto=format&fit=crop';
   }
 
   if (typeof category === 'object') {
@@ -877,7 +886,7 @@ export const getCategoryImage = (category: Category | string): string => {
     }
   }
 
-  return 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=200&auto=format&fit=crop';
+  return 'https://images.unsplash.com/photo-1597362925123-77861d3fbac7?w=200&auto=format&fit=crop';
 };
 
 export const deduplicateSubCategories = (subs: any[] = []): any[] => {
@@ -1446,7 +1455,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const syncWithBackend = async () => {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
 
       try {
         const fetchJson = async (url: string) => {
@@ -1479,8 +1488,8 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           promoCards: pcData?.success && Array.isArray(pcData.promoCards) ? pcData.promoCards : (prev.promoCards || []),
           coupons: cpData?.success && cpData.coupons?.length ? cpData.coupons : prev.coupons,
           blogs: bData?.success && bData.blogs?.length ? bData.blogs : prev.blogs,
-          festivalCampaigns: fcListData?.success && fcListData.campaigns?.length ? fcListData.campaigns : prev.festivalCampaigns,
-          activeFestivalCampaign: fcActiveData?.success && fcActiveData.campaign ? fcActiveData.campaign : (prev.activeFestivalCampaign || prev.festivalCampaigns?.[0] || defaultFestivalCampaigns[0]),
+          festivalCampaigns: fcListData?.success && Array.isArray(fcListData.campaigns) ? fcListData.campaigns : prev.festivalCampaigns,
+          activeFestivalCampaign: fcActiveData?.success && fcActiveData.campaign ? fcActiveData.campaign : (fcListData?.success && Array.isArray(fcListData.campaigns) ? (fcListData.campaigns.find((c: any) => c.isActive) || null) : prev.activeFestivalCampaign),
         }));
         console.log('✅ FreshCart context synchronized with live MERN server database.');
       } catch (err) {
@@ -1625,16 +1634,33 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const fetchActiveFestivalCampaign = async () => {
+  const refreshFestivalCampaigns = async () => {
     try {
-      const res = await fetch('/api/festival-campaigns/active');
-      const data = await res.json();
-      if (data.success && data.campaign !== undefined) {
-        setState(prev => ({ ...prev, activeFestivalCampaign: data.campaign }));
+      const [listRes, activeRes] = await Promise.all([
+        fetch('/api/festival-campaigns'),
+        fetch('/api/festival-campaigns/active')
+      ]);
+      const listData = listRes.ok ? await listRes.json() : null;
+      const activeData = activeRes.ok ? await activeRes.json() : null;
+
+      if (listData?.success && Array.isArray(listData.campaigns)) {
+        const activeCamp = activeData?.success && activeData.campaign !== undefined
+          ? activeData.campaign
+          : (listData.campaigns.find((c: any) => c.isActive) || null);
+
+        setState(prev => ({
+          ...prev,
+          festivalCampaigns: listData.campaigns,
+          activeFestivalCampaign: activeCamp
+        }));
       }
     } catch (e) {
-      console.warn('Failed to fetch active festival campaign', e);
+      console.warn('Failed to refresh festival campaigns', e);
     }
+  };
+
+  const fetchActiveFestivalCampaign = async () => {
+    await refreshFestivalCampaigns();
   };
 
   const addFestivalCampaign = async (campaignData: any) => {
@@ -1645,20 +1671,14 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify(campaignData)
       });
       const data = await res.json();
-      const newCamp = data.campaign || { ...campaignData, id: 'fc_' + Date.now(), _id: 'fc_' + Date.now() };
-      setState(prev => {
-        const nextList = [newCamp, ...(prev.festivalCampaigns || [])];
-        const nextActive = newCamp.isActive ? newCamp : prev.activeFestivalCampaign;
-        return { ...prev, festivalCampaigns: nextList, activeFestivalCampaign: nextActive };
-      });
-    } catch (e) {
-      console.warn('addFestivalCampaign fallback', e);
-      const newCamp = { ...campaignData, id: 'fc_' + Date.now(), _id: 'fc_' + Date.now() };
-      setState(prev => ({
-        ...prev,
-        festivalCampaigns: [newCamp, ...(prev.festivalCampaigns || [])],
-        activeFestivalCampaign: newCamp.isActive ? newCamp : prev.activeFestivalCampaign
-      }));
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to create festival campaign');
+      }
+      await refreshFestivalCampaigns();
+      return data;
+    } catch (e: any) {
+      console.error('addFestivalCampaign error:', e);
+      throw e;
     }
   };
 
@@ -1670,33 +1690,30 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify(updatedData)
       });
       const data = await res.json();
-      const updatedCamp = data.campaign || updatedData;
-      setState(prev => {
-        const nextList = (prev.festivalCampaigns || []).map(c => (c.id === id || c._id === id) ? { ...c, ...updatedCamp } : c);
-        const activeOne = nextList.find(c => c.isActive) || null;
-        return { ...prev, festivalCampaigns: nextList, activeFestivalCampaign: activeOne };
-      });
-    } catch (e) {
-      console.warn('updateFestivalCampaign fallback', e);
-      setState(prev => {
-        const nextList = (prev.festivalCampaigns || []).map(c => (c.id === id || c._id === id) ? { ...c, ...updatedData } : c);
-        const activeOne = nextList.find(c => c.isActive) || null;
-        return { ...prev, festivalCampaigns: nextList, activeFestivalCampaign: activeOne };
-      });
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to update festival campaign');
+      }
+      await refreshFestivalCampaigns();
+      return data;
+    } catch (e: any) {
+      console.error('updateFestivalCampaign error:', e);
+      throw e;
     }
   };
 
   const deleteFestivalCampaign = async (id: string) => {
     try {
-      await fetch(`/api/festival-campaigns/${id}`, { method: 'DELETE' });
-    } catch (e) {
-      console.warn('deleteFestivalCampaign fallback', e);
+      const res = await fetch(`/api/festival-campaigns/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to delete festival campaign');
+      }
+      await refreshFestivalCampaigns();
+      return data;
+    } catch (e: any) {
+      console.error('deleteFestivalCampaign error:', e);
+      throw e;
     }
-    setState(prev => {
-      const nextList = (prev.festivalCampaigns || []).filter(c => c.id !== id && c._id !== id);
-      const activeOne = nextList.find(c => c.isActive) || null;
-      return { ...prev, festivalCampaigns: nextList, activeFestivalCampaign: activeOne };
-    });
   };
 
   const toggleFestivalCampaignStatus = async (id: string, isActive?: boolean) => {
@@ -1707,28 +1724,15 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify({ isActive })
       });
       const data = await res.json();
-      if (data.campaign) {
-        setState(prev => {
-          const nextList = (prev.festivalCampaigns || []).map(c => (c.id === id || c._id === id) ? data.campaign : c);
-          const activeOne = nextList.find(c => c.isActive) || null;
-          return { ...prev, festivalCampaigns: nextList, activeFestivalCampaign: activeOne };
-        });
-        return;
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to toggle festival campaign status');
       }
-    } catch (e) {
-      console.warn('toggleFestivalCampaignStatus fallback', e);
+      await refreshFestivalCampaigns();
+      return data;
+    } catch (e: any) {
+      console.error('toggleFestivalCampaignStatus error:', e);
+      throw e;
     }
-    setState(prev => {
-      const nextList = (prev.festivalCampaigns || []).map(c => {
-        if (c.id === id || c._id === id) {
-          const nextVal = isActive !== undefined ? isActive : !c.isActive;
-          return { ...c, isActive: nextVal };
-        }
-        return c;
-      });
-      const activeOne = nextList.find(c => c.isActive) || null;
-      return { ...prev, festivalCampaigns: nextList, activeFestivalCampaign: activeOne };
-    });
   };
 
 

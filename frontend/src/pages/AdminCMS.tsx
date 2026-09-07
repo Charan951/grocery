@@ -23,92 +23,92 @@ export const PREDEFINED_FESTIVAL_THEMES: Record<string, PredefinedTheme> = {
     key: 'krishna',
     name: 'Krishna Janmashtami',
     emoji: '🦚',
-    gradientStart: '#E0F2FE',
-    gradientEnd: '#CFFAFE',
+    gradientStart: '#8DC9F7',
+    gradientEnd: '#D6F0FE',
     gradientDirection: 'to bottom',
-    cardBackground: '#FFFBEB',
+    cardBackground: '#8DC9F7',
     cardBorder: '#BAE6FD',
-    accentColor: '#F59E0B',
-    buttonColor: '#0EA5E9',
-    textColor: '#0C4A6E'
-  },
-  diwali: {
-    key: 'diwali',
-    name: 'Diwali',
-    emoji: '🪔',
-    gradientStart: '#FFF7ED',
-    gradientEnd: '#FFEDD5',
-    gradientDirection: 'to bottom',
-    cardBackground: '#FEF3C7',
-    cardBorder: '#FDBA74',
     accentColor: '#D97706',
-    buttonColor: '#B91C1C',
-    textColor: '#78350F'
-  },
-  onam: {
-    key: 'onam',
-    name: 'Onam',
-    emoji: '🌸',
-    gradientStart: '#F7FEE7',
-    gradientEnd: '#ECFDF5',
-    gradientDirection: 'to bottom',
-    cardBackground: '#FAFAF9',
-    cardBorder: '#A3E635',
-    accentColor: '#D97706',
-    buttonColor: '#15803D',
-    textColor: '#14532D'
-  },
-  raksha_bandhan: {
-    key: 'raksha_bandhan',
-    name: 'Raksha Bandhan',
-    emoji: '🧿',
-    gradientStart: '#FFF1F2',
-    gradientEnd: '#F3E8FF',
-    gradientDirection: 'to bottom',
-    cardBackground: '#FFF1F2',
-    cardBorder: '#F472B6',
-    accentColor: '#EC4899',
-    buttonColor: '#9333EA',
-    textColor: '#701A75'
+    buttonColor: '#0284C7',
+    textColor: '#0F4C75'
   },
   ganesh_chaturthi: {
     key: 'ganesh_chaturthi',
     name: 'Ganesh Chaturthi',
     emoji: '🌺',
-    gradientStart: '#FEF3C7',
-    gradientEnd: '#FFEDD5',
+    gradientStart: '#FCDAA8',
+    gradientEnd: '#FEF3E2',
     gradientDirection: 'to bottom',
-    cardBackground: '#FFFBEB',
-    cardBorder: '#FCD34D',
-    accentColor: '#EA580C',
-    buttonColor: '#D97706',
-    textColor: '#7C2D12'
+    cardBackground: '#FCDAA8',
+    cardBorder: '#FDE68A',
+    accentColor: '#D97706',
+    buttonColor: '#EA580C',
+    textColor: '#68380D'
+  },
+  diwali: {
+    key: 'diwali',
+    name: 'Diwali',
+    emoji: '🪔',
+    gradientStart: '#FCD39D',
+    gradientEnd: '#FEF4E6',
+    gradientDirection: 'to bottom',
+    cardBackground: '#FCD39D',
+    cardBorder: '#FDE68A',
+    accentColor: '#D97706',
+    buttonColor: '#C2410C',
+    textColor: '#663000'
+  },
+  onam: {
+    key: 'onam',
+    name: 'Onam',
+    emoji: '🌸',
+    gradientStart: '#BBEB9B',
+    gradientEnd: '#EBFADF',
+    gradientDirection: 'to bottom',
+    cardBackground: '#BBEB9B',
+    cardBorder: '#C0F289',
+    accentColor: '#D97706',
+    buttonColor: '#16A34A',
+    textColor: '#1B4D20'
+  },
+  raksha_bandhan: {
+    key: 'raksha_bandhan',
+    name: 'Raksha Bandhan',
+    emoji: '🧿',
+    gradientStart: '#F8A6D2',
+    gradientEnd: '#FCE6F2',
+    gradientDirection: 'to bottom',
+    cardBackground: '#F8A6D2',
+    cardBorder: '#FBCFE8',
+    accentColor: '#EC4899',
+    buttonColor: '#9333EA',
+    textColor: '#701A75'
   },
   holi: {
     key: 'holi',
     name: 'Holi',
     emoji: '🎨',
-    gradientStart: '#FFF1F2',
-    gradientEnd: '#F0FDF4',
+    gradientStart: '#A5B4FC',
+    gradientEnd: '#E0E7FF',
     gradientDirection: '135deg',
-    cardBackground: '#FFFFFF',
-    cardBorder: '#F472B6',
+    cardBackground: '#A5B4FC',
+    cardBorder: '#C7D2FE',
     accentColor: '#E11D48',
-    buttonColor: '#2563EB',
-    textColor: '#1E3A8A'
+    buttonColor: '#4F46E5',
+    textColor: '#1E1B4B'
   },
   navratri: {
     key: 'navratri',
     name: 'Navratri',
     emoji: '🪷',
-    gradientStart: '#FEF9C3',
-    gradientEnd: '#FAF5FF',
+    gradientStart: '#D8B4FE',
+    gradientEnd: '#F3E8FF',
     gradientDirection: 'to bottom',
-    cardBackground: '#FFFBEB',
+    cardBackground: '#D8B4FE',
     cardBorder: '#E9D5FF',
     accentColor: '#9333EA',
     buttonColor: '#7E22CE',
-    textColor: '#581C87'
+    textColor: '#4C1D95'
   }
 };
 
@@ -175,7 +175,8 @@ export const AdminCMS: React.FC = () => {
   const [fcBannerLink, setFcBannerLink] = useState('');
   const [isUploadingFcBanner, setIsUploadingFcBanner] = useState(false);
 
-  // Step 3: Festival Product Groups
+  // Step 3: Festival Product Groups & Style
+  const [fcCardStyle, setFcCardStyle] = useState<'style1' | 'style2'>('style1');
   const [fcGroups, setFcGroups] = useState<any[]>([]);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [groupNameInput, setGroupNameInput] = useState('');
@@ -230,6 +231,7 @@ export const AdminCMS: React.FC = () => {
     setFcBannerImage('');
     setFcBannerLink('');
 
+    setFcCardStyle('style1');
     setFcGroups([]);
     setEditingGroupId(null);
     setGroupNameInput('');
@@ -277,6 +279,7 @@ export const AdminCMS: React.FC = () => {
     setFcBannerImage(campaign.bannerImage || '');
     setFcBannerLink(campaign.bannerLink || '');
 
+    setFcCardStyle(campaign.cardStyle || 'style1');
     setFcGroups(campaign.festivalGroups || []);
 
     const styling = campaign.cardStyling || {};
@@ -339,6 +342,10 @@ export const AdminCMS: React.FC = () => {
   const handleSaveGroup = () => {
     if (!groupNameInput.trim()) {
       alert('Please enter group display name');
+      return;
+    }
+    if (fcCardStyle === 'style2' && !editingGroupId && fcGroups.length >= 4) {
+      alert('Card Style 2 supports a maximum of 4 groups. Please edit existing groups or switch to Style 1 for unlimited groups.');
       return;
     }
     if (groupProductsInput.length === 0) {
@@ -456,6 +463,7 @@ export const AdminCMS: React.FC = () => {
       enableBanner: fcEnableBanner,
       bannerImage: fcBannerImage.trim(),
       bannerLink: fcBannerLink.trim(),
+      cardStyle: fcCardStyle,
       festivalGroups: fcGroups,
       cardStyling: {
         cardBackground: fcCardBackground,
@@ -1501,7 +1509,13 @@ export const AdminCMS: React.FC = () => {
                           const groupsCount = camp.festivalGroups?.length || 0;
                           const totalProductsCount = (camp.festivalGroups || []).reduce((acc: number, g: any) => acc + (g.products?.length || 0), 0);
                           const scopes = camp.applicableSuperCategories || ['all'];
-                          const scopeLabel = (scopes.includes('all') || scopes.includes('sc_all')) ? 'All Super Categories' : `${scopes.length} Super Categories`;
+                          const hasAllScope = scopes.includes('all') || scopes.includes('sc_all') || scopes.includes('All');
+                          const scopeNames = scopes.map((s: string) => {
+                            if (s === 'all' || s === 'sc_all' || s === 'All') return 'All Super Categories';
+                            const foundSc = superCategories.find((sc: any) => sc.id === s || sc.id === `sc_${s}` || sc.slug === s || sc.name.toLowerCase() === s.toLowerCase());
+                            return foundSc ? foundSc.name : s.replace(/^sc_/, '').toUpperCase();
+                          });
+                          const scopeLabel = hasAllScope ? 'All Super Categories' : scopeNames.join(', ');
 
                           return (
                             <div
@@ -1944,10 +1958,59 @@ export const AdminCMS: React.FC = () => {
                     {wizardStep === 3 && (
                       <div className="flex flex-col gap-6 animate-fadeIn">
                         <div className="border-b border-divider pb-3">
-                          <h4 className="text-sm font-extrabold text-text-primary">Step 3 — Festival Product Groups</h4>
+                          <h4 className="text-sm font-extrabold text-text-primary">Step 3 — Card Styling & Festival Product Groups</h4>
                           <p className="text-xs text-text-secondary">
-                            Create temporary campaign display groups (e.g. "Gifts", "Krishna Specials"). You can select products from MULTIPLE existing categories for each group.
+                            First select your Card Styling mode, then create display groups.
                           </p>
+                        </div>
+
+                        {/* Card Styling Selection */}
+                        <div className="bg-surface/50 p-4 border border-divider rounded-2xl flex flex-col gap-3">
+                          <label className="text-xs font-extrabold text-text-primary">Select Card Styling Mode:</label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <button
+                              type="button"
+                              onClick={() => setFcCardStyle('style1')}
+                              className={`p-3 rounded-xl border text-left flex flex-col gap-1 transition-all cursor-pointer ${
+                                fcCardStyle === 'style1'
+                                  ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600 font-extrabold'
+                                  : 'border-divider bg-surface text-text-secondary hover:border-emerald-400'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between text-xs">
+                                <span>Style 1: Full Image Cards</span>
+                                {fcCardStyle === 'style1' && <span className="text-xs font-bold text-emerald-600">✓ Active</span>}
+                              </div>
+                              <span className="text-[11px] font-normal opacity-80">Full background cover images with dark gradient text overlays (Ganesh Chaturthi style).</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (fcGroups.length > 4) {
+                                  alert('Style 2 supports maximum 4 groups. Please reduce groups to 4 or fewer before switching.');
+                                  return;
+                                }
+                                setFcCardStyle('style2');
+                              }}
+                              className={`p-3 rounded-xl border text-left flex flex-col gap-1 transition-all cursor-pointer ${
+                                fcCardStyle === 'style2'
+                                  ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600 font-extrabold'
+                                  : 'border-divider bg-surface text-text-secondary hover:border-emerald-400'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between text-xs">
+                                <span>Style 2: Theme Color Cards (Blinkit Style)</span>
+                                {fcCardStyle === 'style2' && <span className="text-xs font-bold text-emerald-600">✓ Active</span>}
+                              </div>
+                              <span className="text-[11px] font-normal opacity-80">Automatic theme background, limit 4 groups. Left hero card displays dynamic rotating products (MRP, offer price, image).</span>
+                            </button>
+                          </div>
+                          {fcCardStyle === 'style2' && (
+                            <p className="text-[11px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-950/40 p-2 rounded-lg border border-amber-200 dark:border-amber-900">
+                              ⚡ Style 2 Note: Maximum 4 groups allowed. Group 1 will be rendered as the Left Tall Hero Card with dynamic rotating product offers.
+                            </p>
+                          )}
                         </div>
 
                         {/* Created Groups List */}

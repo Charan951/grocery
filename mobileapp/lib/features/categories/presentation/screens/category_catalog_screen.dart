@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,8 +13,9 @@ import 'package:freshcart/core/widgets/product_card.dart';
 import 'package:freshcart/core/widgets/skeletons.dart';
 import 'package:freshcart/features/cart/presentation/controllers/cart_controller.dart';
 import 'package:freshcart/features/cart/presentation/widgets/catalog_cart_bar.dart';
+import 'package:freshcart/features/categories/data/models/category_model.dart';
 import 'package:freshcart/features/categories/presentation/screens/categories_screen.dart'
-    show availableSubCategoriesFor, CategoriesScreen;
+    show availableSubCategoriesFor;
 import 'package:freshcart/features/home/presentation/controllers/catalog_providers.dart';
 
 const _sortLabels = {
@@ -22,6 +24,61 @@ const _sortLabels = {
   'price-high': 'Price: high to low',
   'rating': 'Top rated',
 };
+
+String _resolveSubCategoryImage(String subName, String? catName, [String? customImg]) {
+  if (customImg != null && customImg.trim().isNotEmpty) {
+    final trimmed = customImg.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:') || trimmed.startsWith('/')) {
+      return trimmed;
+    }
+  }
+
+  final subLower = subName.toLowerCase().trim();
+
+  if (subLower.contains('veg')) return 'https://images.unsplash.com/photo-1597362925123-77861d3fbac7?w=200&auto=format&fit=crop';
+  if (subLower.contains('fruit')) return 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=200&auto=format&fit=crop';
+  if (subLower.contains('exotic') || subLower.contains('premium')) return 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=200&auto=format&fit=crop';
+  if (subLower.contains('organic') || subLower.contains('hydro')) return 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=200&auto=format&fit=crop';
+  if (subLower.contains('leafy') || subLower.contains('herb') || subLower.contains('season')) return 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=200&auto=format&fit=crop';
+  if (subLower.contains('mango') || subLower.contains('melon')) return 'https://images.unsplash.com/photo-1553279768-865429fa0078?w=200&auto=format&fit=crop';
+  if (subLower.contains('cut') || subLower.contains('sprout')) return 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=200&auto=format&fit=crop';
+
+  if (subLower.contains('milk')) return 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=200&auto=format&fit=crop';
+  if (subLower.contains('bread') || subLower.contains('bun')) return 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=200&auto=format&fit=crop';
+  if (subLower.contains('egg')) return 'https://images.unsplash.com/photo-1506976785307-8732e854ad03?w=200&auto=format&fit=crop';
+  if (subLower.contains('curd') || subLower.contains('yogurt') || subLower.contains('drink')) return 'https://images.unsplash.com/photo-1571212515416-fef01fc43637?w=200&auto=format&fit=crop';
+  if (subLower.contains('paneer') || subLower.contains('cream') || subLower.contains('cheese')) return 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=200&auto=format&fit=crop';
+  if (subLower.contains('butter')) return 'https://images.unsplash.com/photo-1589985270826-4b7bb135bc9d?w=200&auto=format&fit=crop';
+
+  if (subLower.contains('chip') || subLower.contains('namkeen') || subLower.contains('snack')) return 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=200&auto=format&fit=crop';
+  if (subLower.contains('noodle') || subLower.contains('pasta')) return 'https://images.unsplash.com/photo-1612927601601-6638404737ce?w=200&auto=format&fit=crop';
+  if (subLower.contains('biscuit') || subLower.contains('cookie')) return 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=200&auto=format&fit=crop';
+  if (subLower.contains('chocolate') || subLower.contains('sweet')) return 'https://images.unsplash.com/photo-1549007994-cb92caebd54b?w=200&auto=format&fit=crop';
+
+  if (subLower.contains('atta') || subLower.contains('flour')) return 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=200&auto=format&fit=crop';
+  if (subLower.contains('rice')) return 'https://images.unsplash.com/photo-1536304929831-ee1ca9d44906?w=200&auto=format&fit=crop';
+  if (subLower.contains('oil')) return 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=200&auto=format&fit=crop';
+  if (subLower.contains('dal') || subLower.contains('pulse')) return 'https://images.unsplash.com/photo-1585994191611-726a88060c2d?w=200&auto=format&fit=crop';
+  if (subLower.contains('ghee')) return 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=200&auto=format&fit=crop';
+
+  if (subLower.contains('chicken')) return 'https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=200&auto=format&fit=crop';
+  if (subLower.contains('mutton') || subLower.contains('meat')) return 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=200&auto=format&fit=crop';
+  if (subLower.contains('fish') || subLower.contains('seafood')) return 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?w=200&auto=format&fit=crop';
+
+  if (subLower.contains('spice') || subLower.contains('masala')) return 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=200&auto=format&fit=crop';
+  if (subLower.contains('dry fruit') || subLower.contains('nut') || subLower.contains('cashew') || subLower.contains('almond')) return 'https://images.unsplash.com/photo-1599599810769-bcde5a160d32?w=200&auto=format&fit=crop';
+
+  if (subLower.contains('cereal') || subLower.contains('oats')) return 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=200&auto=format&fit=crop';
+  if (subLower.contains('sauce') || subLower.contains('ketchup') || subLower.contains('spread')) return 'https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=200&auto=format&fit=crop';
+
+  return 'https://images.unsplash.com/photo-1597362925123-77861d3fbac7?w=200&auto=format&fit=crop';
+}
+
+class _SubCategoryItemData {
+  final String name;
+  final String imageUrl;
+  const _SubCategoryItemData({required this.name, required this.imageUrl});
+}
 
 class CategoryCatalogScreen extends ConsumerStatefulWidget {
   final String categoryId;
@@ -99,9 +156,26 @@ class _CategoryCatalogScreenState extends ConsumerState<CategoryCatalogScreen> {
     final category = matches.isNotEmpty ? matches.first : null;
     final title = category?.name ?? 'Category';
     final allProducts = ref.watch(allProductsProvider).valueOrNull ?? const [];
-    final subChips = <String>[
-      'All',
-      if (category != null) ...availableSubCategoriesFor(category, allProducts),
+    final subNames = category != null ? availableSubCategoriesFor(category, allProducts) : <String>[];
+
+    final subItems = <_SubCategoryItemData>[
+      _SubCategoryItemData(
+        name: 'All',
+        imageUrl: (category?.imageUrl.isNotEmpty == true)
+            ? category!.imageUrl
+            : 'https://images.unsplash.com/photo-1597362925123-77861d3fbac7?w=200&auto=format&fit=crop',
+      ),
+      for (final name in subNames) ...[
+        () {
+          final match = category?.subCategoryItems.firstWhere(
+            (s) => s.name.toLowerCase() == name.toLowerCase(),
+            orElse: () => SubCategoryModel(id: name, name: name),
+          );
+          final customImg = match?.imageUrl ?? '';
+          final resolvedImg = _resolveSubCategoryImage(name, category?.name, customImg);
+          return _SubCategoryItemData(name: name, imageUrl: resolvedImg);
+        }()
+      ]
     ];
 
     final query = CatalogQuery(
@@ -141,19 +215,16 @@ class _CategoryCatalogScreenState extends ConsumerState<CategoryCatalogScreen> {
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Left subcategory icon-rail (mirrors the web storefront's mobile
-          // layout: a narrow icon rail beside the product grid, rather than a
-          // horizontal chip row above it).
-          if (subChips.length > 1)
+          if (subItems.length > 1)
             _SubcategoryRail(
-              items: subChips,
+              items: subItems,
               selected: _sub,
               onSelected: (s) => setState(() => _sub = s),
             ),
 
           Expanded(
             child: productsAsync.when(
-              loading: () => const SkeletonGrid(itemCount: 6, childAspectRatio: 0.62),
+              loading: () => const SkeletonGrid(itemCount: 6, childAspectRatio: 0.53),
               error: (e, _) => ErrorState(
                 onRetry: () => ref.invalidate(categoryProductsProvider(query)),
               ),
@@ -168,14 +239,8 @@ class _CategoryCatalogScreenState extends ConsumerState<CategoryCatalogScreen> {
                         padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
                         sliver: SliverToBoxAdapter(
                           child: _FilterHeaderCard(
-                            countLabel: '${products.length} ${products.length == 1 ? 'product' : 'products'}'
-                                '${_sort != 'popular' ? ' · ${_sortLabels[_sort]!.toLowerCase()}' : ''}',
-                            organicOnly: _organicOnly,
-                            inStockOnly: _inStockOnly,
-                            onSaleOnly: _onSaleOnly,
-                            onToggleOrganic: () => setState(() => _organicOnly = !_organicOnly),
-                            onToggleInStock: () => setState(() => _inStockOnly = !_inStockOnly),
-                            onToggleOnSale: () => setState(() => _onSaleOnly = !_onSaleOnly),
+                            currentSort: _sort,
+                            onOpenSort: _openSort,
                           ),
                         ),
                       ),
@@ -200,7 +265,7 @@ class _CategoryCatalogScreenState extends ConsumerState<CategoryCatalogScreen> {
                               crossAxisCount: 2,
                               crossAxisSpacing: 12,
                               mainAxisSpacing: 16,
-                              childAspectRatio: 0.62,
+                              childAspectRatio: 0.53,
                             ),
                             delegate: SliverChildBuilderDelegate(
                               (context, i) {
@@ -234,26 +299,13 @@ class _CategoryCatalogScreenState extends ConsumerState<CategoryCatalogScreen> {
   }
 }
 
-/// The header card shown above the grid: a count line plus quick "Organic /
-/// In stock / On offer" toggle pills — mirrors the web storefront's category
-/// page header exactly.
 class _FilterHeaderCard extends StatelessWidget {
-  final String countLabel;
-  final bool organicOnly;
-  final bool inStockOnly;
-  final bool onSaleOnly;
-  final VoidCallback onToggleOrganic;
-  final VoidCallback onToggleInStock;
-  final VoidCallback onToggleOnSale;
+  final String currentSort;
+  final VoidCallback onOpenSort;
 
   const _FilterHeaderCard({
-    required this.countLabel,
-    required this.organicOnly,
-    required this.inStockOnly,
-    required this.onSaleOnly,
-    required this.onToggleOrganic,
-    required this.onToggleInStock,
-    required this.onToggleOnSale,
+    required this.currentSort,
+    required this.onOpenSort,
   });
 
   @override
@@ -261,49 +313,48 @@ class _FilterHeaderCard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final divider = isDark ? AppColors.dividerDark : AppColors.divider;
 
-    Widget pill(String label, bool on, VoidCallback onTap) {
-      return GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: on ? AppColors.primaryText : (isDark ? Colors.white.withOpacity(0.05) : AppColors.background),
-            borderRadius: AppRadius.brPill,
-            border: Border.all(color: on ? AppColors.primaryText : divider),
-          ),
-          child: Text(
-            label,
-            style: AppTypography.labelSmall(on ? Colors.white : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondary))
-                .copyWith(fontWeight: FontWeight.w700),
-          ),
-        ),
-      );
-    }
-
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDark : AppColors.surface,
         borderRadius: AppRadius.brLg,
         border: Border.all(color: divider),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            countLabel,
-            style: AppTypography.bodySmall(isDark ? AppColors.textSecondaryDark : AppColors.textSecondary)
-                .copyWith(fontWeight: FontWeight.w700),
+            'Filter & Sort',
+            style: AppTypography.title(
+              isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+            ).copyWith(fontWeight: FontWeight.w700, fontSize: 13),
           ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              pill('Organic', organicOnly, onToggleOrganic),
-              pill('In stock', inStockOnly, onToggleInStock),
-              pill('On offer', onSaleOnly, onToggleOnSale),
-            ],
+          InkWell(
+            onTap: onOpenSort,
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white.withOpacity(0.06) : AppColors.background,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: divider),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.tune_rounded, size: 14, color: AppColors.primaryText),
+                  const SizedBox(width: 5),
+                  Text(
+                    _sortLabels[currentSort] ?? 'Sort',
+                    style: AppTypography.labelSmall(
+                      isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                    ).copyWith(fontWeight: FontWeight.w800, fontSize: 11),
+                  ),
+                  const SizedBox(width: 2),
+                  Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: isDark ? Colors.white70 : Colors.black54),
+                ],
+              ),
+            ),
           ),
         ],
       ),
@@ -311,12 +362,8 @@ class _FilterHeaderCard extends StatelessWidget {
   }
 }
 
-/// Left icon-rail: a narrow, independently-scrolling column of circular
-/// subcategory icons, each labelled below — the web storefront's mobile
-/// category layout (a 72-96px rail beside the product grid), in place of a
-/// horizontal chip row.
 class _SubcategoryRail extends StatelessWidget {
-  final List<String> items;
+  final List<_SubCategoryItemData> items;
   final String selected;
   final ValueChanged<String> onSelected;
 
@@ -327,21 +374,26 @@ class _SubcategoryRail extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: 76,
-      color: isDark ? AppColors.surfaceDark : AppColors.surface,
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : AppColors.surface,
+        border: Border(
+          right: BorderSide(
+            color: isDark ? AppColors.dividerDark : AppColors.divider,
+            width: 1,
+          ),
+        ),
+      ),
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(vertical: 8),
         itemCount: items.length,
         itemBuilder: (context, i) {
-          final name = items[i];
-          final isActive = name == selected;
-          final icon = name == 'All'
-              ? Icons.apps_rounded
-              : CategoriesScreen.iconFor('', name);
+          final item = items[i];
+          final isActive = item.name == selected;
           return _SubcategoryRailItem(
-            label: name,
-            icon: icon,
+            label: item.name,
+            imageUrl: item.imageUrl,
             selected: isActive,
-            onTap: () => onSelected(name),
+            onTap: () => onSelected(item.name),
           );
         },
       ),
@@ -351,13 +403,13 @@ class _SubcategoryRail extends StatelessWidget {
 
 class _SubcategoryRailItem extends StatelessWidget {
   final String label;
-  final IconData icon;
+  final String imageUrl;
   final bool selected;
   final VoidCallback onTap;
 
   const _SubcategoryRailItem({
     required this.label,
-    required this.icon,
+    required this.imageUrl,
     required this.selected,
     required this.onTap,
   });
@@ -374,26 +426,20 @@ class _SubcategoryRailItem extends StatelessWidget {
       child: ExcludeSemantics(
         child: InkWell(
           onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
             child: Stack(
+              alignment: Alignment.center,
               clipBehavior: Clip.none,
               children: [
-                if (selected)
-                  Positioned(
-                    right: -6,
-                    top: 8,
-                    bottom: 8,
-                    child: Container(width: 3, decoration: BoxDecoration(
-                      color: AppColors.primaryText,
-                      borderRadius: BorderRadius.circular(2),
-                    )),
-                  ),
                 Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Container(
-                      width: 46,
-                      height: 46,
+                      width: 44,
+                      height: 44,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: selected
@@ -401,22 +447,54 @@ class _SubcategoryRailItem extends StatelessWidget {
                             : (isDark ? Colors.white.withOpacity(0.04) : AppColors.background),
                         border: Border.all(
                           color: selected ? AppColors.primary : (isDark ? AppColors.dividerDark : AppColors.divider),
-                          width: selected ? 1.5 : 1,
+                          width: selected ? 2.0 : 1.0,
                         ),
                       ),
-                      child: Icon(icon, size: 20, color: selected ? AppColors.primaryText : sub),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(22),
+                        child: imageUrl.startsWith('http')
+                            ? CachedNetworkImage(
+                                imageUrl: imageUrl,
+                                fit: BoxFit.cover,
+                                fadeInDuration: const Duration(milliseconds: 150),
+                                errorWidget: (context, url, error) => Container(
+                                  color: isDark ? Colors.white10 : Colors.black12,
+                                  child: Icon(Icons.shopping_bag_rounded, size: 20, color: AppColors.primary),
+                                ),
+                              )
+                            : Container(
+                                color: isDark ? Colors.white10 : Colors.black12,
+                                child: Icon(Icons.shopping_bag_rounded, size: 20, color: AppColors.primary),
+                              ),
+                      ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      label,
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTypography.labelSmall(selected ? AppColors.primaryText : sub)
-                          .copyWith(fontSize: 9, fontWeight: selected ? FontWeight.w800 : FontWeight.w600),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: Text(
+                        label,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.labelSmall(selected ? AppColors.primaryText : sub)
+                            .copyWith(fontSize: 9.5, fontWeight: selected ? FontWeight.w800 : FontWeight.w600, height: 1.15),
+                      ),
                     ),
                   ],
                 ),
+                if (selected)
+                  Positioned(
+                    right: -4,
+                    top: 4,
+                    bottom: 4,
+                    child: Container(
+                      width: 3.5,
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryText,
+                        borderRadius: const BorderRadius.horizontal(left: Radius.circular(3)),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),

@@ -166,18 +166,31 @@ class ApiService {
     }
   }
 
-  /// `GET /festival-campaigns/active` → the running campaign, or null.
-  Future<Map<String, dynamic>?> fetchActiveFestivalCampaign() async {
+  /// `GET /festival-campaigns/active` → active campaigns list.
+  Future<List<Map<String, dynamic>>> fetchActiveFestivalCampaigns() async {
     try {
       final res = await _dio.get('/festival-campaigns/active');
       final data = res.data;
-      final c = (data is Map) ? data['campaign'] : null;
-      if (c is Map && (c['isActive'] == false || c['isActive'] == 0)) {
-        return null;
+      if (data is Map && data['activeCampaigns'] is List) {
+        final list = data['activeCampaigns'] as List;
+        return list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
       }
-      return c is Map ? Map<String, dynamic>.from(c) : null;
+      final c = (data is Map) ? data['campaign'] : null;
+      if (c is Map && c['isActive'] != false) {
+        return [Map<String, dynamic>.from(c)];
+      }
+      return const [];
     } on DioException catch (e) {
-      throw ApiException.fromDio(e);
+      return const [];
+    }
+  }
+
+  Future<Map<String, dynamic>?> fetchActiveFestivalCampaign() async {
+    try {
+      final list = await fetchActiveFestivalCampaigns();
+      return list.isNotEmpty ? list.first : null;
+    } catch (_) {
+      return null;
     }
   }
 

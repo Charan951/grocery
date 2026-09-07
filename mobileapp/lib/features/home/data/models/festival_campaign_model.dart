@@ -101,6 +101,7 @@ class FestivalCampaignModel {
   final bool enableBanner;
   final String bannerImage;
   final String bannerLink;
+  final String cardStyle;
   final List<FestivalGroupModel> festivalGroups;
   final CardStylingModel cardStyling;
   final List<String> applicableSuperCategories;
@@ -121,6 +122,7 @@ class FestivalCampaignModel {
     required this.enableBanner,
     required this.bannerImage,
     required this.bannerLink,
+    required this.cardStyle,
     required this.festivalGroups,
     required this.cardStyling,
     required this.applicableSuperCategories,
@@ -166,6 +168,7 @@ class FestivalCampaignModel {
       enableBanner: (json['enableBanner'] as bool?) ?? false,
       bannerImage: (json['bannerImage'] ?? '').toString(),
       bannerLink: (json['bannerLink'] ?? '').toString(),
+      cardStyle: (json['cardStyle'] ?? 'style1').toString(),
       festivalGroups: groupsList,
       cardStyling: CardStylingModel.fromJson(json['cardStyling'] as Map<String, dynamic>?),
       applicableSuperCategories: scopeList.isEmpty ? <String>['all'] : scopeList,

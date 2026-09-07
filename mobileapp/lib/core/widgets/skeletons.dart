@@ -130,7 +130,7 @@ class SkeletonGrid extends StatelessWidget {
     super.key,
     this.itemCount = 6,
     this.crossAxisCount = 2,
-    this.childAspectRatio = 0.70,
+    this.childAspectRatio = 0.53,
     this.padding = const EdgeInsets.all(16),
   });
 

@@ -32,79 +32,79 @@ class FestivalThemeResolver {
     'krishna': {
       'emoji': '🦚',
       'fontPreset': 'greatVibes',
-      'gStart': Color(0xFFE0F2FE),
-      'gEnd': Color(0xFFCFFAFE),
-      'cardBg': Color(0xFFFFFBEB),
+      'gStart': Color(0xFF8DC9F7), // Soft sky blue at location level (Image 2)
+      'gEnd': Color(0xFFD6F0FE),   // Soft light pastel body blue
+      'cardBg': Color(0xFF8DC9F7), // Matches location section background color!
       'cardBorder': Color(0xFFBAE6FD),
-      'accent': Color(0xFFF59E0B),
-      'btn': Color(0xFF0EA5E9),
-      'text': Color(0xFF0C4A6E),
-    },
-    'diwali': {
-      'emoji': '🪔',
-      'fontPreset': 'rozhaOne',
-      'gStart': Color(0xFFFFF7ED),
-      'gEnd': Color(0xFFFFEDD5),
-      'cardBg': Color(0xFFFEF3C7),
-      'cardBorder': Color(0xFFFDBA74),
       'accent': Color(0xFFD97706),
-      'btn': Color(0xFFB91C1C),
-      'text': Color(0xFF78350F),
-    },
-    'onam': {
-      'emoji': '🌸',
-      'fontPreset': 'cinzelDecorative',
-      'gStart': Color(0xFFF7FEE7),
-      'gEnd': Color(0xFFECFDF5),
-      'cardBg': Color(0xFFFAFAF9),
-      'cardBorder': Color(0xFFA3E635),
-      'accent': Color(0xFFD97706),
-      'btn': Color(0xFF15803D),
-      'text': Color(0xFF14532D),
-    },
-    'raksha_bandhan': {
-      'emoji': '🧿',
-      'fontPreset': 'satisfy',
-      'gStart': Color(0xFFFFF1F2),
-      'gEnd': Color(0xFFF3E8FF),
-      'cardBg': Color(0xFFFFF1F2),
-      'cardBorder': Color(0xFFF472B6),
-      'accent': Color(0xFFEC4899),
-      'btn': Color(0xFF9333EA),
-      'text': Color(0xFF701A75),
+      'btn': Color(0xFF0284C7),
+      'text': Color(0xFF0F4C75),
     },
     'ganesh_chaturthi': {
       'emoji': '🌺',
       'fontPreset': 'rozhaOne',
-      'gStart': Color(0xFFFEF3C7),
-      'gEnd': Color(0xFFFFEDD5),
-      'cardBg': Color(0xFFFFFBEB),
-      'cardBorder': Color(0xFFFCD34D),
-      'accent': Color(0xFFEA580C),
-      'btn': Color(0xFFD97706),
-      'text': Color(0xFF7C2D12),
+      'gStart': Color(0xFFFCDAA8), // Soft warm peach at location level (Image 3)
+      'gEnd': Color(0xFFFEF3E2),   // Soft light warm cream body
+      'cardBg': Color(0xFFFCDAA8), // Matches location section background color!
+      'cardBorder': Color(0xFFFDE68A),
+      'accent': Color(0xFFD97706),
+      'btn': Color(0xFFEA580C),
+      'text': Color(0xFF68380D),
+    },
+    'diwali': {
+      'emoji': '🪔',
+      'fontPreset': 'rozhaOne',
+      'gStart': Color(0xFFFCD39D),
+      'gEnd': Color(0xFFFEF4E6),
+      'cardBg': Color(0xFFFCD39D), // Matches location section background color!
+      'cardBorder': Color(0xFFFDE68A),
+      'accent': Color(0xFFD97706),
+      'btn': Color(0xFFC2410C),
+      'text': Color(0xFF663000),
+    },
+    'onam': {
+      'emoji': '🌸',
+      'fontPreset': 'cinzelDecorative',
+      'gStart': Color(0xFFBBEB9B),
+      'gEnd': Color(0xFFEBFADF),
+      'cardBg': Color(0xFFBBEB9B), // Matches location section background color!
+      'cardBorder': Color(0xFFC0F289),
+      'accent': Color(0xFFD97706),
+      'btn': Color(0xFF16A34A),
+      'text': Color(0xFF1B4D20),
+    },
+    'raksha_bandhan': {
+      'emoji': '🧿',
+      'fontPreset': 'satisfy',
+      'gStart': Color(0xFFF8A6D2),
+      'gEnd': Color(0xFFFCE6F2),
+      'cardBg': Color(0xFFF8A6D2), // Matches location section background color!
+      'cardBorder': Color(0xFFFBCFE8),
+      'accent': Color(0xFFEC4899),
+      'btn': Color(0xFF9333EA),
+      'text': Color(0xFF701A75),
     },
     'holi': {
       'emoji': '🎨',
       'fontPreset': 'pacifico',
-      'gStart': Color(0xFFFFF1F2),
-      'gEnd': Color(0xFFF0FDF4),
-      'cardBg': Color(0xFFFFFFFF),
-      'cardBorder': Color(0xFFF472B6),
+      'gStart': Color(0xFFA5B4FC),
+      'gEnd': Color(0xFFE0E7FF),
+      'cardBg': Color(0xFFA5B4FC), // Matches location section background color!
+      'cardBorder': Color(0xFFC7D2FE),
       'accent': Color(0xFFE11D48),
-      'btn': Color(0xFF2563EB),
-      'text': Color(0xFF1E3A8A),
+      'btn': Color(0xFF4F46E5),
+      'text': Color(0xFF1E1B4B),
     },
     'navratri': {
       'emoji': '🪷',
       'fontPreset': 'cinzelDecorative',
-      'gStart': Color(0xFFFEF9C3),
-      'gEnd': Color(0xFFFAF5FF),
-      'cardBg': Color(0xFFFFFBEB),
+      'gStart': Color(0xFFD8B4FE),
+      'gEnd': Color(0xFFF3E8FF),
+      'cardBg': Color(0xFFD8B4FE), // Matches location section background color!
       'cardBorder': Color(0xFFE9D5FF),
       'accent': Color(0xFF9333EA),
       'btn': Color(0xFF7E22CE),
-      'text': Color(0xFF581C87),
+      'text': Color(0xFF4C1D95),
     },
   };
 
@@ -139,6 +139,8 @@ class FestivalThemeResolver {
       end = Alignment.centerRight;
     }
 
+    final cardBg = gStart;
+
     return ResolvedFestivalTheme(
       key: key,
       emoji: preset['emoji'],
@@ -149,7 +151,7 @@ class FestivalThemeResolver {
         end: end,
       ),
       backgroundColor: solid,
-      cardBackground: styling.cardBackground,
+      cardBackground: cardBg,
       cardBorder: styling.cardBorder,
       accentColor: styling.accentColor,
       buttonColor: styling.buttonColor,

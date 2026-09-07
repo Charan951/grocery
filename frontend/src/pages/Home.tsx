@@ -23,7 +23,7 @@ interface HomeProps {
 export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
   const {
     banners, promoCards, categories, specialCategoryGroups, superCategories, products,
-    testimonials, faqs, blogs, seoSettings, homeSelectedSubCategories, activeFestivalCampaign
+    testimonials, faqs, blogs, seoSettings, homeSelectedSubCategories, festivalCampaigns, activeFestivalCampaign
   } = useCMS();
 
   const location = useLocation();
@@ -31,6 +31,22 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
 
   const searchParams = new URLSearchParams(location.search);
   const activeSuperCatSlug = searchParams.get('superCategory') || 'all';
+
+  const activeCampaignForTab = useMemo(() => {
+    const activeList = (festivalCampaigns || []).filter((c) => c.isActive && c.status !== 'draft');
+    if (activeList.length === 0) return null;
+
+    const matched = activeList.find((c) => {
+      const scopes = c.applicableSuperCategories || ['all'];
+      const isAllCat = !activeSuperCatSlug || activeSuperCatSlug === 'all' || activeSuperCatSlug === 'sc_all' || activeSuperCatSlug === 'All';
+      if (isAllCat) {
+        return scopes.includes('all') || scopes.includes('sc_all') || scopes.includes('All') || scopes.length === 0;
+      }
+      return scopes.includes(activeSuperCatSlug) || scopes.includes(`sc_${activeSuperCatSlug}`) || (activeSuperCatSlug.startsWith('sc_') && scopes.includes(activeSuperCatSlug.replace('sc_', '')));
+    });
+
+    return matched || null;
+  }, [festivalCampaigns, activeSuperCatSlug]);
 
   const [, startTransition] = useTransition();
 
@@ -493,9 +509,9 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
       />
 
       {/* Active Festival Campaign Component (STRICTLY MOBILE ONLY - Placed below SuperCategoryNav) */}
-      {isMobileDevice && activeFestivalCampaign && (
+      {isMobileDevice && (activeCampaignForTab || activeFestivalCampaign) && (
         <FestivalCampaignWrapper
-          campaign={activeFestivalCampaign}
+          campaign={activeCampaignForTab || activeFestivalCampaign!}
           currentSuperCatId={activeSuperCatSlug}
           onQuickView={onQuickView}
         />
@@ -736,7 +752,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
               </section>
             )}
 
-            {/* Shop by Category Grid (Matching Flutter mobileapp circular category cards) */}
+            {/* Shop by Category Grid (Matching Flutter mobileapp rounded category cards) */}
             {zeptoCategoryGridItems.length > 0 && (
               <section className="mb-5 w-full mt-1 sm:mt-2">
                 <div className="flex items-center justify-between mb-3">
@@ -754,11 +770,11 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                       }}
                       className="flex flex-col items-center group cursor-pointer text-center bg-transparent border-none p-0 outline-none"
                     >
-                      <div className="w-16 h-16 sm:w-18 sm:h-18 md:w-20 md:h-20 rounded-full bg-[#F3F4F6] p-1.5 flex items-center justify-center overflow-hidden border border-gray-100/90 group-hover:scale-105 group-hover:shadow-sm transition-all duration-200 shadow-2xs mx-auto">
+                      <div className="w-16 h-16 sm:w-18 sm:h-18 md:w-20 md:h-20 rounded-2xl bg-[#F3F4F6] overflow-hidden border border-gray-200/80 group-hover:scale-105 group-hover:shadow-md transition-all duration-200 shadow-2xs mx-auto">
                         <img
                           src={item.image || 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=300'}
                           alt={item.name}
-                          className="w-12 h-12 sm:w-14 sm:h-14 md:w-15 md:h-15 object-cover rounded-full"
+                          className="w-full h-full object-cover rounded-2xl"
                           onError={(e) => {
                             (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=300';
                           }}

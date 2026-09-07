@@ -41,7 +41,24 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const isFestivalActive = isMobile && activeFestivalCampaign && activeFestivalCampaign.isActive !== false && activeFestivalCampaign.status !== 'draft';
+  const isFestivalActive = React.useMemo(() => {
+    if (!isMobile || !activeFestivalCampaign || activeFestivalCampaign.isActive === false || activeFestivalCampaign.status === 'draft') {
+      return false;
+    }
+    const now = new Date();
+    const start = new Date(activeFestivalCampaign.startDate);
+    const end = new Date(activeFestivalCampaign.endDate);
+    if (now < start || now > end) return false;
+
+    const scopes = activeFestivalCampaign.applicableSuperCategories || ['all'];
+    const currentCat = activeSuperCategory || 'all';
+    const isAllCat = currentCat === 'all' || currentCat === 'sc_all' || currentCat === 'All';
+
+    if (isAllCat) {
+      return scopes.includes('all') || scopes.includes('sc_all') || scopes.includes('All') || scopes.length === 0;
+    }
+    return scopes.includes(currentCat) || scopes.includes(`sc_${currentCat}`);
+  }, [isMobile, activeFestivalCampaign, activeSuperCategory]);
 
   const items = React.useMemo(() => {
     const list = superCategories && superCategories.length > 0 ? superCategories : defaultSuperCategories;

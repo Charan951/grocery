@@ -22,7 +22,7 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
   const { wishlist, cartCount } = useCartWishlist();
   const totalItems = cartCount;
   const setIsCartOpen = (open: boolean) => { if (open) onCartOpen(); };
-  const { categories, products, coupons, banners, userLocation, updateUserLocation, activeHeroBannerIndex, activeFestivalCampaign } = useCMS();
+  const { categories, products, coupons, banners, userLocation, updateUserLocation, activeHeroBannerIndex, festivalCampaigns, activeFestivalCampaign } = useCMS();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -267,25 +267,51 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
   const isHomePage = location.pathname === '/';
 
   // Festival campaign active check ONLY for Mobile
+  const tabActiveCampaign = useMemo(() => {
+    const activeList = (festivalCampaigns || []).filter((c) => c.isActive && c.status !== 'draft');
+    if (activeList.length === 0) return activeFestivalCampaign;
+    if (isHomePage) {
+      const searchParams = new URLSearchParams(location.search);
+      const activeSuperCatSlug = searchParams.get('superCategory') || 'all';
+      const matched = activeList.find((c) => {
+        const scopes = c.applicableSuperCategories || ['all'];
+        const isAll = activeSuperCatSlug === 'all' || activeSuperCatSlug === 'sc_all' || activeSuperCatSlug === 'All';
+        if (isAll) return scopes.includes('all') || scopes.includes('sc_all') || scopes.includes('All') || scopes.length === 0;
+        return scopes.includes(activeSuperCatSlug) || scopes.includes(`sc_${activeSuperCatSlug}`) || (activeSuperCatSlug.startsWith('sc_') && scopes.includes(activeSuperCatSlug.replace('sc_', '')));
+      });
+      return matched || null;
+    }
+    return activeFestivalCampaign;
+  }, [festivalCampaigns, activeFestivalCampaign, isHomePage, location.search]);
+
+  // Festival campaign active check ONLY for Mobile
   const isFestivalActive = useMemo(() => {
     if (!isMobile) return false; // Festival theme is strictly MOBILE ONLY
-    if (!activeFestivalCampaign || activeFestivalCampaign.isActive === false || activeFestivalCampaign.status === 'draft') {
+    const targetCamp = tabActiveCampaign;
+    if (!targetCamp || targetCamp.isActive === false || targetCamp.status === 'draft') {
       return false;
     }
     const now = new Date();
-    const start = new Date(activeFestivalCampaign.startDate);
-    const end = new Date(activeFestivalCampaign.endDate);
+    const start = new Date(targetCamp.startDate);
+    const end = new Date(targetCamp.endDate);
     if (now < start || now > end) return false;
 
-    const scopes = activeFestivalCampaign.applicableSuperCategories || ['all'];
-    const appliesToAll = scopes.includes('all') || scopes.includes('sc_all') || scopes.includes('All');
+    const scopes = targetCamp.applicableSuperCategories || ['all'];
 
-    if (isHomePage) return true;
+    if (isHomePage) {
+      const searchParams = new URLSearchParams(location.search);
+      const activeSuperCatSlug = searchParams.get('superCategory') || 'all';
+      const isAllCat = activeSuperCatSlug === 'all' || activeSuperCatSlug === 'sc_all' || activeSuperCatSlug === 'All';
+
+      if (isAllCat) {
+        return scopes.includes('all') || scopes.includes('sc_all') || scopes.includes('All') || scopes.length === 0;
+      }
+      return scopes.includes(activeSuperCatSlug) || scopes.includes(`sc_${activeSuperCatSlug}`);
+    }
 
     const currentSlug = location.pathname.replace(/^\//, '').split('/')[0] || '';
-    if (appliesToAll) return true;
     return scopes.includes(currentSlug) || scopes.includes(`sc_${currentSlug}`);
-  }, [isMobile, activeFestivalCampaign, location.pathname, isHomePage]);
+  }, [isMobile, tabActiveCampaign, location.pathname, isHomePage, location.search]);
 
   // Active campaign banners list for Home Page
   const validHomeBanners = useMemo(() => {
@@ -312,8 +338,8 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
   }, [validHomeBanners, activeHeroBannerIndex]);
 
   const campaignBgColor = isHomePage ? (activeCampaignBanner?.themeBgColor || activeCampaignBanner?.gradient?.[0]) : null;
-  const campaignTextColor = isHomePage ? (activeFestivalCampaign?.cardStyling?.textColor || activeCampaignBanner?.themeTextColor) : null;
-  const campaignAccentColor = isHomePage ? (activeFestivalCampaign?.cardStyling?.accentColor || activeCampaignBanner?.themeAccentColor || '#F6C453') : '#10B981';
+  const campaignTextColor = isHomePage ? (tabActiveCampaign?.cardStyling?.textColor || activeCampaignBanner?.themeTextColor) : null;
+  const campaignAccentColor = isHomePage ? (tabActiveCampaign?.cardStyling?.accentColor || activeCampaignBanner?.themeAccentColor || '#F6C453') : '#10B981';
 
   const getIsDarkColor = (colorHexOrRgb?: string) => {
     if (!colorHexOrRgb) return false;
@@ -331,8 +357,8 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
   };
 
   const festivalTheme = useMemo(() => {
-    return resolveFestivalTheme(activeFestivalCampaign);
-  }, [activeFestivalCampaign]);
+    return resolveFestivalTheme(tabActiveCampaign);
+  }, [tabActiveCampaign]);
 
   const isScrolledPastFestival = useMemo(() => {
     return isScrolledDown && lastScrollY.current > 140;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams, Link, useNavigate, useLocation, useParams } from 'react-router-dom';
-import { useCMS, getSubCategoryImage, Product, deduplicateSubCategories } from '../context/CMSContext';
+import { useCMS, getSubCategoryImage, getCategoryImage, Product, deduplicateSubCategories } from '../context/CMSContext';
 import { ProductCard } from '../components/ProductCard';
 import { SEO } from '../components/SEO';
 import { BannerCarousel } from '../components/BannerCarousel';
@@ -267,8 +267,8 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
     const slug = currentCategoryObj?.slug || currentCategoryObj?.id || 'fruits-vegetables';
     return categoryMetaData[slug] || {
       description: 'Sourced directly from local farms daily and delivered fresh to your door in 10 minutes.',
-      bannerImg: 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=600&auto=format&fit=crop',
-      icon: 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=150&auto=format&fit=crop'
+      bannerImg: 'https://images.unsplash.com/photo-1597362925123-77861d3fbac7?w=600&auto=format&fit=crop',
+      icon: 'https://images.unsplash.com/photo-1597362925123-77861d3fbac7?w=150&auto=format&fit=crop'
     };
   }, [currentCategoryObj]);
 
@@ -550,24 +550,29 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
               <aside
                 ref={subcategorySidebarRef}
                 style={{ overscrollBehavior: 'contain', overscrollBehaviorY: 'contain' }}
-                className="bg-white border-r border-divider/60 py-2 px-1 h-full overflow-y-auto overscroll-contain overscroll-y-contain touch-pan-y no-scrollbar rounded-xl flex flex-col gap-1 shadow-2xs shrink-0"
+                className="bg-white border-r border-divider/60 py-2 px-0.5 h-full overflow-y-auto overscroll-contain overscroll-y-contain touch-pan-y no-scrollbar rounded-xl flex flex-col gap-1 shadow-2xs shrink-0"
               >
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-1.5 w-full">
                   {/* All Subcategories Button */}
                   <button
                     onClick={() => {
                       setSelectedSubCategory('');
                       setSearchParams({ category: selectedCategory, subCategory: 'All' }, { replace: true });
                     }}
-                    className={`relative w-full flex flex-col items-center justify-center p-1 py-1.5 rounded-xl text-center transition-all duration-200 group cursor-pointer ${selectedSubCategory === '' ? 'font-black' : 'hover:bg-background'
-                      }`}
+                    className={`relative w-full flex flex-col items-center justify-center py-1.5 px-0.5 rounded-xl text-center transition-all duration-200 group cursor-pointer ${
+                      selectedSubCategory === '' ? 'bg-emerald-50/50' : 'hover:bg-background'
+                    }`}
                   >
                     {selectedSubCategory === '' && (
                       <span className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-8 rounded-l-full bg-emerald-600" />
                     )}
-                    <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center flex-shrink-0 border ${selectedSubCategory === '' ? 'border-emerald-500 bg-emerald-100/60 shadow-2xs' : 'border-divider/60 bg-gray-50'
+                    <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full overflow-hidden flex-shrink-0 p-0.5 border ${selectedSubCategory === '' ? 'border-emerald-500 bg-emerald-100/60 shadow-2xs' : 'border-divider/60 bg-gray-50'
                       }`}>
-                      <span className="text-base sm:text-lg">🛍️</span>
+                      <SubcategoryCardImage
+                        src={getCategoryImage(currentCategoryObj || selectedCategory)}
+                        alt="All"
+                        className="w-full h-full object-contain"
+                      />
                     </div>
                     <span className={`text-[10px] leading-tight line-clamp-2 mt-1 text-center font-extrabold ${selectedSubCategory === '' ? 'text-emerald-950 font-black' : 'text-text-secondary'
                       }`}>
@@ -584,12 +589,14 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
 
                     return (
                       <button
-                        key={idx}
+                        key={typeof sub === 'object' && sub.id ? sub.id : (subName || `sub_rail_${idx}`)}
                         onClick={() => {
                           setSelectedSubCategory(subName);
                           setSearchParams({ category: selectedCategory, subCategory: subName }, { replace: true });
                         }}
-                        className={`relative w-full flex flex-col items-center justify-center p-1 py-1.5 rounded-xl text-center transition-all duration-200 group cursor-pointer`}
+                        className={`relative w-full flex flex-col items-center justify-center py-1.5 px-0.5 rounded-xl text-center transition-all duration-200 group cursor-pointer ${
+                          isActive ? 'bg-emerald-50/50' : 'hover:bg-background'
+                        }`}
                       >
                         {isActive && (
                           <span className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-8 rounded-l-full bg-emerald-600" />
@@ -624,17 +631,14 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
                 <BannerCarousel banners={topSubCategoryBanners} />
 
                 <div className="bg-surface/90 backdrop-blur-xs border border-divider/70 rounded-2xl p-3 sm:p-4 shadow-xs flex flex-col gap-2">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+                  <div className="flex flex-row items-center justify-between gap-2 sm:gap-4">
                     <div>
                       <h1 className="text-lg sm:text-xl font-black text-text-primary tracking-tight font-display">
                         {urlSearch ? `Search Results for "${urlSearch}"` : (selectedSubCategory || `All ${currentCategoryObj?.name || ''}`)}
                       </h1>
-                      <p className="text-[11px] sm:text-xs text-text-tertiary font-bold mt-0.5">
-                        {filteredProducts.length} Products available in 10 mins
-                      </p>
                     </div>
 
-                    <div className="flex items-center gap-2 bg-background border border-divider px-3 py-1.5 rounded-xl text-xs self-start sm:self-auto">
+                    <div className="flex items-center gap-2 bg-background border border-divider px-3 py-1.5 rounded-xl text-xs shrink-0">
                       <ArrowUpDown size={14} className="text-emerald-600" />
                       <select
                         value={sortBy}
@@ -648,26 +652,6 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
                         <option value="discount">Max Discount</option>
                       </select>
                     </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 pt-1">
-                    {([
-                      ['Organic', onlyOrganic, setOnlyOrganic],
-                      ['In stock', onlyInStock, setOnlyInStock],
-                      ['On offer', onlyOnSale, setOnlyOnSale],
-                    ] as [string, boolean, (v: boolean) => void][]).map(([label, on, set]) => (
-                      <button
-                        key={label}
-                        onClick={() => set(!on)}
-                        className={`px-3 py-1 rounded-full text-[11px] font-bold border transition-colors ${
-                          on
-                            ? 'bg-emerald-600 text-white border-emerald-600'
-                            : 'bg-background text-text-secondary border-divider hover:border-emerald-400'
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
                   </div>
                 </div>
 
@@ -739,7 +723,7 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
                     const subName = typeof sub === 'string' ? sub : sub.name;
                     const subDesc = subCategoryDescriptions[subName] || `Fresh ${subName.toLowerCase()} restocked daily. Sourced directly for peak freshness.`;
                     const catSlug = currentCategoryObj?.slug || currentCategoryObj?.id || 'fruits-vegetables';
-                    const subImg = subCategoryImages[subName] || categoryMetaData[catSlug]?.icon || 'https://images.unsplash.com/photo-1610398022800-14cf586dcde5?w=150&auto=format&fit=crop';
+                    const subImg = subCategoryImages[subName] || categoryMetaData[catSlug]?.icon || 'https://images.unsplash.com/photo-1597362925123-77861d3fbac7?w=150&auto=format&fit=crop';
 
                     return (
                       <div

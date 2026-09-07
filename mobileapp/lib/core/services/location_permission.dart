@@ -104,6 +104,7 @@ class LocationPermissionService {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return showModalBottomSheet<bool>(
       context: context,
+      useRootNavigator: true,
       showDragHandle: true,
       builder: (_) => Padding(
         padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),

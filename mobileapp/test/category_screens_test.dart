@@ -127,8 +127,8 @@ void main() {
       await tester.tap(find.text('Leafy greens').first);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
-      // Catalog screen shows the sub chip selected + product count line.
-      expect(find.textContaining('products'), findsOneWidget);
+      // Catalog screen shows Filter & Sort header card.
+      expect(find.text('Filter & Sort'), findsOneWidget);
       expect(find.text('PDP 1'), findsNothing);
     });
 
@@ -144,10 +144,10 @@ void main() {
   });
 
   group('Category catalog', () {
-    testWidgets('renders a product grid with a count line', (tester) async {
+    testWidgets('renders a product grid with a filter & sort header', (tester) async {
       await _boot(tester, _host(_base(), start: '/category/veg'));
       expect(find.text('Vegetables'), findsOneWidget); // app bar title
-      expect(find.text('2 products'), findsOneWidget);
+      expect(find.text('Filter & Sort'), findsOneWidget);
     });
 
     testWidgets('respects the initial subcategory from the route', (tester) async {
