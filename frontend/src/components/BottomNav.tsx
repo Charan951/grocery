@@ -1,38 +1,32 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Home, LayoutGrid, Search, Receipt, User } from 'lucide-react';
+import { House, Grid3x3, Package, CircleUser } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const NAV_ITEMS = [
-  { 
-    label: 'Home', 
-    path: '/', 
-    icon: Home, 
-    match: (p: string) => p === '/' 
+  {
+    label: 'Categories',
+    path: '/categories',
+    icon: Grid3x3,
+    match: (p: string) => p.startsWith('/categories') || p.startsWith('/category/')
   },
-  { 
-    label: 'Categories', 
-    path: '/categories', 
-    icon: LayoutGrid, 
-    match: (p: string) => p.startsWith('/categories') || p.startsWith('/category/') 
+  {
+    label: 'Home',
+    path: '/',
+    icon: House,
+    match: (p: string) => p === '/'
   },
-  { 
-    label: 'Search', 
-    path: '/search', 
-    icon: Search, 
-    match: (p: string) => p === '/search' || p.startsWith('/search?') 
+  {
+    label: 'Orders',
+    path: '/orders',
+    icon: Package,
+    match: (p: string) => p.startsWith('/orders') || p.startsWith('/account/orders') || p.startsWith('/track/')
   },
-  { 
-    label: 'Orders', 
-    path: '/orders', 
-    icon: Receipt, 
-    match: (p: string) => p.startsWith('/orders') || p.startsWith('/account/orders') || p.startsWith('/track/') 
-  },
-  { 
-    label: 'Account', 
-    path: '/profile', 
-    icon: User, 
-    match: (p: string) => p.startsWith('/profile') || p.startsWith('/account/profile') || p.startsWith('/account/edit') 
+  {
+    label: 'Account',
+    path: '/profile',
+    icon: CircleUser,
+    match: (p: string) => p.startsWith('/profile') || p.startsWith('/account/profile') || p.startsWith('/account/edit')
   },
 ];
 
@@ -89,7 +83,7 @@ export const BottomNav: React.FC = () => {
       animate={{ y: hidden ? '100%' : '0%' }}
       transition={{ duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
     >
-      <div className="grid grid-cols-5 items-center px-1 py-1.5 min-h-[58px]">
+      <div className="grid grid-cols-4 items-center px-1 py-1.5 min-h-[58px]">
         {NAV_ITEMS.map((item) => {
           const isActive = item.match(location.pathname);
           const Icon = item.icon;
@@ -104,12 +98,12 @@ export const BottomNav: React.FC = () => {
               <Icon
                 size={22}
                 strokeWidth={isActive ? 2.2 : 1.8}
-                fill={isActive && item.label === 'Home' ? '#0C831F' : 'none'}
-                className={isActive ? 'text-[#0C831F]' : 'text-gray-500'}
+                fill="none"
+                className="text-gray-700"
               />
               <span
-                className={`text-[11px] leading-tight mt-1 transition-colors ${
-                  isActive ? 'font-extrabold text-[#0C831F]' : 'font-medium text-gray-600'
+                className={`text-[11px] leading-tight mt-1 transition-[font-weight] ${
+                  isActive ? 'font-extrabold text-gray-900' : 'font-medium text-gray-600'
                 }`}
               >
                 {item.label}

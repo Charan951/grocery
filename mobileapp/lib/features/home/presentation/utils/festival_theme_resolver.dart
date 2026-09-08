@@ -13,6 +13,12 @@ class ResolvedFestivalTheme {
   final Color buttonColor;
   final Color textColor;
 
+  /// Readable colour for text/icons sitting directly on [cardBackground]
+  /// (i.e. not over a dark image overlay). White on a dark card, dark ink on a
+  /// light one — so an admin-picked pastel card background never gets
+  /// unreadable white text. Mirrors the web resolver's `cardText`.
+  final Color cardText;
+
   const ResolvedFestivalTheme({
     required this.key,
     required this.emoji,
@@ -24,7 +30,15 @@ class ResolvedFestivalTheme {
     required this.accentColor,
     required this.buttonColor,
     required this.textColor,
+    required this.cardText,
   });
+}
+
+/// Rough perceived-luminance test so text stays readable whatever colour the
+/// admin picked. Mirrors `isDarkColor` in the web `festivalThemeResolver.ts`.
+bool isDarkColor(Color c) {
+  final luminance = 0.2126 * c.red + 0.7152 * c.green + 0.0722 * c.blue;
+  return luminance < 140;
 }
 
 class FestivalThemeResolver {
@@ -141,6 +155,13 @@ class FestivalThemeResolver {
 
     final cardBg = gStart;
 
+    // Content on the card must read against whatever colour the admin chose:
+    // white on a dark card, else the admin text colour if it is itself dark,
+    // else a near-black ink.
+    final cardText = isDarkColor(cardBg)
+        ? Colors.white
+        : (isDarkColor(styling.textColor) ? styling.textColor : const Color(0xFF1C1C1E));
+
     return ResolvedFestivalTheme(
       key: key,
       emoji: preset['emoji'],
@@ -156,6 +177,7 @@ class FestivalThemeResolver {
       accentColor: styling.accentColor,
       buttonColor: styling.buttonColor,
       textColor: styling.textColor,
+      cardText: cardText,
     );
   }
 }

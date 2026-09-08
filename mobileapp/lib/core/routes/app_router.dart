@@ -113,7 +113,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (!canBrowse) {
         return _publicRoutes.contains(loc) ? null : '/login';
       }
-      // A guest can browse the shell (Home/Categories/Search/Account) and shop,
+      // A guest can browse the shell (Categories/Home/Account), search and shop,
       // but needs a real account for checkout, orders, wallet and settings.
       if (!auth.isAuthenticated &&
           _authOnlyPrefixes.any((p) => loc.startsWith(p))) {
@@ -262,19 +262,32 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Legacy alias — Profile is the Account tab now.
       GoRoute(path: '/profile', redirect: (c, s) => '/account'),
 
-      // ---- Bottom-nav tab shell: strictly wraps ONLY the 5 main tab routes ----
+      // Search is no longer a bottom-nav tab (mirrors the web storefront) — it's
+      // pushed full-screen above the shell from the home search bar / festival
+      // cards. The `/search` path still works everywhere it was used.
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/search',
+        builder: (c, s) {
+          final q = s.uri.queryParameters['q'];
+          return SearchScreen(
+            initialQuery: q,
+            autofocus: q == null || q.isEmpty,
+          );
+        },
+      ),
+
+      // ---- Bottom-nav tab shell: strictly wraps ONLY the 4 main tab routes,
+      //      in bottom-nav order (Categories, Home, Orders, Account) ----
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             MainScaffold(navigationShell: navigationShell),
         branches: [
           StatefulShellBranch(
-            routes: [GoRoute(path: '/', builder: (c, s) => const HomeScreen())],
-          ),
-          StatefulShellBranch(
             routes: [GoRoute(path: '/categories', builder: (c, s) => const CategoriesScreen())],
           ),
           StatefulShellBranch(
-            routes: [GoRoute(path: '/search', builder: (c, s) => const SearchScreen())],
+            routes: [GoRoute(path: '/', builder: (c, s) => const HomeScreen())],
           ),
           StatefulShellBranch(
             routes: [GoRoute(path: '/orders', builder: (c, s) => const OrdersListScreen())],

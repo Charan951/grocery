@@ -22,7 +22,6 @@ import {
 } from 'lucide-react';
 import { useCMS } from '../context/CMSContext';
 import { useSmartBack } from '../hooks/useSmartBack';
-import { searchCitiesByPrefix, CityLocation } from '../data/citiesData';
 
 interface SavedAddress {
   id: string;
@@ -37,13 +36,6 @@ interface SavedAddress {
   lat: number;
   lng: number;
 }
-
-const defaultPopularLocations = [
-  { name: 'HITEC City (Hyderabad)', lat: 17.4474, lng: 78.3762 },
-  { name: 'Kukatpally (Hyderabad)', lat: 17.4842, lng: 78.3888 },
-  { name: 'Indiranagar (Bengaluru)', lat: 12.9784, lng: 77.6408 },
-  { name: 'HSR Layout (Bengaluru)', lat: 12.9121, lng: 77.6446 },
-];
 
 const labelIcon = (label: 'Home' | 'Work' | 'Other') => {
   if (label === 'Home') return Home;
@@ -108,9 +100,14 @@ export const CustomerAddresses: React.FC = () => {
   // Reverse geocoding helper via OpenStreetMap Nominatim API
   const fetchAddressForCoords = async (lat: number, lng: number) => {
     setIsGeocoding(true);
+    // Don't let a slow Nominatim response hang the "Updating address…" state —
+    // bail after 6s and keep whatever the pin already shows.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
     try {
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
+        `https://nominatim.openstreetmap.org/reverse?format=json&zoom=16&lat=${lat}&lon=${lng}`,
+        { signal: controller.signal }
       );
       const data = await res.json();
       if (data && data.display_name) {
@@ -126,8 +123,11 @@ export const CustomerAddresses: React.FC = () => {
         setFullAddressText(`New Balaji Nagar, KPHB Colony, Hyderabad, Telangana 500072, India`);
       }
     } catch (err) {
-      setFullAddressText(`New Balaji Nagar, KPHB Colony, Hyderabad, Telangana 500072, India`);
+      if (!fullAddressText) {
+        setFullAddressText(`New Balaji Nagar, KPHB Colony, Hyderabad, Telangana 500072, India`);
+      }
     } finally {
+      clearTimeout(timeout);
       setIsGeocoding(false);
     }
   };
@@ -149,39 +149,40 @@ export const CustomerAddresses: React.FC = () => {
   };
 
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [prefixSuggestions, setPrefixSuggestions] = useState<CityLocation[]>([]);
   const [apiSuggestions, setApiSuggestions] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
-  // Automatic starting letter prefix search for delivery search bar
+  // Live location search — real-time results straight from OpenStreetMap
+  // Nominatim, debounced. No local/"popular" city fallback list.
   useEffect(() => {
-    const raw = searchQuery.trim();
-    const cleanQ = raw.replace(/[-_]+$/, '').trim();
+    const cleanQ = searchQuery.trim().replace(/[-_]+$/, '').trim();
 
-    if (cleanQ.length > 0) {
-      const localMatches = searchCitiesByPrefix(cleanQ);
-      setPrefixSuggestions(localMatches);
-      setShowSuggestions(true);
-
-      const timer = setTimeout(async () => {
-        try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&countrycodes=in&q=${encodeURIComponent(cleanQ)}`
-          );
-          const data = await res.json();
-          if (data && Array.isArray(data)) {
-            setApiSuggestions(data.slice(0, 5));
-          }
-        } catch (err) {
-          console.warn(err);
-        }
-      }, 250);
-
-      return () => clearTimeout(timer);
-    } else {
-      setPrefixSuggestions([]);
+    if (cleanQ.length < 2) {
       setApiSuggestions([]);
       setShowSuggestions(false);
+      setIsSearching(false);
+      return;
     }
+
+    setShowSuggestions(true);
+    setIsSearching(true);
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=8&q=${encodeURIComponent(cleanQ)}`
+        );
+        const data = await res.json();
+        setApiSuggestions(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.warn(err);
+        setApiSuggestions([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
   }, [searchQuery]);
 
   const handleSelectSuggestion = (
@@ -245,6 +246,24 @@ export const CustomerAddresses: React.FC = () => {
     setDetectedPincode('');
     setPosition([17.4842, 78.3888]);
     setViewMode('form');
+
+    // Auto-detect the visitor's live location the moment the form opens so the
+    // map pins where they actually are instead of a default city centre.
+    if (navigator.geolocation) {
+      setIsGeocoding(true);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          setPosition([lat, lng]);
+          fetchAddressForCoords(lat, lng);
+        },
+        () => {
+          setIsGeocoding(false);
+        },
+        { enableHighAccuracy: false, timeout: 7000, maximumAge: 120000 }
+      );
+    }
   };
 
   const handleOpenEdit = (addr: SavedAddress, e: React.MouseEvent) => {
@@ -264,6 +283,7 @@ export const CustomerAddresses: React.FC = () => {
 
   const handleLocateMe = () => {
     if (navigator.geolocation) {
+      setIsGeocoding(true);
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const lat = pos.coords.latitude;
@@ -274,8 +294,11 @@ export const CustomerAddresses: React.FC = () => {
           setTimeout(() => setNotificationMsg(''), 3000);
         },
         () => {
-          alert('Could not detect exact location. Defaulting to KPHB Colony.');
-        }
+          setIsGeocoding(false);
+          setNotificationMsg('Could not detect your location. Search or tap the map instead.');
+          setTimeout(() => setNotificationMsg(''), 3000);
+        },
+        { enableHighAccuracy: false, timeout: 7000, maximumAge: 120000 }
       );
     }
   };
@@ -596,7 +619,6 @@ export const CustomerAddresses: React.FC = () => {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onFocus={() => searchQuery.trim().length > 0 && setShowSuggestions(true)}
-                    placeholder="Type city or area (e.g. E for Eluru, G for Guntur)..."
                     className="w-full bg-transparent border-none outline-none text-xs sm:text-sm font-semibold text-text-primary placeholder:text-text-tertiary"
                   />
                   {searchQuery && (
@@ -620,37 +642,18 @@ export const CustomerAddresses: React.FC = () => {
                 </button>
               </form>
 
-              {/* Autocomplete Starting-Letter City Suggestions Dropdown */}
-              {showSuggestions && (prefixSuggestions.length > 0 || apiSuggestions.length > 0) && (
+              {/* Live location results straight from OpenStreetMap */}
+              {showSuggestions && (
                 <div className="absolute top-[calc(100%+6px)] left-0 right-0 bg-white border border-divider rounded-2xl shadow-premium overflow-hidden z-[500] max-h-72 overflow-y-auto p-1.5 flex flex-col gap-0.5">
                   <div className="px-3 py-1 text-[10px] font-black text-text-tertiary uppercase tracking-wider bg-background/60 rounded-lg">
-                    Matching Locations ({prefixSuggestions.length + apiSuggestions.length})
+                    {isSearching ? 'Searching…' : `Matching Locations (${apiSuggestions.length})`}
                   </div>
 
-                  {prefixSuggestions.map((city, idx) => (
-                    <div
-                      key={`prefix_addr_${idx}`}
-                      onClick={() => handleSelectSuggestion(city.name, city.state, city.lat, city.lng, city.pincode)}
-                      className="px-3.5 py-2.5 hover:bg-primary/10 rounded-xl cursor-pointer flex items-center justify-between border-b border-divider/40 last:border-b-0 group transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 font-bold text-xs">
-                          📍
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-xs font-extrabold text-text-primary group-hover:text-primary">
-                            {city.name}
-                          </span>
-                          <span className="text-[10px] font-semibold text-text-tertiary">
-                            {city.state} {city.pincode ? `• PIN: ${city.pincode}` : ''}
-                          </span>
-                        </div>
-                      </div>
-                      <span className="text-[10px] font-extrabold text-primary bg-primary/10 px-2.5 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity">
-                        Select City
-                      </span>
+                  {!isSearching && apiSuggestions.length === 0 && (
+                    <div className="px-3.5 py-4 text-xs font-semibold text-text-tertiary text-center">
+                      No locations found. Try a more specific search.
                     </div>
-                  ))}
+                  )}
 
                   {apiSuggestions.map((item, idx) => {
                     const mainName = item.display_name.split(',')[0];
@@ -685,24 +688,6 @@ export const CustomerAddresses: React.FC = () => {
                   })}
                 </div>
               )}
-            </div>
-
-            {/* Popular Locations */}
-            <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-none">
-              <span className="text-[11px] font-black text-text-tertiary uppercase tracking-wider shrink-0">Popular:</span>
-              {defaultPopularLocations.map((loc, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => {
-                    setPosition([loc.lat, loc.lng]);
-                    fetchAddressForCoords(loc.lat, loc.lng);
-                  }}
-                  className="bg-surface hover:bg-primary/5 border border-divider hover:border-primary/40 text-text-secondary font-bold text-[11px] px-3.5 py-1.5 rounded-full flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer"
-                >
-                  <MapPin size={12} className="text-primary" /> {loc.name}
-                </button>
-              ))}
             </div>
 
             {/* Interactive OpenStreetMap Container with Click/Tap Pinning */}
@@ -773,7 +758,6 @@ export const CustomerAddresses: React.FC = () => {
                     required
                     value={receiverName}
                     onChange={(e) => setReceiverName(e.target.value)}
-                    placeholder="e.g. Full Name"
                     className="bg-background border border-divider focus:border-primary rounded-xl px-4 py-2.5 text-xs font-bold text-text-primary focus:outline-none"
                   />
                 </div>
@@ -788,7 +772,6 @@ export const CustomerAddresses: React.FC = () => {
                     required
                     value={receiverPhone}
                     onChange={(e) => setReceiverPhone(e.target.value)}
-                    placeholder="e.g. +91 98765 43210"
                     className="bg-background border border-divider focus:border-primary rounded-xl px-4 py-2.5 text-xs font-bold text-text-primary focus:outline-none"
                   />
                 </div>
@@ -805,7 +788,6 @@ export const CustomerAddresses: React.FC = () => {
                     required
                     value={houseNo}
                     onChange={(e) => setHouseNo(e.target.value)}
-                    placeholder="e.g. Flat No, Building Name"
                     className="bg-background border border-divider focus:border-primary rounded-xl px-4 py-2.5 text-xs font-bold text-text-primary focus:outline-none"
                   />
                 </div>
@@ -818,7 +800,6 @@ export const CustomerAddresses: React.FC = () => {
                     type="text"
                     value={landmark}
                     onChange={(e) => setLandmark(e.target.value)}
-                    placeholder="e.g. Near Bus Stop"
                     className="bg-background border border-divider focus:border-primary rounded-xl px-4 py-2.5 text-xs font-bold text-text-primary focus:outline-none"
                   />
                 </div>

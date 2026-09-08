@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useMemo, useRef, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { CMSProvider, useCMS } from './context/CMSContext';
 import { CartWishlistProvider } from './context/CartWishlistContext';
@@ -36,11 +36,29 @@ import { CartDrawer } from './components/CartDrawer';
 import { QuickViewModal } from './components/QuickViewModal';
 import { FloatingCartBar } from './components/FloatingCartBar';
 import { BottomNav } from './components/BottomNav';
+import { useIsMobile } from './hooks/useIsMobile';
 
-// Scroll To Top on page navigation
+// Scroll To Top on page navigation.
+// Switching the Home super-category tab only mutates the `?superCategory=`
+// query on the same `/` route — that should feel like an in-place tab swap,
+// not a fresh page load, so we skip the hard scroll reset in that case.
 const ScrollToTop: React.FC = () => {
   const { pathname, search } = useLocation();
+  const prev = useRef({ pathname, search });
   useEffect(() => {
+    const last = prev.current;
+    prev.current = { pathname, search };
+
+    if (last.pathname === pathname && pathname === '/') {
+      const strip = (s: string) => {
+        const p = new URLSearchParams(s);
+        p.delete('superCategory');
+        return p.toString();
+      };
+      // Only the super-category tab changed — keep the scroll position.
+      if (strip(last.search) === strip(search)) return;
+    }
+
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [pathname, search]);
   return null;
@@ -109,14 +127,10 @@ const AppContent: React.FC = () => {
   const isStandalonePage = !isMainTabRoute;
   const isBottomNavHidden = !isMainTabRoute;
 
-  const [isMobile, setIsMobile] = useState<boolean>(() => typeof window !== 'undefined' ? window.innerWidth < 640 : false);
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 640);
-    window.addEventListener('resize', handleResize, { passive: true });
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const isMobile = useIsMobile(640);
 
   const isPDP = location.pathname.startsWith('/product/') || location.pathname.startsWith('/prn/');
+  const isProductsListingPage = location.pathname === '/products' || location.pathname.startsWith('/products/');
   const isCategoriesPage = location.pathname === '/categories' || location.pathname.startsWith('/categories/');
   const isSearchPage = location.pathname === '/search' || location.pathname.startsWith('/search');
   const isProfilePage = location.pathname === '/profile' || location.pathname.startsWith('/account/profile');
@@ -160,7 +174,7 @@ const AppContent: React.FC = () => {
       {/* Main Pages */}
       <main
         className="flex-grow"
-        style={{ paddingTop: isMobile && (isPDP || isCategoriesPage || isSearchPage || isProfilePage || isOrdersPage || isAddressesPage) ? 0 : 'var(--sticky-header-h, 140px)' }}
+        style={{ paddingTop: isMobile && (isPDP || isProductsListingPage || isCategoriesPage || isSearchPage || isProfilePage || isOrdersPage || isAddressesPage) ? 0 : 'var(--sticky-header-h)' }}
       >
         <Routes>
           <Route path="/" element={<Home onQuickView={setQuickViewProduct} />} />

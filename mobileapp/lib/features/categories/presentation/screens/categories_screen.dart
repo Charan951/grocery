@@ -262,20 +262,20 @@ class _SubTile extends StatelessWidget {
         children: [
           AspectRatio(
             aspectRatio: 1,
-            child: Container(
-              decoration: BoxDecoration(
+            child: ClipRRect(
+              borderRadius: AppRadius.brMd,
+              child: Container(
                 color: color.withOpacity(isDark ? 0.14 : 0.09),
-                borderRadius: AppRadius.brMd,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(6.0),
                 child: hasValidUrl
                     ? CachedNetworkImage(
                         imageUrl: imageUrl!,
-                        fit: BoxFit.contain,
-                        errorWidget: (context, url, error) => fallbackIcon,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                        errorWidget: (context, url, error) =>
+                            Center(child: fallbackIcon),
                       )
-                    : fallbackIcon,
+                    : Center(child: fallbackIcon),
               ),
             ),
           ),

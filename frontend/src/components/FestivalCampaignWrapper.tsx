@@ -1,13 +1,31 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FestivalCampaign, useCMS } from '../context/CMSContext';
-import { resolveFestivalTheme } from '../utils/festivalThemeResolver';
+import { resolveFestivalTheme, isDarkColor } from '../utils/festivalThemeResolver';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { ChevronRight } from 'lucide-react';
 
 interface FestivalCampaignWrapperProps {
   campaign: FestivalCampaign;
   currentSuperCatId?: string;
   onQuickView?: (product: any) => void;
+}
+
+// Where a festival group card lands:
+//  - exactly one curated product  -> that product's page
+//  - several curated products     -> Products filtered to that id list
+//  - none configured              -> fuzzy catalog search by the group name
+function festivalGroupHref(grp: any): string {
+  const ids = (Array.isArray(grp?.products) ? grp.products : [])
+    .map((v: any) => (typeof v === 'string' ? v : v?.id || v?._id))
+    .filter(Boolean);
+  const name = (grp?.displayName || '').trim();
+  if (ids.length === 1) return `/product/${ids[0]}`;
+  if (ids.length > 1) {
+    const t = name ? `&title=${encodeURIComponent(name)}` : '';
+    return `/products?ids=${ids.map(encodeURIComponent).join(',')}${t}`;
+  }
+  return name ? `/products?search=${encodeURIComponent(name)}` : '/products';
 }
 
 const DEFAULT_GROUP_IMAGES = [
@@ -24,16 +42,7 @@ export const FestivalCampaignWrapper: React.FC<FestivalCampaignWrapperProps> = (
   const navigate = useNavigate();
   const { products = [] } = useCMS();
 
-  // Mobile viewport check
-  const [isMobile, setIsMobile] = useState<boolean>(() =>
-    typeof window !== 'undefined' ? window.innerWidth < 768 : false
-  );
-
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const isMobile = useIsMobile(768);
 
   const theme = useMemo(() => resolveFestivalTheme(campaign), [campaign]);
 
@@ -59,45 +68,60 @@ export const FestivalCampaignWrapper: React.FC<FestivalCampaignWrapperProps> = (
     }
   }
 
-  const groups = campaign.festivalGroups || [];
+  // Active groups only (admin can toggle a group off) — this must match the
+  // mobile app's filter exactly so both surfaces show the same set.
+  const allGroups = (campaign.festivalGroups || []).filter(
+    (g: any) => g?.isActive !== false
+  );
 
-  const displayGroups = groups.length > 0 ? groups : [
-    { id: 'fg_gifts', displayName: 'Gifts', discountPercent: 50 },
-    { id: 'fg_sweets', displayName: 'sweets', discountPercent: 20 },
-    { id: 'fg_pooja', displayName: 'pooja essentials', discountPercent: 10 },
-    { id: 'fg_flowers', displayName: 'flowers', discountPercent: 5 }
-  ];
+  // Prefer groups that carry real content — an explicit image or at least one
+  // curated product. Name-only groups would render as an invisible tile (broken
+  // stock-photo fallback on a tinted background). If every active group is
+  // name-only, fall back to showing them all rather than rendering nothing.
+  const realGroups = allGroups.filter(
+    (g: any) =>
+      (g?.image || g?.imageUrl || '').toString().trim() !== '' ||
+      (Array.isArray(g?.products) && g.products.length > 0)
+  );
+  const displayGroups = realGroups.length > 0 ? realGroups : allGroups;
+
+  // A campaign with no configured groups has nothing to show — render nothing
+  // rather than synthesising stock photos and placeholder group names.
+  if (displayGroups.length === 0) return null;
 
   return (
-    <section 
-      className="w-full pt-3 pb-0 relative transition-colors duration-300"
+    <section
+      className="w-full pt-5 pb-0 relative transition-colors duration-300"
       style={{ background: theme.bgGradient, backgroundColor: theme.gStart }}
     >
-      <div className="max-w-4xl mx-auto px-3 flex flex-col items-center">
-        
-        {/* Festival Title Block: ✨ CELEBRATE ✨ krishnashtami (Matching Flutter festival_campaign_section.dart) */}
-        <div className="flex flex-col items-center text-center mb-3">
-          <div 
-            className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.2em]"
-            style={{ color: theme.accent }}
+      <div className="max-w-4xl mx-auto px-4 flex flex-col items-center">
+
+        {/* Festival title block */}
+        <div className="flex flex-col items-center text-center mb-4">
+          <div
+            className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.28em]"
+            style={{ color: theme.text, opacity: 0.72 }}
           >
-            <span>{theme.emoji}</span>
-            <span>CELEBRATE</span>
-            <span>{theme.emoji}</span>
+            <span aria-hidden>{theme.emoji}</span>
+            <span>Celebrate</span>
+            <span aria-hidden>{theme.emoji}</span>
           </div>
-          <h2 
-            className="text-2xl sm:text-3xl font-black tracking-tight leading-tight mt-0.5 font-serif italic drop-shadow-2xs"
-            style={{ color: theme.text }}
+          <h2
+            className="text-[30px] sm:text-[34px] font-normal leading-[1.1] mt-1"
+            style={{ color: theme.text, fontFamily: theme.fontFamily }}
           >
-            {campaign.name || 'krishnashtami'}
+            {campaign.name || 'Celebrate'}
           </h2>
         </div>
 
-        {/* Group Cards Layout */}
-        {campaign.cardStyle === 'style2' ? (
-          <div className="flex gap-2 w-full h-[215px] mb-3">
-            {/* Left Vertical Hero Rotator Card (2s group-wise rotator) */}
-            <div className="w-5/12 flex">
+        {/* Group Cards Layout. style2 is a hero + fixed 2×2 grid — it can only
+            show 4 groups. Outside 3–4 groups (too few = empty cells, too many =
+            silently dropped) fall back to the style1 grid/carousel, which shows
+            every group. */}
+        {campaign.cardStyle === 'style2' && displayGroups.length >= 3 && displayGroups.length <= 4 ? (
+          <div className="flex gap-3 w-full mb-5 h-[320px] sm:h-[360px]">
+            {/* Left hero: one rotating product spotlight (fixed height, no jump) */}
+            <div className="w-[38%] flex h-full">
               <Style2HeroRotator
                 groups={displayGroups}
                 products={products}
@@ -106,7 +130,7 @@ export const FestivalCampaignWrapper: React.FC<FestivalCampaignWrapperProps> = (
             </div>
 
             {/* Right 2x2 Grid displaying the 4 groups */}
-            <div className="w-7/12 grid grid-cols-2 grid-rows-2 gap-1.5">
+            <div className="w-[62%] h-full grid grid-cols-2 grid-rows-2 gap-3">
               {displayGroups.slice(0, 4).map((grp: any, idx: number) => {
                 let groupImg = grp.image || grp.imageUrl || '';
                 if (!groupImg && Array.isArray(grp.products) && grp.products.length > 0) {
@@ -118,83 +142,129 @@ export const FestivalCampaignWrapper: React.FC<FestivalCampaignWrapperProps> = (
                 if (!groupImg) {
                   groupImg = DEFAULT_GROUP_IMAGES[idx % DEFAULT_GROUP_IMAGES.length];
                 }
+                const discount = grp.discountPercent || 0;
 
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={grp.id || grp.displayName || idx}
-                    onClick={() => navigate('/products')}
-                    className="relative rounded-xl overflow-hidden shadow-2xs cursor-pointer active:scale-95 transition-all p-1.5 flex flex-col items-center justify-between group"
-                    style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorder }}
+                    onClick={() => navigate(festivalGroupHref(grp))}
+                    aria-label={`Shop ${grp.displayName}${discount > 0 ? ` — up to ${discount}% off` : ''}`}
+                    className="relative w-full h-full min-h-0 rounded-2xl overflow-hidden shadow-sm cursor-pointer active:scale-95 transition-transform group border"
+                    style={{ borderColor: theme.cardBorder }}
                   >
-                    {/* Top Center Title */}
-                    <span className="text-[10px] font-black text-white text-center leading-tight line-clamp-2 drop-shadow-xs z-10 w-full">
+                    <img
+                      src={groupImg}
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black/75 via-black/15 to-transparent" />
+                    {discount > 0 && (
+                      <span
+                        className="absolute top-2 right-2 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md leading-none z-10 shadow-2xs"
+                        style={{ backgroundColor: theme.btn }}
+                      >
+                        {discount}% OFF
+                      </span>
+                    )}
+                    <span className="absolute bottom-2.5 left-3 right-3 text-[13px] font-black text-white leading-tight line-clamp-2 text-left drop-shadow-md">
                       {grp.displayName}
                     </span>
-
-                    {/* Lower Center Image */}
-                    <div className="w-full flex-1 flex items-end justify-center max-h-[55px] z-0">
-                      <img
-                        src={groupImg}
-                        alt={grp.displayName}
-                        className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300"
-                      />
-                    </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
           </div>
-        ) : (
-          /* 4 Group Cards Row Layout (Style 1 - Ganesh Chaturthi style) */
-          <div className="grid grid-cols-4 gap-2 w-full mb-3">
-            {displayGroups.slice(0, 4).map((grp: any, idx: number) => {
-              let groupImg = grp.image || grp.imageUrl || '';
-              if (!groupImg && Array.isArray(grp.products) && grp.products.length > 0) {
-                const matchedProd = products.find(p => p.id === grp.products[0] || p._id === grp.products[0]);
-                if (matchedProd) {
-                  groupImg = matchedProd.imageUrl || matchedProd.image || '';
-                }
-              }
-              if (!groupImg) {
-                groupImg = DEFAULT_GROUP_IMAGES[idx % DEFAULT_GROUP_IMAGES.length];
-              }
+        ) : (() => {
+          /* Style 1 — uniform group cards in a 2×3 grid. With 6 or fewer it's
+             a single static grid. With more, it becomes a horizontal
+             snap-carousel where each page is its own full-width 2×3 grid:
+             swipe = jump to the next set of 6. */
+          const style1Groups = displayGroups.slice(0, 18);
+          const paged = style1Groups.length > 6;
 
-              const discount = grp.discountPercent || 0;
+          const renderCard = (grp: any, gIdx: number) => {
+            let groupImg = grp.image || grp.imageUrl || '';
+            if (!groupImg && Array.isArray(grp.products) && grp.products.length > 0) {
+              const matchedProd = products.find(p => p.id === grp.products[0] || p._id === grp.products[0]);
+              if (matchedProd) {
+                groupImg = matchedProd.imageUrl || matchedProd.image || '';
+              }
+            }
+            if (!groupImg) {
+              groupImg = DEFAULT_GROUP_IMAGES[gIdx % DEFAULT_GROUP_IMAGES.length];
+            }
 
-              return (
-                <div
-                  key={grp.id || grp.displayName || idx}
-                  onClick={() => navigate('/products')}
-                  className="relative h-[125px] rounded-2xl overflow-hidden shadow-xs cursor-pointer active:scale-95 transition-all bg-gray-100 group"
-                  style={{ borderColor: theme.cardBorder }}
-                >
-                  <img
-                    src={groupImg}
-                    alt={grp.displayName}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
-                  {discount > 0 && (
-                    <div 
-                      className="absolute top-1.5 right-1.5 text-white text-[8px] font-black px-1.5 py-0.5 rounded-md shadow-2xs"
-                      style={{ backgroundColor: theme.btn }}
-                    >
-                      {discount}% OFF
-                    </div>
-                  )}
-                  <div className="absolute bottom-1.5 left-1.5 right-1.5 flex items-end justify-between gap-1">
-                    <span className="text-[10px] font-black text-white leading-tight line-clamp-2 drop-shadow-sm flex-1">
-                      {grp.displayName}
-                    </span>
-                    <div className="w-4 h-4 rounded-full bg-white flex items-center justify-center shrink-0 shadow-2xs">
-                      <ChevronRight size={11} className="text-gray-900" />
-                    </div>
+            const discount = grp.discountPercent || 0;
+
+            return (
+              <button
+                type="button"
+                key={grp.id || grp.displayName || gIdx}
+                onClick={() => navigate(festivalGroupHref(grp))}
+                aria-label={`Shop ${grp.displayName}${discount > 0 ? ` — up to ${discount}% off` : ''}`}
+                className="relative h-[150px] sm:h-[168px] w-full rounded-2xl overflow-hidden shadow-xs cursor-pointer active:scale-95 transition-transform group border-0"
+                style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorder }}
+              >
+                <img
+                  src={groupImg}
+                  alt=""
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                />
+                <div className="absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                {discount > 0 && (
+                  <div
+                    className="absolute top-1.5 right-1.5 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md shadow-2xs"
+                    style={{ backgroundColor: theme.btn }}
+                  >
+                    {discount}% OFF
+                  </div>
+                )}
+                <div className="absolute bottom-2 left-2 right-2 flex items-end justify-between gap-1">
+                  <span className="text-[11px] font-black text-white leading-tight line-clamp-2 drop-shadow-sm flex-1 text-left">
+                    {grp.displayName}
+                  </span>
+                  <div className="w-4 h-4 rounded-full bg-white flex items-center justify-center shrink-0 shadow-2xs">
+                    <ChevronRight size={11} className="text-text-primary" />
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
+              </button>
+            );
+          };
+
+          if (!paged) {
+            // 1–3 groups: one row of exactly that many columns (no empty cells,
+            // no phantom second row). 4–6: a 3-wide grid that wraps to 2 rows.
+            const colClass =
+              style1Groups.length === 1 ? 'grid-cols-1'
+              : style1Groups.length === 2 ? 'grid-cols-2'
+              : 'grid-cols-3';
+            return (
+              <div className={`w-full mb-4 grid gap-2.5 ${colClass}`}>
+                {style1Groups.map((grp, i) => renderCard(grp, i))}
+              </div>
+            );
+          }
+
+          const pages: any[][] = [];
+          for (let i = 0; i < style1Groups.length; i += 6) {
+            pages.push(style1Groups.slice(i, i + 6));
+          }
+
+          return (
+            <div className="w-full mb-4 flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-1">
+              {pages.map((page, pi) => (
+                <div
+                  key={pi}
+                  className="w-full shrink-0 snap-start grid grid-cols-3 gap-2.5"
+                >
+                  {page.map((grp, ci) => renderCard(grp, pi * 6 + ci))}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Bottom Scallop Arch Transition (24 repeating quadratic arches matching Flutter _ScallopPainter) */}
@@ -240,13 +310,18 @@ const Style2HeroRotator: React.FC<{ groups: any[]; products: any[]; theme: any }
     return items;
   }, [groups, products]);
 
+  const [paused, setPaused] = useState(false);
+
   useEffect(() => {
-    if (rotatorItems.length <= 1) return;
+    if (rotatorItems.length <= 1 || paused) return;
+    if (typeof window !== 'undefined' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    // 4.5s per item — long enough to read the name + price before it moves on.
     const interval = setInterval(() => {
       setIndex((prev) => (prev + 1) % rotatorItems.length);
-    }, 2000); // 2 seconds timer!
+    }, 4500);
     return () => clearInterval(interval);
-  }, [rotatorItems.length]);
+  }, [rotatorItems.length, paused]);
 
   const currentItem = rotatorItems.length > 0 ? rotatorItems[index % rotatorItems.length] : null;
   const currentGroup = currentItem?.group;
@@ -261,56 +336,80 @@ const Style2HeroRotator: React.FC<{ groups: any[]; products: any[]; theme: any }
 
   const prodName = currentProd ? currentProd.name : '';
   const prodImg = currentProd ? (currentProd.imageUrl || currentProd.image || '') : (currentGroup?.imageUrl || currentGroup?.image || '');
+  const darkCard = isDarkColor(theme.cardBg);
 
   return (
-    <div
+    <button
+      type="button"
+      aria-label={currentGroup?.displayName ? `Shop ${currentGroup.displayName}` : 'Shop festive offers'}
       onClick={() => {
         const prodId = currentProd?.id || currentProd?._id;
         if (prodId && prodId !== currentGroup?.id) {
           navigate(`/product/${prodId}`);
         } else {
-          navigate('/products');
+          navigate(festivalGroupHref(currentGroup));
         }
       }}
-      className="flex-1 flex flex-col items-center justify-between p-2 rounded-xl shadow-2xs text-white text-center overflow-hidden transition-all duration-300 border border-white/30 relative cursor-pointer active:scale-95"
-      style={{ backgroundColor: theme.cardBg }}
+      onPointerEnter={() => setPaused(true)}
+      onPointerLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
+      className="relative h-full w-full overflow-hidden rounded-2xl shadow-sm text-left transition-transform duration-300 cursor-pointer active:scale-[0.98] border"
+      style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorder }}
     >
-      {/* Dynamic Group Title top centered */}
-      <span className="text-[11.5px] font-black leading-tight drop-shadow-xs line-clamp-1 w-full text-center">
-        {currentGroup?.displayName || 'Festive Offer'}
-      </span>
+      {/* Full-bleed rotating image + scrim — crossfades in place, card never resizes */}
+      <div key={index} className="absolute inset-0 animate-fadeIn">
+        {prodImg ? (
+          <img src={prodImg} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        ) : (
+          <div className={`absolute inset-0 ${darkCard ? 'bg-white/10' : 'bg-black/5'}`} />
+        )}
+        <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
+      </div>
 
-      {/* Product rotating details: Dynamic Prices & Product Name */}
-      {currentProd && (
-        <div className="flex flex-col items-center gap-1 my-1 w-full animate-fadeIn transition-opacity duration-300">
-          {/* Prices: First MRP on top line, Offer price kindha / below! */}
-          <div className="flex flex-col items-center gap-0.5">
-            {mrp > offerPrice && mrp > 0 && (
-              <span className="bg-black/65 text-white/80 text-[9px] font-bold px-1.5 py-0.5 rounded-xs line-through leading-none">
-                ₹{mrp}
-              </span>
-            )}
-            {offerPrice > 0 && (
-              <span className="bg-amber-400 text-black text-xs font-black px-2 py-0.5 rounded-md shadow-2xs leading-none">
-                ₹{offerPrice}
-              </span>
-            )}
-          </div>
+      {/* Discount badge */}
+      {discountPercent > 0 && (
+        <span
+          className="absolute top-2.5 right-2.5 z-10 text-white text-[10px] font-black px-2 py-0.5 rounded-md leading-none shadow-2xs"
+          style={{ backgroundColor: theme.btn }}
+        >
+          {discountPercent}% OFF
+        </span>
+      )}
 
-          <span className="text-[10px] font-extrabold line-clamp-1 drop-shadow-xs text-white text-center mt-0.5">
-            {prodName}
-          </span>
+      {/* Rotation progress — over the image, clear of the copy */}
+      {rotatorItems.length > 1 && (
+        <div className="absolute top-3 left-3 z-10 flex gap-1">
+          {rotatorItems.slice(0, 6).map((_, i) => {
+            const on = i === index % Math.min(rotatorItems.length, 6);
+            return (
+              <span
+                key={i}
+                className="h-1 rounded-full bg-white transition-all duration-300"
+                style={{ width: on ? 16 : 5, opacity: on ? 0.95 : 0.45 }}
+              />
+            );
+          })}
         </div>
       )}
 
-      {/* Image at bottom */}
-      <div className="w-full flex-1 flex items-end justify-center min-h-[55px] max-h-[80px]">
-        {prodImg ? (
-          <img src={prodImg} alt={prodName} className="max-h-full max-w-full object-contain transition-transform duration-300" />
-        ) : (
-          <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center" />
+      {/* Copy overlay */}
+      <div key={`copy-${index}`} className="absolute inset-x-0 bottom-0 z-10 p-3.5 animate-fadeIn">
+        <span className="block text-[10px] font-black uppercase tracking-[0.18em] text-white/70 line-clamp-1">
+          {currentGroup?.displayName || 'Festive Offer'}
+        </span>
+        <span className="mt-1 block text-[15px] font-black leading-tight text-white line-clamp-2 drop-shadow-md">
+          {prodName || 'Festive picks'}
+        </span>
+        {offerPrice > 0 && (
+          <div className="mt-1.5 flex items-baseline gap-1.5">
+            <span className="text-[19px] font-black leading-none text-white drop-shadow">₹{offerPrice}</span>
+            {mrp > offerPrice && mrp > 0 && (
+              <span className="text-[12px] font-semibold leading-none text-white/60 line-through">₹{mrp}</span>
+            )}
+          </div>
         )}
       </div>
-    </div>
+    </button>
   );
 };

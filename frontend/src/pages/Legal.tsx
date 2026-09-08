@@ -1,6 +1,8 @@
 import React from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import { SEO } from '../components/SEO';
+import { useSmartBack } from '../hooks/useSmartBack';
 import { motion } from 'framer-motion';
 
 interface LegalProps {
@@ -9,6 +11,7 @@ interface LegalProps {
 
 export const Legal: React.FC<LegalProps> = ({ defaultTab }) => {
   const [searchParams] = useSearchParams();
+  const goBack = useSmartBack('/');
   const currentTab = defaultTab || searchParams.get('tab') || 'terms';
 
   const isTerms = currentTab === 'terms';
@@ -27,9 +30,16 @@ export const Legal: React.FC<LegalProps> = ({ defaultTab }) => {
       />
 
       {/* Clean White Standalone Header with Brand Logo Only */}
-      <header className="bg-white py-4 px-6 md:px-16 flex items-center justify-between border-b border-gray-200 sticky top-0 z-40 shadow-2xs">
+      <header className="bg-white py-4 px-6 md:px-16 flex items-center gap-3 border-b border-gray-200 sticky top-0 z-40 shadow-2xs">
+        <button
+          onClick={goBack}
+          aria-label="Go back"
+          className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-800 transition-colors cursor-pointer shrink-0"
+        >
+          <ArrowLeft size={18} />
+        </button>
         <Link to="/" className="flex items-center gap-2">
-          <span className="text-[30px] md:text-[36px] font-extrabold tracking-tight text-gray-900 font-display leading-none">
+          <span className="text-[26px] md:text-[36px] font-extrabold tracking-tight text-gray-900 font-display leading-none">
             fresh<span className="text-[#4CAF50]">cart</span>
           </span>
         </Link>

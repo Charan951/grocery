@@ -64,8 +64,12 @@
   `ApiService`, `SocketService`), Dio REST, `socket_io_client`, Hive (schemaless).
   Bootstrap: `setupInjection()` (Hive + secure `TokenStore`). **MockDataService deleted in P0.**
   Base URL `http://10.0.2.2:5000/api` (Android emu) else `http://localhost:5000/api`.
-  Nav (since P0-4): `routerProvider` GoRouter + `StatefulShellRoute`, 5 tabs Home/Categories/Search/Orders/Account (was `IndexedStack` in
-  `MainNavigationShell`).
+  Nav (since P0-4): `routerProvider` GoRouter + `StatefulShellRoute`. **4 tabs
+  (2026-09-08): Categories / Home / Orders / Account, Home centre (`kHomeNavIndex
+  = 1`)** — Search dropped as a tab to match the web storefront; `/search`
+  (`SearchScreen`) is now a root pushed route (festival cards still use it), the
+  home search bar goes to `/search_detail`. `_handleBack`/back-to-home use
+  `kHomeNavIndex`, not 0.
 
 ## 3. Design System
 
@@ -73,6 +77,17 @@
   hairline dividers, minimal shadow, no glass. Primary green `#4CAF50`, full-pill
   buttons, 12–16px radius. Plus Jakarta Sans (display) / Inter (body). Admin =
   deep-forest "control tower" ink theme.
+  - **`--primary-strong` `#2E7D32`** (`text-primary-strong`/`bg-primary-strong`)
+    — darker step of the *same* brand green for small/bold green text + active
+    labels on light where `#4CAF50` is under 4.5:1. Not a second accent.
+  - **`--sticky-header-h`** CSS var (default `128px`, refined at runtime by
+    `Header.tsx`) drives `<main>` padding-top **and** the category strip's sticky
+    offset. Read it bare — no fallback literals.
+  - **Storefront shell is full-bleed** (`max-w-none`, no `1280px` cap);
+    `body,#root` clip horizontal overflow, wide rows scroll in their own
+    `overflow-x` containers. `useIsMobile(bp)` (`hooks/useIsMobile.ts`) is the
+    one viewport source of truth (breakpoints: 640 header/app-shell, 768
+    category nav / festival block).
 - Mobile: **P0-5 aligned it to the flat web system**; **design-system
   consolidation 2026-08-31** finished the job — `GlassCard`/`AppCard` is fully
   flat (hairline only, **no shadow**); one full-width flat bottom nav (all 5
@@ -136,6 +151,271 @@
   side.
 
 ## 5. Completed Major Work
+
+- **2026-09-08 — Web storefront: full-bleed responsive shell + shared viewport
+  hook + festival-theme depth + Home render perf.** (⚠ uncommitted working tree.)
+  Overwhelmingly `frontend/`-side; most of it is **web catching up to the
+  Flutter app**, not new product behaviour. See "Flutter parity" note at the end.
+  - **`frontend/src/hooks/useIsMobile.ts` (new)** — one `matchMedia` listener per
+    breakpoint value, `useIsMobile(bp = 768)`. Replaces the per-component
+    `useState + window resize` pattern in `App.tsx` (640), `Header.tsx` (640),
+    `SuperCategoryNav.tsx` (768), `FestivalCampaignWrapper.tsx` (768) so the
+    header / category strip / festival block flip at the same instant.
+  - **Full-bleed layout** — every `max-w-[1280px]` page/shell container →
+    `max-w-none` (`App` `<main>`, `Header`, `SuperCategoryNav`, `Home`,
+    `ProductDetails`, `About`, `Blog`, `Brands`, `Categories`, `Offers`,
+    `Stores`). `index.css`: `body, #root { overflow-x: hidden; max-width: 100vw }`
+    (scoped so `position: sticky` still works); wide rows must scroll inside
+    their own `overflow-x` containers.
+  - **`--sticky-header-h` is now a real CSS var** (default `128px` in
+    `index.css`). `Header.tsx` measures the expanded header once via a single
+    `ResizeObserver` (was scroll+resize listeners + rAF); still only two discrete
+    values — measured expanded height while open, `0px` the instant it collapses.
+    **Every consumer reads bare `var(--sticky-header-h)`** — no per-component
+    `140px`/`64px` fallback literals anymore.
+  - **`--primary-strong` `#2E7D32`** token added (`index.css` + `@theme` →
+    `text-primary-strong` / `bg-primary-strong`). Darker step of the one brand
+    green for small/bold green text + active labels on light where `#4CAF50`
+    fails AA. `SuperCategoryNav` active pill/label/underline now use it (was
+    hardcoded `#0C831F`). **Mobile Flutter already had this as `primaryText`
+    `#2E7D32`** — no change needed there.
+  - `index.css` also: imports the 5 festival display fonts (Great Vibes,
+    Rozha One, Cinzel Decorative, Satisfy, Pacifico); themed `::selection` +
+    global `:focus-visible` ring; `@keyframes fade-in` / `.animate-fadeIn`
+    (+ `prefers-reduced-motion` guard).
+  - **`festivalThemeResolver.ts`** — `ResolvedFestivalTheme` gained `fontFamily`
+    (real CSS stack from `FONT_STACKS` keyed by preset) and `cardText` (readable
+    colour for content on `cardBg`); new exported `isDarkColor(hex)` luminance
+    test; `cardBg` now honours `styling.cardBackground` / solid bg.
+    **Mirrored into Flutter** (`festival_theme_resolver.dart`): added top-level
+    `isDarkColor(Color)` + `ResolvedFestivalTheme.cardText` (white on a dark card
+    bg, else the admin text colour if dark, else `#1C1C1E`). Font side was
+    already covered by `AppTypography.festivalCalligraphy(..., fontPreset:)`.
+  - **`FestivalCampaignWrapper.tsx`** — stopped synthesising placeholder groups /
+    stock photos: renders nothing when a campaign has no configured groups
+    (**Flutter already did this** — `activeGroups.isEmpty → SizedBox.shrink()`).
+    New `festivalGroupHref(grp)`: 1 curated product → `/product/:id`, many →
+    `/products?ids=a,b,c&title=`, none → `/products?search=<groupName>`. style2
+    layout reworked to taller fixed-height image-cover cards. Heading uses
+    `theme.fontFamily`.
+    **`festival_campaign_section.dart` was then rewritten as a 1:1 port of the
+    web component** (the old Flutter layout — title-on-solid-colour cards, hero
+    height 215, per-count Row special-cases — looked nothing like web). Now:
+    section `pt-5`/`px-4` (20/16) + `mb-5` cards block; title = "— CELEBRATE —"
+    eyebrow (`theme.textColor` @ 0.72 opacity, `letterSpacing 3`) + festival name
+    at 30 / `w400` via `festivalCalligraphy(fontPreset:)`. **style2** = left hero
+    rotator (38%, 4.5 s cross-fade through every group×product pair, progress
+    pills, discount badge, eyebrow/name/₹offer+strike-through MRP overlay) + right
+    **2×2 full-bleed image grid** (62%, `gap-3`, bottom scrim, black-corner
+    discount badge `theme.buttonColor`, white 13/`w900` title), fixed `h-320`.
+    **style1** = uniform full-bleed image cards `h-150` (scrim + name + white
+    chevron-circle + discount badge): 1–3 → single row, 4–6 → 3-col wrap, >6 →
+    `PageView` of 3×2 grids. Group tap = `_openGroup()` (1 curated product →
+    `/product/:id`, else matched category → `onOpenCategory`, else `/search`;
+    Flutter has no `/products?ids=` route so multi-product groups fall back to
+    category). Bottom `_ScallopPainter` (24 arches) kept as-is. Shared
+    `_Scrim` / `_DiscountBadge` / `_cardImage` helpers.
+    Follow-ups: the left hero now falls back to the group's resolved image
+    (own → curated product → themed stock) via `imageFor`, so it's never a blank
+    pink panel; and the no-single-product tap goes to `/search?q=<groupName>`
+    (was empty `/search`) — `SearchScreen` gained an `initialQuery` param seeded
+    from that query (`app_router` `/search` reads `?q=`).
+  - **`SuperCategoryNav.tsx`** — removed the desktop left/right scroll-arrow
+    buttons; removed the scroll-past-festival white-swap (**the bar keeps
+    `festivalTheme.gStart` the whole time a campaign is active** so it's one
+    continuous colour with the festival section below it); new
+    `festivalCampaignOverride` prop (Home passes `activeCampaignForTab ||
+    activeFestivalCampaign` — the *exact* campaign it renders — so the bar can't
+    show a different theme than the section). Desktop active-tab underline
+    animates via `transform: translateX + scaleX` (was `left`/`width`).
+    `aria-current` / `aria-label` added.
+  - **`Header.tsx`** — dropped the announcement bar + the mobile
+    notifications/profile button cluster; location row is a real `<button>`
+    (a11y) with "Add delivery address" fallback copy; palette tokens instead of
+    hardcoded grays / `#0C831F`; **rotating search placeholder now mutates the
+    `<input>.placeholder` via a ref on the 2s interval** instead of `setState`,
+    so the whole Header no longer re-renders every 2s; search inputs got
+    `aria-label`; header also hidden on the mobile profile route.
+  - **`BottomNav.tsx` — 5 tabs → 4.** Removed the **Search** tab (search lives in
+    the always-visible header bar). Now Categories / Home / Orders / Account,
+    icons `House / Grid3x3 / Package / CircleUser`, `grid-cols-4`, active state
+    neutral bold `text-gray-900` (green fill removed). **Mirrored into Flutter
+    same day** — `bottom_nav.dart` (`kBottomNavDestinations` → 4, `kHomeNavIndex
+    = 1`), `app_router.dart` (branches reordered Categories/Home/Orders/Account,
+    `/search` moved to a root pushed `GoRoute`), `main_shell.dart` (`_handleBack`
+    → `kHomeNavIndex`). Flutter keeps its Material icons + green active label
+    (the documented mobile design system), not the web's neutral treatment.
+  - **`Home.tsx` + `LazyRender.tsx` (new)** — `LazyRender` defers mounting a
+    block until it scrolls within `rootMargin` of the viewport (Intersection
+    Observer + height placeholder). Every additional super-category shelf and
+    every `subCategorySections` entry past the first two is wrapped in it, so a
+    super-category tab switch mounts ~1–2 shelves instead of ~15 (killed the
+    ~588 ms click-handler jank). Also: `useTransition`'s pending flag drives a
+    200 ms opacity dip on the content area during the swap; re-tapping the active
+    tab early-returns; removed the "Fresh stock arriving shortly" empty-shelf
+    filler; new "How to Order" 5-step section. **Flutter lists are already lazy
+    (`ListView`/slivers build on scroll)** — no direct port.
+  - **`App.tsx` `ScrollToTop`** — no longer hard-scrolls to top when only the
+    `?superCategory=` query changed on `/` (keeps scroll position → tab switch
+    feels in-place, not a reload). Web-router-specific; no Flutter analog.
+  - **`Legal.tsx`** — back button (`useSmartBack`) in the standalone header.
+  - **Mobile Flutter `location_select_screen.dart`** (the one genuinely-mobile
+    change) — use `Geolocator.getLastKnownPosition()` for an instant map move,
+    then refine with a fresh `getCurrentPosition` capped at 7 s so it can't hang;
+    reverse-geocode Dio now has 5 s connect / 6 s receive timeouts; nominatim
+    `zoom` 18 → 16.
+  - **Also touched (same token/full-bleed/`useIsMobile` pass, not separately
+    detailed here):** `Products.tsx`, `CustomerProfile.tsx`,
+    `CustomerAddresses.tsx`, `CustomerAuthModal.tsx`.
+  - **Flutter parity note:** the one real cross-platform UX change — **BottomNav
+    5→4 (drop Search tab)** — was mirrored into `mobileapp/` the same day (see
+    the BottomNav bullet above). Everything else above is either web-only
+    plumbing (CSS containers, DOM scroll behaviour, matchMedia hook, re-render
+    avoidance, IO lazy-mount) or something the Flutter app already does.
+  - Verified on the Flutter side (incl. the festival-section rewrite):
+    `flutter analyze lib/` clean (1 pre-existing unrelated `api_service.dart`
+    warning), `flutter test` **124/124**. Not yet visually re-checked on a device
+    — worth a look at both `style1` and `style2` festival campaigns. Web side
+    (`tsc --noEmit` / `vite build`) not re-run after this batch — do before
+    committing.
+
+- **2026-09-08 — follow-up (session 2, same day): festival group parity, `?ids=`
+  product view, image-fit fixes, Flutter Home render perf, misc storefront
+  polish.** (⚠ still uncommitted working tree; `frontend` `tsc --noEmit` clean,
+  `flutter analyze` on the touched files clean.)
+  - **Festival group filtering aligned web ↔ Flutter** — both surfaces now apply
+    the *same* rule: keep groups with `isActive !== false`, then prefer those
+    that carry content (own `image`/`imageUrl` **or** ≥1 product), and fall back
+    to all active groups only if none have content. Before, web dropped
+    name-only groups but kept inactive ones; Flutter did the opposite → the two
+    apps showed different group counts for the same campaign.
+    `FestivalCampaignWrapper.tsx` `allGroups`/`realGroups`;
+    `festival_campaign_section.dart` `activeGroups`/`realGroups`.
+  - **style2 is a fixed 4-slot layout (hero + 2×2).** Both apps now render style2
+    **only for 3–4 groups**; `<3` (empty cells) or `>4` (silently dropped) fall
+    back to the style1 grid/carousel, which shows every group. Web
+    `cardStyle === 'style2' && displayGroups.length >= 3 && <= 4`; Flutter
+    `campaign.cardStyle == 'style2' && groups.length >= 3 && <= 4`.
+  - **`festivalGroupHref(grp)` + new `?ids=` product view (web).** Multi-product
+    festival groups now deep-link to `/products?ids=id1,id2,…&title=<groupName>`
+    (1 product → `/product/:id`, 0 → `/products?search=<name>`).
+    `Products.tsx` gained `urlIds`/`idList`/`urlTitle`: when `ids` is present it
+    filters the catalog to exactly those ids **in the given order**, bypasses all
+    category/search/subcategory filters, drives the list view (the URL-sync
+    effect now treats `urlSearch || urlIds` as "show the list"), and the heading
+    shows `title`. New `showSubRail = idList.length === 0 && !urlSearch &&
+    Boolean(urlCategory)` — the left subcategory `<aside>` is now hidden (and the
+    grid goes full-width, `grid-cols-1`) on any `?ids=` **or** plain `?search=`
+    view, since neither has subcategories. Flutter has **no `/products?ids=`
+    route** → multi-product group taps there fall back to the matched category
+    (documented divergence).
+  - **`Products.tsx` other**: removed the per-subcategory background tint on the
+    product `<main>` (deleted `activeSubCatColor`/`activeSubCatObj`); the "No
+    products available" empty-state `<p>` gets `w-full`/`self-stretch` (it was
+    collapsing to its widest word inside the `items-center` flex box); promo /
+    category cards on Home link with `subCategory=All` so the landing view shows
+    the whole category, not an empty subcategory.
+  - **Image-fit fixes (Flutter)**:
+    - `categories_screen.dart` subcategory tiles — `BoxFit.contain` + 6px padding
+      → **`BoxFit.cover` full-bleed** inside `ClipRRect(AppRadius.brMd)`; the
+      tinted container is now just the loading backdrop; fallback icon centred.
+    - `festival_campaign_section.dart` `_imageFor` now resolves a group's image
+      from **`group.products.first`** (group order, matches web) instead of the
+      first catalog-order product that happened to be in the group.
+  - **`festival_campaign_section.dart` `_Style1Layout` `>6`-group paged grid** —
+    was wrapping to 2 columns (card width computed from `screenW − 32` but the
+    real page was narrower: `PageView` had `viewportFraction: 0.98` + a 12px
+    right pad). Now a **`LayoutBuilder`** sizes cards from the real page width →
+    exactly 3 columns; `PageController()` default (no peek, no per-page pad);
+    `_cardH` 150 → 130 so both rows fit; new `_PageDots` page indicator below the
+    grid (active pill widens, uses `theme.textColor`). ≤6-group static grid uses
+    the same `LayoutBuilder` sizing.
+  - **`home_header.dart`** — removed the **Account** (person) circle icon from
+    the top `LocationHeader` row; the Notifications bell stays; the bottom-nav
+    Account tab is untouched. `onProfileTap` is still threaded through the widget
+    params (now unused) so no `home_screen.dart` call sites had to change.
+  - **`home_screen.dart` — Home render perf (fixes slow super-category tab
+    switch + "blank until you scroll").** `_HomeContent` was a single non-lazy
+    `SliverToBoxAdapter(child: Column(...))` holding the banner, category rail,
+    special groups, 3 curated shelves **and one `ProductRail` per category**
+    (~100+ `CachedNetworkImage`) — every `build()` (tab switch, scroll-threshold
+    `setState`, provider tick) constructed and laid out that whole tree in one
+    frame. Now `_HomeContent.build` returns a lazy **`SliverList`**
+    (`SliverChildBuilderDelegate`, `addAutomaticKeepAlives: false`,
+    `addRepaintBoundaries: true`) over a `_sections()` `List<Widget>`; sections
+    below the fold don't build / lay out / decode images until scrolled into
+    view. `bodyContent` is now a sliver in **every** branch (skeleton/error/empty
+    wrapped in `SliverToBoxAdapter`) and sits directly in the `CustomScrollView`
+    instead of nested in one adapter. `flutter analyze` on the file: clean.
+  - **Web festival hero rotator** (`Style2HeroRotator`) — further redesign
+    passes: image fills the top of the card (`object-cover`), the **group label
+    ("GIFTS") sits *below* the image** with the product name + `₹offer`/strike
+    MRP, discount pill overlays the image; the whole Style-2 row is a **fixed
+    `h-[216px]`** with `min-h-0` on every flex descendant so the card never
+    changes height as it rotates; rotation slowed **2 s → 4.5 s**, pauses on
+    `pointerEnter`/`focus`, respects `prefers-reduced-motion`, progress dots.
+    `.animate-fadeIn` keyframe changed from scale-pop to opacity + 4 px rise.
+  - **`festivalThemeResolver.ts` `cardBg`** now honours `styling.cardBackground`
+    (and a solid `backgroundType`) — it was hard-wired to `gStart`, so the
+    admin's Card Styling colour never rendered. (The `cardText` auto-contrast
+    token + exported `isDarkColor` from earlier in the day already mirrored into
+    Flutter `festival_theme_resolver.dart`.)
+  - **`CustomerAuthModal.tsx`** — removed the `fresh/cart` logo badge and the
+    bottom "Continue as guest" link; added a **top-right pill "Guest" button**
+    (hidden on OTP/success steps); bottom panel `overflow-y-auto` →
+    `overflow-hidden` (the login card now fits without scrolling).
+  - **`CustomerAddresses.tsx`** — removed the "Popular:" location chip row +
+    `defaultPopularLocations`; removed every input `placeholder`
+    (name/phone/house/landmark/search); location search is now **live
+    OpenStreetMap Nominatim only** (debounced 300 ms, min 2 chars,
+    `addressdetails=1&limit=8`, "Searching…" / "No locations found" states) —
+    dropped the local `citiesData` prefix list
+    (`searchCitiesByPrefix`/`CityLocation` removed). **"Add a new address" now
+    auto-detects the visitor's live location on open** (`getCurrentPosition`
+    `enableHighAccuracy:false, timeout:7000, maximumAge:120000`); the
+    reverse-geocode `fetch` has a 6 s `AbortController` timeout and keeps the
+    current pin text on abort instead of overwriting it with the KPHB fallback;
+    `handleLocateMe` got the same fast options + a non-blocking toast.
+  - **`SuperCategoryNav.tsx` / `Header.tsx` — sticky-strip seam / transparency.**
+    The non-festival nav is now `bg-surface border-divider` (it was only tinted
+    while a campaign was active, so it read as see-through once sticky);
+    `top: calc(var(--sticky-header-h) - 1px)` + `margin-top: -1px` closes the
+    hairline gap under the fixed header, and the fixed header wrapper lost its
+    on-scroll `shadow-sm` (that downward shadow looked like a line above the
+    strip) and gained `max-w-[100vw] overflow-x-clip`. Also removed the desktop
+    left/right scroll-arrow buttons, orphan `dark:` variants → tokens, mobile
+    strip `text-[10.5px]` → `text-[11px]`, resize→`syncIndicator` rAF-throttled,
+    `aria-label` on the `<nav>`.
+
+- **2026-09-07 — Festival card styles (style1/style2) + mobile subcategories page.**
+  **Backend** (`FestivalCampaign.js`, `festivalCampaignController.js`): added
+  `cardStyle: enum ['style1','style2'] default 'style1'` to the model. **Removed
+  all campaign date/scope overlap validation** (`checkCampaignOverlap` deleted;
+  create/update/toggle no longer 400 on overlap) — multiple campaigns can now be
+  active at once. `GET /festival-campaigns/active` reworked: accepts
+  `?superCategory=<slug>`, filters out date-expired campaigns, returns both the
+  best-matched `campaign` AND the full `activeCampaigns[]` array (was a single
+  `campaign`). Web (`FestivalCampaignWrapper.tsx`, `festivalThemeResolver.ts`) and
+  Flutter (`festival_campaign_section.dart` +483, `festival_theme_resolver.dart`,
+  `festival_campaign_model.dart` gained `cardStyle`, `catalog_providers.dart` new
+  `activeFestivalCampaignsProvider` + per-super-category matching,
+  `api_service.dart` `fetchActiveFestivalCampaigns()` list) both render two
+  layouts: **style1** = 4-across full-bleed image cards (Ganesh-Chaturthi style,
+  existing), **style2** = left vertical hero rotator (2s group-wise) + right 2×2
+  group grid. Theme resolver now supports `bgGradient`.
+  **Mobile subcategories page**: `category_model.dart` gained `SubCategoryModel`
+  ({id,name,imageUrl,icon}) + `subCategoryItems`; `category_catalog_screen.dart`
+  rebuilt with a subcategory tile grid using `_resolveSubCategoryImage()`
+  (custom img → keyword→Unsplash fallback map) and `cached_network_image`.
+
+- **2026-09-06 — 1:1 web-storefront ↔ Flutter replication pass.**
+  Web `frontend/` components reshaped to match the Flutter `mobileapp/` layouts
+  pixel-for-pixel on mobile breakpoints: `Header.tsx`, `SuperCategoryNav.tsx`
+  (+214), `BottomNav.tsx`, `FloatingCartBar.tsx`, `Home.tsx`, a new full
+  `Search.tsx` page (+291), and a large `CustomerProfile.tsx` rework (+393). New
+  shared web util `frontend/src/utils/categoryIconResolver.ts` (`SEMANTIC_ICON_MAP`
+  keyword→lucide icon, mirrors the mobile category-icon logic) and
+  `frontend/src/utils/festivalThemeResolver.ts`. No backend change.
 
 - **2026-09-05 — Product images not filling their frame (mobile + web + web-responsive).**
   Grid/list product cards and the Product Details hero image used
@@ -1593,6 +1873,12 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
   117/117, `flutter build apk --debug` succeeded.
 
 ## 13. Last Updated
+
+2026-09-08 (session 2) — Festival group parity + `?ids=` product view + image-fit + Flutter Home perf. Web ↔ Flutter now filter festival groups identically (active + has content, fallback to all active); style2 renders only for 3–4 groups, else style1 grid/carousel. `festivalGroupHref` multi-product → `/products?ids=…&title=`; `Products.tsx` `?ids=` shows an ordered curated list, hides the subcategory rail on `?ids=`/`?search=`, full-width grid; removed per-subcategory `<main>` tint. `festivalThemeResolver.cardBg` now honours `styling.cardBackground`. Flutter: `categories_screen` subcategory tiles `BoxFit.cover` full-bleed; `_Style1Layout` `>6` grid now `LayoutBuilder`-sized 3 columns + `_PageDots`; `_imageFor` uses `group.products.first`; removed the Account icon from the top header (`home_header.dart`); **`home_screen.dart` `_HomeContent` → lazy `SliverList`** (was one non-lazy `SliverToBoxAdapter(Column)` with ~100+ images → slow tab switch + blank-until-scroll). Web polish: `CustomerAuthModal` (no logo/guest-link, top-right Guest button, no scroll); `CustomerAddresses` (no "Popular" chips / placeholders, live Nominatim-only search, auto-locate on open, geocode `AbortController` timeout); `SuperCategoryNav`/`Header` sticky-seam + on-scroll transparency fix; festival hero rotator (label below image, fixed height / no rotation jump, 4.5s, pause-on-hover, reduced-motion). `frontend` tsc clean; `flutter analyze` on touched files clean. ⚠ uncommitted.
+
+2026-09-07 — Festival card styles + mobile subcategories page. Backend: `FestivalCampaign.cardStyle` enum style1/style2; removed campaign overlap validation (multiple campaigns can be active); `GET /festival-campaigns/active` now takes `?superCategory=`, drops expired, returns `activeCampaigns[]`. Web + Flutter render style1 (4-across image cards) vs style2 (hero rotator + 2×2 grid). Mobile: `SubCategoryModel` + rebuilt `category_catalog_screen` with subcategory tile grid + keyword→Unsplash image resolver.
+
+2026-09-06 — 1:1 web↔Flutter replication: Header/SuperCategoryNav/BottomNav/FloatingCartBar/Home + new Search page + CustomerProfile rework in `frontend/` remade to match `mobileapp/` layouts; new web utils `categoryIconResolver.ts`, `festivalThemeResolver.ts`. No backend change.
 
 2026-09-05 — Audit-only pass (no app code changed): re-verified MEMORY.md/MOBILE_APP_IMPLEMENTATION.md against real backend (app.js + 8 domain route modules), mobileapp (go_router/StatefulShellRoute, ~35+ screens), frontend, deliveryapp. Confirmed prior P0-P2 completions still hold in code. Diagnosed the "tap category -> no products" report as most likely a data-consistency issue (category with zero tagged products / stale categoriesProvider cache / subcategory-string drift), NOT a code-path bug -- the route -> query-param -> backend $or/regex chain is wired correctly end to end. See Known Issues (Mobile) for detail. MOBILE_APP_IMPLEMENTATION.md rewritten to current-state (was still describing the pre-P0 "hybrid prototype").
 

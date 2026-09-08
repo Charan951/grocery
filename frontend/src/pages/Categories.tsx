@@ -129,7 +129,7 @@ export const Categories: React.FC = () => {
       </header>
 
       {/* Main Content Area (Clean Canvas - Our Actual Grocery Categories) */}
-      <main className="w-full max-w-7xl mx-auto px-4 sm:px-6 pt-4 pb-12 space-y-7">
+      <main className="w-full max-w-none mx-auto px-4 sm:px-6 pt-4 pb-12 space-y-7">
 
         {/* Main Categories & Subcategories Sections */}
         <div className="space-y-7">

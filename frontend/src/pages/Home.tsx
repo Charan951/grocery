@@ -9,10 +9,12 @@ import { BannerCarousel } from '../components/BannerCarousel';
 import { FestivalCampaignWrapper } from '../components/FestivalCampaignWrapper';
 import { SuperCategoryNav } from '../components/SuperCategoryNav';
 import { HorizontalProductShelf } from '../components/HorizontalProductShelf';
+import { LazyRender } from '../components/LazyRender';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowRight, ShieldCheck, Truck, Clock,
-  ChevronDown, ChevronUp, Star, Utensils, Coffee, Leaf, Home as HomeIcon, X, Filter
+  ChevronDown, ChevronUp, Star, Utensils, Coffee, Leaf, Home as HomeIcon, X, Filter,
+  Search as SearchIcon, MapPin, ShoppingCart, CreditCard, PackageCheck
 } from 'lucide-react';
 import { Instagram } from '../components/BrandIcons';
 
@@ -48,11 +50,13 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
     return matched || null;
   }, [festivalCampaigns, activeSuperCatSlug]);
 
-  const [, startTransition] = useTransition();
+  const [isTabSwitching, startTransition] = useTransition();
 
   // Mark the (heavy) view swap as a non-urgent transition so the current page
-  // stays painted/interactive while the new super-category view renders.
+  // stays painted/interactive while the new super-category view renders — no
+  // route change of the Home component itself, just a query-param swap.
   const handleSelectSuperCategory = (slug: string) => {
+    if (slug === activeSuperCatSlug) return;
     startTransition(() => {
       navigate(slug === 'all' ? '/' : `/?superCategory=${encodeURIComponent(slug)}`);
     });
@@ -506,6 +510,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
       <SuperCategoryNav
         activeSuperCategory={activeSuperCatSlug}
         onSelectSuperCategory={handleSelectSuperCategory}
+        festivalCampaignOverride={activeCampaignForTab || activeFestivalCampaign}
       />
 
       {/* Active Festival Campaign Component (STRICTLY MOBILE ONLY - Placed below SuperCategoryNav) */}
@@ -518,7 +523,10 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
       )}
 
       {/* Centered Web Container Layout */}
-      <div className="w-full max-w-[1280px] mx-auto px-3 sm:px-6 lg:px-8 pt-0 sm:pt-3 pb-8">
+      <div
+        className="w-full max-w-none mx-auto px-3 sm:px-6 lg:px-8 pt-0 sm:pt-3 pb-8 transition-opacity duration-200 ease-out"
+        style={{ opacity: isTabSwitching ? 0.55 : 1 }}
+      >
 
         {/* Page landmark for screen readers / heading navigation — visually
             hidden, the header logo already carries the brand visually. */}
@@ -645,20 +653,21 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                   })
                   .slice(1)
                   .map((shelf) => (
-                    <HorizontalProductShelf
-                      key={shelf.id}
-                      id={`shelf-${shelf.id}`}
-                      title={shelf.title}
-                      subtitle={`${shelf.products.length} items`}
-                      products={shelf.products}
-                      onQuickView={onQuickView}
-                      seeAllLink={
-                        shelf.subName
-                          ? `/products?category=${shelf.catSlug}&subCategory=${encodeURIComponent(shelf.subName)}`
-                          : `/products?category=${shelf.catSlug}`
-                      }
-                      categoryColor="#10b981"
-                    />
+                    <LazyRender key={shelf.id} placeholderHeight={300}>
+                      <HorizontalProductShelf
+                        id={`shelf-${shelf.id}`}
+                        title={shelf.title}
+                        subtitle={`${shelf.products.length} items`}
+                        products={shelf.products}
+                        onQuickView={onQuickView}
+                        seeAllLink={
+                          shelf.subName
+                            ? `/products?category=${shelf.catSlug}&subCategory=${encodeURIComponent(shelf.subName)}`
+                            : `/products?category=${shelf.catSlug}`
+                        }
+                        categoryColor="#10b981"
+                      />
+                    </LazyRender>
                   ))}
               </div>
             ) : superCategoryProducts.length > 0 ? (
@@ -696,11 +705,9 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
               <section className="hidden md:block mb-4 w-full">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
                   {activePromoCards.map((card) => {
-                    const targetLink = card.subCategoryName && card.categoryId
-                      ? `/products?category=${card.categoryId}&subCategory=${encodeURIComponent(card.subCategoryName)}`
-                      : card.categoryId
-                        ? `/products?category=${card.categoryId}`
-                        : card.linkUrl || '/products';
+                    const targetLink = card.categoryId
+                      ? `/products?category=${card.categoryId}&subCategory=All`
+                      : card.linkUrl || '/products';
 
                     const promoImg = card.bgImageUrl || card.imageUrl;
 
@@ -792,7 +799,12 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
         {/* 2. Dynamic Subcategories Home Sections & Dynamic Inter-Section Banners & In-Between Mobile Special Groups */}
         {subCategorySections.map((sec, secIdx) => (
           <React.Fragment key={sec.id}>
-            <div id={`sec-${sec.id}`} className="mb-4 border-b border-divider/40 pb-3 last:border-b-0 px-3 sm:px-0">
+            <LazyRender
+              id={`sec-${sec.id}`}
+              placeholderHeight={secIdx < 2 ? 0 : 340}
+              rootMargin={secIdx < 2 ? '4000px 0px' : '800px 0px'}
+            >
+            <div className="mb-4 border-b border-divider/40 pb-3 last:border-b-0 px-3 sm:px-0">
               {/* Special Subcategory Promo Banner (Full 100% Image Visible - Zero Cut-off) */}
               {sec.promoImage && (
                 <div className="mb-3 w-full rounded-2xl md:rounded-3xl overflow-hidden shadow-sm hover:shadow-md border border-divider/60 bg-surface">
@@ -812,7 +824,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
               )}
 
               {/* Subcategory Product Horizontal Scroll Shelf */}
-              {sec.subProducts.length > 0 ? (
+              {sec.subProducts.length > 0 && (
                 <HorizontalProductShelf
                   title={sec.subName}
                   subtitle={`${sec.subProducts.length} item${sec.subProducts.length > 1 ? 's' : ''}`}
@@ -821,10 +833,6 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                   seeAllLink={`/products?category=${sec.catSlug}&subCategory=${encodeURIComponent(sec.subName)}`}
                   categoryColor={sec.categoryColor || '#10b981'}
                 />
-              ) : (
-                <div className="p-6 bg-surface border border-divider rounded-2xl text-center text-xs text-text-tertiary font-bold">
-                  Fresh stock arriving shortly in 10 minutes.
-                </div>
               )}
             </div>
 
@@ -883,6 +891,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
             {sec.matchingBanners && sec.matchingBanners.length > 0 && (
               <BannerCarousel banners={sec.matchingBanners} className="my-2" />
             )}
+            </LazyRender>
           </React.Fragment>
         ))}
 
@@ -986,6 +995,41 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
             </div>
           </section>
         )}
+
+        {/* 5b. How To Order — Step by Step */}
+        <section className="mb-12 md:mb-16">
+          <div className="text-center mb-8 md:mb-10">
+            <h2 className="text-2xl md:text-3xl font-extrabold text-text-primary">How to Order</h2>
+            <p className="text-xs md:text-sm text-text-secondary mt-1">Get fresh groceries at your door in 5 easy steps</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-5">
+            {[
+              { icon: MapPin, title: 'Set Your Location', desc: 'Add your delivery address so we can show items available near you.' },
+              { icon: SearchIcon, title: 'Browse or Search', desc: 'Explore categories or search for the exact products you need.' },
+              { icon: ShoppingCart, title: 'Add to Cart', desc: 'Tap add on any product and adjust quantities right from the cart.' },
+              { icon: CreditCard, title: 'Checkout & Pay', desc: 'Review your cart, apply offers, and pay securely online or on delivery.' },
+              { icon: PackageCheck, title: 'Get It in 10 Min', desc: 'Track your order live and receive it hygiene-packed at your door.' },
+            ].map((step, i) => {
+              const StepIcon = step.icon;
+              return (
+                <div
+                  key={step.title}
+                  className="relative bg-surface p-5 md:p-6 rounded-2xl border border-divider shadow-card flex flex-col items-center text-center gap-3"
+                >
+                  <span className="absolute top-3 right-3 text-xs font-extrabold text-primary/40">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <div className="w-12 h-12 bg-primary/10 text-primary rounded-full flex items-center justify-center">
+                    <StepIcon size={22} />
+                  </div>
+                  <h3 className="text-sm md:text-base font-bold text-text-primary">{step.title}</h3>
+                  <p className="text-xs text-text-secondary leading-relaxed">{step.desc}</p>
+                </div>
+              );
+            })}
+          </div>
+        </section>
 
         {/* 6. Why Choose FreshCart */}
         <section className="mb-12 md:mb-16">

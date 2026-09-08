@@ -290,6 +290,16 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                 <ArrowLeft size={18} />
               </button>
 
+              {/* Floating Top Right Guest Button */}
+              {step !== 'otp' && step !== 'success' && (
+                <button
+                  onClick={handleGuest}
+                  className="absolute top-4 right-4 z-[20] px-4 h-9 rounded-full bg-white shadow-md flex items-center justify-center text-xs font-extrabold text-gray-800 hover:bg-gray-50 cursor-pointer transition-transform hover:scale-105"
+                >
+                  Guest
+                </button>
+              )}
+
               {/* 4 Moving Marquee Rows (Pure GPU 60FPS Right to Left) */}
               <div className="flex flex-col gap-2 justify-around h-full py-1">
                 {renderMarqueeRow(row1, false)}
@@ -303,7 +313,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
             </div>
 
             {/* BOTTOM HALF: White Section with Brand Icon Badge, Headline, Input & Continue Button */}
-            <div className="h-[54%] w-full bg-white px-6 sm:px-8 py-4 flex flex-col items-center justify-center gap-4 text-center overflow-y-auto shrink-0 z-[10]">
+            <div className="h-[54%] w-full bg-white px-6 sm:px-8 py-4 flex flex-col items-center justify-center gap-4 text-center overflow-hidden shrink-0 z-[10]">
               {step === 'success' ? (
                 <div className="my-auto flex flex-col items-center justify-center text-center gap-3">
                   <motion.div
@@ -318,15 +328,8 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                 </div>
               ) : (
                 <>
-                  {/* Brand App Icon Badge & Headline */}
+                  {/* Headline */}
                   <div className="flex flex-col items-center text-center shrink-0 mt-1">
-                    {/* Brand Green App Icon Badge */}
-                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#4CAF50] to-[#2E7D32] shadow-lg shadow-emerald-900/10 flex items-center justify-center mb-3">
-                      <span className="text-sm font-black tracking-tight text-white font-display leading-none">
-                        fresh<br /><span className="text-[#A5D6A7]">cart</span>
-                      </span>
-                    </div>
-
                     <h2 className="text-2xl sm:text-[25px] font-black text-gray-900 tracking-tight leading-tight">
                       India's 10 minute app
                     </h2>
@@ -521,17 +524,6 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                         Already have an account? Sign in
                       </button>
                     </form>
-                  )}
-
-                  {/* Guest */}
-                  {step !== 'otp' && (
-                    <button
-                      type="button"
-                      onClick={handleGuest}
-                      className="text-xs font-extrabold text-gray-600 hover:text-gray-900 underline underline-offset-2 cursor-pointer shrink-0"
-                    >
-                      Continue as guest
-                    </button>
                   )}
 
                   {/* Terms Footer */}

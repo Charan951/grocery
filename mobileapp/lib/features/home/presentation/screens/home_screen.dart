@@ -142,14 +142,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       isFestivalActive: isFestivalHeaderActive,
     );
 
+    // A sliver in every branch so the home body can live directly in the
+    // CustomScrollView (the content branch is a lazy SliverList).
     Widget bodyContent;
     if (categoriesAsync.isLoading && productsAsync.isLoading) {
-      bodyContent = const _HomeSkeleton();
+      bodyContent = const SliverToBoxAdapter(child: _HomeSkeleton());
     } else if (categoriesAsync.hasError && productsAsync.hasError) {
-      bodyContent = ErrorState(onRetry: _refresh);
+      bodyContent = SliverToBoxAdapter(child: ErrorState(onRetry: _refresh));
     } else {
       if (filteredCategories.isEmpty && filteredProducts.isEmpty) {
-        bodyContent = Padding(
+        bodyContent = SliverToBoxAdapter(
+          child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
           child: Column(
             children: [
@@ -190,6 +193,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
             ],
+          ),
           ),
         );
       } else {
@@ -307,8 +311,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
 
-            // 4. Normal Home Sections below festival section
-            SliverToBoxAdapter(child: bodyContent),
+            // 4. Normal Home Sections below festival section (lazy SliverList
+            //    in the content branch, so tabs switch without building the
+            //    whole page up front).
+            bodyContent,
           ],
         ),
       ),
@@ -491,6 +497,21 @@ class _HomeContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final sections = _sections(context, ref);
+    // Lazy sliver list — sections below the fold don't build / lay out / decode
+    // their images until they scroll into view. This is what keeps a super-
+    // category tab switch cheap and stops the "blank until you scroll" gap.
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, i) => sections[i],
+        childCount: sections.length,
+        addAutomaticKeepAlives: false,
+        addRepaintBoundaries: true,
+      ),
+    );
+  }
+
+  List<Widget> _sections(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final banners = ref.watch(bannersProvider).valueOrNull ?? const [];
     final groups = ref.watch(specialGroupsProvider).valueOrNull ?? const [];
@@ -515,10 +536,7 @@ class _HomeContent extends ConsumerWidget {
 
     final bannerUrl = selectedSuperCategory?['banner'] as String?;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
+    return <Widget>[
         // Optional Super Category Banner when admin uploads a banner for a super category
         if (bannerUrl != null && bannerUrl.trim().isNotEmpty) ...[
           Padding(
@@ -604,8 +622,7 @@ class _HomeContent extends ConsumerWidget {
 
         const _TrustRow(),
         const SizedBox(height: 32),
-      ],
-    );
+      ];
   }
 }
 

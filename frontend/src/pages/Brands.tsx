@@ -49,7 +49,7 @@ export const Brands: React.FC<BrandsProps> = ({ onQuickView }) => {
         description="Meet the local organic cooperative farmers, artisanal bakers, and grass-fed dairies that harvest daily for FreshCart."
       />
 
-      <div className="container mx-auto px-4 md:px-6 max-w-[1280px] py-8 pb-16">
+      <div className="container mx-auto px-4 md:px-6 max-w-none py-8 pb-16">
         <AnimatePresence mode="wait">
           {!selectedBrand ? (
             /* BRAND LISTING VIEW */

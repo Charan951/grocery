@@ -5,10 +5,11 @@ import 'package:freshcart/core/widgets/bottom_nav.dart';
 import 'package:freshcart/core/widgets/floating_cart.dart';
 import 'package:freshcart/features/cart/presentation/controllers/cart_controller.dart';
 
-/// Hosts the five main tab branches ([StatefulNavigationShell]).
+/// Hosts the four main tab branches ([StatefulNavigationShell]).
 /// The bottom navigation bar and floating cart are rendered persistent and static
-/// ONLY for the 5 main tab pages (Home, Categories, Search, Orders, Account).
-/// Detail routes are pushed to the root navigator outside this shell.
+/// ONLY for the 4 main tab pages (Categories, Home, Orders, Account).
+/// Detail routes — Search included — are pushed to the root navigator outside
+/// this shell.
 class MainScaffold extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
   const MainScaffold({super.key, required this.navigationShell});
@@ -29,8 +30,8 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
 
   /// Returns true when the app should actually be allowed to exit.
   bool _handleBack() {
-    if (widget.navigationShell.currentIndex != 0) {
-      widget.navigationShell.goBranch(0);
+    if (widget.navigationShell.currentIndex != kHomeNavIndex) {
+      widget.navigationShell.goBranch(kHomeNavIndex);
       return false;
     }
     final now = DateTime.now();
@@ -65,7 +66,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
           children: [
             widget.navigationShell,
 
-            // Floating Cart: Visible ONLY on 5 main tabs when cart has items
+            // Floating Cart: Visible ONLY on the 4 main tabs when cart has items
             if (cartCount > 0)
               Positioned(
                 left: 0,
@@ -74,7 +75,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
                 child: FloatingCart(onTap: () => context.push('/cart')),
               ),
 
-            // Bottom Navigation Bar: Static & persistent on the 5 main tabs
+            // Bottom Navigation Bar: Static & persistent on the 4 main tabs
             Positioned(
               left: 0,
               right: 0,

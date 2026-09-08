@@ -8,6 +8,7 @@ import { CustomerAuthModal } from './CustomerAuthModal';
 import { CustomerProfileDrawer } from './CustomerProfileDrawer';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getProductImage } from '../utils/imageUtils';
+import { useIsMobile } from '../hooks/useIsMobile';
 import {
   Search, Heart, MapPin, Menu, X, Mic,
   ChevronDown, Leaf, Settings, Percent, User, Zap, LogOut, Shield, LayoutGrid, ShoppingCart
@@ -26,13 +27,7 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [isMobile, setIsMobile] = useState<boolean>(() => typeof window !== 'undefined' ? window.innerWidth < 640 : false);
-
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 640);
-    window.addEventListener('resize', handleResize, { passive: true });
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const isMobile = useIsMobile(640);
 
   // Entire app bar (top header, search bar, category nav) tints to the active
   // category's own colour; defaults to campaign or green theme when home is active.
@@ -63,7 +58,6 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
   const shouldHideCategoryAppbar =
     isProductListingPage || isProductDetailPage || isProfilePage || isOrdersPage || isCategoriesPage;
 
-  const [announcementVisible, setAnnouncementVisible] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchResults, setSearchResults] = useState<typeof products>([]);
@@ -95,16 +89,27 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
     'Search "paneer & cream"'
   ], []);
 
-  const [sampleSearchIndex, setSampleSearchIndex] = useState(0);
+  // Rotating placeholder — mutate the input attribute directly on an interval
+  // instead of via state, so the whole Header does not re-render every 2s.
+  const desktopSearchInputRef = useRef<HTMLInputElement>(null);
+  const mobileSearchInputRef = useRef<HTMLInputElement>(null);
+  const initialPlaceholder = SAMPLE_SEARCHES[0];
 
   useEffect(() => {
+    let i = 0;
     const timer = setInterval(() => {
-      setSampleSearchIndex((prev) => (prev + 1) % SAMPLE_SEARCHES.length);
+      i = (i + 1) % SAMPLE_SEARCHES.length;
+      const next = SAMPLE_SEARCHES[i];
+      // Don't clobber the placeholder while the user is mid-search.
+      if (desktopSearchInputRef.current && !desktopSearchInputRef.current.value) {
+        desktopSearchInputRef.current.placeholder = next;
+      }
+      if (mobileSearchInputRef.current && !mobileSearchInputRef.current.value) {
+        mobileSearchInputRef.current.placeholder = next;
+      }
     }, 2000);
     return () => clearInterval(timer);
-  }, [SAMPLE_SEARCHES.length]);
-
-  const currentPlaceholder = SAMPLE_SEARCHES[sampleSearchIndex];
+  }, [SAMPLE_SEARCHES]);
 
   const searchRef = useRef<HTMLDivElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -156,38 +161,37 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
   }, [location.pathname, location.search]);
 
   // --sticky-header-h drives <main>'s padding-top and the category strip's
-  // sticky offset. It must be STABLE (two discrete values), never swept through
-  // every intermediate height of the collapse animation — that per-frame churn
-  // was the juddering. So: measure the expanded height only while the header is
-  // open, and snap the var to 0 the instant it collapses.
+  // sticky offset. It must be STABLE (two discrete values) — the expanded
+  // height while the header is open, and 0 the instant it collapses — never
+  // swept through every intermediate height of the collapse animation.
   const expandedHRef = useRef(0);
 
+  // Measure the expanded header height with a ResizeObserver mounted once — no
+  // layout reads on scroll, no listener churn. While the header is collapsed we
+  // freeze the last expanded value (the collapse effect below snaps the var to
+  // 0), so a scroll-direction flip never triggers a re-measure.
   useEffect(() => {
-    if (headerHidden) return;
-    const measure = () => {
-      const el = appBarRef.current;
-      if (!el) return;
-      const h = el.offsetHeight;
-      if (h > 0) {
+    const el = appBarRef.current;
+    if (!el) return;
+    const commit = (h: number) => {
+      if (h > 0 && !headerHidden) {
         expandedHRef.current = h;
         document.documentElement.style.setProperty('--sticky-header-h', `${h}px`);
       }
     };
-    measure();
-    const raf = requestAnimationFrame(measure); // after paint
-    window.addEventListener('resize', measure);
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener('resize', measure);
-    };
-  }, [location.pathname, location.search, headerHidden, isMobile, isScrolledDown]);
+    const ro = new ResizeObserver((entries) => {
+      commit(entries[0]?.borderBoxSize?.[0]?.blockSize ?? el.offsetHeight);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [headerHidden]);
 
   // One write per collapse/expand — the page padding + sticky category strip
   // then glide via their own CSS transitions.
   useEffect(() => {
     document.documentElement.style.setProperty(
       '--sticky-header-h',
-      headerHidden ? '0px' : `${expandedHRef.current || 140}px`
+      headerHidden ? '0px' : (expandedHRef.current ? `${expandedHRef.current}px` : '128px')
     );
   }, [headerHidden]);
 
@@ -405,7 +409,7 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
   const isSearchPage =
     location.pathname === '/search' || location.pathname.startsWith('/search');
 
-  if (isMobile && (isProductDetailPage || isCategoriesPage || isOrdersPage || isAddressesPage || isSearchPage)) {
+  if (isMobile && (isProductListingPage || isProductDetailPage || isCategoriesPage || isOrdersPage || isAddressesPage || isSearchPage || isProfilePage)) {
     return null;
   }
 
@@ -413,13 +417,12 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
     <>
       <div
         ref={appBarRef}
-        className={`fixed top-0 left-0 right-0 z-[1000] w-full transition-all duration-300 transform translate-y-0 border-none outline-none ${isScrolledDown ? 'shadow-sm' : 'shadow-none'
-          }`}
+        className={`fixed top-0 left-0 right-0 z-[1000] w-full max-w-[100vw] overflow-x-clip transition-all duration-300 transform translate-y-0 border-none outline-none shadow-none`}
         style={festivalHeaderBgStyle}
       >
         {/* Desktop & Mobile Header Content */}
         <header
-          className={`flex items-center justify-between w-full max-w-[1280px] mx-auto px-3 md:px-8 transition-all duration-300 gap-2 md:gap-6 border-none outline-none ${headerHidden
+          className={`flex items-center justify-between w-full max-w-none mx-auto px-3 md:px-8 transition-all duration-300 gap-2 md:gap-6 border-none outline-none ${headerHidden
               ? 'py-0 sm:py-2.5 max-h-0 sm:max-h-24 opacity-0 sm:opacity-100 overflow-hidden sm:overflow-visible pointer-events-none sm:pointer-events-auto'
               : 'py-2 md:py-2.5 max-h-24 opacity-100'
             }`}
@@ -435,9 +438,11 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
             </Link>
 
             {/* Location Selector (Desktop) */}
-            <div
+            <button
+              type="button"
               onClick={() => navigate('/account/addresses')}
-              className="flex flex-col cursor-pointer select-none group pl-3 sm:pl-4"
+              aria-label="Change delivery address"
+              className="flex flex-col items-start text-left cursor-pointer select-none group pl-3 sm:pl-4 bg-transparent border-none"
             >
               <div className={`flex items-center gap-1 font-extrabold text-sm tracking-tight leading-tight ${headerTextColor}`}>
                 <Zap size={15} className={`shrink-0 ${iconColorClass}`} />
@@ -461,23 +466,25 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
                 </span>
                 <ChevronDown size={14} className="shrink-0" />
               </div>
-            </div>
+            </button>
           </div>
 
-          {/* Mobile Header Row (Compact Delivery, Notifications & Profile matching Flutter) */}
+          {/* Mobile Header Row (compact delivery + notifications + profile) */}
           <div className={`flex sm:hidden items-center justify-between w-full gap-2 transition-all duration-300 ease-in-out overflow-hidden ${headerHidden ? 'max-h-0 opacity-0 py-0 pointer-events-none' : 'max-h-16 opacity-100 py-1'
             }`}>
             {/* Left: Express delivery badge & location dropdown */}
-            <div
+            <button
+              type="button"
               onClick={() => navigate('/locations')}
-              className="flex flex-col cursor-pointer select-none group min-w-0"
+              aria-label="Change delivery address"
+              className="flex flex-col items-start text-left cursor-pointer select-none group min-w-0 bg-transparent border-none"
             >
-              <div className="flex items-center gap-1 font-black text-xs tracking-tight leading-tight text-[#0C831F]">
-                <Zap size={14} className="shrink-0 fill-[#0C831F]" />
+              <div className="flex items-center gap-1 font-black text-xs tracking-tight leading-tight text-text-primary">
+                <Zap size={14} className="shrink-0 fill-primary text-primary" />
                 <span>Express delivery</span>
               </div>
-              <div className="flex items-center gap-0.5 text-[11px] font-bold text-gray-600 truncate transition-colors">
-                <span className="truncate max-w-[210px]">
+              <div className="flex items-center gap-0.5 text-[11px] font-bold text-text-secondary truncate transition-colors">
+                <span className="truncate max-w-[190px]">
                   {(() => {
                     if (typeof userLocation === 'object' && userLocation !== null && (userLocation.houseNo || userLocation.area || userLocation.address || userLocation.fullAddress)) {
                       const parts = [];
@@ -489,36 +496,13 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
                     if (typeof userLocation === 'string' && (userLocation as string).trim()) {
                       return userLocation;
                     }
-                    return 'Bhimavole To Dwaraka Tirumala...';
+                    return 'Add delivery address';
                   })()}
                 </span>
-                <ChevronDown size={12} className="shrink-0 text-gray-500" />
+                <ChevronDown size={12} className="shrink-0 text-text-tertiary" />
               </div>
-            </div>
+            </button>
 
-            {/* Right: Notifications & Profile Buttons */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                onClick={() => navigate('/support')}
-                className="w-8 h-8 rounded-full border border-gray-200 bg-white text-gray-700 flex items-center justify-center transition-colors cursor-pointer shadow-2xs hover:bg-gray-50"
-                aria-label="Notifications"
-              >
-                <div className="relative">
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 absolute -top-0.5 -right-0.5" />
-                  <svg className="w-4 h-4 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                  </svg>
-                </div>
-              </button>
-              <button
-                onClick={handleProfileClick}
-                className="w-8 h-8 rounded-full border border-gray-200 bg-white text-gray-700 flex items-center justify-center transition-colors cursor-pointer shadow-2xs hover:bg-gray-50"
-                title={customerUser ? `Logged in as ${customerUser.phone}` : "Customer Login"}
-                aria-label={customerUser ? `Account menu — logged in as ${customerUser.phone}` : "Customer login"}
-              >
-                <User size={16} />
-              </button>
-            </div>
           </div>
 
           {/* Desktop Search Bar */}
@@ -528,14 +512,16 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
               style={{
                 borderColor: isDarkHeader
                   ? (campaignAccentColor || 'rgba(255,255,255,0.4)')
-                  : '#CBD5E1'
+                  : 'var(--divider)'
               }}
-              className="flex items-center w-full px-4 py-2 bg-white/95 rounded-full transition-all border focus-within:bg-white focus-within:ring-2 focus-within:ring-primary/20 shadow-2xs"
+              className="flex items-center w-full px-4 py-2 bg-surface/95 rounded-full transition-colors border focus-within:bg-surface focus-within:ring-2 focus-within:ring-primary/20 shadow-2xs"
             >
               <Search size={17} className="text-text-tertiary mr-2.5 shrink-0" />
               <input
+                ref={desktopSearchInputRef}
                 type="text"
-                placeholder={currentPlaceholder}
+                aria-label="Search products"
+                placeholder={initialPlaceholder}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={() => searchQuery.length > 1 && setShowSearchResults(true)}
@@ -655,22 +641,24 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
           >
             <form
               onSubmit={handleSearchSubmit}
-              className="flex items-center w-full h-11 px-3.5 bg-white rounded-[14px] shadow-xs border border-gray-300 focus-within:border-[#0C831F]"
+              className="flex items-center w-full h-11 px-3.5 bg-surface rounded-[14px] shadow-xs border border-divider focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20"
             >
-              <Search size={20} className="text-gray-800 mr-2.5 shrink-0" />
+              <Search size={20} className="text-text-primary mr-2.5 shrink-0" />
               <input
+                ref={mobileSearchInputRef}
                 type="text"
-                placeholder={currentPlaceholder}
+                aria-label="Search products"
+                placeholder={initialPlaceholder}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={() => searchQuery.length > 1 && setShowSearchResults(true)}
-                className="w-full text-[13px] bg-transparent border-none outline-none text-gray-900 placeholder:text-gray-500 font-medium"
+                className="w-full text-[13px] bg-transparent border-none outline-none text-text-primary placeholder:text-text-secondary font-medium"
               />
               <button
                 type="button"
                 onClick={() => navigate('/search')}
-                className="text-gray-800 hover:text-black p-0.5 ml-1 shrink-0 cursor-pointer"
-                aria-label="Voice Search"
+                className="text-text-primary hover:text-black p-0.5 ml-1 shrink-0 cursor-pointer"
+                aria-label="Open search"
               >
                 <Mic size={20} />
               </button>

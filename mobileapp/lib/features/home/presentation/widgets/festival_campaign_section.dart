@@ -9,6 +9,12 @@ import '../../data/models/festival_campaign_model.dart';
 import '../controllers/catalog_providers.dart';
 import '../utils/festival_theme_resolver.dart';
 
+/// 1:1 port of the web storefront's `FestivalCampaignWrapper.tsx` (mobile
+/// breakpoint). Layout, spacing, type scale, colours and the two card styles
+/// (`style1` uniform grid / paged carousel, `style2` hero-rotator + 2×2 grid)
+/// mirror the React component. The gradient background is painted by the parent
+/// (`home_screen.dart`) so the section blends with the header above it — this
+/// widget only draws the content + the bottom scallop arch.
 class FestivalCampaignSection extends ConsumerWidget {
   final FestivalCampaignModel campaign;
   final Function(String categoryId) onOpenCategory;
@@ -19,275 +25,446 @@ class FestivalCampaignSection extends ConsumerWidget {
     required this.onOpenCategory,
   });
 
+  // web: DEFAULT_GROUP_IMAGES — used only when a group has neither its own image
+  // nor a resolvable curated-product image.
+  static const _fallbackImages = <String>[
+    'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?w=400&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1599785209707-a456fc1337bb?w=400&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1608686207856-001b95cf60ca?w=400&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=400&auto=format&fit=crop',
+  ];
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = FestivalThemeResolver.resolve(campaign);
-    final allProducts = ref.watch(allProductsProvider).valueOrNull ?? const [];
+    final allProducts =
+        ref.watch(allProductsProvider).valueOrNull ?? const <ProductModel>[];
 
-    // Filter active groups & enforce maximum limit of 10 cards
-    final activeGroups = campaign.festivalGroups
-        .where((g) => g.isActive && (g.products.isNotEmpty || g.imageUrl != null))
-        .take(10)
+    // Match the web filter exactly: active groups, and prefer those that carry
+    // real content (own image or ≥1 curated product). If every active group is
+    // name-only, fall back to showing them all rather than nothing.
+    final activeGroups =
+        campaign.festivalGroups.where((g) => g.isActive).take(18).toList();
+    final realGroups = activeGroups
+        .where((g) =>
+            (g.imageUrl ?? '').trim().isNotEmpty || g.products.isNotEmpty)
         .toList();
+    final groups = realGroups.isNotEmpty ? realGroups : activeGroups;
+    if (groups.isEmpty) return const SizedBox.shrink();
 
-    if (activeGroups.isEmpty) return const SizedBox.shrink();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          // web: section `pt-5` (20) + inner `px-4` (16); cards block `mb-5` (20)
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
           child: Column(
             children: [
-              // Blinkit Style Header Header: — CELEBRATE — Festival Name
-              Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(theme.emoji, style: const TextStyle(fontSize: 15)),
-                      const SizedBox(width: 5),
-                      Text(
-                        'CELEBRATE',
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 2.0,
-                          color: theme.accentColor,
-                        ),
-                      ),
-                      const SizedBox(width: 5),
-                      Text(theme.emoji, style: const TextStyle(fontSize: 15)),
-                    ],
-                  ),
-                  const SizedBox(height: 1),
-                  Text(
-                    campaign.name,
-                    textAlign: TextAlign.center,
-                    style: AppTypography.festivalCalligraphy(
-                      theme.textColor,
-                      fontSize: 28,
-                      fontPreset: theme.fontPreset,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
+              _TitleBlock(campaign: campaign, theme: theme),
+              const SizedBox(height: 16), // web title block `mb-4`
 
-              // Optional Banner
-              if (campaign.enableBanner && campaign.bannerImage.trim().isNotEmpty) ...[
+              if (campaign.enableBanner &&
+                  campaign.bannerImage.trim().isNotEmpty) ...[
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(16),
                   child: CachedNetworkImage(
                     imageUrl: campaign.bannerImage,
-                    height: 110,
+                    height: 120,
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    errorWidget: (context, url, error) => const SizedBox.shrink(),
+                    errorWidget: (_, _, _) => const SizedBox.shrink(),
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 16),
               ],
 
-              // Group Cards Layout Logic based on Card Style
-              campaign.cardStyle == 'style2'
-                  ? _buildStyle2CardsLayout(context, activeGroups, allProducts, theme)
-                  : _buildResponsiveCardsLayout(context, activeGroups, allProducts, theme),
+              // style2 is a hero + fixed 2×2 grid — it can only show 4 groups.
+              // Outside 3–4 groups (too few = empty cells, too many = silently
+              // dropped) fall back to the style1 grid/carousel, which shows
+              // every group.
+              if (campaign.cardStyle == 'style2' &&
+                  groups.length >= 3 &&
+                  groups.length <= 4)
+                _Style2Layout(
+                  groups: groups,
+                  products: allProducts,
+                  theme: theme,
+                  imageFor: (g, i) => _imageFor(g, allProducts, i),
+                  onTapGroup: (g) => _openGroup(context, g, allProducts),
+                )
+              else
+                _Style1Layout(
+                  groups: groups,
+                  theme: theme,
+                  imageFor: (g, i) => _imageFor(g, allProducts, i),
+                  onTapGroup: (g) => _openGroup(context, g, allProducts),
+                ),
             ],
           ),
         ),
 
-        // Bottom Scallop Arch Border transition
+        // web: bottom scallop arch transition (24 quadratic arches)
         _ScallopArchBorder(
-          fillColor: Theme.of(context).brightness == Brightness.dark
-              ? const Color(0xFF18181B)
-              : Colors.white,
+          fillColor: isDark ? const Color(0xFF18181B) : Colors.white,
         ),
       ],
     );
   }
 
-  Widget _buildResponsiveCardsLayout(
-    BuildContext context,
-    List<FestivalGroupModel> groups,
+  String _imageFor(
+    FestivalGroupModel group,
     List<ProductModel> allProducts,
-    ResolvedFestivalTheme theme,
+    int index,
   ) {
-    final count = groups.length;
-
-    // > 4 cards (5 up to 10): Auto-scrolling horizontal row every 3 seconds
-    if (count > 4) {
-      return _AutoScrollGroupCardsList(
-        groups: groups,
-        allProducts: allProducts,
-        theme: theme,
-        cardBuilder: _buildSingleGroupCard,
-      );
+    if (group.imageUrl != null && group.imageUrl!.trim().isNotEmpty) {
+      return group.imageUrl!.trim();
     }
-
-    if (count == 1) {
-      return SizedBox(
-        height: 140,
-        width: double.infinity,
-        child: _buildSingleGroupCard(context, groups[0], allProducts, theme),
-      );
+    // Use the group's FIRST product (group order), exactly like web — not the
+    // first catalog product that happens to be in the group.
+    if (group.products.isNotEmpty) {
+      final firstId = group.products.first;
+      final match = allProducts.where((p) => p.id == firstId);
+      if (match.isNotEmpty && match.first.imageUrl.isNotEmpty) {
+        return match.first.imageUrl;
+      }
     }
-
-    if (count == 2) {
-      return Row(
-        children: [
-          Expanded(child: SizedBox(height: 135, child: _buildSingleGroupCard(context, groups[0], allProducts, theme))),
-          const SizedBox(width: 8),
-          Expanded(child: SizedBox(height: 135, child: _buildSingleGroupCard(context, groups[1], allProducts, theme))),
-        ],
-      );
-    }
-
-    if (count == 3) {
-      return Row(
-        children: [
-          for (int i = 0; i < 3; i++) ...[
-            if (i > 0) const SizedBox(width: 6),
-            Expanded(child: SizedBox(height: 130, child: _buildSingleGroupCard(context, groups[i], allProducts, theme))),
-          ],
-        ],
-      );
-    }
-
-    // count == 4: Fit all 4 cards in a single row without increasing theme height!
-    return Row(
-      children: [
-        for (int i = 0; i < 4; i++) ...[
-          if (i > 0) const SizedBox(width: 5),
-          Expanded(
-            child: SizedBox(
-              height: 125,
-              child: _buildSingleGroupCard(
-                context,
-                groups[i],
-                allProducts,
-                theme,
-                isCompact: true,
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
+    return _fallbackImages[index % _fallbackImages.length];
   }
 
-  Widget _buildSingleGroupCard(
+  /// Where a festival group card lands — mirrors `festivalGroupHref` on web:
+  ///  - exactly one curated product  -> that product's page
+  ///  - several curated products with a category -> that category
+  ///  - nothing usable -> catalog search seeded with the group name
+  ///    (web: `/products?search=<name>`)
+  void _openGroup(
     BuildContext context,
     FestivalGroupModel group,
     List<ProductModel> allProducts,
-    ResolvedFestivalTheme theme, {
-    bool isCompact = false,
-  }) {
-    // Resolve group image
-    String? cardImage = group.imageUrl;
-    String targetCatId = 'all';
+  ) {
+    final curated = group.products
+        .map((id) => allProducts.where((p) => p.id == id))
+        .expand((e) => e)
+        .toList();
 
-    if (group.products.isNotEmpty) {
-      final firstProd = allProducts.firstWhere(
-        (p) => group.products.contains(p.id),
-        orElse: () => allProducts.isNotEmpty ? allProducts.first : const ProductModel(
-          id: '', name: '', brand: '', categoryId: '', rating: 0, reviewsCount: 0,
-          price: 0, mrp: 0, weightOptions: [], defaultWeight: '', description: '',
-          nutritionFacts: {}, ingredients: [], imageUrl: '',
+    if (curated.length == 1 && curated.first.id.isNotEmpty) {
+      context.push('/product/${curated.first.id}');
+      return;
+    }
+    final withCat = curated.where((p) => p.categoryId.isNotEmpty);
+    if (withCat.isNotEmpty) {
+      onOpenCategory(withCat.first.categoryId);
+      return;
+    }
+    final name = group.displayName.trim();
+    context.push(name.isEmpty ? '/search' : '/search?q=${Uri.encodeComponent(name)}');
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Title block  (web: "— Celebrate —" eyebrow + festival name in the theme font)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _TitleBlock extends StatelessWidget {
+  final FestivalCampaignModel campaign;
+  final ResolvedFestivalTheme theme;
+
+  const _TitleBlock({required this.campaign, required this.theme});
+
+  @override
+  Widget build(BuildContext context) {
+    // web: `color: theme.text` at `opacity: 0.72`
+    final eyebrowColor = theme.textColor.withOpacity(0.72);
+
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(theme.emoji, style: const TextStyle(fontSize: 12)),
+            const SizedBox(width: 8), // web `gap-2`
+            Text(
+              'CELEBRATE',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 3.0, // web `tracking-[0.28em]` ≈ 11 * 0.28
+                color: eyebrowColor,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(theme.emoji, style: const TextStyle(fontSize: 12)),
+          ],
         ),
+        const SizedBox(height: 4), // web `mt-1`
+        Text(
+          campaign.name.isNotEmpty ? campaign.name : 'Celebrate',
+          textAlign: TextAlign.center,
+          style: AppTypography.festivalCalligraphy(
+            theme.textColor,
+            fontSize: 30, // web `text-[30px]`
+            fontWeight: FontWeight.w400, // web `font-normal`
+            fontPreset: theme.fontPreset,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared card chrome
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Bottom-anchored dark scrim, `heightFactor` of the card, transparent → black.
+class _Scrim extends StatelessWidget {
+  final double heightFactor;
+  final double maxOpacity;
+  final double midOpacity;
+
+  const _Scrim({
+    required this.heightFactor,
+    required this.maxOpacity,
+    required this.midOpacity,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: FractionallySizedBox(
+        heightFactor: heightFactor,
+        widthFactor: 1,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.transparent,
+                Colors.black.withOpacity(midOpacity),
+                Colors.black.withOpacity(maxOpacity),
+              ],
+              stops: const [0.0, 0.55, 1.0],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DiscountBadge extends StatelessWidget {
+  final double percent;
+  final Color color;
+  final bool small;
+
+  const _DiscountBadge({
+    required this.percent,
+    required this.color,
+    this.small = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: small ? 6 : 8,
+        vertical: small ? 2 : 3,
+      ),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(6), // web `rounded-md`
+      ),
+      child: Text(
+        '${percent.toInt()}% OFF',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: small ? 9 : 10,
+          fontWeight: FontWeight.w900,
+          height: 1,
+        ),
+      ),
+    );
+  }
+}
+
+Widget _cardImage(String image, Color fallbackBg) {
+  if (image.startsWith('http')) {
+    return CachedNetworkImage(
+      imageUrl: image,
+      fit: BoxFit.cover,
+      placeholder: (_, _) => ColoredBox(color: fallbackBg),
+      errorWidget: (_, _, _) => ColoredBox(color: fallbackBg),
+    );
+  }
+  return ColoredBox(color: fallbackBg);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STYLE 1  — uniform image cards
+//   1–3 groups : single row (that many columns)
+//   4–6 groups : 3-column grid (wraps to 2 rows)
+//   > 6 groups : horizontal snap carousel, each page a 3×2 grid
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _Style1Layout extends StatelessWidget {
+  final List<FestivalGroupModel> groups;
+  final ResolvedFestivalTheme theme;
+  final String Function(FestivalGroupModel group, int index) imageFor;
+  final void Function(FestivalGroupModel group) onTapGroup;
+
+  const _Style1Layout({
+    required this.groups,
+    required this.theme,
+    required this.imageFor,
+    required this.onTapGroup,
+  });
+
+  static const double _cardH = 130; // card height (web `h-[150px]`, tightened)
+  static const double _gap = 10; // web `gap-2.5`
+
+  @override
+  Widget build(BuildContext context) {
+    final list = groups.take(18).toList();
+
+    Widget card(FestivalGroupModel g, int i) => SizedBox(
+          height: _cardH,
+          child: _Style1Card(
+            group: g,
+            image: imageFor(g, i),
+            theme: theme,
+            onTap: () => onTapGroup(g),
+          ),
+        );
+
+    // Always lay out relative to the real available width (the section already
+    // pads `px-4`), so 3 columns fit exactly and never wrap to 2.
+    Widget gridOf(List<FestivalGroupModel> page, int baseIdx) {
+      return LayoutBuilder(
+        builder: (context, c) {
+          final itemW = ((c.maxWidth - 2 * _gap) / 3).floorToDouble();
+          return Wrap(
+            spacing: _gap,
+            runSpacing: _gap,
+            children: [
+              for (var i = 0; i < page.length; i++)
+                SizedBox(width: itemW, child: card(page[i], baseIdx + i)),
+            ],
+          );
+        },
       );
-      if (cardImage == null || cardImage.isEmpty) {
-        cardImage = firstProd.imageUrl;
-      }
-      if (firstProd.categoryId.isNotEmpty) {
-        targetCatId = firstProd.categoryId;
-      }
     }
 
-    final displayImg = (cardImage != null && cardImage.trim().isNotEmpty)
-        ? cardImage.trim()
-        : null;
+    // 1–6 groups → one static grid.
+    if (list.length <= 6) {
+      return gridOf(list, 0);
+    }
 
-    return GestureDetector(
-      onTap: () {
-        if (targetCatId != 'all') {
-          onOpenCategory(targetCatId);
-        } else {
-          context.push('/search');
-        }
+    // > 6 groups → swipeable pages, each a full-width 3×2 grid.
+    final pages = <List<FestivalGroupModel>>[];
+    for (var i = 0; i < list.length; i += 6) {
+      pages.add(list.sublist(i, (i + 6).clamp(0, list.length)));
+    }
+    final pageCtrl = PageController();
+
+    return Column(
+      children: [
+        SizedBox(
+          height: _cardH * 2 + _gap,
+          child: PageView.builder(
+            controller: pageCtrl,
+            itemCount: pages.length,
+            itemBuilder: (_, pi) => gridOf(pages[pi], pi * 6),
+          ),
+        ),
+        const SizedBox(height: 10),
+        _PageDots(controller: pageCtrl, count: pages.length, color: theme.textColor),
+      ],
+    );
+  }
+}
+
+class _PageDots extends StatelessWidget {
+  final PageController controller;
+  final int count;
+  final Color color;
+  const _PageDots({
+    required this.controller,
+    required this.count,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (_, _) {
+        final page = controller.hasClients
+            ? (controller.page ?? controller.initialPage.toDouble()).round()
+            : 0;
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (var i = 0; i < count; i++)
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                width: i == page ? 18 : 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(i == page ? 0.9 : 0.3),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+          ],
+        );
       },
+    );
+  }
+}
+
+class _Style1Card extends StatelessWidget {
+  final FestivalGroupModel group;
+  final String image;
+  final ResolvedFestivalTheme theme;
+  final VoidCallback onTap;
+
+  const _Style1Card({
+    required this.group,
+    required this.image,
+    required this.theme,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(isCompact ? 14 : 20),
+        borderRadius: BorderRadius.circular(16), // web `rounded-2xl`
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // Background Category Image filling the card cleanly from Database
-            if (displayImg != null && displayImg.startsWith('http'))
-              CachedNetworkImage(
-                imageUrl: displayImg,
-                fit: BoxFit.cover,
-                errorWidget: (context, url, error) => Container(
-                  color: theme.cardBackground,
-                  child: Center(
-                    child: Icon(Icons.shopping_bag_outlined, color: theme.accentColor, size: isCompact ? 24 : 36),
-                  ),
-                ),
-              )
-            else
-              Container(
-                color: theme.cardBackground,
-                child: Center(
-                  child: Icon(Icons.shopping_bag_outlined, color: theme.accentColor, size: isCompact ? 24 : 36),
-                ),
-              ),
+            _cardImage(image, theme.cardBackground),
+            const _Scrim(heightFactor: 0.6, maxOpacity: 0.80, midOpacity: 0.20),
 
-            // Dark gradient overlay at bottom for crisp title text legibility
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withOpacity(0.2),
-                      Colors.black.withOpacity(0.88),
-                    ],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    stops: const [0.25, 0.6, 1.0],
-                  ),
-                ),
-              ),
-            ),
-
-            // Optional Discount Badge at Top Right
             if (group.discountPercent > 0)
               Positioned(
-                top: isCompact ? 4 : 8,
-                right: isCompact ? 4 : 8,
-                child: Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isCompact ? 4 : 6,
-                    vertical: isCompact ? 1 : 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.buttonColor,
-                    borderRadius: BorderRadius.circular(isCompact ? 6 : 8),
-                  ),
-                  child: Text(
-                    '${group.discountPercent.toInt()}% OFF',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: isCompact ? 8 : 9,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
+                top: 6,
+                right: 6,
+                child: _DiscountBadge(
+                  percent: group.discountPercent,
+                  color: theme.buttonColor,
+                  small: true,
                 ),
               ),
 
-            // Content at Bottom Left & Chevron Action Button on Bottom Right
+            // web: bottom row — name (flex) + white chevron circle
             Positioned(
-              left: isCompact ? 6 : 10,
-              right: isCompact ? 6 : 10,
-              bottom: isCompact ? 6 : 10,
+              left: 8,
+              right: 8,
+              bottom: 8,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -296,29 +473,27 @@ class FestivalCampaignSection extends ConsumerWidget {
                       group.displayName,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: Colors.white,
-                        fontSize: isCompact ? 10 : 13,
+                        fontSize: 11,
                         fontWeight: FontWeight.w900,
-                        height: 1.1,
-                        shadows: const [Shadow(color: Colors.black45, blurRadius: 4)],
+                        height: 1.15,
+                        shadows: [Shadow(color: Colors.black54, blurRadius: 3)],
                       ),
                     ),
                   ),
-                  SizedBox(width: isCompact ? 2 : 4),
-
-                  // Circular Chevron Button matching Blinkit design
+                  const SizedBox(width: 4),
                   Container(
-                    width: isCompact ? 18 : 24,
-                    height: isCompact ? 18 : 24,
+                    width: 16,
+                    height: 16,
                     decoration: const BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(
+                    child: const Icon(
                       Icons.chevron_right_rounded,
-                      size: isCompact ? 12 : 18,
-                      color: Colors.black87,
+                      size: 11,
+                      color: Color(0xFF1C1C1E),
                     ),
                   ),
                 ],
@@ -329,245 +504,199 @@ class FestivalCampaignSection extends ConsumerWidget {
       ),
     );
   }
+}
 
-  Widget _buildStyle2CardsLayout(
-    BuildContext context,
-    List<FestivalGroupModel> groups,
-    List<ProductModel> allProducts,
-    ResolvedFestivalTheme theme,
-  ) {
-    if (groups.isEmpty) return const SizedBox.shrink();
+// ─────────────────────────────────────────────────────────────────────────────
+// STYLE 2  — left hero rotator (38%) + right 2×2 group grid (62%)
+// ─────────────────────────────────────────────────────────────────────────────
 
-    // Build rotator items group by group so left card shifts group-wise!
-    final List<HeroGroupProductItem> rotatorItems = [];
-    for (final group in groups) {
-      final groupProds = allProducts.where((p) => group.products.contains(p.id)).toList();
-      if (groupProds.isNotEmpty) {
-        for (final prod in groupProds) {
-          rotatorItems.add(HeroGroupProductItem(group: group, product: prod));
-        }
-      } else {
-        rotatorItems.add(HeroGroupProductItem(
-          group: group,
-          product: ProductModel(
-            id: group.id,
-            name: group.displayName,
-            brand: '',
-            categoryId: '',
-            rating: 0,
-            reviewsCount: 0,
-            price: 0,
-            mrp: 0,
-            weightOptions: const [],
-            defaultWeight: '',
-            description: '',
-            nutritionFacts: const {},
-            ingredients: const [],
-            imageUrl: group.imageUrl ?? '',
-          ),
-        ));
-      }
-    }
+class _Style2Layout extends StatelessWidget {
+  final List<FestivalGroupModel> groups;
+  final List<ProductModel> products;
+  final ResolvedFestivalTheme theme;
+  final String Function(FestivalGroupModel group, int index) imageFor;
+  final void Function(FestivalGroupModel group) onTapGroup;
+
+  const _Style2Layout({
+    required this.groups,
+    required this.products,
+    required this.theme,
+    required this.imageFor,
+    required this.onTapGroup,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final gridGroups = groups.take(4).toList();
 
     return SizedBox(
-      height: 215, // Compact, clean cards layout matching Image 2
+      height: 320, // web `h-[320px]`
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Left Tall Hero Card (Dynamic 2-sec group-wise product rotator)
+          // Left hero — 38%
           Expanded(
-            flex: 4,
-            child: _Style2HeroCard(
-              items: rotatorItems,
+            flex: 38,
+            child: _Style2Hero(
+              groups: groups,
+              products: products,
               theme: theme,
-              onTap: () {
-                if (rotatorItems.isNotEmpty && rotatorItems.first.product.categoryId.isNotEmpty) {
-                  onOpenCategory(rotatorItems.first.product.categoryId);
-                } else {
-                  context.push('/search');
-                }
-              },
+              imageFor: imageFor,
+              onTapGroup: onTapGroup,
             ),
           ),
-          const SizedBox(width: 8),
-
-          // Right Side Column displaying ALL 4 Groups in a 2x2 Grid Layout
+          const SizedBox(width: 12), // web `gap-3`
+          // Right 2×2 grid — 62%
           Expanded(
-            flex: 5,
-            child: _buildStyle2RightGrid(context, groups, allProducts, theme),
+            flex: 62,
+            child: _Style2Grid(
+              groups: gridGroups,
+              theme: theme,
+              imageFor: imageFor,
+              onTapGroup: onTapGroup,
+            ),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildStyle2RightGrid(
-    BuildContext context,
-    List<FestivalGroupModel> groups,
-    List<ProductModel> allProducts,
-    ResolvedFestivalTheme theme,
-  ) {
-    if (groups.isEmpty) return const SizedBox.shrink();
+class _Style2Grid extends StatelessWidget {
+  final List<FestivalGroupModel> groups;
+  final ResolvedFestivalTheme theme;
+  final String Function(FestivalGroupModel group, int index) imageFor;
+  final void Function(FestivalGroupModel group) onTapGroup;
 
-    if (groups.length == 1) {
-      return _buildStyle2SingleCard(context, groups[0], allProducts, theme);
-    }
+  const _Style2Grid({
+    required this.groups,
+    required this.theme,
+    required this.imageFor,
+    required this.onTapGroup,
+  });
 
-    if (groups.length == 2) {
-      return Column(
-        children: [
-          Expanded(child: _buildStyle2SingleCard(context, groups[0], allProducts, theme)),
-          const SizedBox(height: 6),
-          Expanded(child: _buildStyle2SingleCard(context, groups[1], allProducts, theme)),
-        ],
+  @override
+  Widget build(BuildContext context) {
+    Widget cell(int i) {
+      if (i >= groups.length) return const SizedBox.shrink();
+      return _Style2GridCard(
+        group: groups[i],
+        image: imageFor(groups[i], i),
+        theme: theme,
+        onTap: () => onTapGroup(groups[i]),
       );
     }
 
-    if (groups.length == 3) {
-      return Column(
-        children: [
-          Expanded(
-            flex: 1,
-            child: Row(
-              children: [
-                Expanded(child: _buildStyle2SingleCard(context, groups[0], allProducts, theme)),
-                const SizedBox(width: 6),
-                Expanded(child: _buildStyle2SingleCard(context, groups[1], allProducts, theme)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 6),
-          Expanded(
-            flex: 1,
-            child: _buildStyle2SingleCard(context, groups[2], allProducts, theme),
-          ),
-        ],
-      );
-    }
-
-    // 4 groups (or >4): 2x2 Grid layout displaying all 4 groups on the right side!
-    return Column(
-      children: [
-        Expanded(
+    Widget row(List<Widget> children) => Expanded(
           child: Row(
-            children: [
-              Expanded(child: _buildStyle2SingleCard(context, groups[0], allProducts, theme)),
-              const SizedBox(width: 6),
-              Expanded(child: _buildStyle2SingleCard(context, groups[1], allProducts, theme)),
-            ],
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: children,
           ),
-        ),
-        const SizedBox(height: 6),
-        Expanded(
-          child: Row(
-            children: [
-              Expanded(child: _buildStyle2SingleCard(context, groups[2], allProducts, theme)),
-              const SizedBox(width: 6),
-              Expanded(child: _buildStyle2SingleCard(context, groups[3], allProducts, theme)),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+        );
 
-  Widget _buildStyle2SingleCard(
-    BuildContext context,
-    FestivalGroupModel group,
-    List<ProductModel> allProducts,
-    ResolvedFestivalTheme theme,
-  ) {
-    String? cardImage = group.imageUrl;
-    String targetCatId = 'all';
-
-    if (group.products.isNotEmpty) {
-      final firstProd = allProducts.firstWhere(
-        (p) => group.products.contains(p.id),
-        orElse: () => allProducts.isNotEmpty ? allProducts.first : const ProductModel(
-          id: '', name: '', brand: '', categoryId: '', rating: 0, reviewsCount: 0,
-          price: 0, mrp: 0, weightOptions: [], defaultWeight: '', description: '',
-          nutritionFacts: {}, ingredients: [], imageUrl: '',
-        ),
-      );
-      if (cardImage == null || cardImage.isEmpty) {
-        cardImage = firstProd.imageUrl;
-      }
-      if (firstProd.categoryId.isNotEmpty) {
-        targetCatId = firstProd.categoryId;
-      }
-    }
-
-    final displayImg = (cardImage != null && cardImage.trim().isNotEmpty)
-        ? cardImage.trim()
-        : null;
-
-    return GestureDetector(
-      onTap: () {
-        if (targetCatId != 'all') {
-          onOpenCategory(targetCatId);
-        } else {
-          context.push('/search');
-        }
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: theme.cardBackground, // Automatic theme background matching Image 2!
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
+    // 1 group → fills; 2 → stacked; 3 → row of 2 + full-width; 4 → 2×2.
+    switch (groups.length) {
+      case 1:
+        return cell(0);
+      case 2:
+        return Column(
           children: [
-            // Top Center Title
-            Positioned(
-              top: 8,
-              left: 4,
-              right: 4,
-              child: Text(
-                group.displayName,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w800,
-                  height: 1.1,
-                  shadows: [Shadow(color: Colors.black38, blurRadius: 3)],
+            row([Expanded(child: cell(0))]),
+            const SizedBox(height: 12),
+            row([Expanded(child: cell(1))]),
+          ],
+        );
+      case 3:
+        return Column(
+          children: [
+            row([
+              Expanded(child: cell(0)),
+              const SizedBox(width: 12),
+              Expanded(child: cell(1)),
+            ]),
+            const SizedBox(height: 12),
+            row([Expanded(child: cell(2))]),
+          ],
+        );
+      default:
+        return Column(
+          children: [
+            row([
+              Expanded(child: cell(0)),
+              const SizedBox(width: 12),
+              Expanded(child: cell(1)),
+            ]),
+            const SizedBox(height: 12), // web `gap-3`
+            row([
+              Expanded(child: cell(2)),
+              const SizedBox(width: 12),
+              Expanded(child: cell(3)),
+            ]),
+          ],
+        );
+    }
+  }
+}
+
+class _Style2GridCard extends StatelessWidget {
+  final FestivalGroupModel group;
+  final String image;
+  final ResolvedFestivalTheme theme;
+  final VoidCallback onTap;
+
+  const _Style2GridCard({
+    required this.group,
+    required this.image,
+    required this.theme,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16), // web `rounded-2xl`
+          border: Border.all(color: theme.cardBorder),
+        ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            _cardImage(image, theme.cardBackground),
+            const _Scrim(heightFactor: 0.6, maxOpacity: 0.75, midOpacity: 0.15),
+
+            if (group.discountPercent > 0)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: _DiscountBadge(
+                  percent: group.discountPercent,
+                  color: theme.buttonColor,
+                  small: true,
                 ),
               ),
-            ),
 
-            // Bottom Center Image
             Positioned(
-              left: 4,
-              right: 4,
-              bottom: 4,
-              top: 26,
-              child: displayImg != null && displayImg.startsWith('http')
-                  ? CachedNetworkImage(
-                      imageUrl: displayImg,
-                      fit: BoxFit.contain,
-                      alignment: Alignment.bottomCenter,
-                      errorWidget: (context, url, error) => Icon(
-                        Icons.shopping_bag_outlined,
-                        color: theme.accentColor,
-                        size: 20,
-                      ),
-                    )
-                  : Center(
-                      child: Icon(
-                        Icons.shopping_bag_outlined,
-                        color: theme.accentColor,
-                        size: 20,
-                      ),
-                    ),
+              left: 12,
+              right: 12,
+              bottom: 10,
+              child: Text(
+                group.displayName,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.left,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13, // web `text-[13px]`
+                  fontWeight: FontWeight.w900,
+                  height: 1.15,
+                  shadows: [
+                    Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 1)),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
@@ -575,6 +704,243 @@ class FestivalCampaignSection extends ConsumerWidget {
     );
   }
 }
+
+/// Left hero — cross-fades through every (group, product) pair, 4.5 s each.
+class _Style2Hero extends StatefulWidget {
+  final List<FestivalGroupModel> groups;
+  final List<ProductModel> products;
+  final ResolvedFestivalTheme theme;
+  final String Function(FestivalGroupModel group, int index) imageFor;
+  final void Function(FestivalGroupModel group) onTapGroup;
+
+  const _Style2Hero({
+    required this.groups,
+    required this.products,
+    required this.theme,
+    required this.imageFor,
+    required this.onTapGroup,
+  });
+
+  @override
+  State<_Style2Hero> createState() => _Style2HeroState();
+}
+
+class _HeroItem {
+  final FestivalGroupModel group;
+  final ProductModel? product;
+  const _HeroItem(this.group, this.product);
+}
+
+class _Style2HeroState extends State<_Style2Hero> {
+  int _i = 0;
+  Timer? _timer;
+  late List<_HeroItem> _items;
+
+  @override
+  void initState() {
+    super.initState();
+    _items = _buildItems();
+    if (_items.length > 1) {
+      _timer = Timer.periodic(const Duration(milliseconds: 4500), (_) {
+        if (mounted) setState(() => _i = (_i + 1) % _items.length);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  List<_HeroItem> _buildItems() {
+    final out = <_HeroItem>[];
+    for (final g in widget.groups) {
+      final prods = widget.products.where((p) => g.products.contains(p.id)).toList();
+      if (prods.isEmpty) {
+        out.add(_HeroItem(g, null));
+      } else {
+        for (final p in prods) {
+          out.add(_HeroItem(g, p));
+        }
+      }
+    }
+    return out;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = widget.theme;
+    final item = _items.isEmpty ? null : _items[_i % _items.length];
+    final group = item?.group;
+    final prod = item?.product;
+
+    final offer = prod?.price ?? 0;
+    var mrp = (prod != null && prod.mrp > prod.price) ? prod.mrp : 0;
+    final disc = group?.discountPercent ?? 0;
+    if (mrp <= offer && disc > 0 && offer > 0) {
+      mrp = (offer / (1 - disc / 100)).round();
+    }
+
+    // Product image first; otherwise fall back to the group's resolved image
+    // (its own image, a curated product's image, or a themed stock photo) so
+    // the hero is never a blank coloured panel — matching the right-grid cards.
+    final img = (prod != null && prod.imageUrl.isNotEmpty)
+        ? prod.imageUrl
+        : (group != null
+            ? widget.imageFor(group, widget.groups.indexOf(group).clamp(0, 999))
+            : '');
+    final prodName = prod?.name ?? '';
+
+    return GestureDetector(
+      onTap: () {
+        if (prod != null && prod.id.isNotEmpty && prod.id != group?.id) {
+          context.push('/product/${prod.id}');
+        } else if (group != null) {
+          widget.onTapGroup(group);
+        }
+      },
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: theme.cardBackground,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: theme.cardBorder),
+        ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Rotating full-bleed image — cross-fades, card never resizes.
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 400),
+              child: SizedBox.expand(
+                key: ValueKey(_i),
+                child: img.startsWith('http')
+                    ? _cardImage(img, theme.cardBackground)
+                    : ColoredBox(
+                        color: isDarkColor(theme.cardBackground)
+                            ? Colors.white.withOpacity(0.10)
+                            : Colors.black.withOpacity(0.05),
+                      ),
+              ),
+            ),
+            const _Scrim(heightFactor: 0.66, maxOpacity: 0.85, midOpacity: 0.25),
+
+            if (disc > 0)
+              Positioned(
+                top: 10,
+                right: 10,
+                child: _DiscountBadge(
+                  percent: disc.toDouble(),
+                  color: theme.buttonColor,
+                ),
+              ),
+
+            // Rotation progress pills (max 6) — web: active 16px / others 5px.
+            if (_items.length > 1)
+              Positioned(
+                top: 12,
+                left: 12,
+                child: Row(
+                  children: [
+                    for (var d = 0; d < _items.length.clamp(0, 6); d++)
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        margin: const EdgeInsets.only(right: 4),
+                        height: 4,
+                        width: d == _i % _items.length.clamp(1, 6) ? 16 : 5,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(
+                            d == _i % _items.length.clamp(1, 6) ? 0.95 : 0.45,
+                          ),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
+            // Copy overlay — web: p-3.5 (14), eyebrow / name / price
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      (group?.displayName ?? 'Festive Offer').toUpperCase(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.70),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.8, // web `tracking-[0.18em]`
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      prodName.isNotEmpty ? prodName : 'Festive picks',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        height: 1.15,
+                        shadows: [Shadow(color: Colors.black54, blurRadius: 6)],
+                      ),
+                    ),
+                    if (offer > 0) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '₹${offer.toInt()}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 19,
+                              fontWeight: FontWeight.w900,
+                              height: 1,
+                              shadows: [Shadow(color: Colors.black45, blurRadius: 4)],
+                            ),
+                          ),
+                          if (mrp > offer) ...[
+                            const SizedBox(width: 6),
+                            Text(
+                              '₹${mrp.toInt()}',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.60),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                height: 1,
+                                decoration: TextDecoration.lineThrough,
+                                decorationColor: Colors.white.withOpacity(0.60),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bottom scallop arch  (unchanged — already matches the web SVG path)
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _ScallopArchBorder extends StatelessWidget {
   final Color fillColor;
@@ -585,9 +951,7 @@ class _ScallopArchBorder extends StatelessWidget {
     return SizedBox(
       height: 14,
       width: double.infinity,
-      child: CustomPaint(
-        painter: _ScallopPainter(fillColor: fillColor),
-      ),
+      child: CustomPaint(painter: _ScallopPainter(fillColor: fillColor)),
     );
   }
 }
@@ -602,8 +966,7 @@ class _ScallopPainter extends CustomPainter {
       ..color = fillColor
       ..style = PaintingStyle.fill;
 
-    final path = Path();
-    path.moveTo(0, size.height);
+    final path = Path()..moveTo(0, size.height);
     const count = 24;
     final archW = size.width / count;
 
@@ -622,320 +985,3 @@ class _ScallopPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
-
-class _AutoScrollGroupCardsList extends StatefulWidget {
-  final List<FestivalGroupModel> groups;
-  final List<ProductModel> allProducts;
-  final ResolvedFestivalTheme theme;
-  final Widget Function(
-    BuildContext context,
-    FestivalGroupModel group,
-    List<ProductModel> allProducts,
-    ResolvedFestivalTheme theme, {
-    bool isCompact,
-  }) cardBuilder;
-
-  const _AutoScrollGroupCardsList({
-    required this.groups,
-    required this.allProducts,
-    required this.theme,
-    required this.cardBuilder,
-  });
-
-  @override
-  State<_AutoScrollGroupCardsList> createState() =>
-      _AutoScrollGroupCardsListState();
-}
-
-class _AutoScrollGroupCardsListState extends State<_AutoScrollGroupCardsList> {
-  late final ScrollController _scrollController;
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _scrollController = ScrollController();
-    _timer = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (_scrollController.hasClients) {
-        final maxScroll = _scrollController.position.maxScrollExtent;
-        final currentOffset = _scrollController.offset;
-        const step = 133.0; // 125 width + 8 spacing
-        double target = currentOffset + step;
-        if (target >= maxScroll + 10) {
-          target = 0;
-        }
-        _scrollController.animateTo(
-          target,
-          duration: const Duration(milliseconds: 600),
-          curve: Curves.easeInOut,
-        );
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 150,
-      child: ListView.separated(
-        controller: _scrollController,
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        itemCount: widget.groups.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          return SizedBox(
-            width: 125,
-            child: widget.cardBuilder(
-              context,
-              widget.groups[index],
-              widget.allProducts,
-              widget.theme,
-              isCompact: true,
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class HeroGroupProductItem {
-  final FestivalGroupModel group;
-  final ProductModel product;
-
-  const HeroGroupProductItem({
-    required this.group,
-    required this.product,
-  });
-}
-
-class _Style2HeroCard extends StatefulWidget {
-  final List<HeroGroupProductItem> items;
-  final ResolvedFestivalTheme theme;
-  final VoidCallback onTap;
-
-  const _Style2HeroCard({
-    required this.items,
-    required this.theme,
-    required this.onTap,
-  });
-
-  @override
-  State<_Style2HeroCard> createState() => _Style2HeroCardState();
-}
-
-class _Style2HeroCardState extends State<_Style2HeroCard> {
-  int _currentIndex = 0;
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.items.length > 1) {
-      _timer = Timer.periodic(const Duration(milliseconds: 2000), (_) {
-        if (mounted) {
-          setState(() {
-            _currentIndex = (_currentIndex + 1) % widget.items.length;
-          });
-        }
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final currentItem = widget.items.isNotEmpty
-        ? widget.items[_currentIndex % widget.items.length]
-        : null;
-
-    final currentGroup = currentItem?.group;
-    final currentProd = currentItem?.product;
-
-    final offerPrice = currentProd?.price ?? 0.0;
-    double mrp = (currentProd != null && currentProd.mrp > currentProd.price)
-        ? currentProd.mrp
-        : 0.0;
-
-    final discountPercent = currentGroup?.discountPercent ?? 0.0;
-    if (mrp <= offerPrice && discountPercent > 0 && offerPrice > 0) {
-      mrp = (offerPrice / (1 - discountPercent / 100)).roundToDouble();
-    }
-
-    final prodName = currentProd?.name ?? '';
-    final prodImage = (currentProd?.imageUrl.isNotEmpty == true)
-        ? currentProd!.imageUrl
-        : (currentGroup?.imageUrl ?? '');
-
-    return GestureDetector(
-      onTap: () {
-        if (currentProd != null && currentProd.id.isNotEmpty && currentProd.id != currentGroup?.id) {
-          context.push('/product/${currentProd.id}');
-        } else {
-          widget.onTap();
-        }
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: widget.theme.cardBackground, // Matches top section background color!
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.35),
-            width: 1.2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 450),
-            transitionBuilder: (child, animation) {
-              return FadeTransition(
-                opacity: animation,
-                child: ScaleTransition(
-                  scale: Tween<double>(begin: 0.94, end: 1.0).animate(animation),
-                  child: child,
-                ),
-              );
-            },
-            child: Column(
-              key: ValueKey<String>('${currentGroup?.id}_${currentProd?.id}_$_currentIndex'),
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Top Center Group Title (Dynamic shift group-wise!)
-                Text(
-                  currentGroup?.displayName ?? 'Festive Offer',
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w900,
-                    height: 1.1,
-                    shadows: [Shadow(color: Colors.black45, blurRadius: 4)],
-                  ),
-                ),
-                const SizedBox(height: 6),
-
-                // Dynamic Prices: First MRP on top line, Offer price kindha / below!
-                if (currentProd != null) ...[
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // 1. MRP Tag Strikethrough on top
-                      if (mrp > offerPrice && mrp > 0)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                          margin: const EdgeInsets.only(bottom: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.65),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            '₹${mrp.toInt()}',
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              decoration: TextDecoration.lineThrough,
-                              decorationColor: Colors.white70,
-                            ),
-                          ),
-                        ),
-
-                      // 2. Offer Price Pill Badge kindha / below!
-                      if (offerPrice > 0)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFC107), // Vibrant yellow pill tag
-                            borderRadius: BorderRadius.circular(6),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.12),
-                                blurRadius: 3,
-                                offset: const Offset(0, 1),
-                              ),
-                            ],
-                          ),
-                          child: Text(
-                            '₹${offerPrice.toInt()}',
-                            style: const TextStyle(
-                              color: Colors.black,
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-
-                  // Product Name Centered
-                  Text(
-                    prodName,
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      shadows: [Shadow(color: Colors.black38, blurRadius: 3)],
-                    ),
-                  ),
-                ],
-
-                // Product Image at bottom
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 4.0),
-                    child: Center(
-                      child: prodImage.startsWith('http')
-                          ? CachedNetworkImage(
-                              imageUrl: prodImage,
-                              fit: BoxFit.contain,
-                              errorWidget: (context, url, error) => Icon(
-                                Icons.shopping_bag_outlined,
-                                color: widget.theme.accentColor,
-                                size: 36,
-                              ),
-                            )
-                          : Icon(
-                              Icons.shopping_bag_outlined,
-                              color: widget.theme.accentColor,
-                              size: 36,
-                            ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-

@@ -82,13 +82,6 @@ class LocationHeader extends StatelessWidget {
               isDark: isDark,
               label: 'Notifications',
             ),
-            const SizedBox(width: 8),
-            _CircleIcon(
-              icon: Icons.person_outline_rounded,
-              onTap: onProfileTap,
-              isDark: isDark,
-              label: 'Account',
-            ),
           ],
         ),
       ),

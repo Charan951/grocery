@@ -1,14 +1,19 @@
 import React from 'react';
-import { useCMS, defaultSuperCategories } from '../context/CMSContext';
+import { useCMS, defaultSuperCategories, FestivalCampaign } from '../context/CMSContext';
 import { resolveFestivalTheme } from '../utils/festivalThemeResolver';
+import { useIsMobile } from '../hooks/useIsMobile';
 import {
   LayoutGrid, Coffee, Armchair, Shapes, Leaf, Headphones, Smartphone,
-  Sparkles, Shirt, Utensils, ChevronRight, ChevronLeft
+  Sparkles, Shirt, Utensils
 } from 'lucide-react';
 
 interface SuperCategoryNavProps {
   activeSuperCategory: string;
   onSelectSuperCategory: (slug: string) => void;
+  /** The festival campaign actually rendered below the nav, so the bar's
+   *  background matches the festival section exactly. Falls back to the
+   *  CMS context's active campaign when not provided. */
+  festivalCampaignOverride?: FestivalCampaign | null;
 }
 
 function getSuperCatIcon(name: string, iconKey?: string) {
@@ -28,18 +33,12 @@ function getSuperCatIcon(name: string, iconKey?: string) {
 export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
   activeSuperCategory,
   onSelectSuperCategory,
+  festivalCampaignOverride,
 }) => {
-  const { superCategories, activeFestivalCampaign } = useCMS();
+  const { superCategories, activeFestivalCampaign: contextFestivalCampaign } = useCMS();
+  const activeFestivalCampaign = festivalCampaignOverride ?? contextFestivalCampaign;
 
-  const [isMobile, setIsMobile] = React.useState<boolean>(() =>
-    typeof window !== 'undefined' ? window.innerWidth < 768 : false
-  );
-
-  React.useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const isMobile = useIsMobile(768);
 
   const isFestivalActive = React.useMemo(() => {
     if (!isMobile || !activeFestivalCampaign || activeFestivalCampaign.isActive === false || activeFestivalCampaign.status === 'draft') {
@@ -75,13 +74,6 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
   const effectiveActive = pending ?? activeSuperCategory;
   React.useEffect(() => { setPending(null); }, [activeSuperCategory]);
 
-  const scrollNav = (direction: 'left' | 'right') => {
-    if (navRef.current) {
-      const scrollAmount = direction === 'left' ? -250 : 250;
-      navRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
-    }
-  };
-
   const activeIndex = React.useMemo(
     () => items.findIndex((cat) => {
       const s = cat.slug || cat.id || cat.name.toLowerCase();
@@ -110,64 +102,44 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
   }, [syncIndicator, items.length]);
 
   React.useEffect(() => {
-    const onResize = () => syncIndicator(false);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, [syncIndicator]);
-
-  const [isScrolledPastFestival, setIsScrolledPastFestival] = React.useState(false);
-
-  React.useEffect(() => {
-    if (!isMobile || !isFestivalActive) {
-      setIsScrolledPastFestival(false);
-      return;
-    }
     let raf = 0;
-    const handleScroll = () => {
+    const onResize = () => {
       if (raf) return;
-      raf = requestAnimationFrame(() => {
-        raf = 0;
-        setIsScrolledPastFestival(window.scrollY > 140);
-      });
+      raf = requestAnimationFrame(() => { raf = 0; syncIndicator(false); });
     };
-    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', onResize);
     return () => {
-      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', onResize);
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [isMobile, isFestivalActive]);
+  }, [syncIndicator]);
 
   const festivalTheme = React.useMemo(() => resolveFestivalTheme(activeFestivalCampaign), [activeFestivalCampaign]);
 
   const navBgColor = React.useMemo(() => {
     if (isFestivalActive && isMobile) {
-      return isScrolledPastFestival ? '#ffffff' : festivalTheme.gStart;
+      return festivalTheme.gStart;
     }
     return undefined;
-  }, [isFestivalActive, isMobile, isScrolledPastFestival, festivalTheme]);
+  }, [isFestivalActive, isMobile, festivalTheme]);
+
+  const underlineW = 8;
 
   return (
     <nav
+      aria-label="Shop by department"
       className={`w-full sticky z-30 transition-colors border-b shadow-2xs ${
-        isFestivalActive && !isScrolledPastFestival
-          ? 'border-cyan-200/40' 
-          : 'border-gray-200 dark:border-zinc-800'
+        isFestivalActive && isMobile
+          ? 'border-cyan-200/40'
+          : 'bg-surface border-divider'
       }`}
       style={{
         backgroundColor: navBgColor,
-        top: 'var(--sticky-header-h, 64px)'
+        top: 'calc(var(--sticky-header-h) - 1px)',
+        marginTop: '-1px'
       }}
     >
-      <div className="max-w-[1280px] mx-auto px-2 sm:px-4 lg:px-8 relative flex items-center group">
-        
-        {/* Left Arrow Button for Desktop Scroll */}
-        <button
-          onClick={() => scrollNav('left')}
-          className="hidden md:flex absolute left-1 z-10 w-7 h-7 rounded-full bg-white/90 dark:bg-zinc-800/90 shadow-md border border-gray-200 dark:border-zinc-700 items-center justify-center text-gray-700 dark:text-gray-200 hover:bg-emerald-500 hover:text-white transition-all opacity-0 group-hover:opacity-100"
-          aria-label="Scroll Left"
-        >
-          <ChevronLeft size={16} />
-        </button>
+      <div className="max-w-none mx-auto px-2 sm:px-4 lg:px-8 relative flex items-center group">
 
         {/* Scrollable Container */}
         <div
@@ -176,16 +148,16 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
             isMobile ? 'py-1 gap-1 h-[56px]' : 'py-1.5 sm:py-2 px-1 gap-1 sm:gap-2 md:gap-3'
           }`}
         >
-          {/* Desktop Sliding active-tab underline */}
+          {/* Desktop sliding active-tab underline — animates via transform only */}
           {!isMobile && (
             <span
               aria-hidden
-              className="pointer-events-none absolute bottom-0 h-[3px] rounded-t-full bg-emerald-600 dark:bg-emerald-500"
+              className="pointer-events-none absolute bottom-0 left-0 h-[3px] rounded-t-full bg-primary-strong origin-left"
               style={{
-                left: indicator.left + 14,
-                width: Math.max(indicator.width - 28, 0),
+                width: underlineW,
+                transform: `translateX(${indicator.left + 14}px) scaleX(${Math.max(indicator.width - 28, 0) / underlineW})`,
                 opacity: indicator.ready ? 1 : 0,
-                transition: 'left 280ms cubic-bezier(0.4, 0, 0.2, 1), width 280ms cubic-bezier(0.4, 0, 0.2, 1), opacity 150ms ease',
+                transition: 'transform 280ms cubic-bezier(0.4, 0, 0.2, 1), opacity 150ms ease',
               }}
             />
           )}
@@ -198,13 +170,14 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
             const IconComponent = getSuperCatIcon(cat.name, cat.icon);
 
             if (isMobile) {
-              const activeColorClass = isFestivalActive ? 'text-black' : 'text-[#0C831F]';
-              const activeBgClass = isFestivalActive ? 'bg-black' : 'bg-[#0C831F]';
+              const activeColorClass = isFestivalActive ? 'text-black' : 'text-primary-strong';
+              const activeBgClass = isFestivalActive ? 'bg-black' : 'bg-primary-strong';
 
               return (
                 <button
                   key={cat.id || catSlug}
                   ref={(el) => { btnRefs.current[i] = el; }}
+                  aria-current={isActive ? 'true' : undefined}
                   onClick={() => {
                     if (catSlug === effectiveActive) return;
                     setPending(catSlug);
@@ -224,26 +197,26 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
                       size={20}
                       fill={isActive && (cat.name.toLowerCase().includes('cafe') || cat.icon === 'Coffee') ? 'currentColor' : 'none'}
                       className={`transition-colors duration-200 ${
-                        isActive ? activeColorClass : 'text-gray-600 dark:text-gray-400'
+                        isActive ? activeColorClass : 'text-text-secondary'
                       }`}
                     />
                   )}
 
                   {/* Name BELOW Icon */}
                   <span
-                    className={`text-[10.5px] leading-tight mt-0.5 truncate max-w-[68px] text-center ${
+                    className={`text-[11px] leading-tight mt-0.5 truncate max-w-[68px] text-center ${
                       isActive
                         ? `font-extrabold ${activeColorClass}`
-                        : 'font-medium text-gray-700 dark:text-gray-300'
+                        : 'font-medium text-text-secondary'
                     }`}
                   >
                     {cat.name}
                   </span>
 
-                  {/* Active Underline Indicator */}
+                  {/* Active Underline Indicator — scale, not width */}
                   <span
-                    className={`h-[2.5px] rounded-full mt-0.5 transition-all duration-200 ${
-                      isActive ? `w-7 ${activeBgClass}` : 'w-0 bg-transparent'
+                    className={`h-[2.5px] w-7 rounded-full mt-0.5 origin-center transition-transform duration-200 ${activeBgClass} ${
+                      isActive ? 'scale-x-100' : 'scale-x-0'
                     }`}
                   />
                 </button>
@@ -255,15 +228,16 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
               <button
                 key={cat.id || catSlug}
                 ref={(el) => { btnRefs.current[i] = el; }}
+                aria-current={isActive ? 'true' : undefined}
                 onClick={() => {
                   if (catSlug === effectiveActive) return;
                   setPending(catSlug);
                   onSelectSuperCategory(catSlug);
                 }}
-                className={`relative group inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs font-black transition-all duration-200 shrink-0 select-none cursor-pointer ${
+                className={`relative group inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs font-black transition-colors duration-200 shrink-0 select-none cursor-pointer ${
                   isActive
-                    ? 'text-white bg-gray-900 shadow-xs'
-                    : 'text-gray-700 bg-gray-100 hover:bg-gray-200 hover:text-gray-900'
+                    ? 'text-white bg-primary-strong shadow-xs'
+                    : 'text-text-primary bg-background hover:bg-divider/60'
                 }`}
               >
                 {cat.icon && cat.icon.startsWith('http') ? (
@@ -276,7 +250,7 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
                   <IconComponent
                     size={15}
                     className={`transition-transform duration-200 ${
-                      isActive ? 'text-white' : 'text-gray-600'
+                      isActive ? 'text-white' : 'text-text-secondary'
                     }`}
                   />
                 )}
@@ -285,15 +259,6 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
             );
           })}
         </div>
-
-        {/* Right Arrow Button for Desktop Scroll */}
-        <button
-          onClick={() => scrollNav('right')}
-          className="hidden md:flex absolute right-1 z-10 w-7 h-7 rounded-full bg-white/90 dark:bg-zinc-800/90 shadow-md border border-gray-200 dark:border-zinc-700 items-center justify-center text-gray-700 dark:text-gray-200 hover:bg-emerald-500 hover:text-white transition-all opacity-0 group-hover:opacity-100"
-          aria-label="Scroll Right"
-        >
-          <ChevronRight size={16} />
-        </button>
 
       </div>
     </nav>

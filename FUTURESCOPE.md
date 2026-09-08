@@ -88,14 +88,32 @@ duplicate-track status in two places: once one of these starts, update
 - **Phasing**: (a) can ship any time, no dependency. (b) blocked until a provider is picked.
 
 ## A5. Festival-theme mobile/web parity
-- **Screen**: mobile Home `_FestivalHero` vs the web's full festival theme engine (`AdminCMS.tsx` `PREDEFINED_FESTIVAL_THEMES`, `FestivalCampaignWrapper.tsx`).
-- **Functionality**: mobile currently renders title/subtitle over a solid/gradient/image background only; web supports themed card styling, scallop borders, per-group product cards, accent colors, custom fonts.
-- **API required**: none new — `GET /festival-campaigns` already returns the full campaign document; mobile just doesn't consume every field.
-- **Components required**: extend `_FestivalHero` (mobileapp Home) to render the same `festivalGroups`/`cardStyling` fields the web `FestivalCampaignWrapper` does — product-group cards with discount badges, the scallop-border bottom accent, theme-driven text colors (careful: this is exactly the class of bug fixed this session in `SuperCategoryNav`/mobile `_SuperCategoryNav` — any new conditional theme coloring must be checked against every background it can actually render over, not just assumed dark-mode vs light-mode).
-- **Backend changes**: none.
-- **Dependencies**: none.
-- **Testing**: widget tests per campaign background type (solid/gradient/image) + per `cardStyling` override; visual diff against the web campaign preview for at least one real seeded campaign.
-- **Phasing**: incremental — ship background-type parity first, then card styling, then the scallop-border/decorative details last (lowest visual-risk-per-line-of-code ordering).
+- **Status (2026-09-08): DONE bar tests.** `festival_campaign_section.dart` was
+  rewritten as a 1:1 port of the web `FestivalCampaignWrapper.tsx` (2026-09-08,
+  session 1). Since then (session 2) the last parity gaps were closed:
+  - **Font parity** — `festivalThemeResolver.ts` now exposes `theme.fontFamily`
+    from the theme preset (`FONT_STACKS` map); the 5 display faces are loaded in
+    `index.css`; the web heading uses it. Flutter already applied the preset font
+    via `AppTypography.festivalCalligraphy(fontPreset:)`. Note there is **no
+    admin `cardStyling` font-override field** — the font comes from the selected
+    theme preset on both platforms, which is now consistent.
+  - **`cardBackground` / `cardText`** — `festivalThemeResolver.cardBg` now honours
+    `styling.cardBackground` (was hard-wired to `gStart`); `cardText`
+    auto-contrast token + `isDarkColor()` mirrored into
+    `festival_theme_resolver.dart`.
+  - **Group filtering + layout selection aligned** — both apps: keep
+    `isActive !== false` groups, prefer those with content, fall back to all
+    active; `style2` (hero + fixed 2×2) renders only for 3–4 groups, `<3`/`>4`
+    fall back to `style1` (grid / `>6` paged carousel). Flutter `_imageFor` uses
+    `group.products.first` to match web's image pick.
+  - Flutter has **no `/products?ids=` route**, so a multi-product group tap there
+    lands on the matched category instead of a curated id list — accepted
+    divergence, not a bug.
+- **Remaining**: widget tests per background type (solid/gradient/image) and per
+  `cardStyle`; a visual device diff (style1 *and* style2, ≤4 and >4 groups)
+  against the web campaign for a real seeded campaign. Watch the
+  conditional-theme-coloring bug class (see the `SuperCategoryNav` fix) when
+  touching any of this.
 
 ## A6. Analytics / crash reporting
 - **Screen**: none (cross-cutting, both Flutter apps).
@@ -113,6 +131,10 @@ duplicate-track status in two places: once one of these starts, update
 - **API required**: none.
 - **Components required**: audit pass over `AppIconButton` call sites and any raw `IconButton`/`InkWell` usages for missing `semanticLabel`/`tooltip`.
 - **Backend changes**: none.
+- **Progress (2026-09-08)**: the biggest Home-scroll perf hot spot was fixed —
+  `home_screen.dart` `_HomeContent` went from one non-lazy `SliverToBoxAdapter`
+  (whole page + ~100+ images built per frame) to a lazy `SliverList`. Frame-time
+  profiling on a real low-end device + the semantic-label audit are still open.
 - **Dependencies**: a genuinely low-end test device or Android Studio's low-end emulator profile (e.g. 2GB RAM, older API level).
 - **Testing**: `flutter_test`'s `meetsGuideline` accessibility matchers on key screens; a manual TalkBack (Android) / VoiceOver (iOS) pass through the checkout flow specifically (highest-stakes flow for an accessibility failure); a profiled run (`flutter run --profile`) on the low-end target checking for dropped frames on Home/catalog scroll.
 - **Phasing**: audit + fix low-hanging labels first (cheap, high value), perf profiling second (more time-intensive, do once the app is otherwise stable).
@@ -199,7 +221,7 @@ A1–B4 above.
 
 ## Suggested overall sequencing
 
-1. **Finish Part A's dependency-free items first** (A2 retry/backoff, A5 festival parity, A6 Crashlytics, A7 accessibility audit, A8 repo hygiene) — no blockers, pure engineering.
+1. **Finish Part A's dependency-free items first** (A2 retry/backoff, A5 festival parity — DONE bar widget tests + a device visual diff, A6 Crashlytics, A7 accessibility audit — Home-perf hot spot already fixed, A8 repo hygiene) — no blockers, pure engineering.
 2. **Resolve Part A's external dependencies in parallel** (A1 APNs key, A4(b) telephony provider, A3's web-auth decision) — these need the user's input/budget, not more engineering time, so surface them now rather than letting them silently block later work.
 3. **Then B2 (recommendations v1)** — highest value-to-effort ratio in Part B, no dependencies, reuses existing data.
 4. **Then B1 (subscriptions) and B3 (loyalty)** — both meaningfully sized features; pick whichever the business wants to prioritize first, since they're independent of each other.

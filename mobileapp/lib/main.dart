@@ -41,6 +41,15 @@ void main() async {
   );
 }
 
+/// Suppresses the scrollbar Flutter draws by default on web/desktop so the
+/// mobile app looks the same in a browser preview as on a device.
+class _NoScrollbarBehavior extends MaterialScrollBehavior {
+  const _NoScrollbarBehavior();
+
+  @override
+  Widget buildScrollbar(BuildContext context, Widget child, ScrollableDetails details) => child;
+}
+
 class FreshCartApp extends ConsumerWidget {
   const FreshCartApp({super.key});
 
@@ -57,6 +66,7 @@ class FreshCartApp extends ConsumerWidget {
         return MaterialApp.router(
           title: 'FreshCart',
           debugShowCheckedModeBanner: false,
+          scrollBehavior: const _NoScrollbarBehavior(),
           scaffoldMessengerKey: AppToast.messengerKey,
           themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
           theme: AppTheme.lightTheme,

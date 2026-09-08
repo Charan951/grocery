@@ -6,7 +6,7 @@ import { SEO } from '../components/SEO';
 import { BannerCarousel } from '../components/BannerCarousel';
 import { SubcategoryCardImage } from '../components/SubcategoryCardImage';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowUpDown, ChevronRight, SearchX, PackageX } from 'lucide-react';
+import { ArrowLeft, ArrowUpDown, ChevronRight, SearchX, PackageX } from 'lucide-react';
 
 interface ProductsProps {
   onQuickView: (product: Product) => void;
@@ -83,6 +83,13 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
   const urlCategory = searchParams.get('category') || categorySlug || '';
   const urlSubCategory = searchParams.get('subCategory') || '';
   const urlOrganic = searchParams.get('organic') === 'true';
+  // Explicit product-id list (e.g. a festival group's curated products).
+  const urlIds = searchParams.get('ids') || '';
+  const urlTitle = searchParams.get('title') || '';
+  const idList = useMemo(
+    () => urlIds.split(',').map((s) => s.trim()).filter(Boolean),
+    [urlIds]
+  );
 
   // Filter States
   const [selectedCategory, setSelectedCategory] = useState<string>('fruits-vegetables');
@@ -230,7 +237,7 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
         setSelectedSubCategory('');
       }
       setInCategoryView(true);
-    } else if (urlSearch) {
+    } else if (urlSearch || urlIds) {
       setSelectedCategory('');
       setSelectedSubCategory('');
       setInCategoryView(true);
@@ -240,7 +247,7 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
       setInCategoryView(false);
       navigate('/', { replace: true });
     }
-  }, [urlCategory, urlSubCategory, urlSearch, categories, navigate]);
+  }, [urlCategory, urlSubCategory, urlSearch, urlIds, categories, navigate]);
 
   useEffect(() => {
     setOnlyOrganic(urlOrganic);
@@ -272,6 +279,10 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
     };
   }, [currentCategoryObj]);
 
+  // The subcategory rail only makes sense while browsing a real category.
+  // A curated id list (?ids=) or a plain search (?search=) has no subcategories.
+  const showSubRail = idList.length === 0 && !urlSearch && Boolean(urlCategory);
+
   // Extract subcategories for active main category (deduplicated)
   const activeSubCategories = useMemo(() => {
     if (currentCategoryObj && currentCategoryObj.subCategories) {
@@ -280,44 +291,21 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
     return [];
   }, [currentCategoryObj]);
 
-  // Active Subcategory Object & Color Tint for Products Panel
-  const activeSubCatObj = useMemo(() => {
-    if (!currentCategoryObj || !selectedSubCategory) return null;
-    const subs = currentCategoryObj.subCategories || [];
-    return subs.find((s: any) => (typeof s === 'string' ? s : s.name).toLowerCase() === selectedSubCategory.toLowerCase());
-  }, [currentCategoryObj, selectedSubCategory]);
-
-  const activeSubCatColor = useMemo(() => {
-    let rawColor = '#10B981';
-    if (activeSubCatObj && typeof activeSubCatObj === 'object' && activeSubCatObj.color) {
-      rawColor = activeSubCatObj.color;
-    } else if (currentCategoryObj && currentCategoryObj.color) {
-      rawColor = currentCategoryObj.color;
-    }
-
-    if (!rawColor) return 'rgba(16, 185, 129, 0.12)';
-
-    if (rawColor.startsWith('#')) {
-      const hex = rawColor.length === 4
-        ? '#' + rawColor[1] + rawColor[1] + rawColor[2] + rawColor[2] + rawColor[3] + rawColor[3]
-        : rawColor;
-      if (hex.length === 7) {
-        const r = parseInt(hex.slice(1, 3), 16);
-        const g = parseInt(hex.slice(3, 5), 16);
-        const b = parseInt(hex.slice(5, 7), 16);
-        const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-        if (brightness > 225) {
-          return hex;
-        }
-        return `rgba(${r}, ${g}, ${b}, 0.16)`;
-      }
-    }
-    return rawColor;
-  }, [activeSubCatObj, currentCategoryObj]);
-
   // Filter and Sort Logic
   const filteredProducts = useMemo(() => {
     let result = [...products];
+
+    // Curated id list wins over every other filter — show exactly those items,
+    // in the order they were given.
+    if (idList.length > 0) {
+      const rank = new Map(idList.map((id, i) => [id, i]));
+      result = result
+        .filter((p: any) => rank.has(p.id) || rank.has(p._id))
+        .sort((a: any, b: any) =>
+          (rank.get(a.id) ?? rank.get(a._id) ?? 0) - (rank.get(b.id) ?? rank.get(b._id) ?? 0)
+        );
+      return result;
+    }
 
     if (urlSearch) {
       const q = urlSearch.toLowerCase().trim();
@@ -428,11 +416,11 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
     }
 
     return result;
-  }, [products, urlSearch, selectedCategory, selectedSubCategory, currentCategoryObj, onlyOrganic, onlyInStock, onlyOnSale, sortBy]);
+  }, [products, urlSearch, idList, selectedCategory, selectedSubCategory, currentCategoryObj, onlyOrganic, onlyInStock, onlyOnSale, sortBy]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedCategory, selectedSubCategory, onlyOrganic, onlyInStock, onlyOnSale, sortBy, urlSearch]);
+  }, [selectedCategory, selectedSubCategory, onlyOrganic, onlyInStock, onlyOnSale, sortBy, urlSearch, urlIds]);
 
   const paginatedProducts = useMemo(() => {
     const startIdx = (currentPage - 1) * itemsPerPage;
@@ -524,7 +512,7 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
         keywords={seo.keywords}
       />
 
-      <div className={`container mx-auto px-2 sm:px-4 md:px-6 max-w-[1360px] ${inCategoryView ? 'pt-2 sm:pt-3 pb-2 sm:pb-3' : 'pt-4 pb-16'}`}>
+      <div className={`container mx-auto px-2 sm:px-4 md:px-6 max-w-none ${inCategoryView ? 'pt-2 sm:pt-3 pb-2 sm:pb-3' : 'pt-4 pb-16'}`}>
 
         {/* CONDITION 1: Sidebar + product-list view (either a specific subcategory
             or "All" within the current category). Mobile-first: a narrow icon rail
@@ -532,21 +520,59 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
             sidebar at lg+. */}
         {inCategoryView ? (
           <div className="flex flex-col h-[calc(100dvh-16px)] sm:h-[calc(100vh-64px)] min-h-[480px] overflow-hidden">
-            <button
-              onClick={() => {
-                if (location.state && (location.state as any).from) {
-                  navigate((location.state as any).from);
-                } else {
-                  navigate('/');
-                }
-              }}
-              className="mb-2 text-[11px] sm:text-xs font-black text-emerald-600 hover:text-emerald-700 flex items-center gap-1 transition-colors cursor-pointer shrink-0"
+            {/* Compact nav bar — replaces the app header on this list view.
+                Back-to-Home + page title + sort, on every page that lands here
+                (curated id list, subcategory, search results). */}
+            <div
+              className="mb-2 flex items-center gap-2 shrink-0"
+              style={{ paddingTop: 'max(0px, env(safe-area-inset-top))' }}
             >
-              ← Back to Home
-            </button>
-            <div className="grid grid-cols-[72px_1fr] sm:grid-cols-[84px_1fr] lg:grid-cols-[96px_1fr] gap-2 sm:gap-3 lg:gap-4 items-stretch flex-1 min-h-0 overflow-hidden">
+              <button
+                onClick={() => {
+                  if (location.state && (location.state as any).from) {
+                    navigate((location.state as any).from);
+                  } else {
+                    navigate('/');
+                  }
+                }}
+                aria-label="Back to home"
+                className="w-9 h-9 rounded-full bg-surface border border-divider flex items-center justify-center text-text-primary transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 cursor-pointer shrink-0"
+              >
+                <ArrowLeft size={17} />
+              </button>
+              <h1 className="flex-1 min-w-0 truncate text-base sm:text-lg font-black font-display tracking-tight text-text-primary">
+                {idList.length > 0
+                  ? (urlTitle || 'Featured Selection')
+                  : urlSearch
+                    ? `Search results for "${urlSearch}"`
+                    : (selectedSubCategory || `All ${currentCategoryObj?.name || ''}`)}
+              </h1>
+              <div className="flex items-center gap-1.5 bg-background border border-divider px-2.5 py-1.5 rounded-xl text-xs shrink-0">
+                <ArrowUpDown size={13} className="text-emerald-600" />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  aria-label="Sort products"
+                  className="bg-transparent font-extrabold text-text-primary outline-none cursor-pointer"
+                >
+                  <option value="default">Relevance</option>
+                  <option value="price-low">Price: Low to High</option>
+                  <option value="price-high">Price: High to Low</option>
+                  <option value="rating">Popularity</option>
+                  <option value="discount">Max Discount</option>
+                </select>
+              </div>
+            </div>
+            <div className={`grid gap-2 sm:gap-3 lg:gap-4 items-stretch flex-1 min-h-0 overflow-hidden ${
+              showSubRail
+                ? 'grid-cols-[72px_1fr] sm:grid-cols-[84px_1fr] lg:grid-cols-[96px_1fr]'
+                : 'grid-cols-1'
+            }`}>
 
-              {/* Left Subcategory Rail / Sidebar */}
+              {/* Left Subcategory Rail / Sidebar — only when browsing a real
+                  category. A curated id list or a plain search has no
+                  subcategories, so the rail would just be noise. */}
+              {showSubRail && (
               <aside
                 ref={subcategorySidebarRef}
                 style={{ overscrollBehavior: 'contain', overscrollBehaviorY: 'contain' }}
@@ -618,42 +644,15 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
                   })}
                 </div>
               </aside>
+              )}
 
               {/* Right Main Content Area: Fixed Height Scroll with Overscroll Contain */}
               <main
-                style={{
-                  backgroundColor: activeSubCatColor
-                }}
-                className="flex flex-col gap-3 sm:gap-4 min-w-0 h-full overflow-y-auto overscroll-contain no-scrollbar p-2.5 sm:p-4 rounded-xl border border-divider/60 shadow-xs transition-colors duration-300 pb-16"
+                className="flex flex-col gap-3 sm:gap-4 min-w-0 h-full overflow-y-auto overscroll-contain no-scrollbar p-2.5 sm:p-4 rounded-xl border border-divider/60 shadow-xs bg-surface pb-16"
               >
 
                 {/* Top Subcategory Banners */}
                 <BannerCarousel banners={topSubCategoryBanners} />
-
-                <div className="bg-surface/90 backdrop-blur-xs border border-divider/70 rounded-2xl p-3 sm:p-4 shadow-xs flex flex-col gap-2">
-                  <div className="flex flex-row items-center justify-between gap-2 sm:gap-4">
-                    <div>
-                      <h1 className="text-lg sm:text-xl font-black text-text-primary tracking-tight font-display">
-                        {urlSearch ? `Search Results for "${urlSearch}"` : (selectedSubCategory || `All ${currentCategoryObj?.name || ''}`)}
-                      </h1>
-                    </div>
-
-                    <div className="flex items-center gap-2 bg-background border border-divider px-3 py-1.5 rounded-xl text-xs shrink-0">
-                      <ArrowUpDown size={14} className="text-emerald-600" />
-                      <select
-                        value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value)}
-                        className="bg-transparent font-extrabold text-text-primary outline-none cursor-pointer"
-                      >
-                        <option value="default">Relevance</option>
-                        <option value="price-low">Price: Low to High</option>
-                        <option value="price-high">Price: High to Low</option>
-                        <option value="rating">Popularity</option>
-                        <option value="discount">Max Discount</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
 
                 {/* Before Products Subcategory Banners */}
                 <BannerCarousel banners={beforeProductsSubCategoryBanners} />
@@ -663,7 +662,7 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
                   <div className="bg-surface border border-divider rounded-2xl p-10 text-center shadow-card flex flex-col items-center justify-center gap-3">
                     <PackageX size={42} className="text-amber-500/80 mb-1" />
                     <h3 className="text-base font-extrabold text-text-primary">No products available in this category currently.</h3>
-                    <p className="text-xs text-text-secondary leading-normal max-w-sm">We are actively restocking fresh items for this selection. Try selecting another subcategory or resetting filters.</p>
+                    <p className="text-xs text-text-secondary leading-normal text-center self-stretch mx-auto" style={{ maxWidth: '32rem' }}>We are actively restocking fresh items for this selection. Try selecting another subcategory or resetting filters.</p>
                     <button onClick={handleClearAll} className="text-xs font-bold bg-emerald-600 text-white py-2.5 px-6 rounded-full mt-2 hover:bg-emerald-700 transition-colors">Reset All Filters</button>
                   </div>
                 ) : (
@@ -777,7 +776,7 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
                 <div className="bg-surface border border-divider rounded-2xl p-10 text-center shadow-card flex flex-col items-center justify-center gap-3 my-4">
                   <PackageX size={42} className="text-amber-500/80 mb-1" />
                   <h4 className="text-base font-extrabold text-text-primary">No products available in this category currently.</h4>
-                  <p className="text-xs text-text-secondary leading-normal max-w-sm">We are actively restocking fresh items for this category. Please check back soon or browse other catalog categories.</p>
+                  <p className="text-xs text-text-secondary leading-normal text-center self-stretch mx-auto" style={{ maxWidth: '32rem' }}>We are actively restocking fresh items for this category. Please check back soon or browse other catalog categories.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">

@@ -521,7 +521,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ onQuickView }) =
         
         {/* TOP NAVIGATION BAR (ONLY BACK BUTTON) */}
         <div className="bg-white border-b border-gray-100">
-          <div className="max-w-[1280px] mx-auto px-4 py-2.5 flex items-center">
+          <div className="max-w-none mx-auto px-4 py-2.5 flex items-center">
             <button
               onClick={handleBackNav}
               className="inline-flex items-center gap-1.5 text-xs font-black text-gray-700 hover:text-emerald-700 bg-gray-100 hover:bg-emerald-50 px-3 py-1.5 rounded-xl transition-all border border-gray-200 cursor-pointer shadow-2xs active:scale-95"
@@ -534,7 +534,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ onQuickView }) =
         </div>
 
         {/* MAIN TWO-COLUMN CONTAINER */}
-        <div className="max-w-[1280px] mx-auto px-4 py-6">
+        <div className="max-w-none mx-auto px-4 py-6">
           <div className="bg-white rounded-3xl border border-gray-200/80 shadow-2xs p-4 sm:p-8 relative">
             
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -891,7 +891,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ onQuickView }) =
 
         {/* FRESHCART FOOTER */}
         <footer className="mt-16 bg-white border-t border-gray-200 pt-12 pb-16">
-          <div className="max-w-[1280px] mx-auto px-4 grid grid-cols-1 md:grid-cols-12 gap-8">
+          <div className="max-w-none mx-auto px-4 grid grid-cols-1 md:grid-cols-12 gap-8">
             <div className="md:col-span-4 space-y-3">
               <h3 className="font-extrabold text-sm text-gray-900 mb-4">Useful Links</h3>
               <div className="grid grid-cols-3 gap-y-2 text-xs font-semibold text-gray-500">
@@ -935,7 +935,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ onQuickView }) =
             </div>
           </div>
 
-          <div className="max-w-[1280px] mx-auto px-4 pt-8 mt-8 border-t border-gray-200 text-center text-xs text-gray-400 font-medium">
+          <div className="max-w-none mx-auto px-4 pt-8 mt-8 border-t border-gray-200 text-center text-xs text-gray-400 font-medium">
             © FreshCart Retail Private Limited, 2026. All rights reserved.
           </div>
         </footer>

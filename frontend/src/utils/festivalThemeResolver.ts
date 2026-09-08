@@ -4,17 +4,42 @@ export interface ResolvedFestivalTheme {
   key: string;
   emoji: string;
   fontPreset: string;
+  /** Ready-to-use CSS font-family stack for the festival heading. */
+  fontFamily: string;
   gStart: string;
   gEnd: string;
   bgGradient: string;
   cardBg: string;
   cardBorder: string;
+  /** Readable text colour for content sitting directly on `cardBg`. */
+  cardText: string;
   accent: string;
   btn: string;
   text: string;
 }
 
-const PRESETS: Record<string, ResolvedFestivalTheme> = {
+/** Rough perceived-luminance test so text on a card stays readable
+ *  whatever colour the admin picked. */
+export function isDarkColor(hex?: string): boolean {
+  if (!hex || typeof hex !== 'string') return false;
+  let h = hex.replace('#', '').trim();
+  if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+  if (h.length !== 6) return false;
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) < 140;
+}
+
+const FONT_STACKS: Record<string, string> = {
+  greatVibes: "'Great Vibes', 'Brush Script MT', cursive",
+  rozhaOne: "'Rozha One', Georgia, 'Times New Roman', serif",
+  cinzelDecorative: "'Cinzel Decorative', Georgia, serif",
+  satisfy: "'Satisfy', 'Brush Script MT', cursive",
+  pacifico: "'Pacifico', 'Comic Sans MS', cursive",
+};
+
+const PRESETS: Record<string, Omit<ResolvedFestivalTheme, 'cardText' | 'fontFamily'>> = {
   krishna: {
     key: 'krishna',
     emoji: '🦚',
@@ -110,7 +135,11 @@ const PRESETS: Record<string, ResolvedFestivalTheme> = {
 
 export function resolveFestivalTheme(campaign?: FestivalCampaign | null): ResolvedFestivalTheme {
   if (!campaign) {
-    return PRESETS.krishna;
+    return {
+      ...PRESETS.krishna,
+      cardText: isDarkColor(PRESETS.krishna.cardBg) ? '#FFFFFF' : '#1C1C1E',
+      fontFamily: FONT_STACKS[PRESETS.krishna.fontPreset] || 'Georgia, serif',
+    };
   }
 
   const key = (campaign.themeKey || 'krishna').toLowerCase();
@@ -146,21 +175,36 @@ export function resolveFestivalTheme(campaign?: FestivalCampaign | null): Resolv
 
   // Resolve Card Styling Tokens (prioritizing Admin input -> top-level -> preset)
   const styling = campaign.cardStyling || {};
-  const cardBg = gStart;
+  const cardBg =
+    styling.cardBackground ||
+    (campaign as any).cardBackground ||
+    (campaign.backgroundType === 'solid' ? gStart : null) ||
+    gStart;
   const cardBorder = styling.cardBorder || (campaign as any).cardBorder || preset.cardBorder;
   const accent = styling.accentColor || (campaign as any).accentColor || preset.accent;
   const btn = styling.buttonColor || (campaign as any).buttonColor || preset.btn;
   const text = styling.textColor || (campaign as any).textColor || preset.text;
 
+  // Content on the card must read against whatever colour the admin chose.
+  const cardText = isDarkColor(cardBg) ? '#FFFFFF' : (isDarkColor(text) ? text : '#1C1C1E');
+
+  const fontFamily =
+    (campaign as any).fontFamily ||
+    (styling as any).fontFamily ||
+    FONT_STACKS[preset.fontPreset] ||
+    'Georgia, serif';
+
   return {
     key,
     emoji: preset.emoji,
     fontPreset: preset.fontPreset,
+    fontFamily,
     gStart,
     gEnd,
     bgGradient,
     cardBg,
     cardBorder,
+    cardText,
     accent,
     btn,
     text,

@@ -17,7 +17,12 @@ import 'package:freshcart/features/search/presentation/controllers/search_contro
 
 class SearchScreen extends ConsumerStatefulWidget {
   final bool autofocus;
-  const SearchScreen({super.key, this.autofocus = false});
+
+  /// Pre-seed the query (e.g. opened from a festival group card as
+  /// `/search?q=Gifts`) so results show immediately.
+  final String? initialQuery;
+
+  const SearchScreen({super.key, this.autofocus = false, this.initialQuery});
 
   @override
   ConsumerState<SearchScreen> createState() => _SearchScreenState();
@@ -27,6 +32,21 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   final _controller = TextEditingController();
   String _query = '';
   Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    final seed = widget.initialQuery?.trim() ?? '';
+    if (seed.isNotEmpty) {
+      _controller.text = seed;
+      _controller.selection = TextSelection.collapsed(offset: seed.length);
+      _query = seed;
+      // Defer the recents write until after the first frame (provider mutation).
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) ref.read(recentSearchesProvider.notifier).add(seed);
+      });
+    }
+  }
 
   @override
   void dispose() {

@@ -30,7 +30,7 @@ export const Stores: React.FC = () => {
         description="Find a FreshCart experience store or local dark store fulfillment hub near you in Bengaluru, Mumbai, or Delhi."
       />
 
-      <div className="container mx-auto px-4 md:px-6 max-w-[1280px] py-8 pb-16">
+      <div className="container mx-auto px-4 md:px-6 max-w-none py-8 pb-16">
         {/* Title Header */}
         <section className="text-center mb-12">
           <h1 className="text-4xl font-extrabold mb-3 text-text-primary">Fulfillment Centers</h1>

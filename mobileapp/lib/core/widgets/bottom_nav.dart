@@ -9,13 +9,19 @@ class BottomNavDestination {
   const BottomNavDestination(this.icon, this.activeIcon, this.label);
 }
 
+/// Four tabs, Home in the centre (Blinkit-style), mirroring the web
+/// storefront's bottom nav. Search is NOT a tab — it's reached from the home
+/// search bar and pushed full-screen (`/search`).
 const kBottomNavDestinations = <BottomNavDestination>[
-  BottomNavDestination(Icons.home_outlined, Icons.home_rounded, 'Home'),
   BottomNavDestination(Icons.grid_view_outlined, Icons.grid_view_rounded, 'Categories'),
-  BottomNavDestination(Icons.search_rounded, Icons.search_rounded, 'Search'),
+  BottomNavDestination(Icons.home_outlined, Icons.home_rounded, 'Home'),
   BottomNavDestination(Icons.receipt_long_outlined, Icons.receipt_long_rounded, 'Orders'),
   BottomNavDestination(Icons.person_outline_rounded, Icons.person_rounded, 'Account'),
 ];
+
+/// Index of the Home tab in [kBottomNavDestinations]. Home is centre, not
+/// first, so "back returns to Home" logic must not assume index 0.
+const kHomeNavIndex = 1;
 
 /// Flat, full-width bottom navigation. Every tab shows its label at all times
 /// (discoverability + a11y). Active = brand green; ≥ 56 dp tap targets; a

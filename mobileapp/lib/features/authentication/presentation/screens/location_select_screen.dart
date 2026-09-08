@@ -85,8 +85,12 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
       if (!perm.ok) return;
       ref.read(authProvider.notifier).grantLocationPermission();
 
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.best,
+      // Use a recent cached fix straight away if we have one so the map moves
+      // instantly, then refine with a fresh fix (capped at 7s so it never hangs).
+      Position? position = await Geolocator.getLastKnownPosition();
+      position ??= await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 7),
       );
 
       final userLatLng = LatLng(position.latitude, position.longitude);
@@ -105,7 +109,10 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
 
   Future<void> _reverseGeocode(LatLng pos) async {
     try {
-      final dio = Dio();
+      final dio = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 5),
+        receiveTimeout: const Duration(seconds: 6),
+      ));
       dio.options.headers['User-Agent'] = 'FreshCartApp/1.0';
       final response = await dio.get(
         'https://nominatim.openstreetmap.org/reverse',
@@ -113,7 +120,7 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen> wit
           'format': 'json',
           'lat': pos.latitude,
           'lon': pos.longitude,
-          'zoom': 18,
+          'zoom': 16,
           'addressdetails': 1,
         },
       );
