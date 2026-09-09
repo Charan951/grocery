@@ -666,7 +666,7 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
                     <button onClick={handleClearAll} className="text-xs font-bold bg-emerald-600 text-white py-2.5 px-6 rounded-full mt-2 hover:bg-emerald-700 transition-colors">Reset All Filters</button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-8 gap-2 sm:gap-3">
                     {paginatedProducts.map((product, idx) => (
                       <ProductCard key={product.id || `prod_${idx}`} product={product} onQuickView={onQuickView} />
                     ))}
@@ -779,7 +779,7 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
                   <p className="text-xs text-text-secondary leading-normal text-center self-stretch mx-auto" style={{ maxWidth: '32rem' }}>We are actively restocking fresh items for this category. Please check back soon or browse other catalog categories.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-8 gap-2 sm:gap-3 md:gap-4">
                   {filteredProducts.map((product, idx) => (
                     <ProductCard key={product.id || product._id || `cat_prod_${idx}`} product={product} onQuickView={onQuickView} />
                   ))}

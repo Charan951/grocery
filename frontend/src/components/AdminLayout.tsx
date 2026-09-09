@@ -121,7 +121,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, onLogout }) 
     <div className="min-h-screen bg-admin-paper flex font-admin-body text-admin-text">
       {/* SIDEBAR — control tower with accordions */}
       <aside
-        className={`bg-admin-ink flex flex-col transition-all duration-300 z-30 sticky top-0 h-screen ${collapsed ? 'w-[72px]' : 'w-[248px]'}`}
+        className={`bg-admin-ink flex flex-col transition-all duration-300 z-30 fixed top-0 left-0 bottom-0 h-screen shrink-0 ${collapsed ? 'w-[72px]' : 'w-[248px]'}`}
       >
         {/* LOGO AREA */}
         <div className="h-[72px] flex items-center justify-between px-4 border-b border-admin-ink-line">
@@ -224,7 +224,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, onLogout }) 
       </aside>
 
       {/* MAIN CONTAINER */}
-      <div className="flex-1 flex flex-col overflow-x-hidden min-h-screen">
+      <div className={`flex-1 flex flex-col overflow-x-hidden min-h-screen min-w-0 transition-all duration-300 ${collapsed ? 'ml-[72px]' : 'ml-[248px]'}`}>
         {/* HEADER */}
         <header className="h-[72px] sticky top-0 z-20 bg-admin-paper/95 backdrop-blur-sm border-b border-admin-ledger-line flex items-center justify-between px-6">
           {/* Breadcrumbs / Page Title */}

@@ -142,22 +142,27 @@ class FestivalCampaignSection extends ConsumerWidget {
     FestivalGroupModel group,
     List<ProductModel> allProducts,
   ) {
-    final curated = group.products
-        .map((id) => allProducts.where((p) => p.id == id))
-        .expand((e) => e)
-        .toList();
+    final groupName = group.displayName.trim();
+    final ids = group.products;
 
-    if (curated.length == 1 && curated.first.id.isNotEmpty) {
-      context.push('/product/${curated.first.id}');
+    if (ids.length == 1 && ids.first.isNotEmpty) {
+      context.push('/product/${ids.first}');
       return;
     }
-    final withCat = curated.where((p) => p.categoryId.isNotEmpty);
-    if (withCat.isNotEmpty) {
-      onOpenCategory(withCat.first.categoryId);
-      return;
-    }
-    final name = group.displayName.trim();
-    context.push(name.isEmpty ? '/search' : '/search?q=${Uri.encodeComponent(name)}');
+
+    final queryParams = <String, String>{
+      if (groupName.isNotEmpty) 'title': groupName,
+      if (ids.isNotEmpty) 'ids': ids.join(','),
+      if (ids.isEmpty && groupName.isNotEmpty) 'q': groupName,
+      'hideSubcategories': 'true',
+    };
+
+    final groupCatId = group.id.isNotEmpty ? group.id : 'group';
+    final uri = Uri(
+      path: '/category/$groupCatId',
+      queryParameters: queryParams,
+    );
+    context.push(uri.toString());
   }
 }
 

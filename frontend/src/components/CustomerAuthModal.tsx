@@ -349,7 +349,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   {/* Step 1: one field, method auto-detected on submit */}
                   {step === 'identifier' && (
                     <form onSubmit={handleIdentifierSubmit} className="w-[310px] sm:w-[350px] max-w-full flex flex-col gap-3 shrink-0">
-                      <div className="w-full border border-gray-300 focus-within:border-[#4CAF50] focus-within:ring-2 focus-within:ring-[#4CAF50]/20 rounded-xl px-4 py-3.5 flex items-center gap-3 transition-all bg-white shadow-2xs">
+                      <div className="w-full border border-gray-300 focus-within:border-[#4CAF50] rounded-xl px-4 py-3.5 flex items-center gap-3 transition-all bg-white shadow-2xs">
                         <input
                           type="text"
                           placeholder="Phone number or email"
@@ -392,7 +392,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                         Code sent to <strong className="text-gray-900">+91 {phoneDigits}</strong>
                       </p>
 
-                      <div className="w-full border border-gray-300 focus-within:border-[#4CAF50] focus-within:ring-2 focus-within:ring-[#4CAF50]/20 rounded-xl px-4 py-3.5 flex items-center gap-3 transition-colors bg-white shadow-2xs">
+                      <div className="w-full border border-gray-300 focus-within:border-[#4CAF50] rounded-xl px-4 py-3.5 flex items-center gap-3 transition-colors bg-white shadow-2xs">
                         <input
                           type="text"
                           maxLength={6}
@@ -427,7 +427,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                       <p className="text-xs text-gray-600 font-medium text-center">
                         Signing in as <strong className="text-gray-900">{identifier}</strong>
                       </p>
-                      <div className="w-full border border-gray-300 focus-within:border-[#4CAF50] focus-within:ring-2 focus-within:ring-[#4CAF50]/20 rounded-xl px-4 py-3.5 flex items-center gap-2 bg-white shadow-2xs">
+                      <div className="w-full border border-gray-300 focus-within:border-[#4CAF50] rounded-xl px-4 py-3.5 flex items-center gap-2 bg-white shadow-2xs">
                         <input
                           type={showPassword ? 'text' : 'password'}
                           placeholder="Password"
@@ -474,11 +474,11 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                         placeholder="Full name"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        className="w-full border border-gray-300 focus-within:border-[#4CAF50] focus:ring-2 focus:ring-[#4CAF50]/20 rounded-xl px-4 py-3.5 bg-white shadow-2xs outline-none text-gray-900 font-bold placeholder:text-gray-400 placeholder:font-normal text-sm"
+                        className="w-full border border-gray-300 focus:border-[#4CAF50] rounded-xl px-4 py-3.5 bg-white shadow-2xs outline-none text-gray-900 font-bold placeholder:text-gray-400 placeholder:font-normal text-sm"
                         autoFocus
                         autoComplete="name"
                       />
-                      <div className="w-full border border-gray-300 focus-within:border-[#4CAF50] focus-within:ring-2 focus-within:ring-[#4CAF50]/20 rounded-xl px-4 py-3.5 flex items-center gap-2 bg-white shadow-2xs">
+                      <div className="w-full border border-gray-300 focus-within:border-[#4CAF50] rounded-xl px-4 py-3.5 flex items-center gap-2 bg-white shadow-2xs">
                         <input
                           type={showPassword ? 'text' : 'password'}
                           placeholder="Create a password (min 6 characters)"
@@ -496,7 +496,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                           {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                         </button>
                       </div>
-                      <div className="w-full border border-gray-300 focus-within:border-[#4CAF50] focus-within:ring-2 focus-within:ring-[#4CAF50]/20 rounded-xl px-4 py-3.5 flex items-center gap-3 bg-white shadow-2xs">
+                      <div className="w-full border border-gray-300 focus-within:border-[#4CAF50] rounded-xl px-4 py-3.5 flex items-center gap-3 bg-white shadow-2xs">
                         <span className="text-sm font-extrabold text-gray-900 shrink-0">+91</span>
                         <div className="h-4 w-[1px] bg-gray-300 shrink-0" />
                         <input

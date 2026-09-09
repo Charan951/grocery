@@ -174,10 +174,25 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
         path: '/category/:id',
-        builder: (c, s) => CategoryCatalogScreen(
-          categoryId: s.pathParameters['id'] ?? '',
-          initialSubCategory: s.uri.queryParameters['sub'],
-        ),
+        builder: (c, s) {
+          final idsParam = s.uri.queryParameters['ids'];
+          final idsList = idsParam != null && idsParam.isNotEmpty
+              ? idsParam.split(',').where((e) => e.trim().isNotEmpty).toList()
+              : null;
+          final titleParam = s.uri.queryParameters['title'] ?? s.uri.queryParameters['name'];
+          final hideSub = s.uri.queryParameters['hideSubcategories'] == 'true' ||
+              titleParam != null ||
+              idsList != null;
+
+          return CategoryCatalogScreen(
+            categoryId: s.pathParameters['id'] ?? '',
+            initialSubCategory: s.uri.queryParameters['sub'],
+            title: titleParam,
+            productIds: idsList,
+            searchQuery: s.uri.queryParameters['q'] ?? s.uri.queryParameters['search'],
+            hideSubcategories: hideSub,
+          );
+        },
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,

@@ -15,10 +15,29 @@ String? resolveAppRoute(String? webLink) {
   if (path.startsWith('/product/') || path.startsWith('/category/')) return raw;
   if (path == '/cart' || path == '/orders' || path == '/wishlist') return path;
 
-  // Web catalog listing → mobile category screen.
+  // Web catalog listing → mobile category screen or search.
   if (path == '/products') {
     final cat = q['category'];
-    if (cat == null || cat.isEmpty) return null; // no all-products screen
+    final ids = q['ids'];
+    final title = q['title'] ?? q['name'];
+    final search = q['search'] ?? q['q'];
+
+    if (ids != null && ids.isNotEmpty) {
+      final titleQuery = title != null && title.isNotEmpty ? '&title=${Uri.encodeComponent(title)}' : '';
+      return '/category/${cat ?? "group"}?ids=${Uri.encodeComponent(ids)}$titleQuery&hideSubcategories=true';
+    }
+
+    if (search != null && search.isNotEmpty) {
+      return '/search?q=${Uri.encodeComponent(search)}';
+    }
+
+    if (cat == null || cat.isEmpty) {
+      if (title != null && title.isNotEmpty) {
+        return '/category/group?title=${Uri.encodeComponent(title)}&hideSubcategories=true';
+      }
+      return null;
+    }
+
     final sub = q['subCategory'];
     return sub != null && sub.isNotEmpty && sub.toLowerCase() != 'all'
         ? '/category/$cat?sub=${Uri.encodeComponent(sub)}'

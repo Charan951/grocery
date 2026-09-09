@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
@@ -30,8 +31,12 @@ class LocationPermissionService {
   const LocationPermissionService._();
 
   static Future<LocationPermState> _classify(LocationPermission p) async {
-    if (!await Geolocator.isLocationServiceEnabled()) {
-      return LocationPermState.serviceDisabled;
+    if (!kIsWeb) {
+      try {
+        if (!await Geolocator.isLocationServiceEnabled()) {
+          return LocationPermState.serviceDisabled;
+        }
+      } catch (_) {}
     }
     return switch (p) {
       LocationPermission.always ||
@@ -43,19 +48,32 @@ class LocationPermissionService {
   }
 
   /// Non-intrusive check — never shows a system dialog.
-  static Future<LocationPermState> check() async =>
-      _classify(await Geolocator.checkPermission());
+  static Future<LocationPermState> check() async {
+    try {
+      return await _classify(await Geolocator.checkPermission());
+    } catch (_) {
+      return LocationPermState.granted;
+    }
+  }
 
   /// Requests permission (system dialog if still askable).
   static Future<LocationPermState> request() async {
-    if (!await Geolocator.isLocationServiceEnabled()) {
-      return LocationPermState.serviceDisabled;
+    if (!kIsWeb) {
+      try {
+        if (!await Geolocator.isLocationServiceEnabled()) {
+          return LocationPermState.serviceDisabled;
+        }
+      } catch (_) {}
     }
-    var p = await Geolocator.checkPermission();
-    if (p == LocationPermission.denied) {
-      p = await Geolocator.requestPermission();
+    try {
+      var p = await Geolocator.checkPermission();
+      if (p == LocationPermission.denied) {
+        p = await Geolocator.requestPermission();
+      }
+      return _classify(p);
+    } catch (_) {
+      return LocationPermState.granted;
     }
-    return _classify(p);
   }
 
   static Future<void> openAppSettings() => Geolocator.openAppSettings();
@@ -106,7 +124,7 @@ class LocationPermissionService {
       context: context,
       useRootNavigator: true,
       showDragHandle: true,
-      builder: (_) => Padding(
+      builder: (sheetContext) => Padding(
         padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -137,14 +155,14 @@ class LocationPermissionService {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context, false),
+                    onPressed: () => Navigator.of(sheetContext).pop(false),
                     child: const Text('Not now'),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: FilledButton(
-                    onPressed: () => Navigator.pop(context, true),
+                    onPressed: () => Navigator.of(sheetContext).pop(true),
                     style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
                     child: const Text('Allow'),
                   ),
@@ -165,13 +183,13 @@ class LocationPermissionService {
   }) {
     return showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text(title),
         content: Text(body),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
           FilledButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
             style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
             child: Text(action),
           ),

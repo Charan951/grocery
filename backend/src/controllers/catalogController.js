@@ -24,9 +24,22 @@ export const productController = {
     try {
       const {
         categoryId, category, subCategory, search, isOrganic,
-        minPrice, maxPrice, sort, brand, inStock, onSale, page, limit,
+        minPrice, maxPrice, sort, brand, inStock, onSale, page, limit, ids,
       } = req.query;
       let query = {};
+
+      if (ids) {
+        const idList = String(ids).split(',').map((i) => i.trim()).filter(Boolean);
+        if (idList.length > 0) {
+          const objectIds = idList
+            .filter((i) => mongoose.Types.ObjectId.isValid(i))
+            .map((i) => new mongoose.Types.ObjectId(i));
+          query.$or = [
+            { id: { $in: idList } },
+            { _id: { $in: objectIds } }
+          ];
+        }
+      }
 
       if (categoryId || category) {
         const catVal = categoryId || category;

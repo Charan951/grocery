@@ -17,12 +17,20 @@ class CartState {
   final Map<String, dynamic>? appliedCoupon;
   final String selectedDeliverySlot;
   final PricingConfig pricing;
+  final int tipAmount;
+  final bool hasGiftPackaging;
+  final double giftPackagingFee;
+  final Set<String> selectedInstructions;
 
   CartState({
     required this.items,
     this.appliedCoupon,
     this.selectedDeliverySlot = 'Instant (10-15 mins)',
     this.pricing = const PricingConfig(),
+    this.tipAmount = 0,
+    this.hasGiftPackaging = false,
+    this.giftPackagingFee = 30.0,
+    this.selectedInstructions = const {},
   });
 
   double get _couponDiscount => (appliedCoupon?['discount'] as num?)?.toDouble() ?? 0.0;
@@ -45,7 +53,8 @@ class CartState {
   double get platformFee => breakdown.platformFee;
   double get deliveryFee => breakdown.deliveryFee;
   double get taxAmount => breakdown.tax;
-  double get totalPayableAmount => breakdown.total;
+  double get totalPayableAmount =>
+      breakdown.total + tipAmount + (hasGiftPackaging ? giftPackagingFee : 0.0);
   double get totalSavings => breakdown.totalSavings;
 
   CartState copyWith({
@@ -54,12 +63,19 @@ class CartState {
     bool clearCoupon = false,
     String? selectedDeliverySlot,
     PricingConfig? pricing,
+    int? tipAmount,
+    bool? hasGiftPackaging,
+    Set<String>? selectedInstructions,
   }) {
     return CartState(
       items: items ?? this.items,
       appliedCoupon: clearCoupon ? null : (appliedCoupon ?? this.appliedCoupon),
       selectedDeliverySlot: selectedDeliverySlot ?? this.selectedDeliverySlot,
       pricing: pricing ?? this.pricing,
+      tipAmount: tipAmount ?? this.tipAmount,
+      hasGiftPackaging: hasGiftPackaging ?? this.hasGiftPackaging,
+      giftPackagingFee: giftPackagingFee,
+      selectedInstructions: selectedInstructions ?? this.selectedInstructions,
     );
   }
 }
@@ -149,8 +165,36 @@ class CartNotifier extends StateNotifier<CartState> {
 
   void setDeliverySlot(String slot) => state = state.copyWith(selectedDeliverySlot: slot);
 
+  void setTipAmount(int amount) {
+    if (state.tipAmount == amount) {
+      state = state.copyWith(tipAmount: 0);
+    } else {
+      state = state.copyWith(tipAmount: amount);
+    }
+  }
+
+  void toggleGiftPackaging() {
+    state = state.copyWith(hasGiftPackaging: !state.hasGiftPackaging);
+  }
+
+  void toggleInstruction(String instruction) {
+    final next = Set<String>.from(state.selectedInstructions);
+    if (next.contains(instruction)) {
+      next.remove(instruction);
+    } else {
+      next.add(instruction);
+    }
+    state = state.copyWith(selectedInstructions: next);
+  }
+
   void clearCart() {
-    state = state.copyWith(items: [], clearCoupon: true);
+    state = state.copyWith(
+      items: [],
+      clearCoupon: true,
+      tipAmount: 0,
+      hasGiftPackaging: false,
+      selectedInstructions: {},
+    );
     _persistCart();
   }
 }

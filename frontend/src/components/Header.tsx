@@ -514,7 +514,7 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
                   ? (campaignAccentColor || 'rgba(255,255,255,0.4)')
                   : 'var(--divider)'
               }}
-              className="flex items-center w-full px-4 py-2 bg-surface/95 rounded-full transition-colors border focus-within:bg-surface focus-within:ring-2 focus-within:ring-primary/20 shadow-2xs"
+              className="flex items-center w-full px-4 py-2 bg-surface/95 rounded-full transition-colors border focus-within:bg-surface focus-within:border-primary shadow-2xs"
             >
               <Search size={17} className="text-text-tertiary mr-2.5 shrink-0" />
               <input
@@ -641,7 +641,7 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
           >
             <form
               onSubmit={handleSearchSubmit}
-              className="flex items-center w-full h-11 px-3.5 bg-surface rounded-[14px] shadow-xs border border-divider focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20"
+              className="flex items-center w-full h-11 px-3.5 bg-surface rounded-[14px] shadow-xs border border-divider focus-within:border-primary"
             >
               <Search size={20} className="text-text-primary mr-2.5 shrink-0" />
               <input

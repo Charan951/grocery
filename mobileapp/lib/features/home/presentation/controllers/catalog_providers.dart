@@ -67,6 +67,9 @@ class CatalogQuery {
   final bool inStockOnly;
   final bool onSaleOnly;
   final String sort; // 'popular' | 'price-low' | 'price-high' | 'rating'
+  final String? title;
+  final List<String>? productIds;
+  final String? searchQuery;
 
   const CatalogQuery({
     required this.categoryId,
@@ -75,6 +78,9 @@ class CatalogQuery {
     this.inStockOnly = false,
     this.onSaleOnly = false,
     this.sort = 'popular',
+    this.title,
+    this.productIds,
+    this.searchQuery,
   });
 
   @override
@@ -85,16 +91,42 @@ class CatalogQuery {
       other.organicOnly == organicOnly &&
       other.inStockOnly == inStockOnly &&
       other.onSaleOnly == onSaleOnly &&
-      other.sort == sort;
+      other.sort == sort &&
+      other.title == title &&
+      listEquals(other.productIds, productIds) &&
+      other.searchQuery == searchQuery;
 
   @override
   int get hashCode =>
-      Object.hash(categoryId, subCategory, organicOnly, inStockOnly, onSaleOnly, sort);
+      Object.hash(categoryId, subCategory, organicOnly, inStockOnly, onSaleOnly, sort, title, Object.hashAll(productIds ?? []), searchQuery);
 }
 
 final categoryProductsProvider =
     FutureProvider.family<List<ProductModel>, CatalogQuery>((ref, q) async {
   final api = ref.watch(apiServiceProvider);
+
+  // If specific productIds are specified for a group, fetch real products for those IDs
+  if (q.productIds != null && q.productIds!.isNotEmpty) {
+    try {
+      final list = await api.fetchProducts(ids: q.productIds);
+      if (list.isNotEmpty) return list;
+    } catch (_) {}
+    // Fallback: filter from all products
+    final all = await ref.watch(allProductsProvider.future);
+    final set = q.productIds!.toSet();
+    final matched = all.where((p) => set.contains(p.id)).toList();
+    if (matched.isNotEmpty) return matched;
+  }
+
+  // If a search query or title override is provided for a group without productIds
+  final searchKey = q.searchQuery ?? q.title;
+  if (searchKey != null && searchKey.trim().isNotEmpty && (q.categoryId == 'group' || q.categoryId.isEmpty || q.categoryId == 'All')) {
+    try {
+      final list = await api.fetchProducts(search: searchKey.trim());
+      if (list.isNotEmpty) return list;
+    } catch (_) {}
+  }
+
   return api.fetchProducts(
     categoryId: q.categoryId,
     subCategory: q.subCategory == 'All' ? null : q.subCategory,

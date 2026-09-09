@@ -188,7 +188,7 @@ export const ProductReviews: React.FC<{ productId: string }> = ({ productId }) =
             maxLength={1000}
             rows={4}
             placeholder="How was the quality, freshness, packaging?"
-            className="w-full rounded-xl border border-gray-300 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0c831f]/30"
+            className="w-full rounded-xl border border-gray-300 p-3 text-sm focus:outline-none focus:border-[#0c831f]"
           />
           <button
             onClick={submit}

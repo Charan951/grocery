@@ -131,7 +131,7 @@ export const Search: React.FC = () => {
           </button>
 
           {/* Search Input Container */}
-          <div className="flex-1 relative flex items-center bg-gray-100 hover:bg-gray-100/80 rounded-2xl px-3.5 py-2.5 transition-all focus-within:ring-2 focus-within:ring-[#0C831F]/20 focus-within:border-[#0C831F] border border-transparent">
+          <div className="flex-1 relative flex items-center bg-gray-100 hover:bg-gray-100/80 rounded-2xl px-3.5 py-2.5 transition-all focus-within:border-[#0C831F] border border-transparent">
             <SearchIcon size={18} className="text-gray-400 shrink-0 mr-2.5" />
             <input
               ref={inputRef}
@@ -249,7 +249,7 @@ export const Search: React.FC = () => {
             </div>
 
             {searchResults.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-8 gap-3">
                 {searchResults.map((product) => (
                   <ProductCard
                     key={product.id || product._id}

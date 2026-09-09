@@ -17,12 +17,14 @@ import {
   Search as SearchIcon, MapPin, ShoppingCart, CreditCard, PackageCheck
 } from 'lucide-react';
 import { Instagram } from '../components/BrandIcons';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 interface HomeProps {
   onQuickView: (product: any) => void;
 }
 
 export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
+  const isMobile640 = useIsMobile(640);
   const {
     banners, promoCards, categories, specialCategoryGroups, superCategories, products,
     testimonials, faqs, blogs, seoSettings, homeSelectedSubCategories, festivalCampaigns, activeFestivalCampaign
@@ -497,6 +499,31 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
     });
   }, [categories]);
 
+  // Reorder category grid items for mobile 2-row horizontal grid (4 columns per row block)
+  const mobileOrderedCategoryGridItems = useMemo(() => {
+    const items = zeptoCategoryGridItems;
+    const N = items.length;
+    if (N <= 4) return items;
+
+    const fullBlocks = Math.floor(N / 8);
+    const rem = N % 8;
+    const extraCols = rem === 0 ? 0 : (rem <= 4 ? rem : 4);
+    const numCols = fullBlocks * 4 + extraCols;
+
+    const reordered: (typeof items[0] | null)[] = [];
+    for (let col = 0; col < numCols; col++) {
+      const block = Math.floor(col / 4);
+      const colInBlock = col % 4;
+
+      const topIdx = block * 8 + colInBlock;
+      const bottomIdx = block * 8 + 4 + colInBlock;
+
+      reordered.push(topIdx < N ? items[topIdx] : null);
+      reordered.push(bottomIdx < N ? items[bottomIdx] : null);
+    }
+    return reordered;
+  }, [zeptoCategoryGridItems]);
+
   return (
     <div className="w-full page-wrapper bg-background">
       <SEO
@@ -762,35 +789,39 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
             {/* Shop by Category Grid (Matching Flutter mobileapp rounded category cards) */}
             {zeptoCategoryGridItems.length > 0 && (
               <section className="mb-5 w-full mt-1 sm:mt-2">
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center justify-between mb-3 px-1 sm:px-0">
                   <h2 className="text-lg sm:text-xl font-black text-gray-900 tracking-tight font-display">
                     Shop by category
                   </h2>
                 </div>
-                <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-8 lg:grid-cols-10 gap-3 sm:gap-4">
-                  {zeptoCategoryGridItems.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        navigate(`/products?category=${item.catSlug}&subCategory=All`);
-                      }}
-                      className="flex flex-col items-center group cursor-pointer text-center bg-transparent border-none p-0 outline-none"
-                    >
-                      <div className="w-16 h-16 sm:w-18 sm:h-18 md:w-20 md:h-20 rounded-2xl bg-[#F3F4F6] overflow-hidden border border-gray-200/80 group-hover:scale-105 group-hover:shadow-md transition-all duration-200 shadow-2xs mx-auto">
-                        <img
-                          src={item.image || 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=300'}
-                          alt={item.name}
-                          className="w-full h-full object-cover rounded-2xl"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=300';
-                          }}
-                        />
-                      </div>
-                      <span className="text-[11px] sm:text-xs font-extrabold text-gray-800 line-clamp-2 leading-tight mt-1.5 group-hover:text-[#0C831F] transition-colors max-w-[82px]">
-                        {item.name}
-                      </span>
-                    </button>
+                <div className="grid grid-rows-2 grid-flow-col auto-cols-[calc((100vw-32px-36px)/4)] sm:auto-cols-auto overflow-x-auto scrollbar-none gap-x-3 gap-y-2.5 pb-2 px-1 sm:px-0 sm:grid-rows-none sm:grid-flow-row sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 sm:gap-4 sm:overflow-visible">
+                  {(isMobile640 ? mobileOrderedCategoryGridItems : zeptoCategoryGridItems).map((item, idx) => (
+                    item ? (
+                      <button
+                        key={item.id}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          navigate(`/products?category=${item.catSlug}&subCategory=All`);
+                        }}
+                        className="flex flex-col items-center group cursor-pointer text-center bg-transparent border-none p-0 outline-none w-full"
+                      >
+                        <div className="w-14 h-14 sm:w-18 sm:h-18 md:w-20 md:h-20 rounded-2xl bg-[#F3F4F6] overflow-hidden border border-gray-200/80 group-hover:scale-105 group-hover:shadow-md transition-all duration-200 shadow-2xs mx-auto">
+                          <img
+                            src={item.image || 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=300'}
+                            alt={item.name}
+                            className="w-full h-full object-cover rounded-2xl"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=300';
+                            }}
+                          />
+                        </div>
+                        <span className="text-[10px] sm:text-xs font-extrabold text-gray-800 line-clamp-2 leading-tight mt-1 group-hover:text-[#0C831F] transition-colors w-full px-0.5">
+                          {item.name}
+                        </span>
+                      </button>
+                    ) : (
+                      <div key={`empty-${idx}`} className="w-full" />
+                    )
                   ))}
                 </div>
               </section>

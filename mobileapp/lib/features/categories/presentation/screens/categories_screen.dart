@@ -1,3 +1,5 @@
+// ignore_for_file: unused_local_variable
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,13 +19,20 @@ import 'package:freshcart/features/products/data/models/product_model.dart';
 /// which otherwise leads straight to a guaranteed-empty screen. Mirrors the
 /// backend's case-insensitive substring match (`catalogController.getProducts`
 /// subCategory regex) closely enough to hide only the genuinely-empty ones.
-List<String> availableSubCategoriesFor(CategoryModel category, List<ProductModel> products) {
-  if (products.isEmpty) return category.subCategories; // still loading — don't hide, avoid a flicker
+List<String> availableSubCategoriesFor(
+  CategoryModel category,
+  List<ProductModel> products,
+) {
+  if (products.isEmpty) {
+    return category.subCategories; // still loading — don't hide, avoid a flicker
+  }
   return category.subCategories.where((sub) {
     final subLower = sub.toLowerCase();
-    return products.any((p) =>
-        p.categoryId == category.id &&
-        (p.subCategory ?? '').toLowerCase().contains(subLower));
+    return products.any(
+      (p) =>
+          p.categoryId == category.id &&
+          (p.subCategory ?? '').toLowerCase().contains(subLower),
+    );
   }).toList();
 }
 
@@ -34,20 +43,43 @@ class CategoriesScreen extends ConsumerWidget {
 
   static IconData iconFor(String icon, String name) {
     final k = '$icon $name'.toLowerCase();
-    if (k.contains('organic') || k.contains('leaf') || k.contains('eco')) return Icons.eco_rounded;
+    if (k.contains('organic') || k.contains('leaf') || k.contains('eco')) {
+      return Icons.eco_rounded;
+    }
     if (k.contains('veg')) return Icons.grass_rounded;
     if (k.contains('fruit')) return Icons.apple_rounded;
-    if (k.contains('bak') || k.contains('bread')) return Icons.bakery_dining_rounded;
-    if (k.contains('dairy') || k.contains('milk') || k.contains('egg')) return Icons.water_drop_rounded;
-    if (k.contains('meat') || k.contains('fish') || k.contains('chicken')) return Icons.set_meal_rounded;
+    if (k.contains('bak') || k.contains('bread')) {
+      return Icons.bakery_dining_rounded;
+    }
+    if (k.contains('dairy') || k.contains('milk') || k.contains('egg')) {
+      return Icons.water_drop_rounded;
+    }
+    if (k.contains('meat') || k.contains('fish') || k.contains('chicken')) {
+      return Icons.set_meal_rounded;
+    }
     if (k.contains('frozen')) return Icons.ac_unit_rounded;
-    if (k.contains('snack') || k.contains('packaged')) return Icons.cookie_rounded;
-    if (k.contains('beverage') || k.contains('drink')) return Icons.local_cafe_rounded;
-    if (k.contains('masala') || k.contains('spice')) return Icons.scatter_plot_rounded;
-    if (k.contains('rice') || k.contains('atta') || k.contains('dal') || k.contains('staple')) return Icons.rice_bowl_rounded;
-    if (k.contains('clean') || k.contains('home')) return Icons.cleaning_services_rounded;
+    if (k.contains('snack') || k.contains('packaged')) {
+      return Icons.cookie_rounded;
+    }
+    if (k.contains('beverage') || k.contains('drink')) {
+      return Icons.local_cafe_rounded;
+    }
+    if (k.contains('masala') || k.contains('spice')) {
+      return Icons.scatter_plot_rounded;
+    }
+    if (k.contains('rice') ||
+        k.contains('atta') ||
+        k.contains('dal') ||
+        k.contains('staple')) {
+      return Icons.rice_bowl_rounded;
+    }
+    if (k.contains('clean') || k.contains('home')) {
+      return Icons.cleaning_services_rounded;
+    }
     if (k.contains('baby')) return Icons.child_friendly_rounded;
-    if (k.contains('personal') || k.contains('care') || k.contains('beauty')) return Icons.spa_rounded;
+    if (k.contains('personal') || k.contains('care') || k.contains('beauty')) {
+      return Icons.spa_rounded;
+    }
     return Icons.shopping_basket_rounded;
   }
 
@@ -65,18 +97,23 @@ class CategoriesScreen extends ConsumerWidget {
         scrolledUnderElevation: 0,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: isDark ? AppColors.dividerDark : AppColors.divider),
+          child: Container(
+            height: 1,
+            color: isDark ? AppColors.dividerDark : AppColors.divider,
+          ),
         ),
       ),
       body: categoriesAsync.when(
         loading: () => const _CategoriesSkeleton(),
-        error: (e, _) => ErrorState(onRetry: () => ref.invalidate(categoriesProvider)),
+        error: (e, _) =>
+            ErrorState(onRetry: () => ref.invalidate(categoriesProvider)),
         data: (categories) {
           if (categories.isEmpty) {
             return const EmptyState(
               icon: Icons.grid_view_rounded,
               title: 'No categories yet',
-              description: 'Our catalog is being stocked. Pull down to refresh.',
+              description:
+                  'Our catalog is being stocked. Pull down to refresh.',
             );
           }
           final trending = _trendingTerms(categories, products);
@@ -88,15 +125,27 @@ class CategoriesScreen extends ConsumerWidget {
               ref.invalidate(allProductsProvider);
             },
             child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
-                for (final c in categories) _CategorySection(category: c, isDark: isDark, products: products),
+                for (final c in categories)
+                  _CategorySection(
+                    category: c,
+                    isDark: isDark,
+                    products: products,
+                  ),
                 if (trending.isNotEmpty) ...[
                   const SizedBox(height: 8),
-                  Text('Trending searches', style: AppTypography.h3(
-                    isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                  )),
+                  Text(
+                    'Trending searches',
+                    style: AppTypography.h3(
+                      isDark
+                          ? AppColors.textPrimaryDark
+                          : AppColors.textPrimary,
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   Wrap(
                     spacing: 8,
@@ -106,10 +155,18 @@ class CategoriesScreen extends ConsumerWidget {
                         ActionChip(
                           label: Text(t.label),
                           labelStyle: AppTypography.labelSmall(
-                            isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                            isDark
+                                ? AppColors.textPrimaryDark
+                                : AppColors.textPrimary,
                           ).copyWith(fontWeight: FontWeight.w500),
-                          backgroundColor: isDark ? Colors.white10 : AppColors.surface,
-                          side: BorderSide(color: isDark ? AppColors.dividerDark : AppColors.divider),
+                          backgroundColor: isDark
+                              ? Colors.white10
+                              : AppColors.surface,
+                          side: BorderSide(
+                            color: isDark
+                                ? AppColors.dividerDark
+                                : AppColors.divider,
+                          ),
                           shape: const StadiumBorder(),
                           onPressed: () => context.push(t.route),
                         ),
@@ -124,7 +181,10 @@ class CategoriesScreen extends ConsumerWidget {
     );
   }
 
-  List<_Term> _trendingTerms(List<CategoryModel> cats, List<ProductModel> products) {
+  List<_Term> _trendingTerms(
+    List<CategoryModel> cats,
+    List<ProductModel> products,
+  ) {
     final terms = <_Term>[];
     for (final c in cats) {
       terms.add(_Term(c.name, '/category/${c.id}'));
@@ -146,13 +206,21 @@ class _CategorySection extends StatelessWidget {
   final CategoryModel category;
   final bool isDark;
   final List<ProductModel> products;
-  const _CategorySection({required this.category, required this.isDark, required this.products});
+  const _CategorySection({
+    required this.category,
+    required this.isDark,
+    required this.products,
+  });
 
   @override
   Widget build(BuildContext context) {
     final subs = availableSubCategoriesFor(category, products);
-    final textColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimary;
-    final hasCategoryHeaderImage = category.imageUrl.trim().startsWith(RegExp(r'https?://'));
+    final textColor = isDark
+        ? AppColors.textPrimaryDark
+        : AppColors.textPrimary;
+    final hasCategoryHeaderImage = category.imageUrl.trim().startsWith(
+      RegExp(r'https?://'),
+    );
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 24),
@@ -161,32 +229,25 @@ class _CategorySection extends StatelessWidget {
         children: [
           Row(
             children: [
-              if (hasCategoryHeaderImage)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: CachedNetworkImage(
-                    imageUrl: category.imageUrl,
-                    width: 20,
-                    height: 20,
-                    fit: BoxFit.contain,
-                    errorWidget: (context, url, error) => Icon(
-                      CategoriesScreen.iconFor(category.icon, category.name),
-                      size: 20,
-                      color: category.color,
-                    ),
-                  ),
-                )
-              else
-                Icon(CategoriesScreen.iconFor(category.icon, category.name),
-                    size: 20, color: category.color),
-              const SizedBox(width: 8),
-              Expanded(child: Text(category.name, style: AppTypography.title(textColor))),
+              Expanded(
+                child: Text(
+                  category.name,
+                  style: AppTypography.title(textColor),
+                ),
+              ),
               GestureDetector(
                 onTap: () => context.push('/category/${category.id}'),
                 child: Row(
                   children: [
-                    Text('See all', style: AppTypography.labelMedium(AppColors.primaryText)),
-                    const Icon(Icons.chevron_right_rounded, size: 16, color: AppColors.primary),
+                    Text(
+                      'See all',
+                      style: AppTypography.labelMedium(AppColors.primaryText),
+                    ),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
                   ],
                 ),
               ),
@@ -250,10 +311,15 @@ class _SubTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasValidUrl = imageUrl != null &&
+    final hasValidUrl =
+        imageUrl != null &&
         imageUrl!.trim().startsWith(RegExp(r'https?://', caseSensitive: false));
 
-    final fallbackIcon = Icon(icon, color: isDark ? AppColors.accent : color, size: 24);
+    final fallbackIcon = Icon(
+      icon,
+      color: isDark ? AppColors.accent : color,
+      size: 24,
+    );
 
     return GestureDetector(
       onTap: onTap,
@@ -286,9 +352,14 @@ class _SubTile extends StatelessWidget {
               maxLines: 2,
               textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,
-              style: AppTypography.labelSmall(
-                isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-              ).copyWith(fontWeight: FontWeight.w500, height: 1.1, fontSize: 11),
+              style:
+                  AppTypography.labelSmall(
+                    isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                  ).copyWith(
+                    fontWeight: FontWeight.w500,
+                    height: 1.1,
+                    fontSize: 11,
+                  ),
             ),
           ),
         ],
@@ -318,7 +389,10 @@ class _CategoriesSkeleton extends StatelessWidget {
               mainAxisSpacing: 12,
               crossAxisSpacing: 12,
             ),
-            itemBuilder: (_, _) => const SkeletonBox(height: double.infinity, borderRadius: AppRadius.brMd),
+            itemBuilder: (_, _) => const SkeletonBox(
+              height: double.infinity,
+              borderRadius: AppRadius.brMd,
+            ),
           ),
           const SizedBox(height: 24),
         ],

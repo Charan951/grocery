@@ -1159,7 +1159,7 @@ export const AdminCMS: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-8">
 
           {/* Left Navigation Sidebar */}
-          <aside className="bg-surface border border-divider rounded-2xl p-4 shadow-card flex flex-col gap-1.5 h-fit">
+          <aside className="bg-surface border border-divider rounded-2xl p-4 shadow-card flex flex-col gap-1.5 h-fit sticky top-24 self-start">
             <div className="text-[10px] font-bold text-text-secondary px-3 py-1 border-b border-divider mb-2">CMS MODULES</div>
 
             <button

@@ -569,19 +569,66 @@ class _HomeContent extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
-          SizedBox(
-            height: 108,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              physics: const BouncingScrollPhysics(),
-              itemCount: categories.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 12),
-              itemBuilder: (context, i) => CategoryCard(
-                category: categories[i],
-                onTap: () => onOpenCategory(categories[i].id),
-              ),
-            ),
+          Builder(
+            builder: (context) {
+              final screenW = MediaQuery.of(context).size.width;
+              final availableW = screenW - 32;
+              final isMultiRow = categories.length > 4;
+
+              final int numCols;
+              if (!isMultiRow) {
+                numCols = categories.length;
+              } else {
+                final fullBlocks = categories.length ~/ 8;
+                final rem = categories.length % 8;
+                final extraCols = rem == 0 ? 0 : (rem <= 4 ? rem : 4);
+                numCols = fullBlocks * 4 + extraCols;
+              }
+
+              final itemW = (availableW - (3 * 10)) / 4;
+              final rowH = isMultiRow ? 82.0 : 86.0;
+              final gridH = isMultiRow ? 174.0 : 86.0;
+              final aspect = rowH / itemW;
+
+              return SizedBox(
+                height: gridH,
+                child: GridView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: isMultiRow ? numCols * 2 : categories.length,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: isMultiRow ? 2 : 1,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: aspect,
+                  ),
+                  itemBuilder: (context, i) {
+                    final int catIndex;
+                    if (isMultiRow) {
+                      final col = i ~/ 2;
+                      final row = i % 2;
+                      final block = col ~/ 4;
+                      final colInBlock = col % 4;
+                      catIndex = row == 0
+                          ? (block * 8) + colInBlock
+                          : (block * 8) + 4 + colInBlock;
+                    } else {
+                      catIndex = i;
+                    }
+
+                    if (catIndex >= categories.length) {
+                      return const SizedBox.shrink();
+                    }
+
+                    return CategoryCard(
+                      category: categories[catIndex],
+                      onTap: () => onOpenCategory(categories[catIndex].id),
+                    );
+                  },
+                ),
+              );
+            },
           ),
         ],
 

@@ -83,11 +83,19 @@ class _SubCategoryItemData {
 class CategoryCatalogScreen extends ConsumerStatefulWidget {
   final String categoryId;
   final String? initialSubCategory;
+  final String? title;
+  final List<String>? productIds;
+  final String? searchQuery;
+  final bool hideSubcategories;
 
   const CategoryCatalogScreen({
     super.key,
     required this.categoryId,
     this.initialSubCategory,
+    this.title,
+    this.productIds,
+    this.searchQuery,
+    this.hideSubcategories = false,
   });
 
   @override
@@ -154,7 +162,9 @@ class _CategoryCatalogScreenState extends ConsumerState<CategoryCatalogScreen> {
     final categories = ref.watch(categoriesProvider).valueOrNull ?? const [];
     final matches = categories.where((c) => c.id == widget.categoryId).toList();
     final category = matches.isNotEmpty ? matches.first : null;
-    final title = category?.name ?? 'Category';
+    final title = (widget.title != null && widget.title!.trim().isNotEmpty)
+        ? widget.title!.trim()
+        : (category?.name ?? 'Category');
     final allProducts = ref.watch(allProductsProvider).valueOrNull ?? const [];
     final subNames = category != null ? availableSubCategoriesFor(category, allProducts) : <String>[];
 
@@ -185,8 +195,15 @@ class _CategoryCatalogScreenState extends ConsumerState<CategoryCatalogScreen> {
       inStockOnly: _inStockOnly,
       onSaleOnly: _onSaleOnly,
       sort: _sort,
+      title: widget.title,
+      productIds: widget.productIds,
+      searchQuery: widget.searchQuery,
     );
     final productsAsync = ref.watch(categoryProductsProvider(query));
+
+    final showSubcategories = !widget.hideSubcategories &&
+        widget.productIds == null &&
+        subItems.length > 1;
 
     return AppScaffold(
       title: title,
@@ -215,7 +232,7 @@ class _CategoryCatalogScreenState extends ConsumerState<CategoryCatalogScreen> {
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (subItems.length > 1)
+          if (showSubcategories)
             _SubcategoryRail(
               items: subItems,
               selected: _sub,

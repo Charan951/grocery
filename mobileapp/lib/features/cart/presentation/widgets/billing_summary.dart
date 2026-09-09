@@ -23,9 +23,39 @@ class BillingSummary extends StatelessWidget {
         color: isDark ? AppColors.surfaceDark : AppColors.surface,
         borderRadius: AppRadius.brLg,
         border: Border.all(color: isDark ? AppColors.dividerDark : AppColors.divider),
+        boxShadow: isDark
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.receipt_long_rounded, size: 16, color: AppColors.primary),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Bill details',
+                style: AppTypography.labelLarge(
+                  isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                ).copyWith(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
           _row(context, 'Item total', '₹${cart.totalMrp.toStringAsFixed(2)}'),
           if (cart.itemSavings > 0)
             _row(context, 'Product discount', '- ₹${cart.itemSavings.toStringAsFixed(2)}', green: true),
@@ -39,31 +69,42 @@ class BillingSummary extends StatelessWidget {
             green: cart.deliveryFee == 0,
           ),
           _row(context, 'Taxes ($taxPct% GST)', '₹${cart.taxAmount.toStringAsFixed(2)}'),
-          Divider(height: 24, color: isDark ? AppColors.dividerDark : AppColors.divider),
+          if (cart.tipAmount > 0)
+            _row(context, 'Delivery partner tip', '₹${cart.tipAmount.toStringAsFixed(2)}', green: true),
+          if (cart.hasGiftPackaging)
+            _row(context, 'Gift packaging', '₹${cart.giftPackagingFee.toStringAsFixed(2)}'),
+          Divider(height: 20, color: isDark ? AppColors.dividerDark : AppColors.divider),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('To pay', style: AppTypography.title(
                 isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-              )),
+              ).copyWith(fontWeight: FontWeight.w800)),
               Text('₹${cart.totalPayableAmount.toStringAsFixed(2)}', style: AppTypography.h3(
                 isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-              )),
+              ).copyWith(fontWeight: FontWeight.w900, color: AppColors.primary)),
             ],
           ),
           if (showSavingsFooter && cart.totalSavings > 0) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
-                borderRadius: AppRadius.brSm,
+                color: AppColors.success.withOpacity(0.1),
+                borderRadius: AppRadius.brMd,
+                border: Border.all(color: AppColors.success.withOpacity(0.25)),
               ),
-              child: Text(
-                'You save ₹${cart.totalSavings.toStringAsFixed(0)} on this order',
-                textAlign: TextAlign.center,
-                style: AppTypography.labelMedium(AppColors.primaryText),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.savings_rounded, size: 16, color: AppColors.success),
+                  const SizedBox(width: 6),
+                  Text(
+                    'You save ₹${cart.totalSavings.toStringAsFixed(0)} on this order',
+                    style: AppTypography.labelMedium(AppColors.success).copyWith(fontWeight: FontWeight.bold),
+                  ),
+                ],
               ),
             ),
           ],
@@ -83,10 +124,11 @@ class BillingSummary extends StatelessWidget {
             isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
           )),
           Text(value, style: AppTypography.labelMedium(
-            green ? AppColors.primary : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimary),
-          )),
+            green ? AppColors.success : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimary),
+          ).copyWith(fontWeight: green ? FontWeight.bold : FontWeight.w600)),
         ],
       ),
     );
   }
 }
+

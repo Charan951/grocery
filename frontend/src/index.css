@@ -181,10 +181,18 @@ body, #root {
   background-color: color-mix(in srgb, var(--primary) 22%, transparent);
   color: var(--text-primary);
 }
-:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+:where(a, button, [tabindex]):focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+:where(input, select, textarea),
+:where(input, select, textarea):focus,
+:where(input, select, textarea):focus-visible,
+:where(input, select, textarea):focus-within {
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 h1, h2, h3, h4, h5, h6 {

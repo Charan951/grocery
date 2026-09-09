@@ -1050,54 +1050,6 @@ export const SubCategoriesModule: React.FC = () => {
                 />
               </div>
 
-              {/* Subcategory Background Color & Accent Tint Input */}
-              <div className="p-3 bg-background rounded-2xl border border-divider flex flex-col gap-2">
-                <label className="text-[11px] font-bold text-text-primary uppercase flex items-center justify-between">
-                  <span>Subcategory Background Color & Accent Tint</span>
-                  <span className="text-primary font-mono text-[11px] font-bold">{subColorInput}</span>
-                </label>
-                <div className="flex flex-wrap items-center gap-2 mb-1">
-                  {[
-                    { name: 'Emerald', hex: '#10B981' },
-                    { name: 'Light Green', hex: '#E8F5E9' },
-                    { name: 'Teal', hex: '#14B8A6' },
-                    { name: 'Cyan', hex: '#06B6D4' },
-                    { name: 'Sky', hex: '#0EA5E9' },
-                    { name: 'Blue', hex: '#3B82F6' },
-                    { name: 'Amber', hex: '#F59E0B' },
-                    { name: 'Light Amber', hex: '#FFF8E1' },
-                    { name: 'Rose', hex: '#F43F5E' },
-                    { name: 'Purple', hex: '#8B5CF6' }
-                  ].map((preset) => (
-                    <button
-                      key={preset.hex}
-                      type="button"
-                      onClick={() => setSubColorInput(preset.hex)}
-                      className={`w-7 h-7 rounded-full border-2 transition-all cursor-pointer flex items-center justify-center ${
-                        subColorInput === preset.hex ? 'border-primary scale-110 shadow-sm' : 'border-divider hover:scale-105'
-                      }`}
-                      style={{ backgroundColor: preset.hex }}
-                      title={`${preset.name} (${preset.hex})`}
-                    />
-                  ))}
-                </div>
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="color"
-                    value={subColorInput || '#10B981'}
-                    onChange={(e) => setSubColorInput(e.target.value)}
-                    className="w-10 h-10 rounded-xl cursor-pointer border border-divider p-1 bg-surface shrink-0"
-                  />
-                  <input
-                    type="text"
-                    placeholder="#10B981 or #E8F5E9"
-                    value={subColorInput}
-                    onChange={(e) => setSubColorInput(e.target.value)}
-                    className="flex-1 px-4 py-2 border border-divider rounded-xl text-xs bg-surface text-text-primary font-bold focus:outline-none focus:border-primary font-mono"
-                  />
-                </div>
-              </div>
-
               {/* Subcategory Image Upload & Field */}
               <div className="flex flex-col gap-2">
                 <label className="text-[11px] font-bold text-text-secondary uppercase">Subcategory Image / Icon (Cloudinary or URL)</label>
@@ -1276,54 +1228,6 @@ export const SubCategoriesModule: React.FC = () => {
                   onChange={(e) => setEditingSub({ ...editingSub, displayOrder: parseInt(e.target.value) || 1 })}
                   className="w-full px-4 py-2.5 border border-divider rounded-xl text-xs bg-background text-text-primary font-bold focus:outline-none focus:border-primary"
                 />
-              </div>
-
-              {/* Subcategory Background Color & Accent Tint Input */}
-              <div className="p-3 bg-background rounded-2xl border border-divider flex flex-col gap-2">
-                <label className="text-[11px] font-bold text-text-primary uppercase flex items-center justify-between">
-                  <span>Subcategory Background Color & Accent Tint</span>
-                  <span className="text-primary font-mono text-[11px] font-bold">{editingSub.color || '#10B981'}</span>
-                </label>
-                <div className="flex flex-wrap items-center gap-2 mb-1">
-                  {[
-                    { name: 'Emerald', hex: '#10B981' },
-                    { name: 'Light Green', hex: '#E8F5E9' },
-                    { name: 'Teal', hex: '#14B8A6' },
-                    { name: 'Cyan', hex: '#06B6D4' },
-                    { name: 'Sky', hex: '#0EA5E9' },
-                    { name: 'Blue', hex: '#3B82F6' },
-                    { name: 'Amber', hex: '#F59E0B' },
-                    { name: 'Light Amber', hex: '#FFF8E1' },
-                    { name: 'Rose', hex: '#F43F5E' },
-                    { name: 'Purple', hex: '#8B5CF6' }
-                  ].map((preset) => (
-                    <button
-                      key={preset.hex}
-                      type="button"
-                      onClick={() => setEditingSub({ ...editingSub, color: preset.hex })}
-                      className={`w-7 h-7 rounded-full border-2 transition-all cursor-pointer flex items-center justify-center ${
-                        editingSub.color === preset.hex ? 'border-primary scale-110 shadow-sm' : 'border-divider hover:scale-105'
-                      }`}
-                      style={{ backgroundColor: preset.hex }}
-                      title={`${preset.name} (${preset.hex})`}
-                    />
-                  ))}
-                </div>
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="color"
-                    value={editingSub.color || '#10B981'}
-                    onChange={(e) => setEditingSub({ ...editingSub, color: e.target.value })}
-                    className="w-10 h-10 rounded-xl cursor-pointer border border-divider p-1 bg-surface shrink-0"
-                  />
-                  <input
-                    type="text"
-                    placeholder="#10B981 or #E8F5E9"
-                    value={editingSub.color || '#10B981'}
-                    onChange={(e) => setEditingSub({ ...editingSub, color: e.target.value })}
-                    className="flex-1 px-4 py-2 border border-divider rounded-xl text-xs bg-surface text-text-primary font-bold focus:outline-none focus:border-primary font-mono"
-                  />
-                </div>
               </div>
 
               {/* Subcategory Image Upload & Field */}

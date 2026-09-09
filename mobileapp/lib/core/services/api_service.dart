@@ -28,21 +28,23 @@ class ApiService {
       ),
     );
 
-    _dio.interceptors.add(InterceptorsWrapper(
-      onRequest: (options, handler) {
-        final token = _tokenStore?.token;
-        if (token != null && token.isNotEmpty) {
-          options.headers['Authorization'] = 'Bearer $token';
-        }
-        handler.next(options);
-      },
-      onError: (e, handler) {
-        if (e.response?.statusCode == 401) {
-          onUnauthorized?.call();
-        }
-        handler.next(e);
-      },
-    ));
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          final token = _tokenStore?.token;
+          if (token != null && token.isNotEmpty) {
+            options.headers['Authorization'] = 'Bearer $token';
+          }
+          handler.next(options);
+        },
+        onError: (e, handler) {
+          if (e.response?.statusCode == 401) {
+            onUnauthorized?.call();
+          }
+          handler.next(e);
+        },
+      ),
+    );
   }
 
   // ==========================================================================
@@ -52,7 +54,10 @@ class ApiService {
   /// Requests an OTP. Returns `{ testMode: bool, devCode?: String, ttl: int }`.
   Future<Map<String, dynamic>> sendOtp(String phone) async {
     try {
-      final res = await _dio.post('/customers/otp/send', data: {'phone': phone});
+      final res = await _dio.post(
+        '/customers/otp/send',
+        data: {'phone': phone},
+      );
       return Map<String, dynamic>.from(res.data as Map);
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
@@ -95,12 +100,15 @@ class ApiService {
     required String phone,
   }) async {
     try {
-      final res = await _dio.post('/customers/register', data: {
-        'name': name,
-        'email': email,
-        'password': password,
-        'phone': phone,
-      });
+      final res = await _dio.post(
+        '/customers/register',
+        data: {
+          'name': name,
+          'email': email,
+          'password': password,
+          'phone': phone,
+        },
+      );
       return Map<String, dynamic>.from(res.data as Map);
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
@@ -118,7 +126,10 @@ class ApiService {
   }
 
   /// Updates the signed-in customer's name / email.
-  Future<Map<String, dynamic>> updateMyProfile({String? name, String? email}) async {
+  Future<Map<String, dynamic>> updateMyProfile({
+    String? name,
+    String? email,
+  }) async {
     try {
       final payload = <String, dynamic>{};
       if (name != null) payload['name'] = name;
@@ -159,7 +170,9 @@ class ApiService {
     try {
       final res = await _dio.get('/banners');
       final data = res.data;
-      final list = (data is Map && data['banners'] is List) ? data['banners'] as List : const [];
+      final list = (data is Map && data['banners'] is List)
+          ? data['banners'] as List
+          : const [];
       return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
@@ -173,13 +186,17 @@ class ApiService {
       final data = res.data;
       if (data is Map && data['activeCampaigns'] is List) {
         final list = data['activeCampaigns'] as List;
-        return list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        return list
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
       }
       final c = (data is Map) ? data['campaign'] : null;
       if (c is Map && c['isActive'] != false) {
         return [Map<String, dynamic>.from(c)];
       }
       return const [];
+      // ignore: unused_catch_clause
     } on DioException catch (e) {
       return const [];
     }
@@ -198,8 +215,14 @@ class ApiService {
     try {
       final res = await _dio.get('/categories');
       final data = res.data;
-      final list = (data is Map && data['categories'] is List) ? data['categories'] as List : const [];
-      return list.map((e) => CategoryModel.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+      final list = (data is Map && data['categories'] is List)
+          ? data['categories'] as List
+          : const [];
+      return list
+          .map(
+            (e) => CategoryModel.fromJson(Map<String, dynamic>.from(e as Map)),
+          )
+          .toList();
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
     }
@@ -209,7 +232,9 @@ class ApiService {
     try {
       final res = await _dio.get('/special-groups');
       final data = res.data;
-      final list = (data is Map && data['groups'] is List) ? data['groups'] as List : const [];
+      final list = (data is Map && data['groups'] is List)
+          ? data['groups'] as List
+          : const [];
       return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
@@ -220,7 +245,9 @@ class ApiService {
     try {
       final res = await _dio.get('/super-categories');
       final data = res.data;
-      final list = (data is Map && data['superCategories'] is List) ? data['superCategories'] as List : const [];
+      final list = (data is Map && data['superCategories'] is List)
+          ? data['superCategories'] as List
+          : const [];
       if (list.isEmpty) {
         return _defaultSuperCategories();
       }
@@ -237,10 +264,30 @@ class ApiService {
       {'id': 'sc_home', 'name': 'Home', 'slug': 'home', 'icon': 'Home'},
       {'id': 'sc_toys', 'name': 'Toys', 'slug': 'toys', 'icon': 'Gamepad2'},
       {'id': 'sc_fresh', 'name': 'Fresh', 'slug': 'fresh', 'icon': 'Leaf'},
-      {'id': 'sc_electronics', 'name': 'Electronics', 'slug': 'electronics', 'icon': 'Headphones'},
-      {'id': 'sc_mobiles', 'name': 'Mobiles', 'slug': 'mobiles', 'icon': 'Smartphone'},
-      {'id': 'sc_beauty', 'name': 'Beauty', 'slug': 'beauty', 'icon': 'Sparkles'},
-      {'id': 'sc_fashion', 'name': 'Fashion', 'slug': 'fashion', 'icon': 'Shirt'},
+      {
+        'id': 'sc_electronics',
+        'name': 'Electronics',
+        'slug': 'electronics',
+        'icon': 'Headphones',
+      },
+      {
+        'id': 'sc_mobiles',
+        'name': 'Mobiles',
+        'slug': 'mobiles',
+        'icon': 'Smartphone',
+      },
+      {
+        'id': 'sc_beauty',
+        'name': 'Beauty',
+        'slug': 'beauty',
+        'icon': 'Sparkles',
+      },
+      {
+        'id': 'sc_fashion',
+        'name': 'Fashion',
+        'slug': 'fashion',
+        'icon': 'Shirt',
+      },
     ];
   }
 
@@ -254,12 +301,17 @@ class ApiService {
     bool? inStock,
     bool? onSale,
     List<String>? brands,
+    List<String>? ids,
   }) async {
     try {
       final qp = <String, dynamic>{};
-      if (categoryId != null && categoryId.isNotEmpty && categoryId != 'All') qp['categoryId'] = categoryId;
-      if (subCategory != null && subCategory.isNotEmpty && subCategory != 'All') qp['subCategory'] = subCategory;
-      if (search != null && search.trim().isNotEmpty) qp['search'] = search.trim();
+      if (ids != null && ids.isNotEmpty) qp['ids'] = ids.join(',');
+      if (categoryId != null && categoryId.isNotEmpty && categoryId != 'All')
+        qp['categoryId'] = categoryId;
+      if (subCategory != null && subCategory.isNotEmpty && subCategory != 'All')
+        qp['subCategory'] = subCategory;
+      if (search != null && search.trim().isNotEmpty)
+        qp['search'] = search.trim();
       if (isOrganic == true) qp['isOrganic'] = 'true';
       if (sort != null && sort.isNotEmpty) qp['sort'] = sort;
       if (inStock == true) qp['inStock'] = 'true';
@@ -268,8 +320,14 @@ class ApiService {
 
       final res = await _dio.get('/products', queryParameters: qp);
       final data = res.data;
-      final list = (data is Map && data['products'] is List) ? data['products'] as List : const [];
-      return list.map((e) => ProductModel.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+      final list = (data is Map && data['products'] is List)
+          ? data['products'] as List
+          : const [];
+      return list
+          .map(
+            (e) => ProductModel.fromJson(Map<String, dynamic>.from(e as Map)),
+          )
+          .toList();
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
     }
@@ -280,7 +338,9 @@ class ApiService {
       final res = await _dio.get('/products/${Uri.encodeComponent(id)}');
       final data = res.data;
       if (data is Map && data['product'] is Map) {
-        return ProductModel.fromJson(Map<String, dynamic>.from(data['product'] as Map));
+        return ProductModel.fromJson(
+          Map<String, dynamic>.from(data['product'] as Map),
+        );
       }
       throw ApiException('Product not found', statusCode: 404);
     } on DioException catch (e) {
@@ -308,7 +368,9 @@ class ApiService {
     try {
       final res = await _dio.get('/coupons');
       final data = res.data;
-      final list = (data is Map && data['coupons'] is List) ? data['coupons'] as List : const [];
+      final list = (data is Map && data['coupons'] is List)
+          ? data['coupons'] as List
+          : const [];
       return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
@@ -319,7 +381,10 @@ class ApiService {
   /// Returns `{ valid: bool, discount: num, code?, message }`.
   Future<Map<String, dynamic>> validateCoupon(String code, num subtotal) async {
     try {
-      final res = await _dio.post('/coupons/validate', data: {'code': code, 'subtotal': subtotal});
+      final res = await _dio.post(
+        '/coupons/validate',
+        data: {'code': code, 'subtotal': subtotal},
+      );
       return Map<String, dynamic>.from(res.data as Map);
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
@@ -328,7 +393,9 @@ class ApiService {
 
   /// `POST /api/orders` — the customer token (if present) is attached by the
   /// interceptor and trusted server-side. Throws on failure.
-  Future<Map<String, dynamic>> createOrder(Map<String, dynamic> orderPayload) async {
+  Future<Map<String, dynamic>> createOrder(
+    Map<String, dynamic> orderPayload,
+  ) async {
     try {
       final res = await _dio.post('/orders', data: orderPayload);
       final data = res.data;
@@ -344,7 +411,10 @@ class ApiService {
   // ---- Payments ----
 
   /// `POST /api/payment/create-order` → `{ orderId, amount, currency, key, testMode }`.
-  Future<Map<String, dynamic>> createRazorpayOrder({required double amount, String? receipt}) async {
+  Future<Map<String, dynamic>> createRazorpayOrder({
+    required double amount,
+    String? receipt,
+  }) async {
     try {
       final body = <String, dynamic>{'amount': amount};
       if (receipt != null) body['receipt'] = receipt;
@@ -389,7 +459,10 @@ class ApiService {
   /// `POST /api/customers/me/wallet/topup` → `{ orderId, amount, key, testMode }`.
   Future<Map<String, dynamic>> walletTopupCreate(double amount) async {
     try {
-      final res = await _dio.post('/customers/me/wallet/topup', data: {'amount': amount});
+      final res = await _dio.post(
+        '/customers/me/wallet/topup',
+        data: {'amount': amount},
+      );
       return Map<String, dynamic>.from(res.data as Map);
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
@@ -408,7 +481,10 @@ class ApiService {
       if (razorpayOrderId != null) body['razorpay_order_id'] = razorpayOrderId;
       if (paymentId != null) body['razorpay_payment_id'] = paymentId;
       if (signature != null) body['razorpay_signature'] = signature;
-      final res = await _dio.post('/customers/me/wallet/topup/verify', data: body);
+      final res = await _dio.post(
+        '/customers/me/wallet/topup/verify',
+        data: body,
+      );
       return ((res.data as Map)['walletBalance'] as num).toDouble();
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
@@ -420,7 +496,9 @@ class ApiService {
     try {
       final res = await _dio.get('/orders/mine');
       final data = res.data;
-      final list = (data is Map && data['orders'] is List) ? data['orders'] as List : const [];
+      final list = (data is Map && data['orders'] is List)
+          ? data['orders'] as List
+          : const [];
       return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
@@ -445,11 +523,17 @@ class ApiService {
   /// order is refunded to the wallet server-side. Returns the updated order +
   /// `{ refunded, walletBalance }`. Throws 409 when the order is past the
   /// cancellable window.
-  Future<Map<String, dynamic>> cancelOrder(String orderId, {String? reason}) async {
+  Future<Map<String, dynamic>> cancelOrder(
+    String orderId, {
+    String? reason,
+  }) async {
     try {
       final res = await _dio.post(
         '/orders/${Uri.encodeComponent(orderId)}/cancel',
-        data: {if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim()},
+        data: {
+          if (reason != null && reason.trim().isNotEmpty)
+            'reason': reason.trim(),
+        },
       );
       return Map<String, dynamic>.from(res.data as Map);
     } on DioException catch (e) {
@@ -459,13 +543,18 @@ class ApiService {
 
   /// `POST /api/orders/:id/rate-partner` → `{ deliveryRating, partnerRating, partnerRatingCount }`.
   /// Only valid once the order is Delivered; re-submitting edits the rating.
-  Future<Map<String, dynamic>> ratePartner(String orderId, {required int stars, String? comment}) async {
+  Future<Map<String, dynamic>> ratePartner(
+    String orderId, {
+    required int stars,
+    String? comment,
+  }) async {
     try {
       final res = await _dio.post(
         '/orders/${Uri.encodeComponent(orderId)}/rate-partner',
         data: {
           'stars': stars,
-          if (comment != null && comment.trim().isNotEmpty) 'comment': comment.trim(),
+          if (comment != null && comment.trim().isNotEmpty)
+            'comment': comment.trim(),
         },
       );
       return Map<String, dynamic>.from(res.data as Map);
@@ -503,9 +592,15 @@ class ApiService {
   }
 
   /// `POST /api/customers/me/devices` — register this device's FCM token.
-  Future<void> registerDevice(String token, {String platform = 'android'}) async {
+  Future<void> registerDevice(
+    String token, {
+    String platform = 'android',
+  }) async {
     try {
-      await _dio.post('/customers/me/devices', data: {'token': token, 'platform': platform});
+      await _dio.post(
+        '/customers/me/devices',
+        data: {'token': token, 'platform': platform},
+      );
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
     }
@@ -533,7 +628,9 @@ class ApiService {
   /// `GET /api/products/:id/reviews` → `{ summary: {average, count, distribution}, reviews[] }`.
   Future<Map<String, dynamic>> fetchProductReviews(String productId) async {
     try {
-      final res = await _dio.get('/products/${Uri.encodeComponent(productId)}/reviews');
+      final res = await _dio.get(
+        '/products/${Uri.encodeComponent(productId)}/reviews',
+      );
       return Map<String, dynamic>.from(res.data as Map);
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
@@ -553,7 +650,8 @@ class ApiService {
         '/products/${Uri.encodeComponent(productId)}/reviews',
         data: {
           'rating': rating,
-          if (comment != null && comment.trim().isNotEmpty) 'comment': comment.trim(),
+          if (comment != null && comment.trim().isNotEmpty)
+            'comment': comment.trim(),
         },
       );
       return Map<String, dynamic>.from(res.data as Map);

@@ -223,7 +223,7 @@ export const CustomerProfile: React.FC = () => {
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="Your name"
-                        className="w-full rounded-xl border border-divider bg-background px-3.5 py-2 text-sm font-semibold text-text-primary outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+                        className="w-full rounded-xl border border-divider bg-background px-3.5 py-2 text-sm font-semibold text-text-primary outline-none transition-all focus:border-primary"
                       />
                     </div>
                     <div>
@@ -235,7 +235,7 @@ export const CustomerProfile: React.FC = () => {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="name@example.com"
-                        className="w-full rounded-xl border border-divider bg-background px-3.5 py-2 text-sm font-semibold text-text-primary outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+                        className="w-full rounded-xl border border-divider bg-background px-3.5 py-2 text-sm font-semibold text-text-primary outline-none transition-all focus:border-primary"
                       />
                     </div>
                     <div className="flex items-center justify-between gap-3 pt-1">

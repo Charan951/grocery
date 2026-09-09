@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freshcart/core/error/api_exception.dart';
 import 'package:freshcart/core/services/api_service.dart';
@@ -102,7 +103,7 @@ class CheckoutController extends StateNotifier<CheckoutState> {
           final rzpOrderId = (rzp['orderId'] ?? '').toString();
           final testMode = rzp['testMode'] == true;
 
-          final gateway = (testMode && key.isEmpty)
+          final gateway = (testMode && key.isEmpty) || kIsWeb
               ? SimulatedGateway()
               : _ref.read(paymentGatewayProvider);
 

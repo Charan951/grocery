@@ -337,7 +337,7 @@ export const TrackOrder: React.FC = () => {
                     placeholder="Add a note (optional)"
                     maxLength={500}
                     rows={2}
-                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32]"
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:border-[#2E7D32]"
                   />
                   {rateErr && <div className="text-xs font-semibold text-red-600">{rateErr}</div>}
                   <button
