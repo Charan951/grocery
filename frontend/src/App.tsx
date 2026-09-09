@@ -27,6 +27,8 @@ import { Search } from './pages/Search';
 
 // Admin bundle (code-split — a storefront shopper never loads this)
 const AdminApp = lazy(() => import('./AdminApp'));
+// Delivery-partner bundle (code-split — only a role:'Delivery' staff user loads it)
+const PartnerApp = lazy(() => import('./PartnerApp'));
 
 // Components
 import { Header } from './components/Header';
@@ -84,7 +86,7 @@ const AppContent: React.FC = () => {
     setAdminUser(user);
     localStorage.setItem('admin_token', user.token);
     localStorage.setItem('admin_user', JSON.stringify(user));
-    navigate('/admin');
+    navigate(user?.role === 'Delivery' ? '/partner/dashboard' : '/admin');
   };
 
   const handleLogout = () => {
@@ -96,18 +98,31 @@ const AppContent: React.FC = () => {
 
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith('/admin');
+  const isPartnerRoute = location.pathname.startsWith('/partner');
+  const isConsoleRoute = isAdminRoute || isPartnerRoute;
+  const isDeliveryUser = adminUser?.role === 'Delivery';
 
   useEffect(() => {
-    document.documentElement.classList.toggle('no-scrollbar', isAdminRoute);
+    document.documentElement.classList.toggle('no-scrollbar', isConsoleRoute);
     return () => document.documentElement.classList.remove('no-scrollbar');
-  }, [isAdminRoute]);
+  }, [isConsoleRoute]);
 
-  if (isAdminRoute) {
+  if (isConsoleRoute) {
     return (
       <>
         <ScrollToTop />
         <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-[#0F2A1B] text-white/70 text-sm font-semibold">Loading console…</div>}>
-          <AdminApp adminUser={adminUser} onLoginSuccess={handleLoginSuccess} onLogout={handleLogout} />
+          {!adminUser ? (
+            <AdminApp adminUser={adminUser} onLoginSuccess={handleLoginSuccess} onLogout={handleLogout} />
+          ) : isDeliveryUser ? (
+            isAdminRoute
+              ? <Navigate to="/partner/dashboard" replace />
+              : <PartnerApp onLogout={handleLogout} />
+          ) : (
+            isPartnerRoute
+              ? <Navigate to="/admin" replace />
+              : <AdminApp adminUser={adminUser} onLoginSuccess={handleLoginSuccess} onLogout={handleLogout} />
+          )}
         </Suspense>
       </>
     );

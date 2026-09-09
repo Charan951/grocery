@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freshcart_delivery/core/providers.dart';
 import 'package:freshcart_delivery/models/delivery_models.dart';
+import 'package:freshcart_delivery/core/theme.dart';
 
 final notificationsProvider =
     FutureProvider.autoDispose<({int unread, List<AppNotification> items})>((ref) {
@@ -53,13 +54,13 @@ class NotificationsScreen extends ConsumerWidget {
                 return ListTile(
                   leading: Icon(
                     n.type == 'Offer' ? Icons.local_shipping_outlined : Icons.notifications_none_rounded,
-                    color: n.read ? Colors.black38 : null,
+                    color: n.read ? kTextFaint : null,
                   ),
                   title: Text(n.title,
                       style: TextStyle(fontWeight: n.read ? FontWeight.w500 : FontWeight.w800)),
                   subtitle: Text(n.body),
                   trailing: Text(_ago(n.createdAt),
-                      style: const TextStyle(fontSize: 11, color: Colors.black45)),
+                      style: const TextStyle(fontSize: 11, color: kTextFaint)),
                   tileColor: n.read ? null : Colors.green.withValues(alpha: 0.04),
                 );
               },

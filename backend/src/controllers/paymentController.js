@@ -55,10 +55,29 @@ export const paymentController = {
 
   verifyPayment: async (req, res) => {
     try {
-      const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+      const { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderId } = req.body;
+
+      // Mark our own Order (if the caller told us which one) so the payment state
+      // is persisted here as well as by the async webhook.
+      const markOrder = async (paymentStatus) => {
+        if (!orderId) return;
+        try {
+          await Order.updateOne(
+            { orderId: String(orderId) },
+            {
+              $set: {
+                paymentStatus,
+                ...(paymentStatus === 'Paid' && razorpay_payment_id ? { paymentId: razorpay_payment_id } : {}),
+                ...(razorpay_order_id ? { paymentRef: razorpay_order_id } : {}),
+              },
+            },
+          );
+        } catch (_) { /* best-effort */ }
+      };
 
       // Dev/demo/simulation path: no real Razorpay secret configured or simulated gateway used.
       if (isPaymentsTestMode() || razorpay_signature === 'simulated') {
+        await markOrder('Paid');
         return res.json({
           success: true,
           verified: true,
@@ -87,6 +106,7 @@ export const paymentController = {
       const isValid = a.length === b.length && crypto.timingSafeEqual(a, b);
 
       if (!isValid) {
+        await markOrder('Failed');
         return res.status(400).json({
           success: false,
           verified: false,
@@ -94,6 +114,7 @@ export const paymentController = {
         });
       }
 
+      await markOrder('Paid');
       res.json({
         success: true,
         verified: true,

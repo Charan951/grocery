@@ -94,7 +94,7 @@ class _BodyState extends ConsumerState<_Body> {
               children: [
                 const Text('Confirm delivery', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
                 const SizedBox(height: 4),
-                const Text('Ask the customer for their 4-digit code.', style: TextStyle(color: Colors.black54)),
+                const Text('Ask the customer for their 4-digit code.', style: TextStyle(color: kTextMuted)),
                 const SizedBox(height: 14),
                 TextField(
                   controller: otpCtrl,
@@ -158,7 +158,7 @@ class _BodyState extends ConsumerState<_Body> {
                 const SizedBox(height: 8),
                 ...reasons.map((r) => ListTile(
                       leading: Icon(sel == r ? Icons.radio_button_checked : Icons.radio_button_off,
-                          color: sel == r ? kBrand : Colors.black38),
+                          color: sel == r ? kBrand : kTextFaint),
                       title: Text(r),
                       onTap: () => picked.value = r,
                     )),
@@ -332,7 +332,7 @@ class _BodyState extends ConsumerState<_Body> {
   Widget _kv(IconData i, String t, {int maxLines = 1, bool small = false}) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Icon(i, size: small ? 8 : 16, color: Colors.black38),
+          Icon(i, size: small ? 8 : 16, color: kTextFaint),
           const SizedBox(width: 10),
           Expanded(child: Text(t, maxLines: maxLines, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: small ? 13 : 14))),
         ]),
@@ -348,7 +348,7 @@ class _ErrorBox extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.wifi_off_rounded, size: 44, color: Colors.black26),
+            const Icon(Icons.wifi_off_rounded, size: 44, color: kTextFaint),
             const SizedBox(height: 10),
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 12),

@@ -39,7 +39,7 @@ class _ForgotScreenState extends ConsumerState<ForgotScreen> {
         _sent = true;
         _devCode = r['devCode']?.toString();
       });
-      _snack(_devCode != null ? 'Test mode — code: $_devCode' : 'If that account exists, a code was sent.');
+      _snack(_devCode != null ? 'Test mode: code $_devCode' : 'If that account exists, a code was sent.');
     } on ApiException catch (e) {
       _snack(e.message);
     } finally {

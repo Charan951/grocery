@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { PageHeader } from '../../components/admin/PageHeader';
 import { ShelfTag } from '../../components/admin/ShelfTag';
+import { OrderRiderMap } from './OrderRiderMap';
 
 interface OrderItem {
   productId: string;
@@ -479,6 +480,14 @@ export const Orders: React.FC = () => {
                     {selectedOrder.assignmentStalled && ' — last offer was declined/expired. Reassign.'}
                   </div>
                 )}
+                {selectedOrder.deliveryPartnerUserId &&
+                  !['Delivered', 'Cancelled', 'Returned', 'Refunded', 'Failed'].includes(selectedOrder.status) && (
+                    <OrderRiderMap
+                      key={selectedOrder.orderId}
+                      orderId={selectedOrder.orderId}
+                      partnerUserId={selectedOrder.deliveryPartnerUserId}
+                    />
+                  )}
                 <div className="grid grid-cols-2 gap-2">
                   {selectedOrder.status === 'Pending' && (
                     <button 

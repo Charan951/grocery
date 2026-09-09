@@ -171,6 +171,14 @@ export const orderController = {
 
       const calculatedSubtotal = validatedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
+      // Delivery fee is computed server-side from Settings — never trusted from
+      // the client — so web / mobile / any caller charge the same amount.
+      let settingsDoc = null;
+      try { settingsDoc = await Settings.findOne(); } catch (_) {}
+      const feeRule = Number(settingsDoc?.deliveryFeeRule ?? 40);
+      const freeThreshold = Number(settingsDoc?.freeDeliveryThreshold ?? 499);
+      const serverDeliveryFee = calculatedSubtotal >= freeThreshold ? 0 : feeRule;
+
       const normalizedOrder = {
         orderId: orderData.orderId || orderData.orderNumber || 'PNNHJHTYP' + Math.floor(100000 + Math.random() * 900000),
         customerId: authedCustomer?.customerId || orderData.customerId || 'cust_' + cleanPhone,
@@ -178,9 +186,9 @@ export const orderController = {
         customerPhone: `+91 ${cleanPhone}`,
         items: validatedItems,
         itemTotal: calculatedSubtotal,
-        totalAmount: calculatedSubtotal + Number(orderData.deliveryFee || 0) + Number(orderData.handlingFee || 0) - Number(orderData.discount || 0),
+        totalAmount: calculatedSubtotal + serverDeliveryFee + Number(orderData.handlingFee || 0) - Number(orderData.discount || 0),
         discount: Number(orderData.discount || 0),
-        deliveryFee: Number(orderData.deliveryFee || 0),
+        deliveryFee: serverDeliveryFee,
         handlingFee: Number(orderData.handlingFee || 0),
         // COD/cash is collected on delivery — it is Pending until then, never
         // "Paid" on creation. Prepaid methods default to Paid unless the caller
@@ -202,10 +210,13 @@ export const orderController = {
       if (Number.isFinite(dropLat) && Number.isFinite(dropLng)) {
         normalizedOrder.deliveryLocation = { lat: dropLat, lng: dropLng };
       }
-      try {
-        const s = await Settings.findOne();
-        if (s?.storeOrigin) normalizedOrder.pickup = { name: s.storeOrigin.name, lat: s.storeOrigin.lat, lng: s.storeOrigin.lng };
-      } catch (_) {}
+      if (settingsDoc?.storeOrigin) {
+        normalizedOrder.pickup = {
+          name: settingsDoc.storeOrigin.name,
+          lat: settingsDoc.storeOrigin.lat,
+          lng: settingsDoc.storeOrigin.lng,
+        };
+      }
 
       let order;
       try {

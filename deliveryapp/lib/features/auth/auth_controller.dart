@@ -93,6 +93,14 @@ class AuthController extends StateNotifier<AuthState> {
 
   void setProfile(PartnerProfile p) => state = state.copyWith(profile: p);
 
+  /// Partner-initiated profile edit (name / phone / vehicle).
+  Future<void> updateProfile({String? name, String? phone, String? vehicleType}) async {
+    final updated = await _ref
+        .read(apiProvider)
+        .updateMe(name: name, phone: phone, vehicleType: vehicleType);
+    state = state.copyWith(profile: updated);
+  }
+
   Future<void> logout() async {
     await _ref.read(pushServiceProvider).unregister();
     await _ref.read(tokenStoreProvider).clear();

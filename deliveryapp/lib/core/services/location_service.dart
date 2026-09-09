@@ -37,7 +37,10 @@ class LocationService {
     });
 
     try {
-      final p = await Geolocator.getCurrentPosition();
+      // Timeboxed — on web / a blocked sensor `getCurrentPosition` can otherwise
+      // hang forever and freeze whatever awaited `start()`.
+      final p = await Geolocator.getCurrentPosition()
+          .timeout(const Duration(seconds: 8));
       _lastPush = DateTime.now();
       onPush(p.latitude, p.longitude);
     } catch (_) {}

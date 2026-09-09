@@ -128,6 +128,26 @@ test('/delivery/* rejects no token, customer token, and admin (non-Delivery) tok
   assert.equal((await api().get('/api/delivery/me').set('Authorization', `Bearer ${await adminToken()}`)).status, 403);
 });
 
+test('PUT /delivery/me lets a partner edit name/phone/vehicle; validates each', async () => {
+  const token = await riderToken();
+  const ok = await api().put('/api/delivery/me').set('Authorization', `Bearer ${token}`)
+    .send({ name: 'Ravi Kumar', phone: '9876543210', vehicleType: 'scooter' });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.partner.name, 'Ravi Kumar');
+  assert.equal(ok.body.partner.phone, '9876543210');
+  assert.equal(ok.body.partner.vehicleType, 'scooter');
+  const dp = await DeliveryPartner.findOne({ userId: riderUserId });
+  assert.equal(dp.vehicleType, 'scooter');
+  assert.equal(dp.phone, '9876543210');
+
+  assert.equal((await api().put('/api/delivery/me').set('Authorization', `Bearer ${token}`)
+    .send({ phone: '12345' })).status, 400);
+  assert.equal((await api().put('/api/delivery/me').set('Authorization', `Bearer ${token}`)
+    .send({ vehicleType: 'rocket' })).status, 400);
+  assert.equal((await api().put('/api/delivery/me').set('Authorization', `Bearer ${token}`)
+    .send({ name: 'x' })).status, 400);
+});
+
 test('online/offline toggle updates availability; cannot go offline mid-delivery', async () => {
   const token = await riderToken();
   let r = await api().put('/api/delivery/status').set('Authorization', `Bearer ${token}`).send({ isOnline: true });
@@ -190,6 +210,32 @@ test('admin resets a partner password (goes through the hash) and can re-login',
   // restore
   await api().post(`/api/admin/delivery/partners/${riderUserId}/reset-password`)
     .set('Authorization', `Bearer ${aTok}`).send({ password: 'delivery123' });
+});
+
+test('admin deletes a partner: blocked with active orders, then removes login + fleet row', async () => {
+  const aTok = await adminToken();
+  const email = `qa-del+${stamp}@freshcart.test`;
+  const victim = await User.create({ name: 'QA Delete', email, password: 'delivery123', role: 'Delivery', status: 'Active', phone: '9876500009' });
+  const vId = victim._id.toString();
+  await DeliveryPartner.create({ userId: vId, phone: '9876500009', activeOrderIds: ['QA-LIVE-1'] });
+
+  const blocked = await api().delete(`/api/admin/delivery/partners/${vId}`).set('Authorization', `Bearer ${aTok}`);
+  assert.equal(blocked.status, 409);
+
+  await DeliveryPartner.updateOne({ userId: vId }, { $set: { activeOrderIds: [] } });
+  const ok = await api().delete(`/api/admin/delivery/partners/${vId}`).set('Authorization', `Bearer ${aTok}`);
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal(await User.findById(vId), null);
+  assert.equal(await DeliveryPartner.findOne({ userId: vId }), null);
+
+  // gone → 404 on a second delete
+  assert.equal((await api().delete(`/api/admin/delivery/partners/${vId}`).set('Authorization', `Bearer ${aTok}`)).status, 404);
+
+  // a non-staff caller never reaches the handler (use a bogus id so this stays
+  // non-destructive regardless of how the auth layer resolves it)
+  const cTok = await custToken();
+  assert.ok([401, 403, 404].includes(
+    (await api().delete('/api/admin/delivery/partners/000000000000000000000000').set('Authorization', `Bearer ${cTok}`)).status));
 });
 
 test('admin deactivate blocks partner login; reactivate restores it', async () => {
@@ -475,6 +521,62 @@ test('full lifecycle: pickup-arrived → picked-up → arrived → complete (OTP
   const dp = await DeliveryPartner.findOne({ userId: riderUserId });
   assert.ok(!dp.activeOrderIds.includes(orderId));
   assert.ok(dp.completedCount >= 1);
+});
+
+test('GET /delivery/orders/history returns this partner\'s terminal orders, filterable by status', async () => {
+  const rTok = await riderToken();
+  const aTok = await adminToken();
+  const orderId = await assignAndAccept(rTok, aTok);
+  const D = (s, b) => api().post(`/api/delivery/orders/${orderId}/${s}`).set('Authorization', `Bearer ${rTok}`).send(b || {});
+  await D('picked-up');
+  await D('arrived');
+  const otp = (await Order.findOne({ orderId })).deliveryOtp;
+  await D('complete', { otp });
+
+  const all = await api().get('/api/delivery/orders/history').set('Authorization', `Bearer ${rTok}`);
+  assert.equal(all.status, 200);
+  assert.ok(all.body.orders.some((o) => o.orderId === orderId && o.status === 'Delivered'));
+
+  const delivered = await api().get('/api/delivery/orders/history?status=delivered&limit=100').set('Authorization', `Bearer ${rTok}`);
+  assert.ok(delivered.body.orders.every((o) => o.status === 'Delivered'));
+  assert.ok(delivered.body.orders.some((o) => o.orderId === orderId));
+
+  const failedOnly = await api().get('/api/delivery/orders/history?status=failed').set('Authorization', `Bearer ${rTok}`);
+  assert.ok(!failedOnly.body.orders.some((o) => o.orderId === orderId));
+
+  const cTok = await custToken();
+  assert.ok([401, 403].includes(
+    (await api().get('/api/delivery/orders/history').set('Authorization', `Bearer ${cTok}`)).status));
+
+  await DeliveryPartner.updateOne({ userId: riderUserId }, { $set: { activeOrderIds: [] } });
+});
+
+test('GET /delivery/assignments/pending surfaces the live offer and clears once accepted', async () => {
+  const rTok = await riderToken();
+  const aTok = await adminToken();
+  await api().put('/api/delivery/status').set('Authorization', `Bearer ${rTok}`).send({ isOnline: true });
+  await api().post('/api/delivery/location').set('Authorization', `Bearer ${rTok}`).send({ lat: 17.44, lng: 78.37 });
+
+  const none = await api().get('/api/delivery/assignments/pending').set('Authorization', `Bearer ${rTok}`);
+  assert.equal(none.status, 200);
+  assert.equal(none.body.offer, null);
+
+  const order = await makeOrder();
+  const offer = await api().post(`/api/admin/orders/${order.orderId}/assign`)
+    .set('Authorization', `Bearer ${aTok}`).send({ partnerUserId: riderUserId });
+  assert.equal(offer.status, 200);
+
+  const pending = await api().get('/api/delivery/assignments/pending').set('Authorization', `Bearer ${rTok}`);
+  assert.equal(pending.status, 200);
+  assert.ok(pending.body.offer, 'a live offer is returned');
+  assert.equal(pending.body.offer.orderId, order.orderId);
+  assert.equal(pending.body.offer.assignmentId, offer.body.assignmentId);
+
+  await api().post(`/api/delivery/assignments/${offer.body.assignmentId}/accept`).set('Authorization', `Bearer ${rTok}`);
+  const cleared = await api().get('/api/delivery/assignments/pending').set('Authorization', `Bearer ${rTok}`);
+  assert.equal(cleared.body.offer, null);
+
+  await DeliveryPartner.updateOne({ userId: riderUserId }, { $set: { activeOrderIds: [] } });
 });
 
 test('completing a delivery writes one earning row (base + per-km); admin can settle it', async () => {

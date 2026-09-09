@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { io } from 'socket.io-client';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { RefreshCw } from 'lucide-react';
@@ -28,15 +29,25 @@ const rel = (iso: string | null) => {
 };
 
 const colorFor = (p: FleetPartner) =>
-  p.availability === 'busy' ? '#FFB800' : p.isOnline ? '#34C759' : '#9CA3AF';
+  p.availability === 'busy' ? '#F97316' : p.isOnline ? '#2563EB' : '#9CA3AF';
 
-const pin = (p: FleetPartner) =>
-  L.divIcon({
+const BIKE_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>';
+
+const pin = (p: FleetPartner) => {
+  const color = colorFor(p);
+  // Online / on-delivery partners get a bike badge; offline stays a plain dot.
+  const html = p.isOnline
+    ? `<div style="width:28px;height:28px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center">${BIKE_SVG}</div>`
+    : `<div style="width:18px;height:18px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`;
+  const size = p.isOnline ? 28 : 18;
+  return L.divIcon({
     className: 'fleet-pin',
-    html: `<div style="width:18px;height:18px;border-radius:50%;background:${colorFor(p)};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
-    iconSize: [18, 18],
-    iconAnchor: [9, 9],
+    html,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
   });
+};
 
 export const DeliveryFleetMap: React.FC = () => {
   const elRef = useRef<HTMLDivElement>(null);
@@ -71,6 +82,35 @@ export const DeliveryFleetMap: React.FC = () => {
       map.remove();
       mapRef.current = null;
       markersRef.current = {};
+    };
+  }, []);
+
+  // Live updates: the backend emits `fleet_update` (one partner) to the
+  // `admin_fleet` room on every status / location change. The 10s poll above
+  // stays as a fallback for missed events / reconnects.
+  useEffect(() => {
+    const token = localStorage.getItem('admin_token');
+    if (!token) return;
+    const socket = io(window.location.origin, {
+      path: '/socket.io',
+      transports: ['websocket'],
+      auth: { token },
+    });
+    socket.on('fleet_update', (u: any) => {
+      if (!u?.userId) return;
+      const incoming = { ...u, userId: String(u.userId) } as FleetPartner;
+      setFleet((prev) => {
+        const i = prev.findIndex((p) => p.userId === incoming.userId);
+        if (i === -1) return [...prev, incoming];
+        const next = [...prev];
+        next[i] = { ...next[i], ...incoming };
+        return next;
+      });
+      setUpdatedAt(new Date());
+    });
+    return () => {
+      socket.removeAllListeners();
+      socket.close();
     };
   }, []);
 

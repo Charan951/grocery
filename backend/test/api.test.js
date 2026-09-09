@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import request from 'supertest';
@@ -468,6 +469,41 @@ test('payment verify rejects a bad signature when not in test mode', async () =>
     assert.equal(res.body.verified, false);
   } finally {
     process.env.PAYMENTS_TEST_MODE = 'true';
+  }
+});
+
+test('payment verify persists the order state when an orderId is supplied', async () => {
+  const secret = process.env.RAZORPAY_KEY_SECRET;
+  if (!secret) return; // skip when no real secret is configured for the test env
+
+  const oid = `QAPAY${stamp}`;
+  await Order.create({
+    orderId: oid, customerId: 'cust_qa', customerName: 'QA', customerPhone: `+91 ${PHONE_A}`,
+    items: [{ name: 'Milk', quantity: 1, price: 50 }], itemTotal: 50, totalAmount: 75,
+    deliveryAddress: 'QA', paymentMethod: 'Razorpay', paymentStatus: 'Pending',
+  });
+  process.env.PAYMENTS_TEST_MODE = 'false';
+  try {
+    // bad signature -> order marked Failed
+    const bad = await api().post('/api/payment/verify').send({
+      razorpay_order_id: 'order_q', razorpay_payment_id: 'pay_q', razorpay_signature: 'nope', orderId: oid,
+    });
+    assert.equal(bad.body.verified, false);
+    assert.equal((await Order.findOne({ orderId: oid })).paymentStatus, 'Failed');
+
+    // valid signature -> Paid + paymentId/paymentRef stored
+    const sig = crypto.createHmac('sha256', secret).update('order_q|pay_q').digest('hex');
+    const ok = await api().post('/api/payment/verify').send({
+      razorpay_order_id: 'order_q', razorpay_payment_id: 'pay_q', razorpay_signature: sig, orderId: oid,
+    });
+    assert.equal(ok.body.verified, true);
+    const fresh = await Order.findOne({ orderId: oid });
+    assert.equal(fresh.paymentStatus, 'Paid');
+    assert.equal(fresh.paymentId, 'pay_q');
+    assert.equal(fresh.paymentRef, 'order_q');
+  } finally {
+    process.env.PAYMENTS_TEST_MODE = 'true';
+    await Order.deleteOne({ orderId: oid });
   }
 });
 

@@ -15,9 +15,20 @@ class OfferController extends StateNotifier<DeliveryOffer?> {
     _subs.add(s.revoked.listen((j) {
       if (state?.assignmentId == j['assignmentId'] || j['orderId'] == state?.orderId) state = null;
     }));
+    checkPending();
   }
 
   void dismiss() => state = null;
+
+  /// Pull the live offer from the API in case the socket missed it (cold start,
+  /// backgrounded app, reconnect). No-op if an offer is already showing.
+  Future<void> checkPending() async {
+    if (state != null) return;
+    try {
+      final o = await _ref.read(apiProvider).pendingAssignment();
+      if (o != null && state == null) state = o;
+    } on ApiException {/* ignore — socket remains the primary channel */}
+  }
 
   Future<DeliveryOrder?> accept() async {
     final o = state;

@@ -26,6 +26,7 @@ router.post('/delivery/auth/forgot', deliveryAuthLimiter, deliveryController.for
 router.post('/delivery/auth/reset', deliveryAuthLimiter, deliveryController.resetPassword);
 
 router.get('/delivery/me', protectDelivery, deliveryController.getMe);
+router.put('/delivery/me', protectDelivery, deliveryController.updateMe);
 router.post('/delivery/devices', protectDelivery, deliveryController.registerDevice);
 router.delete('/delivery/devices/:token', protectDelivery, deliveryController.removeDevice);
 router.get('/delivery/notifications', protectDelivery, deliveryController.listNotifications);
@@ -33,7 +34,9 @@ router.post('/delivery/notifications/read', protectDelivery, deliveryController.
 router.put('/delivery/status', protectDelivery, deliveryController.setStatus);
 router.post('/delivery/location', locationLimiter, protectDelivery, deliveryController.updateLocation);
 router.get('/delivery/orders/active', protectDelivery, deliveryController.getActiveOrders);
+router.get('/delivery/orders/history', protectDelivery, deliveryController.getHistory);
 router.get('/delivery/earnings', protectDelivery, deliveryController.getEarnings);
+router.get('/delivery/assignments/pending', protectDelivery, deliveryController.getPendingAssignment);
 router.post('/delivery/assignments/:id/accept', protectDelivery, deliveryController.acceptAssignment);
 router.post('/delivery/assignments/:id/reject', protectDelivery, deliveryController.rejectAssignment);
 router.get('/delivery/orders/:id', protectDelivery, deliveryController.getOrder);
@@ -62,6 +65,7 @@ router.get('/admin/delivery/partners/:userId/earnings', protect, authorize('Admi
 router.post('/admin/delivery/partners/:userId/earnings/settle', protect, authorize('Admin'), adminDeliveryController.settlePartnerEarnings);
 router.post('/admin/delivery/partners/:userId/reset-password', protect, authorize('Admin'), adminDeliveryController.resetPartnerPassword);
 router.post('/admin/delivery/partners/:userId/account', protect, authorize('Admin'), adminDeliveryController.setPartnerAccount);
+router.delete('/admin/delivery/partners/:userId', protect, authorize('Admin'), adminDeliveryController.deletePartner);
 router.post('/admin/orders/:id/assign', protect, authorize('Admin', 'Manager'), adminDeliveryController.assignOrder);
 router.post('/admin/orders/:id/reassign', protect, authorize('Admin', 'Manager'), adminDeliveryController.reassignOrder);
 router.post('/admin/orders/:id/unassign', protect, authorize('Admin', 'Manager'), adminDeliveryController.unassignOrder);

@@ -115,7 +115,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           </div>
           <div>
             <h2 className="text-xl font-extrabold text-text-primary tracking-tight font-display">FreshCart Control Console</h2>
-            <p className="text-xs text-text-secondary font-medium">Enterprise portal sign-in</p>
+            <p className="text-xs text-text-secondary font-medium">Staff &amp; delivery-partner sign-in</p>
           </div>
         </div>
 

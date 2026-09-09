@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { io } from 'socket.io-client';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Phone, MessageCircle, ArrowLeft, MapPin, RefreshCw } from 'lucide-react';
@@ -82,6 +83,10 @@ export const TrackOrder: React.FC = () => {
   const [order, setOrder] = useState<TrackedOrder | null>(null);
   const [err, setErr] = useState('');
   const [tick, setTick] = useState(0);
+  // Live rider position pushed over the socket (arrives from the moment the
+  // partner is assigned + online, ahead of the REST `delivery.location` which
+  // the server only reveals at "Out For Delivery").
+  const [liveRider, setLiveRider] = useState<{ lat: number; lng: number } | null>(null);
 
   const [rateStars, setRateStars] = useState(0);
   const [rateComment, setRateComment] = useState('');
@@ -119,8 +124,38 @@ export const TrackOrder: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
 
+  // Real-time updates for this order (rider location + status changes).
+  useEffect(() => {
+    if (!orderId) return;
+    const socket = io(window.location.origin, { path: '/socket.io', transports: ['websocket'] });
+    const join = () => socket.emit('join_order_room', orderId);
+    socket.on('connect', join);
+
+    socket.on('rider_location_update', (p: any) => {
+      if (String(p?.orderId) !== String(orderId)) return;
+      const lat = Number(p.lat);
+      const lng = Number(p.lng);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) setLiveRider({ lat, lng });
+    });
+    socket.on('order_status_update', (p: any) => {
+      if (String(p?.orderId) !== String(orderId)) return;
+      fetchOrder();
+      setTick((n) => n + 1);
+    });
+
+    return () => {
+      socket.emit('leave_order_room', orderId);
+      socket.removeAllListeners();
+      socket.close();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderId]);
+
+  // A new order id should not carry the previous order's rider marker.
+  useEffect(() => { setLiveRider(null); }, [orderId]);
+
   const terminal = order ? ['Delivered', 'Cancelled', 'Returned', 'Refunded', 'Failed'].includes(order.status) : false;
-  const rider = order?.delivery?.location || null;
+  const rider = (!terminal && liveRider) || order?.delivery?.location || null;
   const dest = order?.deliveryLocation || null;
   const pickup = order?.pickup || null;
 

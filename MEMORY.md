@@ -149,8 +149,44 @@
   genuinely web-only (e.g. an admin-only desktop screen) or mobile-only (native
   permission flow), say so explicitly instead of silently skipping the other
   side.
+- **Reaffirmed again (user, 2026-09-09):** the parity rule covers the
+  **delivery-partner surface** too — a change to the responsive web partner app
+  (`frontend/src/partner/`) must also land in the Flutter **`deliveryapp/`**
+  (its "mobile" counterpart), and vice-versa. Every such change: **check
+  `MEMORY.md` first**, then implement across surfaces, then **verify** — backend
+  `cd backend && node --test test/*.test.js`; web `cd frontend && npx tsc -b &&
+  npm run build`; Flutter `cd deliveryapp && flutter analyze && flutter test`
+  (APK build only on request) — then **update `MEMORY.md`**. Known-noisy: see §7
+  for pre-existing test failures that are not regressions.
 
 ## 5. Completed Major Work
+
+- **2026-09-09 — Delivery-partner self-service profile edit + redesigned Profile
+  screen (all surfaces).**
+  - **Backend**: new `PUT /api/delivery/me` (`protectDelivery`,
+    `deliveryController.updateMe`) — partner edits own `name` (→ `User.name`,
+    2–60 chars), `phone` (digits, `^[6-9]\d{9}$`; written to BOTH `User.phone`
+    and `DeliveryPartner.phone`) and `vehicleType` (enum
+    bike/scooter/bicycle/car/on_foot). Returns the same partner shape as
+    `getMe` incl. recomputed `todayEarnings`. Test: `delivery.test.js` +1
+    (edit round-trips + persists to `DeliveryPartner`; bad phone/vehicle/name
+    → 400). Backend suite: 29 pass / **3 pre-existing unrelated failures**
+    (analytics, PUT /settings, zones — §7 known-noisy, not regressions).
+  - **Web** (`frontend/src/partner/`): `partnerApi.updateMe()`,
+    `PartnerContext.updateMe()` (merges response into `partner`).
+    `screens/Profile.tsx` fully redesigned — identity card (bigger avatar +
+    availability pill + last-seen), 4-up stat row (Delivered/Failed/Rating/
+    Today ₹), a **Details** card that swaps to an inline edit form (name +
+    phone `Field`s, vehicle = chip selector, email shown read-only "managed by
+    ops"), Save/Cancel with loading + inline error + "Profile updated" banner,
+    then Shortcuts + Account sections. `tsc -b` + `vite build` clean.
+  - **deliveryapp** (`deliveryapp/lib/`): `ApiClient.updateMe()`,
+    `AuthController.updateProfile()`. `features/profile/profile_screen.dart`
+    redesigned to match web (initial-avatar identity card + status chip,
+    3-up stat cards, Details rows, Shortcuts, Support, Log out) + an **Edit
+    profile bottom sheet** (`_EditProfileSheet`: name/phone `TextField`s with
+    digit formatters, vehicle `ChoiceChip`s, same validation, `updateProfile`).
+    `flutter analyze` clean, `flutter test` 6/6.
 
 - **2026-09-08 — Web storefront: full-bleed responsive shell + shared viewport
   hook + festival-theme depth + Home render perf.** (⚠ uncommitted working tree.)
@@ -1742,7 +1778,26 @@ Repo hygiene:
   field — mobile defaults them (499 / 5); add to `Settings` if the business wants
   them configurable.
 - Third-party: Cloudinary (images), OSM Nominatim (geocoding, used directly by
-  both clients), Razorpay (payments, simulated), Firebase (dep only, no code).
+  both clients), **Razorpay (payments — real server-side flow, see below)**,
+  Firebase (dep only, no code).
+- **Razorpay — server-side only** (`backend/.env`, git-ignored:
+  `RAZORPAY_KEY_ID` `rzp_test_*` / `RAZORPAY_KEY_SECRET` / `RAZORPAY_WEBHOOK_SECRET`
+  / `PAYMENTS_TEST_MODE=false`). Secret **never** leaves the server — the browser
+  only receives `key_id` via `POST /api/payment/create-order`'s `key` field.
+  `_shared.js` `isPaymentsTestMode()` = true only when `PAYMENTS_TEST_MODE==='true'`
+  OR no secret OR key starts `mock` (then verification is skipped / `SimulatedGateway`).
+  Flow (both web + mobile): `POST /payment/create-order {amount,receipt}` →
+  `{key,orderId(rzp),amount,currency,testMode}`; client opens the Razorpay sheet
+  (web `checkout.js`, mobile `razorpay_flutter`) with `key`+`order_id`; on success
+  `POST /payment/verify {razorpay_order_id,razorpay_payment_id,razorpay_signature
+  [,orderId]}` → real HMAC-SHA256 constant-time check; then (or before, for web)
+  `POST /api/orders`. `verifyPayment` now also persists our `Order`
+  (`orderId` in body → `paymentStatus` Paid/Failed + `paymentId`/`paymentRef`).
+  `POST /payment/webhook` (raw body in `app.js`, `x-razorpay-signature` verified
+  with `RAZORPAY_WEBHOOK_SECRET`) reconciles by `paymentRef` on
+  `payment.captured`/`order.paid`. `orderController.createOrder` derives
+  COD/Wallet→Pending, prepaid→Paid unless the body says otherwise, and writes a
+  `Payment` row.
 - **Email** — `nodemailer` via Gmail SMTP (`src/services/mailService.js`).
   Credentials in `backend/.env` (`EMAIL_USER`/`EMAIL_APP_PASSWORD` App Password /
   `EMAIL_FROM`). Silent no-op if unset; `MAIL_TEST_MODE=true` → in-memory
@@ -1777,6 +1832,20 @@ Done (P0-7): `GET /api/orders/mine` (`protectCustomer`) → `{success, orders[]}
 newest first. `GET /api/orders/:id` now ownership-checked when a customer token
 is supplied (403 for someone else's order; still open for tokenless web calls).
 
+Done (2026-09-09): `GET /api/products?ids=a,b,c` returns exactly those products,
+ordered by the caller (matches string `id` or Mongo `_id`) — powers `/products?ids=`.
+`POST /api/payment/verify` now also returns `verified:true` when
+`razorpay_signature === 'simulated'` (mobile SimulatedGateway fallback), in
+addition to `isPaymentsTestMode()`.
+
+Done (2026-09-09, partner web): `GET /api/delivery/orders/history?status=delivered|failed|returned&limit=`
+(`protectDelivery`) — the partner's terminal orders (`Order.deliveryPartnerUserId`
++ status in `Delivered|Failed|Returned`), newest first; also unblocks the Flutter
+`api_client.history()` call, which already hit this (previously missing) path.
+`GET /api/delivery/assignments/pending` (`protectDelivery`) — the partner's live
+`Assignment{status:'offered'}` as the same payload the `delivery_offer` socket
+event carries, or `{offer:null}`; refresh-resilience for the web app.
+
 Planned new endpoints (see `MOBILE_APP_IMPLEMENTATION.md` §8):
 `POST /api/customers/otp/send` + `/otp/verify` (+ customer JWT), `protectCustomer`
 middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM tokens),
@@ -1792,6 +1861,25 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
   providers hitting the live API; retire `MockDataService` for runtime use.
 
 ## 12. Testing Status
+
+- **2026-09-09 baseline (delivery-partner work):**
+  - `backend/test/delivery.test.js` → **28 / 31 pass**. The 3 failures
+    (`admin/delivery/analytics`, `PUT /api/settings` delivery tuning,
+    `delivery zones CRUD`) are **pre-existing shared-Mongo flakiness**, present on
+    a clean tree — not regressions. `delivery.test.js` runs against a real
+    shared Atlas cluster (see its own header comment) and is order/timing-fragile.
+  - `backend/test/api.test.js` → **17 / 26 pass** on a clean tree too (verified by
+    stashing all uncommitted changes). Pre-existing; do **not** attribute these to
+    partner-web / delivery work.
+  - `frontend` → `npx tsc -b --force` + `npm run build` clean. (Note: a stale
+    `.tsbuildinfo` after a `git stash` dance can throw a phantom `')' expected`
+    in `Modules.tsx` — `tsc -b --force` clears it.)
+  - `deliveryapp` → `flutter analyze` clean, `flutter test` **6 / 6**, debug APK builds.
+  - A concurrent session ("Implement Delivery Assignment") is also editing
+    `backend/src/controllers/orderController.js`, `models/Operations.js`,
+    `frontend/src/components/CheckoutModal.tsx`,
+    `frontend/src/pages/admin/DeliveryFleetMap.tsx`, and `Modules.tsx`
+    (`DeliveryModule` tab refactor). Those are not this session's work.
 
 - **Backend: `npm test` → 45 tests, all green**
   (`node:test` + `supertest` against `MONGO_URI`). Covers auth/OTP, protectCustomer,
@@ -1873,6 +1961,12 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
   117/117, `flutter build apk --debug` succeeded.
 
 ## 13. Last Updated
+
+2026-09-09 (session 2) — **Delivery-partner web app** (`frontend/src/partner/` + `frontend/src/PartnerApp.tsx`). The rider experience, previously Flutter-only (`deliveryapp/`), now also runs on the web, role-gated behind the shared staff login. **Routing** (`App.tsx`): console branch is now `/admin/*` **or** `/partner/*`; after login a `role:'Delivery'` user is sent to `/partner/dashboard` and any `/admin/*` hit redirects there; non-Delivery staff hitting `/partner/*` redirect to `/admin`. `PartnerApp` is a lazy chunk (~74 KB). **Module**: `partnerApi.ts` (fetch wrapper over `/api/delivery/*`, bearer = `admin_token`), `PartnerContext` (polls `/delivery/me` 60 s, online toggle), `usePartnerSocket` (one `socket.io-client` conn, `auth:{token}` → server auto-joins `partner:<id>`; listens `delivery_offer` / `_revoked` / `assignment_confirmed` / `order_status_update`), `useLocationHeartbeat` (`watchPosition` → `POST /delivery/location`, 25 s throttle, only while online), `PartnerShell` (mobile-first `max-w-480`, top bar online/bell, 4-tab bottom nav), `OfferModal` (countdown accept/reject), screens Dashboard / OrderDetail (lifecycle `pickup-arrived→picked-up→arrived→complete` + OTP&photo dialog, `fail`, `returned`; tel/WhatsApp) / Earnings / History / Notifications / Profile / ForgotPassword. **New dep**: `socket.io-client@^4.8.3` (first socket use in `frontend/`). Backend: only the 2 additive `/api/delivery/*` routes above. Verified: backend `node --test test/delivery.test.js` 27/30 (3 pre-existing shared-Mongo flakes, unrelated), 2 new tests green; `frontend` `tsc -b` + `vite build` clean; API smoke test of all new + `me`/`earnings` endpoints against a seeded Delivery user. Not yet browser-walked on a device. **`deliveryapp/` splash fix (same session)**: `SplashScreen` was a dumb `StatelessWidget` and the router `redirect` keeps `/splash` in `_public`, so a tokenless partner sat on the spinner forever (it only left `/splash` once *authenticated*). Rewrote it as a `ConsumerStatefulWidget` that — like `mobileapp`'s splash — awaits `authProvider.ensureHydrated()` + a 1.4 s branding hold (6 s hard cap) then `context.go('/')` or `/login`. `flutter analyze` clean, 6/6 tests pass. **Delete partner (same session)**: `DELETE /api/admin/delivery/partners/:userId` (`authorize('Admin')`, `adminDeliveryController.deletePartner`) — 409 if `activeOrderIds` non-empty, else cancels live offers + removes `DeliveryPartner`/`User`/`DeviceToken`/`Notification` (Orders + `DeliveryEarning` kept), emits `fleet_partner_removed`, `logAudit`; admin `DeliveryModule` got a trash action (desktop + mobile, disabled while active orders > 0). ⚠ `protect` middleware falls back to a default Admin on a bad/customer token, so admin-only routes are not truly RBAC-safe against a forged token — pre-existing. **Partner console redesign via `/impeccable` (same session)**: migrated the whole `frontend/src/partner/` surface off raw Tailwind grays onto the **admin design system** — `--admin-*` tokens + `font-admin-display/body/mono`. New shared primitives in `frontend/src/partner/ui.tsx` (`PageHead`, `Card`, `Pill`, `Stat`, `Btn`, `Field`, `CenterState`, `SectionLabel`, `money`). PartnerShell (collapsible sidebar + mobile drawer) was already reworked by a concurrent session; no behaviour/API changes. `tsc -b` + `vite build` clean, impeccable detector `[]`. **Slide-to-online (same session)**: Vite proxy now forwards `/socket.io` → `:5000` with `ws:true` (the partner socket never connected in dev before — `usePartnerSocket` hits `window.location.origin`). Phone-only slide-to-confirm status control replaces the header toggle on mobile: web `frontend/src/partner/SwipeOnline.tsx` (floats above the bottom edge via `bottom-[max(1rem,safe-area+.75rem)]`, `md:hidden`, hidden on `/partner/orders/:id`, transform-based knob/trail; header pill is now `hidden sm:flex`); Flutter `_SlideToOnline` in `dashboard_screen.dart` (in `bottomNavigationBar`, SafeArea, replaces the `Switch`). Drag knob L→R to go online / R→L to go offline, ~80% travel threshold. **Flutter offer parity (same session)**: `deliveryapp` now also uses `GET /delivery/assignments/pending` for refresh-resilience — `api_client.pendingAssignment()` → `OfferController.checkPending()` (runs on construct + on `AppLifecycleState.resumed` via a `WidgetsBindingObserver` on `DashboardScreen`), so a `delivery_offer` the socket missed while backgrounded still surfaces. Matches the web partner app's dashboard-mount fetch. `flutter analyze` clean, 6/6 tests. **`deliveryapp` nav + online-control rework (same session, user-directed)**: bottom bar is now a real 3-tab `NavigationBar` — **Home · Orders · Profile & settings** — via `StatefulShellRoute.indexedStack` + new `lib/features/main/main_shell.dart` (also hosts the offer overlay, moved off `_OfferShell`); `/order/:id`, `/earnings`, `/notifications` are full-screen root routes. New `lib/features/orders/orders_screen.dart` = active deliveries + history with filter chips (folds in the old `history_screen.dart`, now unrouted). Dashboard: bell + **online/offline `Switch` in the AppBar** (both directions); **slide-to-go-online is now one-way (offline→online only)**, an in-body card shown only while offline (`_SlideToGoOnline`, smoother drag); `_toggle` no longer `await`s `loc.start()` (root cause of the stuck "GOING ONLINE…" — `Geolocator.getCurrentPosition` hangs on web) and `location_service.start()` timeboxes it to 8 s. `profile_screen` gained Earnings + Notifications rows. **Web parity**: `SwipeOnline.tsx` also made one-way (hidden when online); `PartnerShell` header toggle shows on mobile only while online (to stop). `tsc -b` + `vite build` clean; `flutter analyze` clean, 6/6. **Web bottom tab bar (follow-up, user-directed)**: `PartnerShell` now also renders a phone-only (`md:hidden`) 3-tab bottom bar — **Home · Orders · Profile & settings** — matching the Flutter app; desktop keeps the `bg-admin-ink` sidebar. New `frontend/src/partner/screens/Orders.tsx` (active deliveries + history with filter chips) at `/partner/orders`, added to `PartnerApp.tsx` + the sidebar `navItems`. `Profile.tsx` got an Earnings + Notifications "Shortcuts" card (they're not in the 3 tabs). Bottom bar + `SwipeOnline` are both hidden on `/partner/orders/:orderId`; `SwipeOnline` now floats `3.5rem` above the tab bar; `<main>` bottom pad `pb-32` on phones. `tsc -b` + `vite build` clean, detector `[]`.
+
+2026-09-09 (session 3) — **Real Razorpay checkout on the web storefront.** `.env` got real `rzp_test_*` keys + `PAYMENTS_TEST_MODE=false` (git-ignored; see §9 for the full flow). **Backend**: `paymentController.verifyPayment` now persists our `Order` when the body carries `orderId` — valid signature → `paymentStatus:'Paid'` + `paymentId`/`paymentRef`; invalid → `'Failed'`; test-mode/`'simulated'` bypass still marks Paid. New `api.test.js` case (crafted HMAC) covers it — payment tests 4/4 green (`api.test.js` still has its 9 pre-existing shared-Mongo failures, unchanged). **Web `frontend/src/components/CheckoutModal.tsx`** fully rewritten: was faking a bogus signature + hard-coded `paymentStatus:'Paid'` and never opening Razorpay (broke once test mode went off). Now: payment-method selector (**Pay online** / **Cash on delivery**); online path = `create-order` → place Order **Pending** → real `checkout.js` sheet (`theme:{color:'#2E7D32'}`) → `verify` (flips to Paid) → success; `modal.ondismiss` / `payment.failed` → inline "Payment cancelled", order stays Pending, cart intact; COD → Order Pending, no sheet; `testMode && !key` → simulated. Redesigned on storefront tokens (`--primary`/`--primary-strong`, `bg-surface`/`bg-background`, `border-divider`) — dropped the ad-hoc grays + pink `#E91E63` + fake coupon/savings cards. `tsc -b` + `vite build` clean, detector `[]`. **Mobile `mobileapp/`**: checkout was already a correct server-side flow (`payment_service.dart` `RazorpayGateway` + `checkout_controller.dart` create-order→sheet→verify→`placeOrder`) — no change; `flutter test` 124/124, `flutter analyze` has 3 pre-existing `info` lints in `api_service.dart` (concurrent session, not payment).
+
+2026-09-09 — Customer-web modifications (commit `eab8f1d`). **Backend**: `GET /api/products` now accepts `?ids=a,b,c` — returns exactly those products (matches both string `id` and Mongo `_id`), used by the festival curated `/products?ids=` view (previously filtered client-side). `POST /api/payment/verify` also treats `razorpay_signature === 'simulated'` as verified (was `isPaymentsTestMode()` only), for the mobile SimulatedGateway fallback. **CartDrawer** rebuilt Blinkit-style: header now "Checkout" with search + Clear, `backdrop-blur`, wider (430px), gray-50 shell; added delivery-partner tip (`tipAmount`), gift packaging (`giftPackagingFee` ₹30), delivery instruction chips (`selectedInstructions`), and a "You might also like" recommendations shelf from `useCMS().products`; removed the `FREE_DELIVERY_THRESHOLD` (499) progress bar; `total` now adds tip + gift fee. **Home** "Shop by category": mobile (`useIsMobile(640)`) shows a 2-row horizontal-scroll grid with column-major reordering (`mobileOrderedCategoryGridItems`), desktop unchanged. **Products/Search grids** widened to `lg:grid-cols-6 xl:grid-cols-8`. **AdminLayout** sidebar `sticky`→`fixed` with matching `ml-` offset on main; **AdminCMS** left nav `sticky top-24`. **Admin SubCategoriesModule**: removed the "Subcategory Background Color & Accent Tint" colour picker (add + edit forms) — subcategory `color` tint no longer editable. **Global focus style** (`index.css`): inputs/select/textarea no longer get the focus ring/outline (`outline:none!important`); ring removed from many field wrappers across CustomerAuthModal, Header, ProductReviews, CustomerProfile, TrackOrder, Search — fields now indicate focus with a border-colour change only.
 
 2026-09-08 (session 3) — Mobile location select null checks, permission pop assertion fix, auto-locate & Razorpay web payment fallback. Fixed `LocationPermState? perm` nullability errors in `location_select_screen.dart`. Updated `location_permission.dart` modal sheets/dialogs to pop via `sheetContext`/`dialogContext` instead of outer page context (prevents popping GoRouter root stack). Reworked `_locateUser` to auto-locate immediately after permission grant without re-prompting, with multi-stage position fallback (`getLastKnownPosition` → `getCurrentPosition(medium, 8s)` → `getCurrentPosition(lowest, 5s)` → map center). Fixed Razorpay web/missing native plugin channel crash on checkout (`checkout_controller.dart` & `payment_service.dart` fallback to `SimulatedGateway`, backend `/api/payment/verify` handles simulated signature). `flutter test` **124/124** passed.
 

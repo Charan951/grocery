@@ -5,6 +5,7 @@ import 'package:freshcart_delivery/core/error/api_exception.dart';
 import 'package:freshcart_delivery/core/providers.dart';
 import 'package:freshcart_delivery/core/theme.dart';
 import 'package:freshcart_delivery/features/auth/auth_controller.dart';
+import 'package:freshcart_delivery/features/offer/offer_controller.dart';
 import 'package:freshcart_delivery/models/delivery_models.dart';
 
 final activeOrdersProvider = FutureProvider.autoDispose<List<DeliveryOrder>>((ref) {
@@ -28,10 +29,33 @@ class DashboardScreen extends ConsumerStatefulWidget {
   ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+class _DashboardScreenState extends ConsumerState<DashboardScreen> with WidgetsBindingObserver {
   bool _toggling = false;
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // The socket may have dropped a `delivery_offer` while backgrounded.
+      ref.read(offerProvider.notifier).checkPending();
+      ref.read(authProvider.notifier).refreshProfile();
+      ref.invalidate(activeOrdersProvider);
+    }
+  }
+
   Future<void> _toggle(bool value) async {
+    if (_toggling) return;
     setState(() => _toggling = true);
     try {
       final loc = ref.read(locationServiceProvider);
@@ -46,10 +70,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           return;
         }
       }
+      // The API call is the source of truth for online state; it must not be
+      // blocked by the (sometimes slow / hanging) location stream startup.
       final res = await ref.read(apiProvider).setOnline(value);
       await ref.read(authProvider.notifier).refreshProfile();
       if (res['isOnline'] == true) {
-        await loc.start(interval: const Duration(seconds: 12));
+        loc.start(interval: const Duration(seconds: 12)); // fire-and-forget
       } else {
         loc.stop();
       }
@@ -65,10 +91,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final p = ref.watch(authProvider.select((s) => s.profile));
     final online = p?.isOnline ?? false;
     final active = ref.watch(activeOrdersProvider);
+    final unread = ref.watch(unreadCountProvider).valueOrNull ?? 0;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dashboard'),
+        title: const Text('Home'),
         actions: [
           IconButton(
             onPressed: () async {
@@ -76,14 +103,36 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               ref.invalidate(unreadCountProvider);
             },
             icon: Badge(
-              isLabelVisible: (ref.watch(unreadCountProvider).valueOrNull ?? 0) > 0,
-              label: Text('${ref.watch(unreadCountProvider).valueOrNull ?? 0}'),
+              isLabelVisible: unread > 0,
+              label: Text('$unread'),
               child: const Icon(Icons.notifications_none_rounded),
             ),
           ),
-          IconButton(onPressed: () => context.push('/earnings'), icon: const Icon(Icons.account_balance_wallet_outlined)),
-          IconButton(onPressed: () => context.push('/history'), icon: const Icon(Icons.history_rounded)),
-          IconButton(onPressed: () => context.push('/profile'), icon: const Icon(Icons.person_outline_rounded)),
+          // App-bar toggle: flips status both ways (the body slide bar is the
+          // friendlier "go online" affordance while offline).
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: _toggling
+                ? const SizedBox(
+                    width: 46,
+                    child: Center(
+                      child: SizedBox(
+                        width: 18, height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2.4),
+                      ),
+                    ),
+                  )
+                : Row(
+                    children: [
+                      Text(online ? 'On' : 'Off',
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: online ? kBrand : kTextFaint)),
+                      Switch(value: online, onChanged: _toggle),
+                    ],
+                  ),
+          ),
         ],
       ),
       body: RefreshIndicator(
@@ -94,6 +143,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            if (!online) ...[
+              _SlideToGoOnline(busy: _toggling, onConfirm: () => _toggle(true)),
+              const SizedBox(height: 14),
+            ],
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(18),
@@ -103,11 +156,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       width: 46,
                       height: 46,
                       decoration: BoxDecoration(
-                        color: (online ? kBrand : Colors.grey).withValues(alpha: 0.14),
+                        color: (online ? kBrand : kTextFaint).withValues(alpha: 0.14),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(online ? Icons.bolt_rounded : Icons.power_settings_new_rounded,
-                          color: online ? kBrand : Colors.grey),
+                          color: online ? kBrand : kTextFaint),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -117,15 +170,22 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           Text(online ? "You're online" : "You're offline",
                               style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
                           Text(
-                            online ? 'Availability: ${p?.availability ?? '—'}' : 'Go online to receive orders',
-                            style: const TextStyle(color: Colors.black54, fontSize: 12.5),
+                            online
+                                ? 'Availability: ${p?.availability ?? 'unknown'}'
+                                : 'Slide below or use the switch above to start',
+                            style: const TextStyle(color: kTextMuted, fontSize: 12.5),
                           ),
                         ],
                       ),
                     ),
-                    _toggling
-                        ? const SizedBox(width: 40, child: Center(child: CircularProgressIndicator(strokeWidth: 2.5)))
-                        : Switch(value: online, onChanged: _toggle),
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: online ? kBrand : kTextFaint,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -135,9 +195,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               children: [
                 _stat("Today", '₹${(p?.todayEarnings ?? 0).toStringAsFixed(0)}', Icons.account_balance_wallet_rounded),
                 const SizedBox(width: 12),
-                _stat('Completed', '${p?.completedCount ?? 0}', Icons.check_circle_rounded),
-                const SizedBox(width: 12),
-                _stat('Failed', '${p?.failedCount ?? 0}', Icons.cancel_rounded),
+                _stat('Delivered', '${p?.completedCount ?? 0}', Icons.check_circle_rounded),
                 const SizedBox(width: 12),
                 _stat(
                   (p?.ratingCount ?? 0) > 0 ? 'Rating (${p!.ratingCount})' : 'Rating',
@@ -175,7 +233,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 Icon(icon, color: kBrand, size: 22),
                 const SizedBox(height: 6),
                 Text(value, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
-                Text(label, style: const TextStyle(color: Colors.black54, fontSize: 11.5)),
+                Text(label, style: const TextStyle(color: kTextMuted, fontSize: 11.5)),
               ],
             ),
           ),
@@ -198,13 +256,138 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           padding: const EdgeInsets.all(28),
           child: Column(
             children: [
-              const Icon(Icons.inbox_rounded, size: 40, color: Colors.black26),
+              const Icon(Icons.inbox_rounded, size: 40, color: kTextFaint),
               const SizedBox(height: 10),
               Text(t, style: const TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(height: 4),
-              Text(s, textAlign: TextAlign.center, style: const TextStyle(color: Colors.black54, fontSize: 12.5)),
+              Text(s, textAlign: TextAlign.center, style: const TextStyle(color: kTextMuted, fontSize: 12.5)),
             ],
           ),
         ),
       );
+}
+
+/// One-way slide-to-confirm: drag the knob left → right to go online. Shown only
+/// while offline. Going offline is the app-bar switch.
+class _SlideToGoOnline extends StatefulWidget {
+  final bool busy;
+  final VoidCallback onConfirm;
+  const _SlideToGoOnline({required this.busy, required this.onConfirm});
+
+  @override
+  State<_SlideToGoOnline> createState() => _SlideToGoOnlineState();
+}
+
+class _SlideToGoOnlineState extends State<_SlideToGoOnline> {
+  static const double _knob = 52;
+  static const double _pad = 5;
+  static const double _threshold = 0.85;
+
+  double _t = 0; // 0..1
+  bool _dragging = false;
+  bool _fired = false;
+
+  @override
+  void didUpdateWidget(covariant _SlideToGoOnline old) {
+    super.didUpdateWidget(old);
+    if (old.busy && !widget.busy) {
+      // toggle finished (success or failure) — snap the knob back.
+      setState(() {
+        _t = 0;
+        _fired = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, c) {
+        final travel = (c.maxWidth - _knob - _pad * 2).clamp(1.0, double.infinity);
+        void onUpdate(DragUpdateDetails d) {
+          if (widget.busy || _fired) return;
+          setState(() {
+            _dragging = true;
+            _t = (_t + d.primaryDelta! / travel).clamp(0.0, 1.0);
+          });
+        }
+
+        void onEnd(DragEndDetails _) {
+          setState(() => _dragging = false);
+          if (_t >= _threshold && !widget.busy) {
+            setState(() {
+              _t = 1;
+              _fired = true;
+            });
+            widget.onConfirm();
+          } else {
+            setState(() => _t = 0);
+          }
+        }
+
+        return Container(
+          height: _knob + _pad * 2,
+          decoration: BoxDecoration(
+            color: kInk,
+            borderRadius: BorderRadius.circular((_knob + _pad * 2) / 2),
+            boxShadow: const [
+              BoxShadow(color: Color(0x33000000), blurRadius: 20, offset: Offset(0, 8)),
+            ],
+          ),
+          child: Stack(
+            alignment: Alignment.centerLeft,
+            children: [
+              // travelled trail
+              FractionallySizedBox(
+                widthFactor: (_t).clamp(0.0, 1.0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: kBrand.withValues(alpha: 0.28),
+                    borderRadius: BorderRadius.circular((_knob + _pad * 2) / 2),
+                  ),
+                ),
+              ),
+              Center(
+                child: Opacity(
+                  opacity: (1 - _t * 2).clamp(0.0, 1.0),
+                  child: Text(
+                    widget.busy ? 'GOING ONLINE…' : 'SLIDE TO GO ONLINE',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.6,
+                    ),
+                  ),
+                ),
+              ),
+              AnimatedPositioned(
+                duration: _dragging ? Duration.zero : const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                left: _pad + _t * travel,
+                top: _pad,
+                child: GestureDetector(
+                  onHorizontalDragStart: (_) {},
+                  onHorizontalDragUpdate: onUpdate,
+                  onHorizontalDragEnd: onEnd,
+                  child: Container(
+                    width: _knob,
+                    height: _knob,
+                    decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+                    child: widget.busy
+                        ? const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: CircularProgressIndicator(strokeWidth: 2.6, color: kBrand),
+                          )
+                        : const Icon(Icons.keyboard_double_arrow_right_rounded,
+                            color: kInk, size: 24),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }

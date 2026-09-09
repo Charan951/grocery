@@ -55,7 +55,8 @@ const settingsSchema = new mongoose.Schema({
   supportEmail: { type: String, default: 'support@freshcart.com' },
   supportPhone: { type: String, default: '+91 80 4912 3456' },
   taxPercent: { type: Number, default: 5 }, // 5% GST standard on groceries
-  deliveryFeeRule: { type: Number, default: 40 }, // Flat 40 Rs below 499
+  deliveryFeeRule: { type: Number, default: 40 }, // flat customer delivery fee below the free threshold
+  freeDeliveryThreshold: { type: Number, default: 499 }, // item subtotal at/above which customer delivery is free
   gatewayKeys: {
     razorpayId: { type: String, default: 'mock_key_id' },
     razorpaySecret: { type: String, default: 'mock_key_secret' }

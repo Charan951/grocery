@@ -94,7 +94,7 @@ class _OfferSheetState extends ConsumerState<OfferSheet> {
               const SizedBox(height: 14),
               const Text('New delivery', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
               const SizedBox(height: 4),
-              Text('Order ${o.orderId}', style: const TextStyle(color: Colors.black54)),
+              Text('Order ${o.orderId}', style: const TextStyle(color: kTextMuted)),
               const SizedBox(height: 16),
               _row(Icons.payments_rounded, '₹${o.amount.toStringAsFixed(0)}  ·  ${o.isCOD ? 'COLLECT CASH' : 'Prepaid'}'),
               _row(Icons.shopping_bag_rounded, '${o.itemCount} item${o.itemCount == 1 ? '' : 's'}'),
@@ -132,7 +132,7 @@ class _OfferSheetState extends ConsumerState<OfferSheet> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(i, size: 18, color: Colors.black45),
+            Icon(i, size: 18, color: kTextFaint),
             const SizedBox(width: 10),
             Expanded(child: Text(t, maxLines: maxLines, overflow: TextOverflow.ellipsis)),
           ],

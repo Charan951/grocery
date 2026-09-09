@@ -75,6 +75,21 @@ class ApiClient {
     }
   }
 
+  /// Partner edits their own name / phone / vehicle. Mirrors the web
+    /// partner app's `PUT /delivery/me`.
+  Future<PartnerProfile> updateMe({String? name, String? phone, String? vehicleType}) async {
+    try {
+      final data = <String, dynamic>{};
+      if (name != null) data['name'] = name;
+      if (phone != null) data['phone'] = phone;
+      if (vehicleType != null) data['vehicleType'] = vehicleType;
+      final r = await _dio.put('/delivery/me', data: data);
+      return PartnerProfile.fromJson(Map<String, dynamic>.from((r.data as Map)['partner'] as Map));
+    } on DioException catch (e) {
+      _rethrow(e);
+    }
+  }
+
   Future<Map<String, dynamic>> setOnline(bool online) async {
     try {
       final r = await _dio.put('/delivery/status', data: {'isOnline': online});
@@ -93,6 +108,20 @@ class ApiClient {
   }
 
   // ---- assignments ----
+  /// The partner's live offer, if any — refresh-resilience for when the socket
+  /// missed a `delivery_offer` (app backgrounded / reconnecting). Mirrors the
+  /// web partner app's dashboard-mount fetch. Returns null when there's none.
+  Future<DeliveryOffer?> pendingAssignment() async {
+    try {
+      final r = await _dio.get('/delivery/assignments/pending');
+      final offer = (r.data as Map)['offer'];
+      if (offer == null) return null;
+      return DeliveryOffer.fromJson(Map<String, dynamic>.from(offer as Map));
+    } on DioException catch (e) {
+      _rethrow(e);
+    }
+  }
+
   Future<DeliveryOrder> acceptAssignment(String id) async {
     try {
       final r = await _dio.post('/delivery/assignments/$id/accept');

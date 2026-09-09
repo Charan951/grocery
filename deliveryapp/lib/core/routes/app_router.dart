@@ -6,10 +6,9 @@ import 'package:freshcart_delivery/features/auth/forgot_screen.dart';
 import 'package:freshcart_delivery/features/auth/login_screen.dart';
 import 'package:freshcart_delivery/features/dashboard/dashboard_screen.dart';
 import 'package:freshcart_delivery/features/earnings/earnings_screen.dart';
-import 'package:freshcart_delivery/features/history/history_screen.dart';
-import 'package:freshcart_delivery/features/offer/offer_controller.dart';
-import 'package:freshcart_delivery/features/offer/offer_sheet.dart';
+import 'package:freshcart_delivery/features/main/main_shell.dart';
 import 'package:freshcart_delivery/features/notifications/notifications_screen.dart';
+import 'package:freshcart_delivery/features/orders/orders_screen.dart';
 import 'package:freshcart_delivery/features/orders/order_detail_screen.dart';
 import 'package:freshcart_delivery/features/profile/profile_screen.dart';
 import 'package:freshcart_delivery/features/splash/splash_screen.dart';
@@ -22,11 +21,18 @@ class _AuthRefresh extends ChangeNotifier {
 
 const _public = {'/splash', '/login', '/forgot'};
 
+final _rootKey = GlobalKey<NavigatorState>();
+final _homeKey = GlobalKey<NavigatorState>();
+final _ordersKey = GlobalKey<NavigatorState>();
+final _earningsKey = GlobalKey<NavigatorState>();
+final _profileKey = GlobalKey<NavigatorState>();
+
 final routerProvider = Provider<GoRouter>((ref) {
   final refresh = _AuthRefresh(ref);
   ref.onDispose(refresh.dispose);
 
   return GoRouter(
+    navigatorKey: _rootKey,
     initialLocation: '/splash',
     refreshListenable: refresh,
     redirect: (context, state) {
@@ -41,34 +47,42 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/splash', builder: (c, s) => const SplashScreen()),
       GoRoute(path: '/login', builder: (c, s) => const LoginScreen()),
       GoRoute(path: '/forgot', builder: (c, s) => const ForgotScreen()),
-      // Authenticated area — an offer overlay sits above every page.
-      ShellRoute(
-        builder: (c, s, child) => _OfferShell(child: child),
-        routes: [
-          GoRoute(path: '/', builder: (c, s) => const DashboardScreen()),
-          GoRoute(path: '/history', builder: (c, s) => const HistoryScreen()),
-          GoRoute(path: '/earnings', builder: (c, s) => const EarningsScreen()),
-          GoRoute(path: '/notifications', builder: (c, s) => const NotificationsScreen()),
-          GoRoute(path: '/profile', builder: (c, s) => const ProfileScreen()),
-          GoRoute(
-            path: '/order/:id',
-            builder: (c, s) => OrderDetailScreen(orderId: s.pathParameters['id'] ?? ''),
+
+      // Full-screen authed routes (no bottom nav).
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/order/:id',
+        builder: (c, s) => OrderDetailScreen(orderId: s.pathParameters['id'] ?? ''),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/notifications',
+        builder: (c, s) => const NotificationsScreen(),
+      ),
+
+      // Bottom-nav shell: Home · Orders · Earnings · Profile. An offer overlay
+      // sits above every tab (see MainShell).
+      StatefulShellRoute.indexedStack(
+        builder: (c, s, navigationShell) => MainShell(navigationShell: navigationShell),
+        branches: [
+          StatefulShellBranch(
+            navigatorKey: _homeKey,
+            routes: [GoRoute(path: '/', builder: (c, s) => const DashboardScreen())],
+          ),
+          StatefulShellBranch(
+            navigatorKey: _ordersKey,
+            routes: [GoRoute(path: '/orders', builder: (c, s) => const OrdersScreen())],
+          ),
+          StatefulShellBranch(
+            navigatorKey: _earningsKey,
+            routes: [GoRoute(path: '/earnings', builder: (c, s) => const EarningsScreen())],
+          ),
+          StatefulShellBranch(
+            navigatorKey: _profileKey,
+            routes: [GoRoute(path: '/profile', builder: (c, s) => const ProfileScreen())],
           ),
         ],
       ),
     ],
   );
 });
-
-class _OfferShell extends ConsumerWidget {
-  final Widget child;
-  const _OfferShell({required this.child});
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final offer = ref.watch(offerProvider);
-    return Stack(children: [
-      child,
-      if (offer != null) Positioned.fill(child: OfferSheet(offer: offer)),
-    ]);
-  }
-}

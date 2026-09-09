@@ -173,6 +173,71 @@ export const deliveryController = {
     }
   },
 
+  // PUT /api/delivery/me  { name?, phone?, vehicleType? }
+  // Lets a partner edit their own display name, contact phone and vehicle.
+  updateMe: async (req, res) => {
+    try {
+      const { user, partner } = req;
+      const { name, phone, vehicleType } = req.body || {};
+      const VEHICLES = ['bike', 'scooter', 'bicycle', 'car', 'on_foot'];
+
+      if (name !== undefined) {
+        const trimmed = String(name).trim();
+        if (trimmed.length < 2 || trimmed.length > 60) {
+          return res.status(400).json({ success: false, message: 'Name must be 2–60 characters.' });
+        }
+        user.name = trimmed;
+      }
+      if (phone !== undefined) {
+        const digits = String(phone).replace(/\D/g, '');
+        if (digits && !/^[6-9]\d{9}$/.test(digits)) {
+          return res.status(400).json({ success: false, message: 'Enter a valid 10-digit mobile number.' });
+        }
+        partner.phone = digits;
+        user.phone = digits;
+      }
+      if (vehicleType !== undefined) {
+        if (!VEHICLES.includes(vehicleType)) {
+          return res.status(400).json({ success: false, message: 'Unknown vehicle type.' });
+        }
+        partner.vehicleType = vehicleType;
+      }
+
+      const IST_OFFSET = 5.5 * 3600000;
+      const nowIst = new Date(Date.now() + IST_OFFSET);
+      const istMidnight = new Date(Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate()) - IST_OFFSET);
+      const [, , todayRows] = await Promise.all([
+        user.save(),
+        partner.save(),
+        DeliveryEarning.find({ partnerUserId: user._id, earnedAt: { $gte: istMidnight } }).select('total').lean(),
+      ]);
+      const todayEarnings = todayRows.reduce((s, e) => s + (e.total || 0), 0);
+
+      res.json({
+        success: true,
+        partner: {
+          todayEarnings,
+          userId: user._id,
+          name: user.name,
+          email: user.email,
+          phone: partner.phone || user.phone || '',
+          vehicleType: partner.vehicleType,
+          isOnline: partner.isOnline,
+          availability: partner.availability,
+          activeOrderIds: partner.activeOrderIds || [],
+          maxConcurrent: partner.maxConcurrent,
+          rating: partner.rating,
+          ratingCount: partner.ratingCount || 0,
+          completedCount: partner.completedCount,
+          failedCount: partner.failedCount,
+          lastSeenAt: partner.lastSeenAt,
+        },
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
   // GET /api/delivery/notifications?unreadOnly=1&limit=50
   listNotifications: async (req, res) => {
     try {
@@ -536,6 +601,75 @@ export const deliveryController = {
       const ids = req.partner.activeOrderIds || [];
       const orders = await Order.find({ orderId: { $in: ids } }).sort({ updatedAt: -1 });
       res.json({ success: true, orders });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // GET /api/delivery/orders/history?status=delivered|failed|returned&limit=50
+  // Terminal orders this partner handled, newest first.
+  getHistory: async (req, res) => {
+    try {
+      const STATUS_MAP = {
+        delivered: ['Delivered'],
+        failed: ['Failed'],
+        returned: ['Returned'],
+      };
+      const key = String(req.query.status || '').toLowerCase();
+      const statuses = STATUS_MAP[key] || ['Delivered', 'Failed', 'Returned'];
+      const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 100);
+
+      const orders = await Order.find({
+        deliveryPartnerUserId: req.user._id,
+        status: { $in: statuses },
+      })
+        .sort({ deliveredAt: -1, updatedAt: -1 })
+        .limit(limit);
+
+      res.json({ success: true, orders });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // GET /api/delivery/assignments/pending
+  // The partner's live offer (if any) — refresh-resilience for the web app,
+  // which otherwise only learns of offers through the socket. Mirrors the
+  // `delivery_offer` socket payload shape.
+  getPendingAssignment: async (req, res) => {
+    try {
+      const assignment = await Assignment.findOne({
+        partnerUserId: req.user._id,
+        status: 'offered',
+      }).sort({ offeredAt: -1 });
+
+      if (!assignment) return res.json({ success: true, offer: null });
+
+      // A sweeper does the functional expiry; treat an already-past offer as gone.
+      if (assignment.expiresAt && assignment.expiresAt.getTime() < Date.now()) {
+        return res.json({ success: true, offer: null });
+      }
+
+      const order = await Order.findOne({ orderId: assignment.orderId });
+      if (!order) return res.json({ success: true, offer: null });
+
+      res.json({
+        success: true,
+        offer: {
+          assignmentId: String(assignment._id),
+          orderId: order.orderId,
+          attempt: assignment.attempt,
+          expiresAt: assignment.expiresAt,
+          distanceMeters: assignment.distanceMeters,
+          amount: order.totalAmount,
+          paymentMethod: order.paymentMethod,
+          isCOD: /cash|cod/i.test(order.paymentMethod || ''),
+          itemCount: (order.items || []).length,
+          pickup: order.pickup || null,
+          drop: order.deliveryLocation || null,
+          deliveryAddress: order.deliveryAddress,
+        },
+      });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
     }

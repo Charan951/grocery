@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freshcart_delivery/core/providers.dart';
+import 'package:freshcart_delivery/core/theme.dart';
 
 final _rangeProvider = StateProvider.autoDispose<String>((ref) => 'week');
 
@@ -58,7 +59,7 @@ class EarningsScreen extends ConsumerWidget {
                                       fontSize: 30, fontWeight: FontWeight.w800)),
                               const SizedBox(height: 2),
                               Text('${s['count'] ?? 0} deliveries',
-                                  style: const TextStyle(color: Colors.black54)),
+                                  style: const TextStyle(color: kTextMuted)),
                               const Divider(height: 20),
                               _line('Base pay', money(s['base'])),
                               _line('Distance pay', money(s['distance'])),
@@ -120,7 +121,7 @@ class EarningsScreen extends ConsumerWidget {
           children: [
             Text(k,
                 style: TextStyle(
-                    color: Colors.black54,
+                    color: kTextMuted,
                     fontWeight: strong ? FontWeight.w700 : FontWeight.w400)),
             Text(v, style: TextStyle(fontWeight: strong ? FontWeight.w800 : FontWeight.w600)),
           ],

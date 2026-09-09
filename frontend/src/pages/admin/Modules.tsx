@@ -5,7 +5,7 @@ import {
   Tag, Megaphone, Layers, DollarSign, FileText, LineChart, Star, LifeBuoy, 
   Bell, Settings, ShieldAlert, Plus, Trash2, Edit2, Search, ArrowRight, ArrowLeft,
   Send, UserMinus, Shield, Key, Download, CheckSquare, Sparkles, RefreshCw,
-  ArrowUp, ArrowDown, X, ChevronDown, ChevronUp, Check
+  ArrowUp, ArrowDown, X, ChevronDown, ChevronUp, Check, Bike, Eye, EyeOff
 } from 'lucide-react';
 import { useCMS, getCategoryImage, getSubCategoryImage } from '../../context/CMSContext';
 import { DeliveryFleetMap } from './DeliveryFleetMap';
@@ -1948,6 +1948,9 @@ export const DeliveryModule: React.FC = () => {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [showPw, setShowPw] = useState(false);
+  const [addErr, setAddErr] = useState('');
+  const [adding, setAdding] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const API_URL = '/api';
@@ -2013,32 +2016,61 @@ export const DeliveryModule: React.FC = () => {
     return () => clearInterval(t);
   }, []);
 
+  const resetAddForm = () => {
+    setName(''); setEmail(''); setPhone(''); setPassword('');
+    setShowPw(false); setAddErr('');
+  };
+  const closeAdd = () => { setShowAdd(false); resetAddForm(); };
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim()) return;
+    setAddErr('');
+
+    const n = name.trim();
+    const em = email.trim();
+    const ph = phone.replace(/\D/g, '');
+    if (!n || !em || !phone.trim() || !password) {
+      setAddErr('All fields are required.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) {
+      setAddErr('Enter a valid email address.');
+      return;
+    }
+    if (ph.length !== 10) {
+      setAddErr('Phone must be a 10-digit number.');
+      return;
+    }
+    if (password.length < 6) {
+      setAddErr('Password must be at least 6 characters.');
+      return;
+    }
+
+    setAdding(true);
     try {
       const res = await fetch(`${API_URL}/employees`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
         body: JSON.stringify({
-          name: name.trim(),
-          email: email.trim(),
-          phone: phone.trim(),
-          password: password || 'delivery123',
+          name: n,
+          email: em,
+          phone: ph,
+          password,
           role: 'Delivery',
         }),
       });
       const data = await res.json();
       if (data.success) {
-        const sentTo = email.trim();
-        setName(''); setEmail(''); setPhone(''); setPassword(''); setShowAdd(false);
+        closeAdd();
         fetchPartners();
-        alert(`Delivery partner created. Login credentials were emailed to ${sentTo}.`);
+        alert(`Delivery partner created. Login credentials were emailed to ${em}.`);
       } else {
-        alert('Failed: ' + (data.message || 'Unknown error'));
+        setAddErr(data.message || 'Could not create the partner.');
       }
     } catch {
-      alert('Failed to register delivery partner.');
+      setAddErr('Network error — could not reach the server.');
+    } finally {
+      setAdding(false);
     }
   };
 
@@ -2080,6 +2112,24 @@ export const DeliveryModule: React.FC = () => {
     }
   };
 
+  const deletePartner = async (p: FleetPartner) => {
+    if (!window.confirm(`Permanently delete ${p.name} (${p.email})?\n\nTheir login and fleet record are removed. Past orders and earnings are kept.`)) return;
+    setBusyId(p.userId);
+    try {
+      const res = await fetch(`${API_URL}/admin/delivery/partners/${p.userId}`, {
+        method: 'DELETE',
+        headers: { ...getAuthHeader() },
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) alert(data.message || 'Delete failed');
+      fetchPartners();
+    } catch {
+      alert('Delete failed');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const availTone = (p: FleetPartner) => {
     if (p.accountStatus === 'Suspended') return 'text-error bg-error/10';
     if (!p.isOnline) return 'text-text-secondary bg-divider/40';
@@ -2094,6 +2144,21 @@ export const DeliveryModule: React.FC = () => {
   const online = partners.filter(p => p.isOnline && p.accountStatus === 'Active').length;
   const onDelivery = partners.filter(p => p.availability === 'busy').length;
 
+  // Online / offline filter for the partner list.
+  const [tab, setTab] = useState<'partners' | 'fleet' | 'performance' | 'zones'>('partners');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'online' | 'offline'>('all');
+  const visiblePartners = useMemo(() => {
+    if (statusFilter === 'online') return partners.filter(p => p.isOnline);
+    if (statusFilter === 'offline') return partners.filter(p => !p.isOnline);
+    return partners;
+  }, [partners, statusFilter]);
+
+  // Refresh re-pulls the fleet and jumps the list to the online partners.
+  const refreshPartners = () => {
+    fetchPartners();
+    setStatusFilter('online');
+  };
+
   const fa = analytics?.fleet;
   const stat = (label: string, value: string) => (
     <div className="flex flex-col gap-0.5">
@@ -2104,11 +2169,38 @@ export const DeliveryModule: React.FC = () => {
 
   return (
    <div className="flex flex-col gap-5">
-    <DeliveryFleetMap />
+    <div className="flex flex-wrap gap-1 border-b border-divider">
+      {([
+        ['partners', 'Delivery Partners'],
+        ['fleet', 'Live fleet'],
+        ['performance', 'Fleet performance'],
+        ['zones', 'Delivery zones'],
+      ] as const).map(([key, label]) => (
+        <button
+          key={key}
+          onClick={() => setTab(key)}
+          className={`px-4 py-2 text-xs font-bold -mb-px border-b-2 transition-colors cursor-pointer ${
+            tab === key
+              ? 'border-primary text-primary'
+              : 'border-transparent text-text-secondary hover:text-text-primary'
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
 
-    <ZonesManager />
+    {tab === 'fleet' && <DeliveryFleetMap />}
 
-    {fa && (
+    {tab === 'zones' && <ZonesManager />}
+
+    {tab === 'performance' && !fa && (
+      <div className="bg-surface border border-divider p-6 rounded-[28px] shadow-card text-center text-xs text-text-secondary font-semibold">
+        No fleet analytics yet.
+      </div>
+    )}
+
+    {tab === 'performance' && fa && (
       <div className="bg-surface border border-divider p-4 sm:p-6 rounded-[28px] shadow-card flex flex-col gap-4">
         <div className="flex items-baseline justify-between">
           <h2 className="font-extrabold text-sm text-text-primary">Fleet performance</h2>
@@ -2161,7 +2253,7 @@ export const DeliveryModule: React.FC = () => {
       </div>
     )}
 
-    {returns && returns.orders.length > 0 && (
+    {tab === 'partners' && returns && returns.orders.length > 0 && (
       <div className="bg-surface border border-divider rounded-[28px] shadow-card p-4 sm:p-6 flex flex-col gap-3">
         <h3 className="font-extrabold text-sm text-text-primary">
           Returns & re-attempts
@@ -2210,6 +2302,7 @@ export const DeliveryModule: React.FC = () => {
       </div>
     )}
 
+    {tab === 'partners' && (
     <div className="bg-surface border border-divider p-4 sm:p-6 rounded-[28px] shadow-card flex flex-col gap-5">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 pb-3 border-b border-divider">
         <div>
@@ -2218,30 +2311,141 @@ export const DeliveryModule: React.FC = () => {
             {partners.length} registered • {online} online • {onDelivery} on delivery
           </p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={fetchPartners} className="flex items-center gap-1 border border-divider text-text-secondary font-bold py-1.5 px-3 rounded-full text-[10px] hover:bg-background cursor-pointer">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center rounded-full border border-divider overflow-hidden text-[10px] font-bold">
+            {([
+              ['all', `All (${partners.length})`],
+              ['online', `Online (${online})`],
+              ['offline', `Offline (${partners.length - online})`],
+            ] as const).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setStatusFilter(key)}
+                className={`px-3 py-1.5 cursor-pointer transition-colors ${
+                  statusFilter === key
+                    ? 'bg-primary text-white'
+                    : 'text-text-secondary hover:bg-background'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <button onClick={refreshPartners} className="flex items-center gap-1 border border-divider text-text-secondary font-bold py-1.5 px-3 rounded-full text-[10px] hover:bg-background cursor-pointer">
             <RefreshCw size={12} /> Refresh
           </button>
-          <button onClick={() => setShowAdd(v => !v)} className="flex items-center gap-1 bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[10px] hover:bg-secondary cursor-pointer">
+          <button onClick={() => { resetAddForm(); setShowAdd(true); }} className="flex items-center gap-1 bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[10px] hover:bg-secondary cursor-pointer">
             <Plus size={12} /> Add Partner
           </button>
         </div>
       </div>
 
       {showAdd && (
-        <form onSubmit={handleAdd} className="bg-background p-4 rounded-2xl border border-divider flex flex-col gap-3">
-          <h3 className="font-bold text-xs">Register delivery partner</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <input type="text" placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} className="px-3 py-1.5 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary" required />
-            <input type="email" placeholder="Email (login)" value={email} onChange={(e) => setEmail(e.target.value)} className="px-3 py-1.5 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary" required />
-            <input type="tel" placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="px-3 py-1.5 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary" />
-            <input type="text" placeholder="Password (default: delivery123)" value={password} onChange={(e) => setPassword(e.target.value)} className="px-3 py-1.5 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary" />
-          </div>
-          <div className="flex gap-2">
-            <button type="submit" className="bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[10px] cursor-pointer">Save</button>
-            <button type="button" onClick={() => setShowAdd(false)} className="bg-surface text-text-secondary border border-divider font-bold py-1.5 px-4 rounded-full text-[10px] cursor-pointer">Cancel</button>
-          </div>
-        </form>
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs"
+          onClick={(e) => { if (e.target === e.currentTarget && !adding) closeAdd(); }}
+        >
+          <form
+            onSubmit={handleAdd}
+            className="w-full max-w-[440px] bg-surface rounded-[28px] shadow-premium border border-divider p-6 flex flex-col gap-4"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="font-extrabold text-sm text-text-primary">Register delivery partner</h3>
+                <p className="text-[10px] text-text-secondary font-medium mt-0.5">
+                  Login credentials are emailed to the partner on save.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeAdd}
+                disabled={adding}
+                className="p-1.5 rounded-lg border border-divider text-text-secondary hover:bg-background cursor-pointer disabled:opacity-40"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            {addErr && (
+              <div className="rounded-xl bg-error/10 border border-error/20 px-3 py-2 text-[11px] font-bold text-error">
+                {addErr}
+              </div>
+            )}
+
+            <div className="flex flex-col gap-3">
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-text-secondary">Full name</span>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Rohan Murthy"
+                  autoFocus
+                  className="px-3 py-2 border border-divider rounded-xl text-xs bg-background focus:border-primary text-text-primary"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-text-secondary">Email (login)</span>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="rohan@freshcart.com"
+                  className="px-3 py-2 border border-divider rounded-xl text-xs bg-background focus:border-primary text-text-primary"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-text-secondary">Phone</span>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="10-digit mobile number"
+                  className="px-3 py-2 border border-divider rounded-xl text-xs bg-background focus:border-primary text-text-primary tabular-nums"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-text-secondary">Password</span>
+                <div className="relative">
+                  <input
+                    type={showPw ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Min. 6 characters"
+                    className="w-full px-3 py-2 pr-9 border border-divider rounded-xl text-xs bg-background focus:border-primary text-text-primary font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPw((v) => !v)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-secondary hover:text-text-primary cursor-pointer"
+                    aria-label={showPw ? 'Hide password' : 'Show password'}
+                  >
+                    {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </label>
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="submit"
+                disabled={adding}
+                className="bg-primary text-white font-bold py-2 px-5 rounded-full text-[10px] hover:bg-secondary disabled:opacity-40 cursor-pointer"
+              >
+                {adding ? 'Creating…' : 'Create & email credentials'}
+              </button>
+              <button
+                type="button"
+                onClick={closeAdd}
+                disabled={adding}
+                className="bg-surface text-text-secondary border border-divider font-bold py-2 px-5 rounded-full text-[10px] hover:bg-background disabled:opacity-40 cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
       )}
 
       {loading && partners.length === 0 && (
@@ -2250,9 +2454,14 @@ export const DeliveryModule: React.FC = () => {
       {!loading && partners.length === 0 && (
         <div className="py-10 text-center text-text-secondary text-xs font-semibold">No delivery partners yet. Add one to get started.</div>
       )}
+      {!loading && partners.length > 0 && visiblePartners.length === 0 && (
+        <div className="py-10 text-center text-text-secondary text-xs font-semibold">
+          No {statusFilter} partners right now.
+        </div>
+      )}
 
       {/* Desktop table */}
-      {partners.length > 0 && (
+      {visiblePartners.length > 0 && (
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
@@ -2263,10 +2472,13 @@ export const DeliveryModule: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {partners.map(p => (
+              {visiblePartners.map(p => (
                 <tr key={p.userId} className="border-b border-divider last:border-0 hover:bg-background/60">
                   <td className="p-2.5">
-                    <button onClick={() => navigate(`/admin/delivery/${p.userId}`)} className="font-extrabold text-text-primary hover:text-primary hover:underline cursor-pointer text-left">{p.name}</button>
+                    <div className="flex items-center gap-1.5">
+                      <button onClick={() => navigate(`/admin/delivery/${p.userId}`)} className="font-extrabold text-text-primary hover:text-primary hover:underline cursor-pointer text-left">{p.name}</button>
+                      {p.isOnline && <Bike size={13} className="text-success shrink-0" aria-label="Online" />}
+                    </div>
                     <div className="text-[10px] text-text-secondary">{p.email}</div>
                     <div className="text-[10px] text-text-secondary">{p.phone || '—'} • {p.vehicleType}</div>
                   </td>
@@ -2304,6 +2516,9 @@ export const DeliveryModule: React.FC = () => {
                           <UserCheck size={12} />
                         </button>
                       )}
+                      <button disabled={busyId === p.userId || p.activeOrderIds.length > 0} onClick={() => deletePartner(p)} title={p.activeOrderIds.length > 0 ? 'Reassign active deliveries first' : 'Delete partner'} className="p-1.5 rounded-lg border border-divider text-text-secondary hover:text-error hover:bg-error/10 cursor-pointer disabled:opacity-40">
+                        <Trash2 size={12} />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -2315,11 +2530,14 @@ export const DeliveryModule: React.FC = () => {
 
       {/* Mobile cards */}
       <div className="md:hidden grid grid-cols-1 gap-3">
-        {partners.map(p => (
+        {visiblePartners.map(p => (
           <div key={p.userId} className="p-4 border border-divider rounded-2xl bg-background flex flex-col gap-2">
             <div className="flex justify-between items-start gap-2">
               <div>
-                <button onClick={() => navigate(`/admin/delivery/${p.userId}`)} className="font-extrabold text-xs text-text-primary hover:text-primary hover:underline cursor-pointer text-left">{p.name}</button>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => navigate(`/admin/delivery/${p.userId}`)} className="font-extrabold text-xs text-text-primary hover:text-primary hover:underline cursor-pointer text-left">{p.name}</button>
+                  {p.isOnline && <Bike size={12} className="text-success shrink-0" aria-label="Online" />}
+                </div>
                 <div className="text-[10px] text-text-secondary">{p.email}</div>
                 <div className="text-[10px] text-text-secondary">{p.phone || '—'} • {p.vehicleType}</div>
               </div>
@@ -2348,11 +2566,15 @@ export const DeliveryModule: React.FC = () => {
                   <UserCheck size={11} /> Activate
                 </button>
               )}
+              <button disabled={busyId === p.userId || p.activeOrderIds.length > 0} onClick={() => deletePartner(p)} title={p.activeOrderIds.length > 0 ? 'Reassign active deliveries first' : 'Delete partner'} className="flex items-center justify-center gap-1 border border-error/40 text-error font-bold py-1.5 px-3 rounded-full text-[10px] cursor-pointer disabled:opacity-40">
+                <Trash2 size={11} />
+              </button>
             </div>
           </div>
         ))}
       </div>
     </div>
+    )}
    </div>
   );
 };
@@ -3400,6 +3622,8 @@ type DeliveryCfg = {
   maxOfferAttempts: number;
   deliveryBaseFee: number;
   deliveryPerKmFee: number;
+  deliveryFeeRule: number;
+  freeDeliveryThreshold: number;
   storeName: string;
   storeLat: number | '';
   storeLng: number | '';
@@ -3408,6 +3632,7 @@ type DeliveryCfg = {
 const DEFAULT_DELIVERY_CFG: DeliveryCfg = {
   autoAssignEnabled: true, assignRadiusKm: 6, batchRadiusKm: 1.5,
   offerTimeoutSec: 25, maxOfferAttempts: 5, deliveryBaseFee: 20, deliveryPerKmFee: 6,
+  deliveryFeeRule: 40, freeDeliveryThreshold: 499,
   storeName: '', storeLat: '', storeLng: '',
 };
 
@@ -3441,6 +3666,8 @@ export const SettingsModule: React.FC = () => {
           maxOfferAttempts: s.maxOfferAttempts ?? 5,
           deliveryBaseFee: s.deliveryBaseFee ?? 20,
           deliveryPerKmFee: s.deliveryPerKmFee ?? 6,
+          deliveryFeeRule: s.deliveryFeeRule ?? 40,
+          freeDeliveryThreshold: s.freeDeliveryThreshold ?? 499,
           storeName: s.storeOrigin?.name || '',
           storeLat: s.storeOrigin?.lat ?? '',
           storeLng: s.storeOrigin?.lng ?? '',
@@ -3467,6 +3694,8 @@ export const SettingsModule: React.FC = () => {
         maxOfferAttempts: Number(dcfg.maxOfferAttempts) || 5,
         deliveryBaseFee: Number(dcfg.deliveryBaseFee) || 0,
         deliveryPerKmFee: Number(dcfg.deliveryPerKmFee) || 0,
+        deliveryFeeRule: Number(dcfg.deliveryFeeRule) || 0,
+        freeDeliveryThreshold: Number(dcfg.freeDeliveryThreshold) || 0,
       };
       if (dcfg.storeLat !== '' && dcfg.storeLng !== '') {
         body.storeOrigin = { name: dcfg.storeName || 'Dark store', lat: Number(dcfg.storeLat), lng: Number(dcfg.storeLng) };
@@ -3553,7 +3782,7 @@ export const SettingsModule: React.FC = () => {
 
       <div className="pt-5 border-t border-divider">
         <h2 className="font-extrabold text-sm text-text-primary">Delivery &amp; dispatch</h2>
-        <p className="text-[10px] text-text-secondary font-medium">Auto-assignment radius, offer timing, batching, partner earning rates, dark-store origin</p>
+        <p className="text-[10px] text-text-secondary font-medium">Auto-assignment radius, offer timing, batching, partner earning rates, customer delivery fee, dark-store origin</p>
       </div>
       <form onSubmit={saveDelivery} className="flex flex-col gap-4">
         <label className="flex items-center gap-2 text-xs font-bold text-text-primary">
@@ -3567,8 +3796,10 @@ export const SettingsModule: React.FC = () => {
             { k: 'batchRadiusKm', label: '2nd-order radius (km)', step: '0.5' },
             { k: 'offerTimeoutSec', label: 'Offer timeout (s)', step: '1' },
             { k: 'maxOfferAttempts', label: 'Max offer attempts', step: '1' },
-            { k: 'deliveryBaseFee', label: 'Base fee (₹)', step: '1' },
-            { k: 'deliveryPerKmFee', label: 'Per-km fee (₹)', step: '1' },
+            { k: 'deliveryBaseFee', label: 'Partner base fee (₹)', step: '1' },
+            { k: 'deliveryPerKmFee', label: 'Partner per-km fee (₹)', step: '1' },
+            { k: 'deliveryFeeRule', label: 'Customer delivery fee (₹)', step: '1' },
+            { k: 'freeDeliveryThreshold', label: 'Free delivery above (₹)', step: '10' },
           ].map(f => (
             <div key={f.k} className="flex flex-col gap-1">
               <label className="text-[11px] font-bold text-text-primary">{f.label}</label>

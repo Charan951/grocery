@@ -66,7 +66,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const SizedBox(height: 4),
                     Text('Sign in to start delivering',
                         textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.black54)),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: kTextMuted)),
                     const SizedBox(height: 28),
                     TextFormField(
                       controller: _email,

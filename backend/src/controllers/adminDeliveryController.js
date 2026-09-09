@@ -5,6 +5,7 @@ import { Assignment } from '../models/Assignment.js';
 import { Settings, Notification } from '../models/Operations.js';
 import { DeliveryEarning } from '../models/DeliveryEarning.js';
 import { DeliveryZone } from '../models/DeliveryZone.js';
+import { DeviceToken } from '../models/DeviceToken.js';
 import { createOffer, acceptOffer, cancelForOrder, tryAssign } from '../services/assignmentService.js';
 import { logAudit } from './apiController.js';
 import { sendDeliveryCredentials } from '../services/mailService.js';
@@ -616,6 +617,44 @@ export const adminDeliveryController = {
       await logAudit(String(req.user._id), req.user.name,
         active ? 'Partner Activated' : 'Partner Deactivated', `${user.name} (${user.email})`);
       res.json({ success: true, accountStatus: user.status });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // DELETE /api/admin/delivery/partners/:userId
+  // Hard-removes the partner's login + fleet record. Historical Orders and
+  // DeliveryEarning rows are kept (they carry the partner's name inline) so
+  // finance/analytics history stays intact.
+  deletePartner: async (req, res) => {
+    try {
+      const user = await User.findOne({ _id: req.params.userId, role: 'Delivery' });
+      if (!user) return res.status(404).json({ success: false, message: 'Delivery partner not found' });
+
+      const partner = await DeliveryPartner.findOne({ userId: user._id });
+      if (partner && (partner.activeOrderIds || []).length > 0) {
+        return res.status(409).json({
+          success: false,
+          message: 'Partner has active deliveries — reassign or complete them first',
+        });
+      }
+
+      // Withdraw any live offer so the sweeper/queue doesn't chase a ghost.
+      await Assignment.updateMany(
+        { partnerUserId: user._id, status: 'offered' },
+        { $set: { status: 'cancelled', respondedAt: new Date() } },
+      );
+      await Promise.allSettled([
+        DeliveryPartner.deleteOne({ userId: user._id }),
+        DeviceToken.deleteMany({ ownerId: String(user._id) }),
+        Notification.deleteMany({ userId: String(user._id) }),
+      ]);
+      await User.deleteOne({ _id: user._id });
+
+      req.app.get('io')?.to('admin_fleet').emit('fleet_partner_removed', { userId: String(user._id) });
+      await logAudit(String(req.user._id), req.user.name, 'Partner Deleted', `${user.name} (${user.email})`);
+
+      res.json({ success: true, deleted: String(user._id) });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
     }

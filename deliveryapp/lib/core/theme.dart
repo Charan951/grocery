@@ -1,51 +1,161 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-const kBrand = Color(0xFF2E7D32);
-const kBg = Color(0xFFF6F8F6);
+/// Delivery-partner app theme, pinned 1:1 to the web rider console
+/// (`frontend/src/partner/ui.tsx` + the `--admin-*` tokens): the FreshCart
+/// "control tower" identity — Space Grotesk display, IBM Plex Sans body,
+/// deep-forest ink chrome on warm ledger paper, one emerald signal green.
+
+// ── Ink chrome (dark) ────────────────────────────────────────────────────
+const kInk = Color(0xFF0F2A1B); // sidebar / slide-control ground
+const kInkSoft = Color(0xFF17402A); // hover / active on ink
+const kInkLine = Color(0xFF234F35); // hairline on ink
+
+// ── Paper surfaces (light) ───────────────────────────────────────────────
+const kPaper = Color(0xFFF5F5F0); // scaffold canvas, warm
+const kSurface = Color(0xFFFFFFFF); // cards / sheets
+const kLedgerLine = Color(0xFFE4E1D5); // hairline divider on paper
+const kText = Color(0xFF171B16); // primary ink text
+const kTextMuted = Color(0xFF6E6C5F); // secondary
+const kTextFaint = Color(0xFFA6A392); // meta / labels / disabled
+
+// ── Signal colours (functional only) ─────────────────────────────────────
+const kGreen = Color(0xFF059669);
+const kGreenSoft = Color(0xFFE3F3EC);
+const kAmber = Color(0xFFB8860A);
+const kAmberSoft = Color(0xFFFBF0D9);
+const kRed = Color(0xFFC0392B);
+const kRedSoft = Color(0xFFFBE4E1);
+
+/// Legacy aliases so existing screens re-skin without edits.
+const kBrand = kGreen;
+const kBg = kPaper;
 
 ThemeData buildTheme() {
-  final base = ThemeData(
+  final scheme = ColorScheme.fromSeed(
+    seedColor: kGreen,
+    primary: kGreen,
+    surface: kSurface,
+    error: kRed,
+  ).copyWith(surfaceTint: Colors.transparent);
+
+  final display = GoogleFonts.spaceGrotesk();
+  final body = GoogleFonts.ibmPlexSansTextTheme(
+    ThemeData(brightness: Brightness.light).textTheme,
+  ).apply(bodyColor: kText, displayColor: kText);
+
+  return ThemeData(
     useMaterial3: true,
-    colorScheme: ColorScheme.fromSeed(seedColor: kBrand, primary: kBrand),
-    scaffoldBackgroundColor: kBg,
-  );
-  return base.copyWith(
-    textTheme: GoogleFonts.interTextTheme(base.textTheme),
-    appBarTheme: const AppBarTheme(
-      backgroundColor: Colors.white,
-      foregroundColor: Color(0xFF1B1B1B),
+    colorScheme: scheme,
+    scaffoldBackgroundColor: kPaper,
+    splashFactory: InkSparkle.splashFactory,
+    textTheme: body.copyWith(
+      headlineSmall: display.copyWith(fontWeight: FontWeight.w700, fontSize: 20, color: kText, letterSpacing: -0.2),
+      titleLarge: display.copyWith(fontWeight: FontWeight.w700, fontSize: 17, color: kText, letterSpacing: -0.1),
+      titleMedium: display.copyWith(fontWeight: FontWeight.w600, fontSize: 15, color: kText),
+      labelLarge: body.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+    ),
+    appBarTheme: AppBarTheme(
+      backgroundColor: kPaper,
+      surfaceTintColor: Colors.transparent,
+      foregroundColor: kText,
       elevation: 0,
+      scrolledUnderElevation: 0,
       centerTitle: false,
+      titleTextStyle: display.copyWith(fontWeight: FontWeight.w700, fontSize: 18, color: kText, letterSpacing: -0.2),
+      shape: const Border(bottom: BorderSide(color: kLedgerLine)),
     ),
     cardTheme: CardThemeData(
-      color: Colors.white,
+      color: kSurface,
       elevation: 0,
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: Color(0xFFE6E6E6)),
+        side: const BorderSide(color: kLedgerLine),
       ),
     ),
+    dividerTheme: const DividerThemeData(color: kLedgerLine, thickness: 1, space: 1),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        minimumSize: const Size.fromHeight(52),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        textStyle: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15),
+        backgroundColor: kGreen,
+        foregroundColor: Colors.white,
+        disabledBackgroundColor: kGreen.withValues(alpha: 0.4),
+        minimumSize: const Size.fromHeight(50),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        textStyle: GoogleFonts.ibmPlexSans(fontWeight: FontWeight.w700, fontSize: 14),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        minimumSize: const Size.fromHeight(52),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        foregroundColor: kText,
+        minimumSize: const Size.fromHeight(50),
+        side: const BorderSide(color: kLedgerLine),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        textStyle: GoogleFonts.ibmPlexSans(fontWeight: FontWeight.w700, fontSize: 14),
       ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(foregroundColor: kGreen, textStyle: GoogleFonts.ibmPlexSans(fontWeight: FontWeight.w600)),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: Colors.white,
+      fillColor: kSurface,
+      hintStyle: const TextStyle(color: kTextFaint),
+      labelStyle: const TextStyle(color: kTextMuted, fontWeight: FontWeight.w600),
+      floatingLabelStyle: const TextStyle(color: kGreen, fontWeight: FontWeight.w600),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: kLedgerLine),
+      ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+        borderSide: const BorderSide(color: kLedgerLine),
       ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: kGreen, width: 1.5),
+      ),
+    ),
+    listTileTheme: const ListTileThemeData(
+      iconColor: kTextFaint,
+      textColor: kText,
+      titleTextStyle: TextStyle(color: kText, fontSize: 14, fontWeight: FontWeight.w600),
+      subtitleTextStyle: TextStyle(color: kTextMuted, fontSize: 12.5),
+    ),
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: kSurface,
+      surfaceTintColor: Colors.transparent,
+      indicatorColor: kGreenSoft,
+      height: 64,
+      elevation: 0,
+      labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+      iconTheme: WidgetStateProperty.resolveWith(
+        (s) => IconThemeData(size: 22, color: s.contains(WidgetState.selected) ? kGreen : kTextFaint),
+      ),
+      labelTextStyle: WidgetStateProperty.resolveWith(
+        (s) => GoogleFonts.ibmPlexSans(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: s.contains(WidgetState.selected) ? kGreen : kTextFaint,
+        ),
+      ),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: kInk,
+      contentTextStyle: GoogleFonts.ibmPlexSans(color: Colors.white, fontSize: 13),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ),
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith(
+        (s) => s.contains(WidgetState.selected) ? Colors.white : kTextFaint,
+      ),
+      trackColor: WidgetStateProperty.resolveWith(
+        (s) => s.contains(WidgetState.selected) ? kGreen : kLedgerLine,
+      ),
+      trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
     ),
   );
 }
