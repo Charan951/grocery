@@ -1,3 +1,5 @@
+// ignore_for_file: curly_braces_in_flow_control_structures
+
 import 'package:dio/dio.dart';
 import 'package:freshcart/core/config/app_config.dart';
 import 'package:freshcart/core/error/api_exception.dart';
@@ -305,7 +307,6 @@ class ApiService {
   }) async {
     try {
       final qp = <String, dynamic>{};
-      if (ids != null && ids.isNotEmpty) qp['ids'] = ids.join(',');
       if (categoryId != null && categoryId.isNotEmpty && categoryId != 'All')
         qp['categoryId'] = categoryId;
       if (subCategory != null && subCategory.isNotEmpty && subCategory != 'All')

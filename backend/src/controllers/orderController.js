@@ -23,6 +23,15 @@ import { signToken, maskPhone, isPaymentsTestMode, razorpayInstance, RAZORPAY_KE
 export const orderController = {
   getOrders: async (req, res) => {
     try {
+      // Orders are auto-accepted — clear any legacy "Pending" rows so the
+      // admin never has to accept an order by hand.
+      await Order.updateMany(
+        { status: 'Pending' },
+        {
+          $set: { status: 'Accepted' },
+          $push: { trackingTimeline: { status: 'Accepted', note: 'Order auto-accepted.' } },
+        }
+      ).catch(() => {});
       const list = await Order.find().sort({ createdAt: -1 });
       res.json({ success: true, orders: list });
     } catch (err) {
@@ -198,7 +207,12 @@ export const orderController = {
         paymentMethod: orderData.paymentMethod || 'Razorpay UPI/Card',
         paymentId: orderData.paymentId || undefined,
         paymentRef: orderData.paymentRef || orderData.razorpayOrderId || undefined,
-        status: orderData.status || 'In Transit',
+        // Orders are auto-accepted — admin never has to accept manually.
+        // Anything that would land as "Pending" is promoted straight to "Accepted".
+        status: (() => {
+          const s = orderData.status || 'In Transit';
+          return s === 'Pending' ? 'Accepted' : s;
+        })(),
         deliveryAddress: typeof orderData.deliveryAddress === 'string'
           ? orderData.deliveryAddress
           : orderData.address?.fullAddress || 'Selected Delivery Address'
@@ -216,6 +230,13 @@ export const orderController = {
           lat: settingsDoc.storeOrigin.lat,
           lng: settingsDoc.storeOrigin.lng,
         };
+      }
+
+      // Seed the timeline so an auto-accepted order shows the step in history.
+      if (normalizedOrder.status === 'Accepted') {
+        normalizedOrder.trackingTimeline = [
+          { status: 'Accepted', note: 'Order auto-accepted.' },
+        ];
       }
 
       let order;

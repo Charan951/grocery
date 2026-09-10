@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ShoppingBag, Eye, Printer, UserPlus, UserMinus, Clock, ArrowRight, CheckCircle2,
   XCircle, Truck, FileText, ChevronRight, X, AlertCircle
@@ -77,24 +78,11 @@ export const Orders: React.FC = () => {
       console.warn('Failed to fetch orders from API:', e);
     }
 
-    // Merge any customer orders saved in local storage
-    let localOrders: any[] = [];
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('customer_orders_')) {
-          const parsed = JSON.parse(localStorage.getItem(key) || '[]');
-          if (Array.isArray(parsed)) localOrders.push(...parsed);
-        }
-      }
-    } catch (_) {}
-
+    // The admin dispatch view is a server view — the database is the single
+    // source of truth. Browser localStorage ("customer_orders_*") holds only the
+    // customer app's own cache and produces phantom, un-actionable rows here, so
+    // it is deliberately NOT merged in.
     const allRaw = [...apiOrders];
-    localOrders.forEach(loc => {
-      if (!allRaw.some(o => o.orderId === loc.orderId)) {
-        allRaw.push(loc);
-      }
-    });
 
     if (allRaw.length > 0) {
       const normalized: Order[] = allRaw.map((o: any) => ({
@@ -128,6 +116,8 @@ export const Orders: React.FC = () => {
         ]
       }));
 
+      // Newest order first.
+      normalized.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setOrders(normalized);
     } else {
       // Mock Data fallback if no orders exist at all
@@ -253,13 +243,24 @@ export const Orders: React.FC = () => {
         headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
         body: JSON.stringify({ status: newStatus })
       });
-      const data = await res.json();
-      if (data.success && data.order) {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        if (res.status === 404) {
+          alert(`Order ${orderId} is not on the server (local-only test order). Place a fresh order from the customer app so it is saved to the database, then update it here.`);
+        } else {
+          alert(data.message || `Failed to update status (HTTP ${res.status}).`);
+        }
+        return;
+      }
+      if (data.order) {
         setOrders(prev => prev.map(o => o.orderId === orderId ? { ...o, ...data.order } : o));
         if (selectedOrder?.orderId === orderId) {
           setSelectedOrder({ ...selectedOrder, ...data.order });
         }
       }
+      fetchOrders();
+      alert(`Order status updated to ${newStatus}.`);
+      return;
     } catch (e) {
       // Local Sync in Offline Mode
       setOrders(prev => prev.map(o => {
@@ -389,10 +390,9 @@ export const Orders: React.FC = () => {
       </div>
 
       {/* DETAIL INVOICE & TIMELINE PROCESS DRAWER */}
-      {selectedOrder && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-xs" onClick={() => setSelectedOrder(null)} />
-          <div className="relative w-full max-w-[600px] bg-surface h-full shadow-premium flex flex-col p-6 overflow-y-auto z-10 border-l border-divider printable-area">
+      {selectedOrder && createPortal(
+        <div className="fixed inset-0 z-[60] bg-surface overflow-y-auto">
+          <div className="relative mx-auto w-full max-w-4xl min-h-full flex flex-col p-6 md:p-10 printable-area">
             {/* Drawer Header */}
             <div className="flex items-center justify-between border-b border-divider pb-4 mb-4 dont-print">
               <h2 className="text-base font-extrabold text-text-primary">Order dispatch cockpit</h2>
@@ -474,6 +474,47 @@ export const Orders: React.FC = () => {
               {/* ACTION: Shift Status / Assign Rider */}
               <div className="flex flex-col gap-3 dont-print">
                 <span className="text-[10px] font-bold text-text-secondary uppercase">Dispatch Action Panel</span>
+                {(() => {
+                  const s = selectedOrder.status;
+                  const hasRider = !!selectedOrder.deliveryPartnerUserId;
+                  let label = '';
+                  let tone = 'bg-background text-text-secondary';
+                  if (['Pending', 'In Transit', 'Accepted', 'Packed'].includes(s)) {
+                    label = 'Preparing — rider assignment begins when the order is marked Ready for Pickup';
+                  } else if (s === 'Ready' && !hasRider && selectedOrder.assignmentStalled) {
+                    label = 'No rider available nearby — waiting / retryable. Order stays Ready.';
+                    tone = 'bg-error/10 text-error';
+                  } else if (s === 'Ready' && !hasRider) {
+                    label = 'Ready for Pickup — searching for a nearby rider…';
+                    tone = 'bg-primary/10 text-primary';
+                  } else if (s === 'Ready' && hasRider) {
+                    label = `Rider assigned: ${selectedOrder.deliveryPartnerName}`;
+                    tone = 'bg-success/10 text-success';
+                  } else if (s === 'Assigned') {
+                    label = `Rider assigned: ${selectedOrder.deliveryPartnerName} — heading to store`;
+                    tone = 'bg-success/10 text-success';
+                  } else if (s === 'Arrived At Store') {
+                    label = `${selectedOrder.deliveryPartnerName} at store — picking up`;
+                    tone = 'bg-success/10 text-success';
+                  } else if (s === 'Out For Delivery') {
+                    label = `Out for delivery with ${selectedOrder.deliveryPartnerName}`;
+                    tone = 'bg-success/10 text-success';
+                  } else if (s === 'Arrived') {
+                    label = `${selectedOrder.deliveryPartnerName} arrived at customer`;
+                    tone = 'bg-success/10 text-success';
+                  } else if (s === 'Delivered') {
+                    label = `Delivered by ${selectedOrder.deliveryPartnerName || 'rider'}`;
+                    tone = 'bg-success/10 text-success';
+                  } else {
+                    return null;
+                  }
+                  return (
+                    <div className={`text-[11px] font-semibold rounded-lg px-3 py-2 ${tone}`}>
+                      <span className="uppercase text-[9px] font-bold opacity-70 mr-1.5">Rider assignment</span>
+                      {label}
+                    </div>
+                  );
+                })()}
                 {selectedOrder.deliveryPartnerName && (
                   <div className={`text-[11px] font-semibold rounded-lg px-3 py-2 ${selectedOrder.assignmentStalled ? 'bg-error/10 text-error' : 'bg-background text-text-secondary'}`}>
                     Partner: <b className="text-text-primary">{selectedOrder.deliveryPartnerName}</b>
@@ -489,36 +530,28 @@ export const Orders: React.FC = () => {
                     />
                   )}
                 <div className="grid grid-cols-2 gap-2">
-                  {selectedOrder.status === 'Pending' && (
-                    <button 
-                      onClick={() => handleUpdateStatus(selectedOrder.orderId, 'Accepted')}
-                      className="bg-primary text-white font-bold py-2 rounded-xl text-xs hover:bg-secondary cursor-pointer"
-                    >
-                      Accept Order
-                    </button>
-                  )}
-                  {selectedOrder.status === 'Accepted' && (
-                    <button 
+                  {['Pending', 'In Transit', 'Accepted'].includes(selectedOrder.status) && (
+                    <button
                       onClick={() => handleUpdateStatus(selectedOrder.orderId, 'Packed')}
                       className="bg-primary text-white font-bold py-2 rounded-xl text-xs hover:bg-secondary cursor-pointer"
                     >
-                      Order Packed
+                      Mark Packed
                     </button>
                   )}
                   {selectedOrder.status === 'Packed' && (
-                    <button 
+                    <button
                       onClick={() => handleUpdateStatus(selectedOrder.orderId, 'Ready')}
                       className="bg-primary text-white font-bold py-2 rounded-xl text-xs hover:bg-secondary cursor-pointer"
                     >
-                      Ready for Dispatch
+                      Mark Ready for Pickup
                     </button>
                   )}
-                  {(selectedOrder.status === 'Ready' || selectedOrder.status === 'Packed') && !selectedOrder.deliveryPartnerUserId && (
+                  {selectedOrder.status === 'Ready' && !selectedOrder.deliveryPartnerUserId && (
                     <button
                       onClick={() => openAssign(false)}
                       className="bg-primary text-white font-bold py-2 rounded-xl text-xs hover:bg-secondary cursor-pointer flex items-center justify-center gap-1.5"
                     >
-                      <UserPlus size={14} /> Assign Partner
+                      <UserPlus size={14} /> Assign Partner Manually
                     </button>
                   )}
                   {selectedOrder.deliveryPartnerUserId && !['Delivered', 'Cancelled', 'Returned', 'Refunded'].includes(selectedOrder.status) && (
@@ -573,12 +606,13 @@ export const Orders: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* PARTNER ASSIGNMENT MODAL OVERLAY */}
-      {showRiderModal && selectedOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {showRiderModal && selectedOrder && createPortal(
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black/40 backdrop-blur-xs" onClick={() => !assignBusy && setShowRiderModal(false)} />
           <div className="bg-surface rounded-[28px] border border-divider p-6 max-w-sm w-full relative z-10 shadow-premium flex flex-col gap-4">
             <h3 className="font-extrabold text-sm text-text-primary uppercase">
@@ -637,7 +671,8 @@ export const Orders: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

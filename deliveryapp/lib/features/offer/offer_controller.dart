@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freshcart_delivery/core/error/api_exception.dart';
 import 'package:freshcart_delivery/core/providers.dart';
+import 'package:freshcart_delivery/core/routes/app_router.dart';
 import 'package:freshcart_delivery/models/delivery_models.dart';
 
 /// Holds the current in-flight offer (if any). Emits null when there's none.
@@ -11,7 +12,7 @@ class OfferController extends StateNotifier<DeliveryOffer?> {
 
   OfferController(this._ref) : super(null) {
     final s = _ref.read(socketProvider);
-    _subs.add(s.offers.listen((j) => state = DeliveryOffer.fromJson(j)));
+    _subs.add(s.offers.listen((j) => _onOfferReceived(DeliveryOffer.fromJson(j))));
     _subs.add(s.revoked.listen((j) {
       if (state?.assignmentId == j['assignmentId'] || j['orderId'] == state?.orderId) state = null;
     }));
@@ -20,13 +21,23 @@ class OfferController extends StateNotifier<DeliveryOffer?> {
 
   void dismiss() => state = null;
 
+  void _onOfferReceived(DeliveryOffer o) async {
+    state = o;
+    try {
+      final order = await accept();
+      if (order != null) {
+        _ref.read(routerProvider).go('/order/${order.orderId}');
+      }
+    } catch (_) {}
+  }
+
   /// Pull the live offer from the API in case the socket missed it (cold start,
   /// backgrounded app, reconnect). No-op if an offer is already showing.
   Future<void> checkPending() async {
     if (state != null) return;
     try {
       final o = await _ref.read(apiProvider).pendingAssignment();
-      if (o != null && state == null) state = o;
+      if (o != null && state == null) _onOfferReceived(o);
     } on ApiException {/* ignore — socket remains the primary channel */}
   }
 

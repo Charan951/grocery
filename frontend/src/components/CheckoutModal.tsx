@@ -157,6 +157,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     try {
       const newOrder = {
         id: `ord_${Date.now()}`,
+        orderId,            // real server orderId — used for tracking + admin lookups
         orderNumber: orderId,
         date:
           new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) +

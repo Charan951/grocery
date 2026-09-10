@@ -309,12 +309,14 @@ export const tryAssign = async (orderOrId) => {
   }
 
   let candidates = [];
+  // Progressive radius search starting from 100m, 200m, 300m...
+  const radiiKm = [0.1, 0.2, 0.3, 0.5, 1, 2, 3, baseRadius, baseRadius * 2];
   // Pass 1: zone-restricted (skipped when no zone applies). Pass 2: unrestricted.
   const passes = restrictUserIds ? [restrictUserIds, null] : [null];
   for (const list of passes) {
-    for (const mult of [1, 2, 3]) {
+    for (const rKm of radiiKm) {
       candidates = await findCandidates({
-        pickup: order.pickup, excludeUserIds, radiusKm: baseRadius * mult, restrictUserIds: list,
+        pickup: order.pickup, excludeUserIds, radiusKm: rKm, restrictUserIds: list,
         drop: order.deliveryLocation, batchRadiusKm,
       });
       if (candidates.length) break;

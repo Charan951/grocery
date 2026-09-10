@@ -593,7 +593,7 @@ export const CustomerOrders: React.FC = () => {
                   {bucketOf(order.status) === 'In Transit' ? (
                     <div className="flex items-center gap-2">
                       <Link
-                        to={`/track/${encodeURIComponent((order as any).orderId || order.id || order.orderNumber)}`}
+                        to={`/track/${encodeURIComponent((order as any).orderId || order.orderNumber || order.id)}`}
                         onClick={(e) => e.stopPropagation()}
                         className="bg-[#2E7D32] text-white px-3 py-1 rounded-full text-xs font-black hover:bg-[#256628]"
                       >
