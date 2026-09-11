@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:freshcart_delivery/core/delivery_numbering.dart';
 import 'package:freshcart_delivery/core/providers.dart';
 import 'package:freshcart_delivery/core/theme.dart';
 import 'package:freshcart_delivery/core/widgets/filter_sheet.dart';
@@ -20,6 +21,7 @@ class EarningsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final range = ref.watch(_rangeProvider);
     final async = ref.watch(earningsProvider);
+    final numberByOrderId = ref.watch(deliveryNumberingProvider).valueOrNull ?? const <String, int>{};
 
     return Scaffold(
       appBar: AppBar(
@@ -85,10 +87,12 @@ class EarningsScreen extends ConsumerWidget {
                       else
                         ...data.items.map((e) {
                           final settled = e['status'] == 'settled';
+                          final number = numberByOrderId[e['orderId']];
+                          final label = number != null ? 'Delivery #$number' : '${e['orderId']}';
                           return Card(
                             child: ListTile(
                               dense: true,
-                              title: Text('${e['orderId']}',
+                              title: Text(label,
                                   style: const TextStyle(fontWeight: FontWeight.w700)),
                               subtitle: Text(
                                   'Base ₹${e['baseFee'] ?? 0} + ${(e['distanceKm'] ?? 0)} km ₹${e['distanceFee'] ?? 0}'),

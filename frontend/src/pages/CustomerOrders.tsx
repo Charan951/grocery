@@ -182,6 +182,47 @@ export const CustomerOrders: React.FC = () => {
     (o) => filter === 'All' || bucketOf(o.status) === filter
   );
 
+  // Stable per-customer order numbers (#1 = this customer's very first
+  // order), shown instead of the raw DB order id. Derived from the full
+  // unfiltered order list, which the backend returns newest-first.
+  const orderKey = (o: any): string => o.orderId || o.orderNumber || o.id || '';
+  const orderNumberByKey = React.useMemo(() => {
+    const total = orders.length;
+    const map: Record<string, number> = {};
+    orders.forEach((o, i) => {
+      const key = orderKey(o);
+      if (key) map[key] = total - i;
+    });
+    return map;
+  }, [orders]);
+  const orderLabel = (o: any): string => {
+    const n = orderNumberByKey[orderKey(o)];
+    return n != null ? `Order #${n}` : orderKey(o) || 'Order';
+  };
+
+  // Ticks every 30s so the ETA badge counts down live instead of freezing at
+  // whatever the estimate was when the order was placed.
+  const [nowTick, setNowTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setNowTick((n) => n + 1), 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  const liveEtaMinutes = React.useMemo(() => {
+    if (!selectedOrder || !selectedOrder.createdAt) return null;
+    const placedAt = new Date(selectedOrder.createdAt).getTime();
+    if (Number.isNaN(placedAt)) return null;
+    const totalMinutes = parseInt(selectedOrder.estimatedDelivery || '10', 10) || 10;
+    const elapsedMinutes = (Date.now() - placedAt) / 60000;
+    return Math.max(0, Math.round(totalMinutes - elapsedMinutes));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedOrder, nowTick]);
+  const liveEtaLabel = liveEtaMinutes == null
+    ? null
+    : liveEtaMinutes <= 0
+    ? 'Any moment'
+    : `${liveEtaMinutes} min${liveEtaMinutes === 1 ? '' : 's'}`;
+
   const handleCopyOrderId = (id: string) => {
     navigator.clipboard.writeText(id);
     setCopied(true);
@@ -424,8 +465,8 @@ export const CustomerOrders: React.FC = () => {
         className="min-h-screen bg-gray-50/70 text-gray-900 pb-28 font-sans"
       >
         <SEO
-          title={`Order #${selectedOrder.orderNumber} | FreshCart`}
-          description={`Order details for order #${selectedOrder.orderNumber}`}
+          title={`${orderLabel(selectedOrder)} | FreshCart`}
+          description={`Order details for ${orderLabel(selectedOrder)}`}
         />
 
         {/* Top Sticky Header */}
@@ -441,11 +482,11 @@ export const CustomerOrders: React.FC = () => {
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
                 <h1 className="text-base md:text-lg font-black text-gray-900 font-display leading-tight">
-                  Order #{selectedOrder.orderNumber}
+                  {orderLabel(selectedOrder)}
                 </h1>
                 <button
                   type="button"
-                  onClick={() => handleCopyOrderId(selectedOrder.orderNumber)}
+                  onClick={() => handleCopyOrderId(orderKey(selectedOrder))}
                   className="text-gray-400 hover:text-gray-700 cursor-pointer p-0.5"
                   title="Copy Order ID"
                 >
@@ -503,7 +544,7 @@ export const CustomerOrders: React.FC = () => {
                     : isDelivered
                     ? 'DELIVERED'
                     : isOutForDelivery
-                    ? `ARRIVING IN ${selectedOrder.estimatedDelivery || '8 MINS'}`
+                    ? `ARRIVING IN ${(liveEtaLabel || selectedOrder.estimatedDelivery || '8 mins').toUpperCase()}`
                     : 'IN PROGRESS'}
                 </span>
               </span>
@@ -511,7 +552,7 @@ export const CustomerOrders: React.FC = () => {
               {isActive && (
                 <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 text-[11px] font-extrabold border border-emerald-200/80">
                   <Clock size={12} className="text-emerald-700" />
-                  <span>{selectedOrder.estimatedDelivery || '10 mins'}</span>
+                  <span>{liveEtaLabel || selectedOrder.estimatedDelivery || '10 mins'}</span>
                 </div>
               )}
             </div>
@@ -1007,7 +1048,7 @@ export const CustomerOrders: React.FC = () => {
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-black text-gray-900 font-display group-hover:text-[#4CAF50] transition-colors">
-                      {order.orderNumber}
+                      {orderLabel(order)}
                     </span>
                     <span className="text-xs text-gray-400 font-semibold">•</span>
                     <span className="text-xs text-gray-500 font-semibold flex items-center gap-1">

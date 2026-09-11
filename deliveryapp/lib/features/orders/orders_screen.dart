@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:freshcart_delivery/core/delivery_numbering.dart';
 import 'package:freshcart_delivery/core/providers.dart';
 import 'package:freshcart_delivery/core/theme.dart';
 import 'package:freshcart_delivery/core/widgets/filter_sheet.dart';
@@ -54,16 +55,8 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
     final history = ref.watch(_historyProvider(_filters[_filterLabel]));
 
     // Stable per-partner delivery numbers (#1 = their very first delivery),
-    // independent of whichever status filter is active — derived from the
-    // unfiltered lifetime list, which the backend returns newest-first.
-    final allHistory = ref.watch(_historyProvider(null)).valueOrNull;
-    final numberByOrderId = <String, int>{};
-    if (allHistory != null) {
-      final total = allHistory.length;
-      for (var i = 0; i < total; i++) {
-        numberByOrderId[allHistory[i].orderId] = total - i;
-      }
-    }
+    // independent of whichever status filter is active.
+    final numberByOrderId = ref.watch(deliveryNumberingProvider).valueOrNull ?? const <String, int>{};
 
     return Scaffold(
       appBar: AppBar(

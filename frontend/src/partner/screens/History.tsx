@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { partnerApi } from '../partnerApi';
 import { CenterState, FilterMenu, PageHead, Pill, money } from '../ui';
+import { useDeliveryNumbering } from '../useDeliveryNumbering';
 
 const FILTERS = [
   { key: '', label: 'All' },
@@ -19,6 +20,7 @@ export const History: React.FC = () => {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const numberByOrderId = useDeliveryNumbering();
 
   useEffect(() => {
     setLoading(true);
@@ -65,7 +67,7 @@ export const History: React.FC = () => {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="font-admin-mono text-[12px] font-semibold text-admin-text">
-                    {o.orderId}
+                    {numberByOrderId[o.orderId] ? `Delivery #${numberByOrderId[o.orderId]}` : o.orderId}
                   </span>
                   <Pill tone={toneFor(o.status)}>{o.status}</Pill>
                 </div>

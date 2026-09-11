@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CenterState, FilterMenu, PageHead, SectionLabel, money } from '../ui';
 import { partnerApi } from '../partnerApi';
+import { useDeliveryNumbering } from '../useDeliveryNumbering';
 
 const RANGES: Array<'today' | 'week' | 'month' | 'all'> = ['today', 'week', 'month', 'all'];
 
@@ -8,6 +9,7 @@ export const Earnings: React.FC = () => {
   const [range, setRange] = useState<'today' | 'week' | 'month' | 'all'>('week');
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const numberByOrderId = useDeliveryNumbering();
 
   useEffect(() => {
     setLoading(true);
@@ -80,7 +82,7 @@ export const Earnings: React.FC = () => {
                 >
                   <div className="min-w-0">
                     <div className="font-admin-mono text-[12px] font-semibold text-admin-text">
-                      {e.orderId}
+                      {numberByOrderId[e.orderId] ? `Delivery #${numberByOrderId[e.orderId]}` : e.orderId}
                     </div>
                     <div className="font-admin-mono text-[10px] text-admin-text-faint mt-0.5 uppercase tracking-[0.08em]">
                       {new Date(e.earnedAt).toLocaleDateString()} ·{' '}

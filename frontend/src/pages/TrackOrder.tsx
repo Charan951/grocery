@@ -150,6 +150,29 @@ export function formatOrderNumber(orderId: string): string {
   return clean.length > 0 ? clean : orderId.replace('#', '');
 }
 
+/**
+ * Stable per-customer order number (#1 = this customer's very first order),
+ * read from the same cache CustomerOrders.tsx maintains
+ * (`customer_orders_<phone>`, newest-first) — falls back to the raw id when
+ * the cache doesn't have this order yet (e.g. tracked before ever opening
+ * "Your Orders").
+ */
+function customerOrderLabel(orderId: string): string {
+  try {
+    const phone = customerPhone();
+    const key = phone ? `customer_orders_${phone.replace(/\D/g, '')}` : '';
+    const cached = key ? JSON.parse(localStorage.getItem(key) || '[]') : [];
+    if (Array.isArray(cached) && cached.length > 0) {
+      const total = cached.length;
+      const idx = cached.findIndex((o: any) => (o.orderId || o.id) === orderId);
+      if (idx !== -1) return `Order #${total - idx}`;
+    }
+  } catch {
+    /* fall through */
+  }
+  return formatOrderNumber(orderId);
+}
+
 export const TrackOrder: React.FC = () => {
   const { orderId = '' } = useParams();
   const navigate = useNavigate();
@@ -506,7 +529,7 @@ export const TrackOrder: React.FC = () => {
                 </span>
                 <div className="flex items-center gap-2 mt-0.5">
                   <h1 className="text-base font-black text-gray-900 font-mono">
-                    {formatOrderNumber(order.orderId)}
+                    {customerOrderLabel(order.orderId)}
                   </h1>
                   <button
                     onClick={handleCopyOrderId}

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -25,6 +27,19 @@ import 'package:freshcart/features/orders/data/models/order_model.dart';
 import 'package:freshcart/features/orders/presentation/controllers/orders_controller.dart';
 import 'package:freshcart/features/orders/presentation/screens/orders_list_screen.dart' show reorder;
 
+/// Stable per-customer order number (#1 = this customer's very first order),
+/// derived from the full orders list (newest-first from the backend) instead
+/// of the raw DB order id — falls back to the raw id while the list hasn't
+/// loaded yet (e.g. this screen opened directly, before Orders was visited).
+String _customerOrderLabel(String orderId, List<OrderModel>? orders) {
+  if (orders != null) {
+    final total = orders.length;
+    final idx = orders.indexWhere((o) => o.id == orderId);
+    if (idx != -1) return 'Order #${total - idx}';
+  }
+  return 'Order #$orderId';
+}
+
 class OrderDetailScreen extends ConsumerWidget {
   final String orderId;
   const OrderDetailScreen({super.key, required this.orderId});
@@ -43,7 +58,7 @@ class OrderDetailScreen extends ConsumerWidget {
     final async = ref.watch(orderDetailProvider(orderId));
 
     return AppScaffold(
-      title: 'Order #$orderId',
+      title: _customerOrderLabel(orderId, ref.watch(ordersProvider).valueOrNull),
       actions: async.maybeWhen(
         data: (order) => [
           Padding(
@@ -289,17 +304,52 @@ class _MilestoneStepper extends StatelessWidget {
   }
 }
 
-class _StatusHeader extends StatelessWidget {
+/// Computes a live "N mins" / "Any moment" label from the order's placed
+/// time + its estimated-delivery minutes, instead of freezing at whatever
+/// the estimate was when the order was first placed.
+String? _liveEtaLabel(OrderModel order) {
+  final totalMinutes = int.tryParse(RegExp(r'\d+').firstMatch(order.eta)?.group(0) ?? '') ?? 10;
+  final elapsedMinutes = DateTime.now().difference(order.date).inSeconds / 60;
+  final remaining = (totalMinutes - elapsedMinutes).round();
+  if (remaining <= 0) return 'Any moment';
+  return '$remaining min${remaining == 1 ? '' : 's'}';
+}
+
+class _StatusHeader extends StatefulWidget {
   final OrderModel order;
   final bool isDark;
   const _StatusHeader({required this.order, required this.isDark});
 
   @override
+  State<_StatusHeader> createState() => _StatusHeaderState();
+}
+
+class _StatusHeaderState extends State<_StatusHeader> {
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final order = widget.order;
+    final isDark = widget.isDark;
     final isArriving = order.isActive;
     final isOutForDelivery = order.statusRaw.toLowerCase() == 'out for delivery';
     final isDelivered = order.status == OrderStatus.delivered;
     final isCancelled = order.status == OrderStatus.cancelled;
+    final liveEta = _liveEtaLabel(order);
 
     final badgeTextColor = isCancelled ? AppColors.errorText : AppColors.primaryText;
     final badgeBg = isCancelled ? const Color(0xFFFFEBEE) : const Color(0xFFE8F5E9);
@@ -309,7 +359,7 @@ class _StatusHeader extends StatelessWidget {
         : (isDelivered
             ? 'Delivered'
             : (isOutForDelivery
-                ? 'Arriving in ${order.eta.isNotEmpty ? order.eta : "8 mins"}'
+                ? 'Arriving in ${liveEta ?? (order.eta.isNotEmpty ? order.eta : "8 mins")}'
                 : 'In Progress'));
 
     final headline = isCancelled
@@ -390,7 +440,7 @@ class _StatusHeader extends StatelessWidget {
                       const Icon(Icons.timer_outlined, size: 13, color: AppColors.primaryText),
                       const SizedBox(width: 4),
                       Text(
-                        order.eta.isNotEmpty ? order.eta : '10 mins',
+                        liveEta ?? (order.eta.isNotEmpty ? order.eta : '10 mins'),
                         style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
