@@ -2,9 +2,23 @@
  * Centralized API & Real-time Configuration
  *
  * All frontend requests (storefront, admin ops, delivery partner web) use this
- * module instead of hardcoding '/api' or server URLs. Configurable via Vite
- * environment variables in `.env` (e.g. `VITE_API_URL`).
+ * module instead of hardcoding '/api' or server URLs.
+ *
+ * Configurable via a single environment variable in `.env`:
+ *   `VITE_API_URL=http://localhost:5000`
+ *
+ * - API endpoints automatically target `${VITE_API_URL}/api`
+ * - Socket.IO automatically derives its host origin from `VITE_API_URL`
  */
+
+function normalizeHost(url: string): string {
+  let clean = url.trim().replace(/\/+$/, '');
+  if (!clean) return '';
+  if (/^localhost(:\d+)?/i.test(clean) || /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?/.test(clean)) {
+    clean = `http://${clean}`;
+  }
+  return clean;
+}
 
 function resolveApiBaseUrl(): string {
   const envUrl = (
@@ -15,14 +29,14 @@ function resolveApiBaseUrl(): string {
 
   if (!envUrl) return '/api';
 
-  const clean = envUrl.replace(/\/+$/, '');
+  const clean = normalizeHost(envUrl);
 
   // Relative path (e.g. '/api' or '/backend/api')
   if (clean.startsWith('/') && !clean.startsWith('//')) {
     return clean;
   }
 
-  // Absolute URL (e.g. 'http://localhost:5000' or 'https://api.freshcart.com/api')
+  // Absolute URL (e.g. 'http://localhost:5000' or 'https://api.freshcart.com')
   if (/^https?:\/\//i.test(clean)) {
     return clean.endsWith('/api') ? clean : `${clean}/api`;
   }
@@ -30,32 +44,38 @@ function resolveApiBaseUrl(): string {
   return clean;
 }
 
-/** The centralized base URL for all REST API endpoints. */
+/** The centralized base URL for all REST API endpoints (e.g. http://localhost:5000/api). */
 export const API_BASE_URL = resolveApiBaseUrl();
 
 /** Alias for backwards compatibility across existing admin and partner screens. */
 export const API_URL = API_BASE_URL;
 
 function resolveSocketUrl(): string {
+  // Optional explicit override (if Socket server is hosted on a different host/port)
   const envSocket = (import.meta.env.VITE_SOCKET_URL || '').trim();
-  if (envSocket) return envSocket.replace(/\/+$/, '');
+  if (envSocket) return normalizeHost(envSocket);
 
+  // Automatically derived from VITE_API_URL
   const envApi = (
     import.meta.env.VITE_API_URL ||
     import.meta.env.VITE_API_BASE_URL ||
     ''
   ).trim();
 
-  if (/^https?:\/\//i.test(envApi)) {
-    try {
-      return new URL(envApi).origin;
-    } catch (_) {}
+  if (envApi) {
+    const clean = normalizeHost(envApi);
+    if (/^https?:\/\//i.test(clean)) {
+      try {
+        return new URL(clean).origin;
+      } catch (_) {}
+    }
   }
 
+  // Fallback to current browser window origin (supports local Vite dev proxy)
   return typeof window !== 'undefined' ? window.location.origin : '';
 }
 
-/** The centralized host URL for Socket.IO connections. */
+/** The centralized host URL for Socket.IO connections (e.g. http://localhost:5000). */
 export const SOCKET_URL = resolveSocketUrl();
 
 /**
