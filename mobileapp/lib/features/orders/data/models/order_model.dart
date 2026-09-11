@@ -18,6 +18,7 @@ OrderStatus orderStatusFrom(String raw) {
     case 'out for delivery':
     case 'arrived':
     case 'in transit':
+    case 'in progress':
       return OrderStatus.dispatched;
     case 'delivered':
       return OrderStatus.delivered;
@@ -37,11 +38,14 @@ class OrderTimelineEntry {
   final DateTime? at;
   const OrderTimelineEntry({required this.status, required this.note, this.at});
 
-  factory OrderTimelineEntry.fromJson(Map<String, dynamic> j) => OrderTimelineEntry(
-        status: asString(j['status']),
-        note: asString(j['note']),
-        at: DateTime.tryParse(asString(j['at'])),
-      );
+  factory OrderTimelineEntry.fromJson(Map<String, dynamic> j) {
+    final s = asString(j['status']);
+    return OrderTimelineEntry(
+      status: s.toLowerCase() == 'in transit' ? 'In Progress' : s,
+      note: asString(j['note']),
+      at: DateTime.tryParse(asString(j['at'])),
+    );
+  }
 }
 
 class OrderModel {
@@ -88,14 +92,17 @@ class OrderModel {
   });
 
   String get statusText {
-    if (statusRaw.isNotEmpty) return statusRaw;
+    if (statusRaw.isNotEmpty) {
+      if (statusRaw.toLowerCase() == 'in transit') return 'In Progress';
+      return statusRaw;
+    }
     switch (status) {
       case OrderStatus.placed:
         return 'Order Placed';
       case OrderStatus.processing:
         return 'Packing Groceries';
       case OrderStatus.dispatched:
-        return 'Out for Delivery';
+        return 'In Progress';
       case OrderStatus.delivered:
         return 'Delivered';
       case OrderStatus.cancelled:
@@ -128,7 +135,8 @@ class OrderModel {
 
     final total = asDouble(j['totalAmount'], fallback: asDouble(j['total']));
     final itemTotal = asDouble(j['itemTotal'], fallback: asDouble(j['subTotal']));
-    final statusRaw = asString(j['status'], fallback: 'Pending');
+    final rawStatus = asString(j['status'], fallback: 'Pending');
+    final statusRaw = rawStatus.toLowerCase() == 'in transit' ? 'In Progress' : rawStatus;
 
     return OrderModel(
       id: asString(j['orderId'], fallback: asString(j['id'])),
@@ -167,7 +175,7 @@ class OrderModel {
         (e) => e.name == json['status'],
         orElse: () => OrderStatus.placed,
       ),
-      statusRaw: asString(json['statusRaw']),
+      statusRaw: asString(json['statusRaw']).toLowerCase() == 'in transit' ? 'In Progress' : asString(json['statusRaw']),
       items: ((json['items'] as List?) ?? const [])
           .map((i) => CartItemModel.fromJson(Map<String, dynamic>.from(i as Map)))
           .toList(),

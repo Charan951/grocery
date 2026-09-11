@@ -24,13 +24,14 @@ colors:
   admin-signal-red: "#C0392B"
 typography:
   display:
-    fontFamily: "Plus Jakarta Sans, system-ui, sans-serif"
+    fontFamily: "Manrope, system-ui, sans-serif"
     fontWeight: 800
-    lineHeight: 1.1
+    lineHeight: 1.2
   body:
     fontFamily: "Inter, system-ui, -apple-system, sans-serif"
     fontWeight: 400
-    lineHeight: 1.5
+    lineHeight: 1.52
+  scale: [11, 12, 13, 14, 15, 16, 17, 18, 20, 22, 24, 28, 32, 36, 40]
   admin-display:
     fontFamily: "Space Grotesk, Inter, system-ui, sans-serif"
     fontWeight: 700
@@ -121,22 +122,108 @@ The palette is a single-accent system: one green does almost all of the work, wi
 
 ## Typography
 
-**Display Font (storefront):** Plus Jakarta Sans, with Inter/system-ui fallback
-**Body Font (storefront):** Inter, with system-ui/-apple-system fallback
-**Display Font (admin):** Space Grotesk, with Inter fallback
-**Body Font (admin):** IBM Plex Sans, with Inter fallback
-**Mono Font (admin):** IBM Plex Mono, ui-monospace fallback
+### 1. Direction & Typefaces
+FreshCart typography is fast, fresh, premium, clear, friendly, trustworthy, and modern — calibrated to high-end consumer technology standards (Apple-like clean scannability).
 
-**Character:** Storefront pairing is warm and consumer-approachable — Plus Jakarta Sans headlines carry personality without being decorative, Inter body text stays maximally legible at small sizes on mobile. Admin pairing swaps to Space Grotesk/IBM Plex — slightly more geometric and technical, signaling "tool" rather than "shop."
+- **Primary Brand & Display:** **Manrope**
+  - Supported Weights: `300` (Light), `400` (Regular), `500` (Medium), `600` (SemiBold), `700` (Bold), `800` (ExtraBold)
+  - Primary UI Weights: `500`, `600`, `700` (Use `800` strictly for major display hero headlines)
+  - Scope: Page headings, section headers, product names, prices, numbers, CTAs, navigation, tabs, hero headlines, status messages.
+- **Secondary Content & UI:** **Inter**
+  - Supported Weights: `400` (Regular), `500` (Medium), `600` (SemiBold), `700` (Bold)
+  - Scope: Body text, product descriptions, form labels, input text, delivery info, addresses, metadata, reviews, notifications, helper text.
 
-### Hierarchy
-- **Display / H1** (800, `text-2xl`–`text-4xl`, tight leading): page titles, category hero headings, section titles like "Fresh Fruits."
-- **Title / H2–H3** (700–800, `text-lg`–`text-xl`): card group headers, modal titles.
-- **Body** (400–600, `text-xs`–`text-sm`): product names, descriptions, form labels — the vast majority of storefront text sits at `text-xs`/`text-sm` given the dense mobile-first grid.
-- **Label** (700–900, `text-[10px]`–`text-[11px]`, often uppercase with letter-spacing): badges, eyebrow labels, category tags, shelf-tag status chips.
+### 2. Character Set Specimen
+```
+Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww Xx Yy Zz
+0123456789 • ₹12,345,678.90 • % + - / # @ &
+```
 
-### Named Rules
-**The Small-and-Bold Rule.** Given the dense product-grid layout, body text runs small (`text-xs`/`text-sm`) but compensates with heavier weight (`font-bold`/`font-black`) rather than larger size — legibility comes from contrast and weight, not from generous sizing.
+### 3. The 15-Step Master Typographic Scale
+Strict scale: `[11, 12, 13, 14, 15, 16, 17, 18, 20, 22, 24, 28, 32, 36, 40]`. Arbitrary sizes (19px, 21px, 23px, 25px, 27px) are strictly prohibited.
+
+| Token | Font | Size | Weight | Line Height | Letter Spacing | Target Usage |
+|---|---|---|---|---|---|---|
+| `Display Large` | Manrope | 40px | 800 (ExtraBold) | 48px (1.20) | -1.0px | Major hero display / big promotional headlines |
+| `Display Medium` | Manrope | 36px | 800 (ExtraBold) | 44px (1.22) | -0.8px | Large marketing banners, modal heroes |
+| `Display Small` | Manrope | 32px | 700 (Bold) | 40px (1.25) | -0.6px | Hero headlines, empty state heroes |
+| `H1` | Manrope | 28px | 700 (Bold) | 36px (1.28) | -0.5px | Screen primary title |
+| `H2` | Manrope | 24px | 700 (Bold) | 32px (1.33) | -0.3px | Secondary screen headings, modal titles |
+| `H3` | Manrope | 20px | 700 (Bold) | 28px (1.40) | -0.2px | Sub-screen headings, drawer titles |
+| `H4` | Manrope | 18px | 600 (SemiBold) | 24px (1.33) | -0.1px | Subsection headers, card block titles |
+| `Section Large` | Manrope | 20px | 700 (Bold) | 28px (1.40) | -0.2px | Major section headers |
+| `Section Medium` | Manrope | 18px | 600 (SemiBold) | 24px (1.33) | -0.1px | Standard section headers |
+| `Section Small` | Manrope | 16px | 600 (SemiBold) | 22px (1.38) | 0.0px | Compact section headers |
+| `Body Large` | Inter | 17px | 400 (Regular) | 26px (1.53) | 0.0px | Editorial body, long-form descriptions |
+| `Body Medium` | Inter | 15px | 400 (Regular) | 23px (1.53) | 0.0px | Standard body copy, list descriptions |
+| `Body Small` | Inter | 14px | 400 (Regular) | 20px (1.43) | 0.0px | Compact body, metadata, helper copy |
+| `Label Large` | Inter | 15px | 600 (SemiBold) | 20px (1.33) | 0.0px | Form field values, action labels |
+| `Label Medium` | Inter | 14px | 600 (SemiBold) | 18px (1.28) | 0.0px | Standard labels, table headers |
+| `Label Small` | Inter | 12px | 600 (SemiBold) | 16px (1.33) | 0.0px | Compact badges, status tags |
+| `Caption Large` | Inter | 13px | 500 (Medium) | 18px (1.38) | 0.0px | Secondary captions, timestamps |
+| `Caption Small` | Inter | 11px | 500 (Medium) | 14px (1.27) | 0.0px | Micro timestamps, fine legal copy |
+
+### 4. Product Typography
+- **Product Name:** `16px` Manrope SemiBold, line height `22px`, max 2 lines with intelligent ellipsis (`TextOverflow.ellipsis` / `line-clamp-2`).
+- **Product Brand:** `12px` Inter Medium, line height `16px`.
+- **Product Weight:** `13px` Inter Regular, line height `18px`.
+- **Product Rating:** `13px` Manrope SemiBold, line height `18px` with tabular digits.
+- **Product Price:** `18px` Manrope Bold, line height `24px` with tabular figures (`₹249`).
+- **Product MRP:** `13px` Inter Regular, line height `18px`, strikethrough.
+- **Discount:** `12px` Manrope SemiBold, line height `16px`.
+- **Product Card CTA:** `13px` Manrope SemiBold, line height `18px`.
+
+### 5. Price & Numerical Hierarchy (Tabular Numbers)
+- **Current Price:** `20px` Manrope Bold, tabular.
+- **Premium / Featured Price:** `22–24px` Manrope Bold, tabular.
+- **MRP:** `13–14px` Inter Medium, strikethrough, tabular.
+- **Discount Tag:** `12–13px` Manrope SemiBold.
+- **Large Total Amount (Checkout):** `28px` Manrope Bold, tabular.
+- **Subtotal:** `15px` Inter Medium, tabular.
+- **Discount (Bill):** `14px` Inter Medium, tabular.
+- **Delivery Fee / Tax:** `14px` Inter Regular, tabular.
+- **Savings Summary:** `14px` Manrope SemiBold.
+- **Tabular Figures Rule:** All numerical values, prices, counters, dates, and order IDs must be rendered with tabular digits (`FontFeature.tabularFigures()` in Flutter, `font-variant-numeric: tabular-nums` in Web CSS).
+
+### 6. Button Typography Architecture
+- SemiBold (`600`) is the default button weight across the entire system. Bold (`700`) is avoided on buttons to maintain clean elegance.
+- **Primary CTA:** `15px` Manrope SemiBold, line height `20px`, letter-spacing `0`.
+- **Secondary CTA:** `15px` Manrope SemiBold, line height `20px`, letter-spacing `0`.
+- **Text Button:** `14px` Manrope SemiBold, line height `18px`, letter-spacing `0`.
+- **Small CTA:** `13px` Manrope SemiBold, line height `18px`, letter-spacing `0`.
+
+### 7. Navigation & Search Typography
+- **Bottom Navigation (Inactive):** `12px` Manrope Medium.
+- **Bottom Navigation (Active):** `12px` Manrope SemiBold.
+- **Top Navigation Title:** `17px` Manrope SemiBold.
+- **Tab (Inactive):** `14px` Manrope Medium.
+- **Tab (Active):** `14px` Manrope SemiBold.
+- **Search Placeholder:** `14px` Inter Regular.
+- **Search Input:** `15px` Inter Regular.
+- **Search Suggestion:** `15px` Inter Medium.
+- **Search Category:** `13px` Inter Medium.
+
+### 8. Delivery, Orders & Forms
+- **Order ID:** `13px` Manrope Medium, tabular.
+- **Order Status:** `13px` Manrope SemiBold.
+- **ETA:** `18px` Manrope Bold, tabular.
+- **Delivery Time / Driver Name:** `16px` Manrope SemiBold.
+- **Tracking Info:** `14px` Inter Regular.
+- **Form Input Label:** `13px` Inter Medium.
+- **Form Input Text / Placeholder:** `15px` Inter Regular.
+- **Form Helper Text:** `12px` Inter Regular.
+- **Form Error Text:** `12px` Inter Medium.
+- **Form Section Heading:** `18px` Manrope SemiBold.
+- **Profile Name:** `22px` Manrope Bold.
+- **Membership Badge:** `13px` Manrope Medium.
+- **Menu Item:** `15px` Inter Medium.
+
+### 9. Typographic Rules
+- **Line Heights:** Headings: `1.15–1.30`. Body: `1.40–1.60`. Labels: `1.25–1.40`. Numbers/Prices: `1.10–1.25`.
+- **Letter Spacing:** Default: `0`. Large headings: `-0.5px to -1.0px`. Display: `-1.0px to -1.2px`. Body/Labels: `0`. Uppercase micro labels: `+0.5px to +1.0px`.
+- **Text Case:** Sentence case for standard UI. Title Case only where appropriate. ALL CAPS is strictly reserved for tiny labels, badges, and promotional metadata.
+- **Intelligent Truncation:** Product title: max 2 lines with ellipsis. Description on cards: 3–4 lines max. Address: max 2 lines. Navigation: single line. Ellipsis only when necessary; zero text overflow.
+- **Accessibility:** Minimum readable body size is `14px`. Interactive touch labels are `14–16px`. Dynamic scaling and high-contrast compliance are preserved. Never communicate critical information through font weight alone.
 
 ## Layout
 

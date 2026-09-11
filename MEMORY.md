@@ -161,6 +161,86 @@
 
 ## 5. Completed Major Work
 
+- **2026-09-11 (follow-up 5) — Order-lookup bug fix, delivery-code visibility, FCM
+  Android permission fix, tracking-map zoom tightened (web+mobile), deliveryapp
+  in-app route map, deliveryapp order history/profile/login fixes, orders-list
+  filter parity (position + smart default) web+mobile.**
+  - **Backend bug: `getCustomerOrders` (`orderController.js`) did an exact-string
+    match** on `customerPhone`, but orders are stored as `"+91 6305804155"` while
+    clients send the bare 10-digit number — "Your Orders" silently returned
+    empty for a customer with real orders. Fixed to match on last-10-digits via
+    regex, same pattern already used by `getMyOrders`/`getOrder` in the same file.
+  - **Delivery OTP now rendered directly from the order object** on both
+    `TrackOrder.tsx` (attaches `customer_token` so the owner-gated `deliveryOtp`
+    field comes through) and mobile `tracking_screen.dart`/`order_detail_screen.dart`
+    — no longer solely dependent on FCM push working.
+  - **`deliveryapp` Android push was silently broken on Android 13+**:
+    `AndroidManifest.xml` was missing `POST_NOTIFICATIONS` (mobile `mobileapp`
+    already had it) — without it `FirebaseMessaging.requestPermission()` can't
+    get the OS to grant notification display rights. Added the permission line.
+    Web storefront still has **no FCM registration at all** (needs a Web App +
+    VAPID key from the Firebase console — user deferred, in-app OTP card covers
+    the gap for now).
+  - **Tracking-map zoom was auto-fitting too far out** (`minZoom` had no floor,
+    so a store↔drop pair a few km apart zoomed out to neighborhood level with a
+    barely-visible route). Mobile `core/widgets/freshcart_map.dart` gained
+    configurable `fitMinZoom`/`fitMaxZoom` (now `14.5`/`17.5`, was hardcoded
+    `13.5`/`16.5`); `tracking_screen.dart` passes the tighter bounds + wired
+    `onMapReady` to re-fit. Web `TrackOrder.tsx` Leaflet map now sets
+    `minZoom: 14` on the map instance (so `fitBounds` can never zoom out past
+    it) and raised `fitBounds` `maxZoom` `16→17`.
+  - **`deliveryapp` gained its first in-app map** — previously "Navigate" only
+    deep-linked to the external Google Maps app. New `core/widgets/
+    delivery_map.dart` (`flutter_map`/OSM, same tightened zoom convention) shows
+    a store→drop route preview inside `order_detail_screen.dart`'s destination
+    card, above the external-navigate button. Added `flutter_map`/`latlong2` to
+    `deliveryapp/pubspec.yaml` (same versions as `mobileapp`).
+  - **`deliveryapp` history numbering**: `orders_screen.dart` now shows
+    `"Delivery #N"` (partner's own lifetime sequence, `#1` = their first-ever
+    delivery, computed from the unfiltered list so it's stable across the
+    Delivered/Failed/Returned filter) instead of the raw DB `orderId`.
+  - **`deliveryapp` profile**: `profile_screen.dart` — merged the standalone
+    "Details" card (Phone/Email/Vehicle) into the top identity/name card
+    (below the rating row) instead of a separate section further down.
+  - **`deliveryapp` login overflow bug**: `login_screen.dart` — `heroHeight`
+    was clamped to a minimum of 240px regardless of actual viewport height, so
+    on a short window the login `Form` (no scroll fallback) hard-overflowed.
+    Wrapped the `Form` in a `SingleChildScrollView`.
+  - **Orders-list "Arriving in X minutes" removed** (premature — showed before
+    the order was actually out for delivery) on both `mobileapp`
+    `orders_list_screen.dart` and web `CustomerOrders.tsx` list badge; now shows
+    the real status text. Order-detail page's ETA (gated on `isOutForDelivery`)
+    was left as-is — already accurate.
+  - **Orders-list filter — moved to the right + smart default, web+mobile
+    parity**: web `CustomerOrders.tsx` filter pill `flex justify-end` (dropdown
+    anchors `right-0`); mobile `orders_list_screen.dart` `_TabBar` `Align`
+    `centerLeft→centerRight`. Both now default the filter once orders load:
+    prefer **"In Progress"** (something to track), else **"Delivered"**, else
+    leave **"All"** — a one-time guard so it never overrides a manual filter
+    change afterward.
+  - Verified: `flutter analyze` clean on every touched `deliveryapp`/`mobileapp`
+    file; `tsc --noEmit` clean on `frontend` after each web change; backend
+    endpoint spot-checked with `curl` (phone-match fix confirmed returning the
+    real order). No full `flutter test`/`npm run build`/backend suite re-run
+    this session — worth doing before the next release cut.
+
+- **2026-09-11 (follow-up 4) — Renamed "In Transit" to "In Progress" across stack & updated mobile app to mirror frontend mobile-responsive order cards.**
+  - **"In Transit" -> "In Progress" Status Terminology:**
+    - **Mobile App** (`orders_list_screen.dart`, `order_model.dart`): `_OrdersTab` enum renamed `inTransit` to `inProgress`, label displays `"In Progress"`, filter predicate matches `o.isActive`, empty state displays `"No in progress orders"`. `orderStatusFrom` supports `'in progress'`.
+    - **Web Storefront** (`CustomerOrders.tsx`): `StatusBucket` changed from `'In Transit'` to `'In Progress'`, filter popover dropdown options updated to `['In Progress', 'Delivered', 'Cancelled']`, card badges and arrival banners now check `bucketOf(order.status) === 'In Progress'`.
+    - **Admin Console & Checkout** (`Orders.tsx`, `CheckoutModal.tsx`): Active/cancellable filter checks and order caching fallback include `'In Progress'`.
+    - **Backend** (`Order.js`, `orderController.js`): `status` enum includes `'In Progress'` with default `'In Progress'`; `orderController.js` includes `'In Progress'` in `CANCELLABLE` list and status fallback.
+  - **Customer Mobile Responsive Parity Updates in Flutter `mobileapp`:**
+    - **Order Card Invoice Download** (`orders_list_screen.dart`): Added `_OrderInvoiceButton` directly on every `_OrderCard` in the orders list view, enabling instant PDF tax invoice download/print via `downloadInvoice(order)` without needing to open the details screen first.
+    - **Active Order Pulse Header Pill** (`orders_list_screen.dart`): Active orders in the list display a green arrival pill (`Icons.bolt_rounded` + "Arriving in <eta>" / status) matching web `CustomerOrders.tsx`.
+    - **Thumbnail Quantity Badges** (`orders_list_screen.dart`): Item thumbnails in `_Thumbs` now display an `x{qty}` badge overlay for multi-pack items (`quantity > 1`).
+    - **Active Order Header Banner** (`order_detail_screen.dart`): Active orders now show a prominent top status card with bolt icon and arrival time (`Arriving in ...` / `In Progress`) matching web.
+    - **Delivery Code (OTP) Card in Live Tracking** (`tracking_controller.dart`, `tracking_screen.dart`): Added `deliveryOtp` to `TrackingState` and rendered `_DeliveryOtpCard` with large tabular OTP digits on the live tracking screen matching `TrackOrder.tsx`.
+  - **Verification:**
+    - Mobile App: `flutter analyze lib/` clean (0 issues), `flutter test` passed 123/123.
+    - Web: `npx tsc -b` clean (0 issues), `npm run build` production bundle generated cleanly.
+    - Backend: `node --test test/api.test.js` passing (24 pass / 3 baseline pre-existing failures).
+
 - **2026-09-11 (follow-up 3) — Tax Invoice PDF download parity (web + mobile), switch COD to prepaid via Razorpay, customer delivery OTP card, filter menus, and auto-dispatch broadcast dispatch.**
   - **Tax Invoice / Credit Note PDF Generation & Download (Web + Mobile parity):**
     - **Web** (`frontend/src/utils/invoice.ts` + `CustomerOrders.tsx` / `TrackOrder.tsx`): integrated `jspdf` (`downloadInvoice`) to generate and download client-side tax invoices without extra server roundtrips. Features brand header (`FreshCart`, South Hub / GSTIN, green branding), order metadata (Order ID, date, payment method, delivery address), itemized table with weight specifications, quantity, unit price, and line amount, plus breakdown of Item Total, Delivery Fee, Handling Fee, Discount, and Total Bill. Connected to "Download Invoice / Credit Note" button on `CustomerOrders` and `TrackOrder`.
@@ -2133,6 +2213,12 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
 
 ## 13. Last Updated
 
+2026-09-11 (follow-up 5) — see §5 top entry: order-lookup phone-match bug fix,
+delivery-code visibility (web+mobile), deliveryapp Android FCM permission fix,
+tracking-map zoom tightened (web+mobile), deliveryapp in-app route map, deliveryapp
+history numbering/profile/login fixes, orders-list filter parity (right-aligned +
+smart default) web+mobile.
+
 2026-09-09 (session 2) — **Delivery-partner web app** (`frontend/src/partner/` + `frontend/src/PartnerApp.tsx`). The rider experience, previously Flutter-only (`deliveryapp/`), now also runs on the web, role-gated behind the shared staff login. **Routing** (`App.tsx`): console branch is now `/admin/*` **or** `/partner/*`; after login a `role:'Delivery'` user is sent to `/partner/dashboard` and any `/admin/*` hit redirects there; non-Delivery staff hitting `/partner/*` redirect to `/admin`. `PartnerApp` is a lazy chunk (~74 KB). **Module**: `partnerApi.ts` (fetch wrapper over `/api/delivery/*`, bearer = `admin_token`), `PartnerContext` (polls `/delivery/me` 60 s, online toggle), `usePartnerSocket` (one `socket.io-client` conn, `auth:{token}` → server auto-joins `partner:<id>`; listens `delivery_offer` / `_revoked` / `assignment_confirmed` / `order_status_update`), `useLocationHeartbeat` (`watchPosition` → `POST /delivery/location`, 25 s throttle, only while online), `PartnerShell` (mobile-first `max-w-480`, top bar online/bell, 4-tab bottom nav), `OfferModal` (countdown accept/reject), screens Dashboard / OrderDetail (lifecycle `pickup-arrived→picked-up→arrived→complete` + OTP&photo dialog, `fail`, `returned`; tel/WhatsApp) / Earnings / History / Notifications / Profile / ForgotPassword. **New dep**: `socket.io-client@^4.8.3` (first socket use in `frontend/`). Backend: only the 2 additive `/api/delivery/*` routes above. Verified: backend `node --test test/delivery.test.js` 27/30 (3 pre-existing shared-Mongo flakes, unrelated), 2 new tests green; `frontend` `tsc -b` + `vite build` clean; API smoke test of all new + `me`/`earnings` endpoints against a seeded Delivery user. Not yet browser-walked on a device. **`deliveryapp/` splash fix (same session)**: `SplashScreen` was a dumb `StatelessWidget` and the router `redirect` keeps `/splash` in `_public`, so a tokenless partner sat on the spinner forever (it only left `/splash` once *authenticated*). Rewrote it as a `ConsumerStatefulWidget` that — like `mobileapp`'s splash — awaits `authProvider.ensureHydrated()` + a 1.4 s branding hold (6 s hard cap) then `context.go('/')` or `/login`. `flutter analyze` clean, 6/6 tests pass. **Delete partner (same session)**: `DELETE /api/admin/delivery/partners/:userId` (`authorize('Admin')`, `adminDeliveryController.deletePartner`) — 409 if `activeOrderIds` non-empty, else cancels live offers + removes `DeliveryPartner`/`User`/`DeviceToken`/`Notification` (Orders + `DeliveryEarning` kept), emits `fleet_partner_removed`, `logAudit`; admin `DeliveryModule` got a trash action (desktop + mobile, disabled while active orders > 0). ⚠ `protect` middleware falls back to a default Admin on a bad/customer token, so admin-only routes are not truly RBAC-safe against a forged token — pre-existing. **Partner console redesign via `/impeccable` (same session)**: migrated the whole `frontend/src/partner/` surface off raw Tailwind grays onto the **admin design system** — `--admin-*` tokens + `font-admin-display/body/mono`. New shared primitives in `frontend/src/partner/ui.tsx` (`PageHead`, `Card`, `Pill`, `Stat`, `Btn`, `Field`, `CenterState`, `SectionLabel`, `money`). PartnerShell (collapsible sidebar + mobile drawer) was already reworked by a concurrent session; no behaviour/API changes. `tsc -b` + `vite build` clean, impeccable detector `[]`. **Slide-to-online (same session)**: Vite proxy now forwards `/socket.io` → `:5000` with `ws:true` (the partner socket never connected in dev before — `usePartnerSocket` hits `window.location.origin`). Phone-only slide-to-confirm status control replaces the header toggle on mobile: web `frontend/src/partner/SwipeOnline.tsx` (floats above the bottom edge via `bottom-[max(1rem,safe-area+.75rem)]`, `md:hidden`, hidden on `/partner/orders/:id`, transform-based knob/trail; header pill is now `hidden sm:flex`); Flutter `_SlideToOnline` in `dashboard_screen.dart` (in `bottomNavigationBar`, SafeArea, replaces the `Switch`). Drag knob L→R to go online / R→L to go offline, ~80% travel threshold. **Flutter offer parity (same session)**: `deliveryapp` now also uses `GET /delivery/assignments/pending` for refresh-resilience — `api_client.pendingAssignment()` → `OfferController.checkPending()` (runs on construct + on `AppLifecycleState.resumed` via a `WidgetsBindingObserver` on `DashboardScreen`), so a `delivery_offer` the socket missed while backgrounded still surfaces. Matches the web partner app's dashboard-mount fetch. `flutter analyze` clean, 6/6 tests. **`deliveryapp` nav + online-control rework (same session, user-directed)**: bottom bar is now a real 3-tab `NavigationBar` — **Home · Orders · Profile & settings** — via `StatefulShellRoute.indexedStack` + new `lib/features/main/main_shell.dart` (also hosts the offer overlay, moved off `_OfferShell`); `/order/:id`, `/earnings`, `/notifications` are full-screen root routes. New `lib/features/orders/orders_screen.dart` = active deliveries + history with filter chips (folds in the old `history_screen.dart`, now unrouted). Dashboard: bell + **online/offline `Switch` in the AppBar** (both directions); **slide-to-go-online is now one-way (offline→online only)**, an in-body card shown only while offline (`_SlideToGoOnline`, smoother drag); `_toggle` no longer `await`s `loc.start()` (root cause of the stuck "GOING ONLINE…" — `Geolocator.getCurrentPosition` hangs on web) and `location_service.start()` timeboxes it to 8 s. `profile_screen` gained Earnings + Notifications rows. **Web parity**: `SwipeOnline.tsx` also made one-way (hidden when online); `PartnerShell` header toggle shows on mobile only while online (to stop). `tsc -b` + `vite build` clean; `flutter analyze` clean, 6/6. **Web bottom tab bar (follow-up, user-directed)**: `PartnerShell` now also renders a phone-only (`md:hidden`) 3-tab bottom bar — **Home · Orders · Profile & settings** — matching the Flutter app; desktop keeps the `bg-admin-ink` sidebar. New `frontend/src/partner/screens/Orders.tsx` (active deliveries + history with filter chips) at `/partner/orders`, added to `PartnerApp.tsx` + the sidebar `navItems`. `Profile.tsx` got an Earnings + Notifications "Shortcuts" card (they're not in the 3 tabs). Bottom bar + `SwipeOnline` are both hidden on `/partner/orders/:orderId`; `SwipeOnline` now floats `3.5rem` above the tab bar; `<main>` bottom pad `pb-32` on phones. `tsc -b` + `vite build` clean, detector `[]`.
 
 2026-09-09 (session 3) — **Real Razorpay checkout on the web storefront.** `.env` got real `rzp_test_*` keys + `PAYMENTS_TEST_MODE=false` (git-ignored; see §9 for the full flow). **Backend**: `paymentController.verifyPayment` now persists our `Order` when the body carries `orderId` — valid signature → `paymentStatus:'Paid'` + `paymentId`/`paymentRef`; invalid → `'Failed'`; test-mode/`'simulated'` bypass still marks Paid. New `api.test.js` case (crafted HMAC) covers it — payment tests 4/4 green (`api.test.js` still has its 9 pre-existing shared-Mongo failures, unchanged). **Web `frontend/src/components/CheckoutModal.tsx`** fully rewritten: was faking a bogus signature + hard-coded `paymentStatus:'Paid'` and never opening Razorpay (broke once test mode went off). Now: payment-method selector (**Pay online** / **Cash on delivery**); online path = `create-order` → place Order **Pending** → real `checkout.js` sheet (`theme:{color:'#2E7D32'}`) → `verify` (flips to Paid) → success; `modal.ondismiss` / `payment.failed` → inline "Payment cancelled", order stays Pending, cart intact; COD → Order Pending, no sheet; `testMode && !key` → simulated. Redesigned on storefront tokens (`--primary`/`--primary-strong`, `bg-surface`/`bg-background`, `border-divider`) — dropped the ad-hoc grays + pink `#E91E63` + fake coupon/savings cards. `tsc -b` + `vite build` clean, detector `[]`. **Mobile `mobileapp/`**: checkout was already a correct server-side flow (`payment_service.dart` `RazorpayGateway` + `checkout_controller.dart` create-order→sheet→verify→`placeOrder`) — no change; `flutter test` 124/124, `flutter analyze` has 3 pre-existing `info` lints in `api_service.dart` (concurrent session, not payment).
@@ -2191,3 +2277,12 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
 - **Environment config**: Created `frontend/.env` and `frontend/.env.example` with a single configurable variable `VITE_API_URL=http://localhost:5000`. Socket.IO host URL is automatically derived from `VITE_API_URL`, and REST endpoints automatically append `/api`.
 - **All frontend pages & components migrated**: Eliminated hardcoded `/api` and hardcoded localhost/origin URLs across storefront (`TrackOrder`, `CustomerProfile`, `CustomerOrders`, `CustomerAddresses`, `CheckoutModal`, `CustomerAuthModal`, `ProductReviews`, `ActiveOrderBanner`, `CMSContext`), partner web (`partnerApi`, `usePartnerSocket`), and admin modules (`Modules`, `Orders`, `Products`, `PartnerDetail`, `ZonesManager`, `Dashboard`, `Login`, `DeliveryFleetMap`, `OrderRiderMap`).
 - **Backend CORS enhancement**: Updated `backend/app.js` with `buildCorsOptions()` reading `CORS_ORIGINS`, `CORS_ORIGIN`, `CLIENT_URL`, and `FRONTEND_URL`. Trims trailing slashes, supports wildcard subdomains (`*.vercel.app`), allows LAN IPs and localhost automatically, returns clean `callback(null, false)` without 500 error crashes, and handles preflight OPTIONS with HTTP 204. Updated `backend/.env` and `backend/.env.example`. Tested and verified.
+
+2026-09-11 — FreshCart Premium Typography & Visual Language System:
+- **Typeface architecture**: Configured primary brand & display font **Manrope** (weights 300, 400, 500, 600, 700, 800) and secondary content/UI font **Inter** (weights 400, 500, 600, 700). Primary weights: 500, 600, 700; 800 reserved strictly for major display hero titles.
+- **Master scale [11..40]**: Strict 15-step scale `[11, 12, 13, 14, 15, 16, 17, 18, 20, 22, 24, 28, 32, 36, 40]`. Line heights: Headings (1.15–1.30), Body (1.40–1.60), Labels (1.25–1.40), Numbers/Prices (1.10–1.25). Letter-spacing: 0 default, -0.5px to -1.0px on large headings, -1.0px to -1.2px on display heroes.
+- **Flutter AppTypography (`mobileapp`)**: Nested namespaced style classes (`DisplayStyles`, `HeadingStyles`, `SectionStyles`, `BodyStyles`, `LabelStyles`, `CaptionStyles`, `PriceStyles`, `LargePriceStyles`, `ButtonStyles`, `NavigationStyles`, `SearchStyles`, `OfferStyles`, `DeliveryStyles`, `FormStyles`, `ProfileStyles`, `ProductStyles`), embedded tabular numbers (`FontFeature.tabularFigures()`) across all prices and counters, plus full backward-compatible static methods (`display`, `h1`, `h2`, `h3`, `h4`, `bodyLarge`, `bodyMedium`, `bodySmall`, `labelLarge`, `labelMedium`, `labelSmall`, `title`, `festivalCalligraphy`).
+- **Flutter Widgets & Theme**: Aligned `AppTheme` light and dark `TextTheme`, `ProductCard` (16px SemiBold title max 2 lines with ellipsis, 18px Bold tabular price, 13px Regular MRP strikethrough, 12px SemiBold discount, 12px Medium brand, 13px SemiBold rating, 13px SemiBold ADD CTA), `RatingWidget` (13px SemiBold), `PrimaryButton`/`SecondaryButton` (15px SemiBold, 0 letter-spacing), and `BottomNav` (12px Medium / 12px SemiBold).
+- **Web Storefront (`frontend`)**: Preconnected and imported Manrope & Inter in `index.html` and `index.css`, configured `--font-display: 'Manrope'` and `--font-sans: 'Inter'`, implemented `.fc-*` scale and component classes, and aligned `ProductCard.tsx` typography.
+- **Design System Documentation**: Updated `DESIGN.md` with complete typography system rules, scale matrix, tabular figure guidelines, intelligent truncation (2-line title, 3-4 line description), button architecture, and dynamic type accessibility.
+- **Verification**: `flutter analyze lib/` 0 issues, all 123 `flutter test` pass, `npx tsc -b` 0 errors, `npm run build` production bundle built cleanly.

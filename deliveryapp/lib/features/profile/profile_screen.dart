@@ -17,11 +17,24 @@ const _vehicles = <String, String>{
 };
 String _vehicleLabel(String? v) => _vehicles[v] ?? 'Not set';
 
-class ProfileScreen extends ConsumerWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(authProvider.notifier).refreshProfile();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final p = ref.watch(authProvider.select((s) => s.profile));
     final available = p?.availability == 'available';
     final busy = p?.availability == 'busy';
@@ -33,9 +46,13 @@ class ProfileScreen extends ConsumerWidget {
         leading: const TabBackButton(),
         title: const Text('Profile'),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
+      body: RefreshIndicator(
+        onRefresh: () => ref.read(authProvider.notifier).refreshProfile(),
+        color: kGreen,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          children: [
           // Identity
           Card(
             child: Padding(
@@ -80,6 +97,12 @@ class ProfileScreen extends ConsumerWidget {
                     style: const TextStyle(color: kTextMuted, fontSize: 12.5, fontWeight: FontWeight.w600),
                   ),
                 ]),
+                const SizedBox(height: 14),
+                const Divider(height: 1),
+                const SizedBox(height: 6),
+                _detailRow(Icons.phone_outlined, 'Phone', p?.phone.isNotEmpty == true ? p!.phone : 'Not set'),
+                _detailRow(Icons.mail_outline, 'Email', p?.email.isNotEmpty == true ? p!.email : 'Not set'),
+                _detailRow(Icons.two_wheeler_outlined, 'Vehicle', _vehicleLabel(p?.vehicleType)),
               ]),
             ),
           ),
@@ -93,18 +116,6 @@ class ProfileScreen extends ConsumerWidget {
             const SizedBox(width: 10),
             _stat('Today', '₹${(p?.todayEarnings ?? 0).toStringAsFixed(0)}', kText),
           ]),
-          const SizedBox(height: 20),
-
-          _sectionLabel('Details'),
-          Card(
-            child: Column(children: [
-              _detailRow(Icons.phone_outlined, 'Phone', p?.phone.isNotEmpty == true ? p!.phone : 'Not set'),
-              const Divider(height: 1),
-              _detailRow(Icons.mail_outline, 'Email', p?.email.isNotEmpty == true ? p!.email : 'Not set'),
-              const Divider(height: 1),
-              _detailRow(Icons.two_wheeler_outlined, 'Vehicle', _vehicleLabel(p?.vehicleType)),
-            ]),
-          ),
           const SizedBox(height: 20),
 
           _sectionLabel('Shortcuts'),
@@ -171,8 +182,9 @@ class ProfileScreen extends ConsumerWidget {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   static Widget _stat(String label, String value, Color color) => Expanded(
         child: Card(
@@ -198,7 +210,7 @@ class ProfileScreen extends ConsumerWidget {
       );
 
   static Widget _detailRow(IconData icon, String label, String value) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(children: [
           Icon(icon, size: 16, color: kTextFaint),
           const SizedBox(width: 12),

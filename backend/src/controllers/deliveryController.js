@@ -78,8 +78,9 @@ const notifyCustomer = async (order, title, body) => {
 // Earnings model: base fee + per-km distance fee (+ tips, not yet collectable).
 // Both rates come from Settings so ops can tune payout without a deploy. Written
 // once per order via upsert, so the idempotent `complete` never double-pays.
-const recordEarning = async (order, partnerUserId) => {
+export const recordEarning = async (order, partnerUserId) => {
   try {
+    if (!order || !partnerUserId) return;
     const s = (await Settings.findOne().lean()) || {};
     const baseFee = Number(s.deliveryBaseFee ?? 20);
     const perKm = Number(s.deliveryPerKmFee ?? 6);
@@ -93,10 +94,11 @@ const recordEarning = async (order, partnerUserId) => {
     const distanceFee = Math.round(distanceKm * perKm);
     const tips = 0;
     const total = baseFee + distanceFee + tips;
+    const earnedAt = order.deliveredAt || order.updatedAt || new Date();
 
     await DeliveryEarning.updateOne(
       { orderId: order.orderId },
-      { $setOnInsert: { partnerUserId, baseFee, distanceKm, distanceFee, tips, total, status: 'pending', earnedAt: new Date() } },
+      { $setOnInsert: { partnerUserId, baseFee, distanceKm, distanceFee, tips, total, status: 'pending', earnedAt } },
       { upsert: true }
     );
   } catch (_) { /* earnings must never block a completion */ }
@@ -142,10 +144,45 @@ export const deliveryController = {
       const IST_OFFSET = 5.5 * 3600000;
       const nowIst = new Date(Date.now() + IST_OFFSET);
       const istMidnight = new Date(Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate()) - IST_OFFSET);
-      const [unreadNotifications, todayRows] = await Promise.all([
+
+      // Clean up any stale terminal orders from partner.activeOrderIds
+      if (partner.activeOrderIds && partner.activeOrderIds.length > 0) {
+        const terminalOrders = await Order.find({
+          orderId: { $in: partner.activeOrderIds },
+          status: { $in: ['Delivered', 'Failed', 'Cancelled', 'Returned'] },
+        }).select('orderId');
+        if (terminalOrders.length > 0) {
+          const terminalIds = new Set(terminalOrders.map((o) => o.orderId));
+          partner.activeOrderIds = partner.activeOrderIds.filter((id) => !terminalIds.has(id));
+          partner.availability = availabilityFor(partner);
+          await partner.save();
+        }
+      }
+
+      // Auto-heal: Ensure any delivered orders assigned to this partner have earnings recorded
+      const unrecordedDelivered = await Order.find({
+        deliveryPartnerUserId: user._id,
+        status: 'Delivered',
+      }).select('orderId pickup deliveryLocation totalAmount deliveredAt updatedAt');
+      for (const ord of unrecordedDelivered) {
+        await recordEarning(ord, user._id);
+      }
+
+      const [unreadNotifications, todayRows, actualCompleted, actualFailed] = await Promise.all([
         Notification.countDocuments({ userId: String(user._id), read: false }),
         DeliveryEarning.find({ partnerUserId: user._id, earnedAt: { $gte: istMidnight } }).select('total').lean(),
+        Order.countDocuments({ deliveryPartnerUserId: user._id, status: 'Delivered' }),
+        Order.countDocuments({ deliveryPartnerUserId: user._id, status: 'Failed' }),
       ]);
+
+      const completedCount = Math.max(partner.completedCount || 0, actualCompleted);
+      const failedCount = Math.max(partner.failedCount || 0, actualFailed);
+      if (partner.completedCount !== completedCount || partner.failedCount !== failedCount) {
+        partner.completedCount = completedCount;
+        partner.failedCount = failedCount;
+        await partner.save();
+      }
+
       const todayEarnings = todayRows.reduce((s, e) => s + (e.total || 0), 0);
       res.json({
         success: true,
@@ -162,8 +199,8 @@ export const deliveryController = {
           maxConcurrent: partner.maxConcurrent,
           rating: partner.rating,
           ratingCount: partner.ratingCount || 0,
-          completedCount: partner.completedCount,
-          failedCount: partner.failedCount,
+          completedCount,
+          failedCount,
           lastSeenAt: partner.lastSeenAt,
           todayEarnings,
         },
@@ -558,6 +595,15 @@ export const deliveryController = {
     try {
       const uid = req.user._id;
       const range = String(req.query.range || 'week');
+
+      // Auto-heal: Ensure delivered orders assigned to this partner have earnings recorded
+      const unrecordedDelivered = await Order.find({
+        deliveryPartnerUserId: uid,
+        status: 'Delivered',
+      }).select('orderId pickup deliveryLocation totalAmount deliveredAt updatedAt');
+      for (const ord of unrecordedDelivered) {
+        await recordEarning(ord, uid);
+      }
 
       // IST (UTC+5:30) day boundary for "today".
       const IST_OFFSET = 5.5 * 3600000;

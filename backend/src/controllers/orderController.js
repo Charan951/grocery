@@ -226,7 +226,7 @@ export const orderController = {
         // Orders are auto-accepted — admin never has to accept manually.
         // Anything that would land as "Pending" is promoted straight to "Accepted".
         status: (() => {
-          const s = orderData.status || 'In Transit';
+          const s = orderData.status || 'In Progress';
           return s === 'Pending' ? 'Accepted' : s;
         })(),
         deliveryAddress: typeof orderData.deliveryAddress === 'string'
@@ -329,7 +329,7 @@ export const orderController = {
       if (order.status === 'Cancelled') {
         return res.status(409).json({ success: false, message: 'Order is already cancelled' });
       }
-      const CANCELLABLE = ['Pending', 'In Transit', 'Accepted', 'Packed', 'Ready'];
+      const CANCELLABLE = ['Pending', 'In Progress', 'In Transit', 'Accepted', 'Packed', 'Ready'];
       if (!CANCELLABLE.includes(order.status)) {
         return res.status(409).json({
           success: false,

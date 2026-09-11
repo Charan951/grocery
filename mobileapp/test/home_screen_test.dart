@@ -153,7 +153,9 @@ void main() {
   testWidgets('tapping a product opens its detail route', (tester) async {
     await boot(tester);
 
-    await tester.tap(find.text('Product 1').first);
+    final item = find.text('Product 1').first;
+    await tester.ensureVisible(item);
+    await tester.tap(item);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('PDP 1'), findsOneWidget);

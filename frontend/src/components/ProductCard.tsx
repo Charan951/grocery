@@ -138,11 +138,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
           ) : (
             <button
               onClick={handleAddToCart}
-              className="bg-white border-2 border-rose-500 text-rose-600 font-extrabold text-[11px] px-3.5 py-1 rounded-xl hover:bg-rose-600 hover:text-white transition-all duration-200 cursor-pointer shadow-sm uppercase tracking-wider flex flex-col items-center leading-none"
+              className="bg-white border-2 border-rose-500 text-rose-600 font-manrope font-semibold text-[13px] leading-[18px] px-3.5 py-1 rounded-xl hover:bg-rose-600 hover:text-white transition-all duration-200 cursor-pointer shadow-sm uppercase tracking-wider flex flex-col items-center"
             >
               <span>ADD</span>
               {hasOptions && (
-                <span className="text-[8px] font-medium lowercase leading-none mt-0.5 text-rose-500 group-hover:text-white">
+                <span className="text-[11px] font-medium lowercase leading-none mt-0.5 text-rose-500 group-hover:text-white">
                   {product.weightOptions?.length} options
                 </span>
               )}
@@ -153,48 +153,48 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
 
       {/* 2. Details Section (Outside Image Container, NO outline border) */}
       <div className="pt-2 sm:pt-2.5 flex flex-col flex-1">
-        {/* Price Row */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="bg-emerald-700 text-white font-black text-xs px-2 py-0.5 rounded-md">
+        {/* Price Row: 18px Bold tabular price + 13px Regular strikethrough MRP */}
+        <div className="flex items-baseline gap-1.5 flex-wrap">
+          <span className="font-manrope font-bold text-[18px] leading-[24px] tabular-nums text-text-primary">
             ₹{currentPrice}
           </span>
           {originalPrice > currentPrice && (
-            <span className="text-xs text-text-secondary line-through font-medium">
+            <span className="font-inter font-normal text-[13px] leading-[18px] text-text-secondary line-through tabular-nums">
               ₹{originalPrice}
             </span>
           )}
         </div>
 
-        {/* Discount Amount Tag */}
+        {/* Discount Amount Tag: 12px SemiBold */}
         {originalPrice > currentPrice && (
-          <div className="text-[10px] font-bold text-emerald-600 uppercase tracking-tight mt-1">
+          <div className="font-manrope font-semibold text-[12px] leading-[16px] text-emerald-600 mt-0.5">
             ₹{originalPrice - currentPrice} OFF
           </div>
         )}
 
-        {/* Product Title */}
+        {/* Product Title: 16px SemiBold, line-height 22px, max 2 lines */}
         <Link to={`/product/${product.id}`} className="block mt-1">
-          <h3 className="text-xs sm:text-sm font-bold text-text-primary leading-snug line-clamp-2 group-hover:text-emerald-600 transition-colors">
+          <h3 className="font-manrope font-semibold text-[16px] leading-[22px] text-text-primary line-clamp-2 group-hover:text-emerald-600 transition-colors">
             {product.name}
           </h3>
         </Link>
 
-        {/* Net Quantity / Weight */}
-        <div className="text-xs text-text-secondary font-medium mt-0.5">
+        {/* Net Quantity / Weight: 13px Regular */}
+        <div className="font-inter font-normal text-[13px] leading-[18px] text-text-secondary mt-0.5">
           {netWeight}
         </div>
 
-        {/* Brand Tag & Rating Row */}
+        {/* Brand Tag (12px Medium) & Rating Row (13px SemiBold) */}
         <div className="mt-1.5 flex items-center justify-between gap-1 flex-wrap">
           {product.brand && (
-            <span className="text-[10px] text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 font-semibold px-2 py-0.5 rounded-md truncate max-w-[120px]">
+            <span className="font-inter font-medium text-[12px] leading-[16px] text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md truncate max-w-[120px]">
               {product.brand}
             </span>
           )}
           {product.rating && (
-            <div className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5 ml-auto">
+            <div className="font-manrope font-semibold text-[13px] leading-[18px] tabular-nums text-emerald-600 flex items-center gap-0.5 ml-auto">
               <span>★ {product.rating}</span>
-              {product.reviewsCount ? <span className="text-text-secondary font-normal">({product.reviewsCount})</span> : null}
+              {product.reviewsCount ? <span className="text-text-secondary font-normal text-[12px]">({product.reviewsCount})</span> : null}
             </div>
           )}
         </div>

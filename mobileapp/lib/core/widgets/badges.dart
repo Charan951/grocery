@@ -33,7 +33,7 @@ class RatingWidget extends StatelessWidget {
         const SizedBox(width: 4),
         Text(
           rating.toStringAsFixed(1),
-          style: AppTypography.labelMedium(
+          style: AppTypography.productStyles.rating(
             isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
           ).copyWith(fontSize: fontSize),
         ),
@@ -41,9 +41,9 @@ class RatingWidget extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             '(${reviewsCount! > 999 ? "${(reviewsCount! / 1000).toStringAsFixed(1)}k" : reviewsCount})',
-            style: AppTypography.bodySmall(
+            style: AppTypography.captionLarge(
               isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-            ).copyWith(fontSize: fontSize),
+            ).copyWith(fontSize: fontSize > 2 ? fontSize - 2 : fontSize),
           ),
         ],
       ],

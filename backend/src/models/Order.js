@@ -31,11 +31,11 @@ const orderSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: [
-      'Pending', 'In Transit', 'Accepted', 'Packed', 'Ready',
+      'Pending', 'In Progress', 'In Transit', 'Accepted', 'Packed', 'Ready',
       'Assigned', 'Arrived At Store', 'Out For Delivery', 'Arrived', 'Delivered',
       'Failed', 'Cancelled', 'Returned', 'Refunded'
     ],
-    default: 'In Transit',
+    default: 'In Progress',
     index: true
   },
   deliveryAddress: { type: String, required: true },

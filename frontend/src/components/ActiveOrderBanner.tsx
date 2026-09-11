@@ -44,6 +44,7 @@ export const ActiveOrderBanner: React.FC = () => {
   }, []);
 
   if (!order) return null;
+  const displayStatus = String(order.status || '').toLowerCase() === 'in transit' ? 'In Progress' : order.status;
 
   return (
     <Link
@@ -55,7 +56,7 @@ export const ActiveOrderBanner: React.FC = () => {
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-extrabold text-gray-900">
-          {order.status === 'Out For Delivery' ? 'Your order is on the way' : `Order ${order.status}`}
+          {order.status === 'Out For Delivery' ? 'Your order is on the way' : `Order ${displayStatus}`}
         </span>
         <span className="block truncate text-xs font-semibold text-gray-600">
           #{order.orderId}

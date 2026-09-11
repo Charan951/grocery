@@ -9,6 +9,7 @@ import 'package:freshcart/core/constants/app_colors.dart';
 class AppScaffold extends StatelessWidget {
   final Widget body;
   final String? title;
+  final Widget? titleWidget;
   final List<Widget>? actions;
   final Widget? leading;
   final bool showBack;
@@ -31,6 +32,7 @@ class AppScaffold extends StatelessWidget {
     super.key,
     required this.body,
     this.title,
+    this.titleWidget,
     this.actions,
     this.leading,
     this.showBack = true,
@@ -51,7 +53,7 @@ class AppScaffold extends StatelessWidget {
     final bg = backgroundColor ??
         (isDark ? AppColors.backgroundDark : AppColors.background);
 
-    final hasAppBar = title != null || actions != null || leading != null || showBack;
+    final hasAppBar = title != null || titleWidget != null || actions != null || leading != null || showBack;
 
     Widget content = body;
     if (padded) {
@@ -87,7 +89,7 @@ class AppScaffold extends StatelessWidget {
                           onPressed: onBack ?? () => Navigator.of(context).maybePop(),
                         )
                       : null),
-              title: title == null ? null : Text(title!),
+              title: titleWidget ?? (title == null ? null : Text(title!)),
               actions: actions,
               bottom: PreferredSize(
                 preferredSize: const Size.fromHeight(1),

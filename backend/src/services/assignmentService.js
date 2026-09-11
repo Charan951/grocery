@@ -4,6 +4,7 @@ import { User } from '../models/User.js';
 import { DeliveryPartner } from '../models/DeliveryPartner.js';
 import { Notification, Settings } from '../models/Operations.js';
 import { DeliveryZone } from '../models/DeliveryZone.js';
+import { DeliveryEarning } from '../models/DeliveryEarning.js';
 import { sendToOwner } from './pushService.js';
 
 const CANDIDATE_LIMIT = 10;
@@ -449,21 +450,63 @@ export const cancelForOrder = async (orderId, reason = 'order cancelled') => {
 // override otherwise leaves the order stuck in the partner's activeOrderIds
 // forever, blocking them from ever going offline again.
 export const completeForOrder = async (orderId, status) => {
+  const order = await Order.findOne({ orderId });
   const live = await Assignment.findOne({ orderId, status: 'accepted' });
-  if (!live) return;
-  await Assignment.updateOne(
-    { _id: live._id },
-    { $set: { status: status === 'Delivered' ? 'completed' : 'failed', respondedAt: new Date() } }
-  );
-  const partner = await DeliveryPartner.findOne({ userId: live.partnerUserId });
-  if (!partner) return;
-  partner.activeOrderIds = (partner.activeOrderIds || []).filter((id) => id !== orderId);
-  partner.availability = availabilityFor(partner);
-  if (status === 'Delivered') partner.completedCount = (partner.completedCount || 0) + 1;
-  else partner.failedCount = (partner.failedCount || 0) + 1;
-  await partner.save();
-  const u = await User.findById(live.partnerUserId).select('name');
-  emit('admin_fleet', 'fleet_update', fleetPayload(partner, u?.name));
+  if (live) {
+    await Assignment.updateOne(
+      { _id: live._id },
+      { $set: { status: status === 'Delivered' ? 'completed' : 'failed', respondedAt: new Date() } }
+    );
+  }
+  const partnerUserId = order?.deliveryPartnerUserId || live?.partnerUserId;
+  if (!partnerUserId) return;
+
+  const partner = await DeliveryPartner.findOne({ userId: partnerUserId });
+  if (partner) {
+    partner.activeOrderIds = (partner.activeOrderIds || []).filter((id) => id !== orderId);
+    partner.availability = availabilityFor(partner);
+    if (status === 'Delivered') partner.completedCount = (partner.completedCount || 0) + 1;
+    else partner.failedCount = (partner.failedCount || 0) + 1;
+    await partner.save();
+    const u = await User.findById(partnerUserId).select('name');
+    emit('admin_fleet', 'fleet_update', fleetPayload(partner, u?.name));
+  }
+
+  if (status === 'Delivered' && order) {
+    try {
+      const s = (await Settings.findOne().lean()) || {};
+      const baseFee = Number(s.deliveryBaseFee ?? 20);
+      const perKm = Number(s.deliveryPerKmFee ?? 6);
+      let distanceKm = 0;
+      const p = order.pickup;
+      const d = order.deliveryLocation;
+      if (p?.lat != null && p?.lng != null && d?.lat != null && d?.lng != null) {
+        const m = geoDistanceMeters(p, d);
+        if (m != null) distanceKm = Math.round((m / 1000) * 10) / 10;
+      }
+      const distanceFee = Math.round(distanceKm * perKm);
+      const tips = 0;
+      const total = baseFee + distanceFee + tips;
+      const earnedAt = order.deliveredAt || new Date();
+
+      await DeliveryEarning.updateOne(
+        { orderId: order.orderId },
+        {
+          $setOnInsert: {
+            partnerUserId,
+            baseFee,
+            distanceKm,
+            distanceFee,
+            tips,
+            total,
+            status: 'pending',
+            earnedAt,
+          },
+        },
+        { upsert: true }
+      );
+    } catch (_) {}
+  }
 };
 
 export const assignmentService = {

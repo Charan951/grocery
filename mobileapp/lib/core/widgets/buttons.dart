@@ -74,10 +74,7 @@ class PrimaryButton extends StatelessWidget {
                             text,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: AppTypography.labelLarge(Colors.white).copyWith(
-                              fontSize: 16,
-                              letterSpacing: 0.5,
-                            ),
+                            style: AppTypography.buttonStyles.primaryCTA(Colors.white),
                           ),
                         ),
                       ],
@@ -145,9 +142,9 @@ class SecondaryButton extends StatelessWidget {
                   ],
                   Text(
                     text,
-                    style: AppTypography.labelLarge(
+                    style: AppTypography.buttonStyles.secondaryCTA(
                       isDark ? Colors.white : AppColors.primary,
-                    ).copyWith(fontSize: 16),
+                    ),
                   ),
                 ],
               ),
@@ -213,9 +210,9 @@ class GlassButton extends StatelessWidget {
                         ],
                         Text(
                           text,
-                          style: AppTypography.labelLarge(
+                          style: AppTypography.buttonStyles.primaryCTA(
                             isDark ? Colors.white : AppColors.textPrimary,
-                          ).copyWith(fontSize: 16),
+                          ),
                         ),
                       ],
                     ),

@@ -38,3 +38,4 @@ const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, () => {
   console.log(`🚀 FreshCart MERN Server listening on http://localhost:${PORT}`);
 });
+

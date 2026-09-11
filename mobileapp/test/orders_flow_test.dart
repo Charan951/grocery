@@ -140,10 +140,10 @@ void main() {
       expect(find.text('Track order'), findsOneWidget);
       expect(find.text('Reorder'), findsOneWidget);
 
-      // Open the filter menu and switch to "In Transit" — hides the delivered order.
+      // Open the filter menu and switch to "In Progress" — hides the delivered order.
       await tester.tap(find.text('All Orders'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('In Transit'));
+      await tester.tap(find.text('In Progress'));
       await tester.pumpAndSettle();
       expect(find.text('Track order'), findsOneWidget);
       expect(find.text('Reorder'), findsNothing);

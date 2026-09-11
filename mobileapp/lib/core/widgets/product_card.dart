@@ -169,65 +169,61 @@ class ProductCard extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Price row: green pill + strikethrough MRP.
+                    // Price row: 18px Bold tabular price + 13px Regular strikethrough MRP
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryText,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            '₹${product.price.toStringAsFixed(0)}',
-                            style: AppTypography.labelMedium(Colors.white).copyWith(fontWeight: FontWeight.w900, fontSize: 11),
+                        Text(
+                          '₹${product.price.toStringAsFixed(0)}',
+                          style: AppTypography.productStyles.price(
+                            isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
                           ),
                         ),
                         if (product.hasDiscount) ...[
                           const SizedBox(width: 6),
                           Text(
                             '₹${product.mrp.toStringAsFixed(0)}',
-                            style: AppTypography.bodySmall(
+                            style: AppTypography.productStyles.mrp(
                               isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                            ).copyWith(decoration: TextDecoration.lineThrough, fontSize: 11),
+                            ),
                           ),
                         ],
                       ],
                     ),
                     if (product.hasDiscount)
                       Padding(
-                        padding: const EdgeInsets.only(top: 1),
+                        padding: const EdgeInsets.only(top: 2),
                         child: Text(
                           '₹${(product.mrp - product.price).toStringAsFixed(0)} OFF',
-                          style: AppTypography.labelSmall(AppColors.primaryText).copyWith(fontWeight: FontWeight.w800, fontSize: 9),
+                          style: AppTypography.productStyles.discount(AppColors.primaryText),
                         ),
                       ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
 
-                    // Title
+                    // Title: 16px SemiBold, Line Height: 22px, Max 2 lines
                     Text(
                       product.name,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: AppTypography.title(
+                      style: AppTypography.productStyles.name(
                         isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                      ).copyWith(fontSize: 11, height: 1.15, fontWeight: FontWeight.w700),
+                      ),
                     ),
                     const SizedBox(height: 2),
 
-                    // Weight label
+                    // Weight label: 13px Regular, Line Height: 18px
                     Text(
                       product.defaultWeight,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: AppTypography.bodySmall(
+                      style: AppTypography.productStyles.weight(
                         isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                      ).copyWith(fontSize: 10, fontWeight: FontWeight.w500),
+                      ),
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 4),
 
-                    // Brand tag & rating
+                    // Brand tag & rating: Brand 12px Medium, Rating 13px SemiBold
                     Row(
                       children: [
                         if (product.brand.isNotEmpty)
@@ -242,12 +238,12 @@ class ProductCard extends ConsumerWidget {
                                 product.brand,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: AppTypography.labelSmall(AppColors.primaryText).copyWith(fontWeight: FontWeight.w700, fontSize: 9),
+                                style: AppTypography.productStyles.brand(AppColors.primaryText),
                               ),
                             ),
                           ),
                         const Spacer(),
-                        RatingWidget(rating: product.rating, iconSize: 11, fontSize: 9.5),
+                        RatingWidget(rating: product.rating, iconSize: 13, fontSize: 13),
                       ],
                     ),
                   ],
@@ -347,18 +343,18 @@ class _AddChip extends StatelessWidget {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.add_rounded, color: AppColors.error, size: 13),
+                Icon(Icons.add_rounded, color: AppColors.error, size: 14),
                 const SizedBox(width: 2),
                 Text(
                   'ADD',
-                  style: AppTypography.labelSmall(AppColors.error).copyWith(fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 0.5),
+                  style: AppTypography.productStyles.cta(AppColors.error),
                 ),
               ],
             ),
             if (optionsCount != null)
               Text(
                 '$optionsCount options',
-                style: AppTypography.labelSmall(AppColors.error).copyWith(fontSize: 7, fontWeight: FontWeight.w500),
+                style: AppTypography.captionSmall(AppColors.error),
               ),
           ],
         ),
@@ -387,10 +383,13 @@ class _QtyStepper extends StatelessWidget {
         children: [
           _stepperButton(Icons.remove_rounded, onDecrement),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 6),
             child: Text(
               '$qty',
-              style: AppTypography.labelSmall(Colors.white).copyWith(fontWeight: FontWeight.w900, fontSize: 11),
+              style: AppTypography.labelMedium(Colors.white).copyWith(
+                fontWeight: FontWeight.w700,
+                fontFeatures: AppTypography.tabularNums,
+              ),
             ),
           ),
           _stepperButton(Icons.add_rounded, onIncrement),

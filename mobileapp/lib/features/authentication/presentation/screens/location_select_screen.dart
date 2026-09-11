@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:mapcn_flutter/mapcn_flutter.dart';
+import 'package:freshcart/core/widgets/freshcart_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:dio/dio.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
@@ -25,7 +25,7 @@ class LocationSelectScreen extends ConsumerStatefulWidget {
 
 class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen>
     with TickerProviderStateMixin {
-  late final MapcnController _mapController;
+  late final FreshCartMapController _mapController;
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
@@ -53,7 +53,7 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen>
   @override
   void initState() {
     super.initState();
-    _mapController = MapcnController(vsync: this);
+    _mapController = FreshCartMapController(vsync: this);
     final user = ref.read(authProvider).user;
     _nameController.text = user?.name ?? '';
     _phoneController.text = user?.phone ?? '';
@@ -188,6 +188,7 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen>
     _phoneController.dispose();
     _houseNoController.dispose();
     _landmarkController.dispose();
+    _mapController.dispose();
     super.dispose();
   }
 
@@ -824,21 +825,15 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen>
                     borderRadius: AppRadius.brMd,
                     child: Stack(
                       children: [
-                        Mapcn(
+                        FreshCartMap(
                           controller: _mapController,
                           initialCenter: _currentCenter,
                           initialZoom: 15,
-                          style: isDark ? MapcnStyle.dark : MapcnStyle.normal,
-                          accentColor: AppColors.primaryText,
+                          isDark: isDark,
                           onCameraMove: (camera, hasGesture) =>
                               _onCameraMoved(camera.center, hasGesture),
-                          markerConfig: MarkerConfig(
-                            style: MarkerStyle.pulse,
-                            coreRadius: 8,
-                            pulseRadius: 30,
-                            glowIntensity: 0.4,
-                          ),
                           points: [_currentCenter],
+                          showAttribution: true,
                         ),
                         Positioned(
                           top: 10,

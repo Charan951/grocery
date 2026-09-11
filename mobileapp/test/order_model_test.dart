@@ -8,6 +8,7 @@ void main() {
       expect(orderStatusFrom('Packed'), OrderStatus.processing);
       expect(orderStatusFrom('Out For Delivery'), OrderStatus.dispatched);
       expect(orderStatusFrom('In Transit'), OrderStatus.dispatched);
+      expect(orderStatusFrom('In Progress'), OrderStatus.dispatched);
       expect(orderStatusFrom('Delivered'), OrderStatus.delivered);
       expect(orderStatusFrom('Returned'), OrderStatus.cancelled);
       expect(orderStatusFrom('something-else'), OrderStatus.placed);

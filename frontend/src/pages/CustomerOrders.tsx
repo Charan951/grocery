@@ -23,7 +23,10 @@ import {
   Check,
   FileText,
   SlidersHorizontal,
-  ChevronDown
+  ChevronDown,
+  Lock,
+  CreditCard,
+  Navigation
 } from 'lucide-react';
 
 interface OrderItem {
@@ -66,17 +69,31 @@ interface MockOrder {
 }
 
 /** Collapse the backend's 11-value status enum onto the 3 UI buckets. */
-type StatusBucket = 'In Transit' | 'Delivered' | 'Cancelled';
+type StatusBucket = 'In Progress' | 'Delivered' | 'Cancelled';
 const bucketOf = (raw?: string): StatusBucket => {
   const s = (raw || '').toLowerCase();
   if (s === 'delivered') return 'Delivered';
   if (['cancelled', 'canceled', 'returned', 'refunded'].includes(s)) return 'Cancelled';
-  return 'In Transit';
+  return 'In Progress';
 };
 
 /** Statuses at which a customer may still cancel (before the order leaves the store). */
-const CANCELLABLE_STATUSES = ['pending', 'in transit', 'accepted', 'packed', 'ready'];
+const CANCELLABLE_STATUSES = ['pending', 'in progress', 'in transit', 'accepted', 'packed', 'ready'];
 const canCancelOrder = (raw?: string) => CANCELLABLE_STATUSES.includes((raw || '').toLowerCase());
+
+const normalizeStatus = (raw?: string): string => {
+  const s = (raw || '').trim();
+  if (s.toLowerCase() === 'in transit') return 'In Progress';
+  return s || 'In Progress';
+};
+
+const getStepIndex = (status?: string): number => {
+  const s = (status || '').toLowerCase();
+  if (s === 'delivered') return 3;
+  if (s === 'in progress' || s === 'in transit' || s === 'out for delivery' || s === 'assigned' || s === 'arrived') return 2;
+  if (s === 'packed' || s === 'ready' || s === 'arrived at store' || s === 'processing') return 1;
+  return 0; // Placed / Pending / Accepted
+};
 
 
 export const CustomerOrders: React.FC = () => {
@@ -86,7 +103,7 @@ export const CustomerOrders: React.FC = () => {
   })();
   const userPhoneKey = customerUser?.phone ? customerUser.phone.replace(/\D/g, '') : 'default';
 
-  const [filter, setFilter] = useState<'All' | 'In Transit' | 'Delivered' | 'Cancelled'>('All');
+  const [filter, setFilter] = useState<'All' | 'In Progress' | 'Delivered' | 'Cancelled'>('All');
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -135,8 +152,12 @@ export const CustomerOrders: React.FC = () => {
         .then((res) => res.json())
         .then((data) => {
           if (data && data.success && data.orders && data.orders.length > 0) {
-            setOrders(data.orders);
-            localStorage.setItem(`customer_orders_${userPhoneKey}`, JSON.stringify(data.orders));
+            const normalized = data.orders.map((o: any) => ({
+              ...o,
+              status: String(o.status || '').toLowerCase() === 'in transit' ? 'In Progress' : (o.status || 'Pending'),
+            }));
+            setOrders(normalized);
+            localStorage.setItem(`customer_orders_${userPhoneKey}`, JSON.stringify(normalized));
           }
         })
         .catch(() => null)
@@ -145,6 +166,17 @@ export const CustomerOrders: React.FC = () => {
       setIsLoadingOrders(false);
     }
   }, [userPhoneKey]);
+
+  // Default the filter to whatever's most relevant once orders are known:
+  // prefer "In Progress" (something to track), else "Delivered", else leave
+  // "All". Only runs once so it never stomps a manual filter change.
+  const defaultFilterSet = useRef(false);
+  useEffect(() => {
+    if (defaultFilterSet.current || orders.length === 0) return;
+    defaultFilterSet.current = true;
+    if (orders.some((o) => bucketOf(o.status) === 'In Progress')) setFilter('In Progress');
+    else if (orders.some((o) => bucketOf(o.status) === 'Delivered')) setFilter('Delivered');
+  }, [orders]);
 
   const filteredOrders = orders.filter(
     (o) => filter === 'All' || bucketOf(o.status) === filter
@@ -353,24 +385,51 @@ export const CustomerOrders: React.FC = () => {
     alert('All items added back to your cart!');
   };
 
-  // IF AN ORDER IS SELECTED: RENDER EXACT ORDER DETAILS PAGE MATCHING SCREENSHOT
+  // IF AN ORDER IS SELECTED: RENDER EXACT ORDER DETAILS PAGE MATCHING MOBILE APP DESIGN
   if (selectedOrder) {
-    const totalUnitsCount = selectedOrder.items.reduce((sum, item) => sum + item.qty, 0);
+    const orderStatusNormalized = normalizeStatus(selectedOrder.status);
+    const bucket = bucketOf(orderStatusNormalized);
+    const isActive = bucket === 'In Progress';
+    const isDelivered = bucket === 'Delivered';
+    const isCancelled = bucket === 'Cancelled';
+    const isOutForDelivery = (selectedOrder.status || '').toLowerCase() === 'out for delivery';
+    const stepIdx = getStepIndex(selectedOrder.status);
+    const STEPS = ['Placed', 'Packed', 'In Progress', 'Delivered'];
+
+    const calcItemTotal = selectedOrder.items.reduce(
+      (sum: number, it: any) => sum + Number(it.price || it.unitPrice || 0) * Number(it.qty || it.quantity || 1),
+      0
+    );
+    const calcItemMrpTotal = selectedOrder.items.reduce(
+      (sum: number, it: any) =>
+        sum + Number(it.mrp || it.originalPrice || Number(it.price || 0) + 20) * Number(it.qty || it.quantity || 1),
+      0
+    );
+    const displayItemTotal = Number(selectedOrder.itemTotal || (selectedOrder as any).subTotal || calcItemTotal);
+    const displayItemMrpTotal = Number(selectedOrder.itemTotalMrp || calcItemMrpTotal);
+    const displayTotalAmount = Number(selectedOrder.totalAmount || (selectedOrder as any).totalPrice || displayItemTotal);
+    const deliveryFee = Number(selectedOrder.deliveryFee || 0);
+    const handlingFee = Number(selectedOrder.handlingFee || 0);
+    const totalSavings = Math.max(0, displayItemMrpTotal - displayItemTotal) + (deliveryFee === 0 ? 30 : 0);
+
+    const isPaid = (selectedOrder.paymentStatus || '').toLowerCase() === 'paid';
+    const isCod = /cod|cash/i.test(selectedOrder.paymentMethod || '');
+    const deliveryOtp = (selectedOrder as any).deliveryOtp || '';
 
     return (
       <motion.div
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: -20 }}
-        className="min-h-screen bg-white text-gray-900 pb-16 font-sans"
+        className="min-h-screen bg-gray-50/70 text-gray-900 pb-28 font-sans"
       >
-        <SEO 
+        <SEO
           title={`Order #${selectedOrder.orderNumber} | FreshCart`}
           description={`Order details for order #${selectedOrder.orderNumber}`}
         />
 
         {/* Top Sticky Header */}
-        <header className="bg-white border-b border-gray-200 py-3.5 px-4 md:px-12 flex items-center justify-between sticky top-0 z-40 shadow-2xs">
+        <header className="bg-white border-b border-gray-200 py-3.5 px-4 md:px-8 flex items-center justify-between sticky top-0 z-40 shadow-xs">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSelectedOrder(null)}
@@ -380,280 +439,437 @@ export const CustomerOrders: React.FC = () => {
               <ArrowLeft size={18} />
             </button>
             <div className="flex flex-col">
-              <h1 className="text-base md:text-lg font-black text-gray-900 font-display leading-tight">
-                Order #{selectedOrder.orderNumber}
-              </h1>
-              <span className="text-xs text-gray-500 font-semibold">
-                {selectedOrder.items.length} {selectedOrder.items.length === 1 ? 'item' : 'items'}
-              </span>
-            </div>
-          </div>
-
-          <button
-            onClick={() => navigate('/help')}
-            className="border border-rose-200 text-rose-600 hover:bg-rose-50 px-4 py-1.5 rounded-full text-xs font-extrabold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-          >
-            <MessageSquare size={14} className="text-rose-500" />
-            <span>Get Help</span>
-          </button>
-        </header>
-
-        {/* Status Banner */}
-        <div className="px-4 md:px-12 py-5 bg-white border-b border-gray-100">
-          {bucketOf(selectedOrder.status) === 'Delivered' ? (
-            <div className="bg-emerald-50 border border-emerald-200/80 text-emerald-900 p-4 rounded-2xl flex items-center gap-3 font-extrabold text-lg shadow-2xs">
-              <div className="w-8 h-8 rounded-xl bg-[#00E676]/20 text-[#00E676] flex items-center justify-center shrink-0">
-                <CheckCircle2 size={24} className="text-emerald-600" />
-              </div>
-              <span className="font-display tracking-tight text-emerald-950">Delivered</span>
-            </div>
-          ) : bucketOf(selectedOrder.status) === 'In Transit' ? (
-            <div className="bg-emerald-50 border border-emerald-200/80 text-emerald-900 p-4 rounded-2xl flex items-center gap-3 font-extrabold text-lg shadow-2xs animate-pulse">
-              <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0">
-                <Zap size={20} className="fill-white" />
-              </div>
-              <span className="font-display tracking-tight text-emerald-950">
-                {selectedOrder.status === 'Out For Delivery'
-                  ? `Arriving in ${selectedOrder.estimatedDelivery || '8 minutes'}`
-                  : selectedOrder.status}
-              </span>
-            </div>
-          ) : (
-            <div className="bg-rose-50 border border-rose-200 text-rose-800 p-4 rounded-2xl flex items-center gap-3 font-extrabold text-lg">
-              <span>{selectedOrder.status || 'Cancelled'}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Status Timeline (real trackingTimeline from the order document) */}
-        {Array.isArray(selectedOrder.trackingTimeline) && selectedOrder.trackingTimeline.length > 0 && (
-          <div className="px-4 md:px-12 py-6 border-b border-gray-100">
-            <h2 className="text-sm font-extrabold text-gray-900 mb-4">Order progress</h2>
-            <ol className="flex flex-col">
-              {selectedOrder.trackingTimeline.map((t, i, arr) => (
-                <li key={i} className="flex gap-3">
-                  <div className="flex flex-col items-center">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#4CAF50] shrink-0 mt-1" />
-                    {i !== arr.length - 1 && <span className="w-0.5 flex-1 min-h-[28px] bg-gray-200" />}
-                  </div>
-                  <div className="pb-4 min-w-0">
-                    <p className="text-xs sm:text-sm font-bold text-gray-900">{t.status || '—'}</p>
-                    {t.note && <p className="text-[11px] sm:text-xs text-gray-500 leading-relaxed">{t.note}</p>}
-                    {t.at && (
-                      <p className="text-[10px] sm:text-[11px] text-gray-400 mt-0.5">
-                        {new Date(t.at).toLocaleString('en-IN', {
-                          day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
-                        })}
-                      </p>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </div>
-        )}
-
-        {/* Items Section */}
-        <div className="px-4 md:px-12 py-6 border-b border-gray-100">
-          <h2 className="text-sm font-extrabold text-gray-900 mb-4">
-            {selectedOrder.items.length} {selectedOrder.items.length === 1 ? 'item' : 'items'} in order
-          </h2>
-
-          <div className="flex flex-col gap-5">
-            {selectedOrder.items.map((item: any, idx: number) => {
-              const nameVal = item.name || item.productName || item.title || 'Grocery Product';
-              const weightVal = item.weightSpec || item.weight || item.selectedWeight || '1 unit';
-              const qtyVal = Number(item.qty || item.quantity || item.units || 1);
-              const priceVal = Number(item.price || item.unitPrice || item.productPrice || 0);
-              const mrpVal = Number(item.mrp || item.originalPrice || (priceVal ? priceVal + 20 : 0));
-              const imgVal = item.image || item.imageUrl || item.productImage || 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop';
-              const lineTotal = priceVal * qtyVal;
-              const lineTotalMrp = mrpVal * qtyVal;
-
-              return (
-                <div key={item.id || `ord_item_${idx}`} className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3.5 min-w-0">
-                    <div className="w-14 h-14 rounded-xl bg-gray-50 border border-gray-200/80 p-1 shrink-0 flex items-center justify-center">
-                      <img 
-                        src={imgVal} 
-                        alt={nameVal} 
-                        className="w-full h-full object-contain" 
-                        onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop'; }}
-                      />
-                    </div>
-                    <div className="flex flex-col min-w-0">
-                      <h3 className="text-xs sm:text-sm font-bold text-gray-900 leading-snug line-clamp-2">
-                        {nameVal}
-                      </h3>
-                      <span className="text-[11px] font-semibold text-gray-500 mt-0.5">
-                        {weightVal} • {qtyVal} {qtyVal === 1 ? 'unit' : 'units'} (₹{priceVal} / unit)
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="text-right shrink-0">
-                    <span className="text-xs sm:text-sm font-black text-gray-900 block font-display">
-                      ₹{lineTotal}
-                    </span>
-                    {mrpVal > priceVal && (
-                      <span className="text-[11px] text-gray-400 line-through font-medium block">
-                        ₹{lineTotalMrp}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Bill Summary Section */}
-        <div className="px-4 md:px-12 py-6 border-b border-gray-100 bg-gray-50/50">
-          <div className="flex items-center gap-2 mb-4">
-            <FileText size={18} className="text-gray-700" />
-            <h2 className="text-base font-extrabold text-gray-900 font-display">
-              Bill Summary
-            </h2>
-          </div>
-
-          {(() => {
-            const calcItemTotal = selectedOrder.items.reduce((sum: number, it: any) => sum + (Number(it.price || it.unitPrice || 0) * Number(it.qty || it.quantity || 1)), 0);
-            const calcItemMrpTotal = selectedOrder.items.reduce((sum: number, it: any) => sum + (Number(it.mrp || it.originalPrice || (Number(it.price || 0) + 20)) * Number(it.qty || it.quantity || 1)), 0);
-            const displayItemTotal = Number(selectedOrder.itemTotal || (selectedOrder as any).subTotal || calcItemTotal);
-            const displayItemMrpTotal = Number(selectedOrder.itemTotalMrp || calcItemMrpTotal);
-            const displayTotalAmount = Number(selectedOrder.totalAmount || (selectedOrder as any).totalPrice || displayItemTotal);
-
-            return (
-              <div className="flex flex-col gap-2.5 text-xs md:text-sm">
-                <div className="flex items-center justify-between text-gray-600 font-medium">
-                  <span>Item Total</span>
-                  <div className="flex items-center gap-2">
-                    <span className="line-through text-gray-400">₹{displayItemMrpTotal}</span>
-                    <span className="font-bold text-gray-900">₹{displayItemTotal}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between text-gray-600 font-medium">
-                  <span>Delivery Fee</span>
-                  <div className="flex items-center gap-2">
-                    <span className="line-through text-gray-400">₹30</span>
-                    <span className="font-extrabold text-[#2E7D32]">FREE</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between text-gray-600 font-medium">
-                  <span>Handling Fee</span>
-                  <div className="flex items-center gap-2">
-                    <span className="line-through text-gray-400">₹10</span>
-                    <span className="font-extrabold text-[#2E7D32]">FREE</span>
-                  </div>
-                </div>
-
-                <div className="border-t border-gray-200 my-2" />
-
-                <div className="flex items-center justify-between font-black text-sm md:text-base text-gray-900">
-                  <span className="font-display">Total Bill</span>
-                  <div className="flex items-center gap-2">
-                    <span className="line-through text-xs font-normal text-gray-400">₹{displayItemMrpTotal + 40}</span>
-                    <span className="text-base font-black text-gray-900 font-display">₹{displayTotalAmount}</span>
-                  </div>
-                </div>
-
-                {/* Download Invoice Button */}
-                <div className="pt-3 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => handleDownloadInvoice(selectedOrder)}
-                    className="bg-[#F3E8FF] hover:bg-[#E9D5FF] text-[#8E24AA] font-extrabold text-xs px-5 py-2.5 rounded-xl transition-colors cursor-pointer shadow-2xs"
-                  >
-                    Download Invoice / Credit Note
-                  </button>
-                </div>
-              </div>
-            );
-          })()}
-        </div>
-
-        {/* Order Details Section */}
-        <div className="px-4 md:px-12 py-6 flex flex-col gap-4 text-xs md:text-sm">
-          <h2 className="text-base font-extrabold text-gray-900 font-display">
-            Order Details
-          </h2>
-
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-gray-500 font-semibold">Order ID</span>
-            <div className="flex items-center gap-2 font-bold text-gray-900">
-              <span>#{selectedOrder.orderNumber}</span>
-              <button
-                type="button"
-                onClick={() => handleCopyOrderId(selectedOrder.orderNumber)}
-                className="text-gray-400 hover:text-gray-700 cursor-pointer p-0.5"
-                title="Copy Order ID"
-              >
-                {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-              </button>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-gray-500 font-semibold">Delivery Address</span>
-            <p className="text-xs md:text-sm font-medium text-gray-800 leading-relaxed max-w-2xl">
-              {selectedOrder.deliveryAddress}
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-gray-500 font-semibold">Order Placed at</span>
-            <span className="font-semibold text-gray-900">{selectedOrder.orderPlacedAt}</span>
-          </div>
-
-          {selectedOrder.orderArrivedAt && (
-            <div className="flex flex-col gap-1">
-              <span className="text-xs text-gray-500 font-semibold">Order Arrived at</span>
-              <span className="font-semibold text-gray-900">{selectedOrder.orderArrivedAt}</span>
-            </div>
-          )}
-
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-gray-500 font-semibold">Payment Method</span>
-            <span className="font-semibold text-gray-900">
-              {selectedOrder.paymentMethod || 'Payment'}
-              {selectedOrder.paymentStatus ? ` · ${selectedOrder.paymentStatus}` : ''}
-            </span>
-            {canSwitchToPrepaid(selectedOrder) && (
-              <div className="pt-1.5">
+              <div className="flex items-center gap-2">
+                <h1 className="text-base md:text-lg font-black text-gray-900 font-display leading-tight">
+                  Order #{selectedOrder.orderNumber}
+                </h1>
                 <button
                   type="button"
-                  disabled={switchingPayment}
-                  onClick={() => handleSwitchToPrepaid(selectedOrder)}
-                  className="inline-flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-[#2E7D32] disabled:opacity-60 px-4 py-2 rounded-xl text-xs font-extrabold transition-colors cursor-pointer"
+                  onClick={() => handleCopyOrderId(selectedOrder.orderNumber)}
+                  className="text-gray-400 hover:text-gray-700 cursor-pointer p-0.5"
+                  title="Copy Order ID"
                 >
-                  {switchingPayment ? 'Processing…' : 'Switch to UPI / Card'}
+                  {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
                 </button>
-                {switchPaymentError && (
-                  <p className="text-[11px] text-rose-600 font-medium mt-1.5">{switchPaymentError}</p>
-                )}
               </div>
+              <span className="text-xs text-gray-500 font-semibold">
+                {selectedOrder.items.length} {selectedOrder.items.length === 1 ? 'item' : 'items'} · Placed on {selectedOrder.orderPlacedAt || selectedOrder.date}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleDownloadInvoice(selectedOrder)}
+              className="hidden sm:inline-flex items-center gap-1.5 bg-[#F3E8FF] hover:bg-[#E9D5FF] text-[#8E24AA] font-extrabold text-xs px-3.5 py-1.5 rounded-full transition-colors cursor-pointer shadow-2xs"
+            >
+              <Download size={13} />
+              <span>Invoice</span>
+            </button>
+            <button
+              onClick={() => navigate('/help')}
+              className="border border-rose-200 text-rose-600 hover:bg-rose-50 px-3.5 py-1.5 rounded-full text-xs font-extrabold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+            >
+              <MessageSquare size={13} className="text-rose-500" />
+              <span>Get Help</span>
+            </button>
+          </div>
+        </header>
+
+        <main className="max-w-xl mx-auto px-4 py-4 md:py-6 flex flex-col gap-4">
+          {/* 1. HERO STATUS CARD */}
+          <div className="bg-white rounded-2xl border border-gray-200/90 shadow-sm p-4 sm:p-5">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <span
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black tracking-wide uppercase ${
+                  isCancelled
+                    ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                    : isDelivered
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                    : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                }`}
+              >
+                {isCancelled ? (
+                  <CheckCircle2 size={13} className="text-rose-600" />
+                ) : isDelivered ? (
+                  <CheckCircle2 size={13} className="text-emerald-600" />
+                ) : (
+                  <Zap size={13} className="fill-emerald-600 text-emerald-600" />
+                )}
+                <span>
+                  {isCancelled
+                    ? 'CANCELLED'
+                    : isDelivered
+                    ? 'DELIVERED'
+                    : isOutForDelivery
+                    ? `ARRIVING IN ${selectedOrder.estimatedDelivery || '8 MINS'}`
+                    : 'IN PROGRESS'}
+                </span>
+              </span>
+
+              {isActive && (
+                <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 text-[11px] font-extrabold border border-emerald-200/80">
+                  <Clock size={12} className="text-emerald-700" />
+                  <span>{selectedOrder.estimatedDelivery || '10 mins'}</span>
+                </div>
+              )}
+            </div>
+
+            <h2 className="text-lg sm:text-xl font-black text-gray-900 font-display">
+              {isCancelled
+                ? 'Order Cancelled'
+                : isDelivered
+                ? 'Delivered to your doorstep'
+                : isOutForDelivery
+                ? 'Delivery partner is on the way!'
+                : 'Your order is in progress'}
+            </h2>
+            <p className="text-xs sm:text-sm text-gray-500 font-medium mt-1 leading-relaxed">
+              {isCancelled
+                ? 'This order has been cancelled and refunded if prepaid.'
+                : isDelivered
+                ? 'Delivered with care from your local FreshCart dark store.'
+                : 'Fresh grocery items handpicked and packed from FreshCart dark store.'}
+            </p>
+
+            {/* 4-Step Stepper */}
+            {!isCancelled && (
+              <div className="mt-5 pt-4 border-t border-gray-100">
+                <div className="flex items-center justify-between relative">
+                  {STEPS.map((step, idx) => {
+                    const isDone = idx < stepIdx;
+                    const isCurrent = idx === stepIdx;
+
+                    return (
+                      <div key={step} className="flex-1 flex flex-col items-center relative">
+                        {/* Connecting bar */}
+                        {idx > 0 && (
+                          <div
+                            className={`absolute top-2.5 right-1/2 w-full h-[2.5px] -z-0 ${
+                              idx <= stepIdx ? 'bg-[#00A86B]' : 'bg-gray-200'
+                            }`}
+                          />
+                        )}
+                        {/* Circle node */}
+                        <div
+                          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold relative z-10 transition-all ${
+                            isDone
+                              ? 'bg-[#00A86B] text-white'
+                              : isCurrent
+                              ? 'bg-[#00A86B] text-white ring-4 ring-emerald-100'
+                              : 'bg-gray-100 border border-gray-300 text-gray-400'
+                          }`}
+                        >
+                          {isDone ? <Check size={13} /> : isCurrent ? <div className="w-2 h-2 rounded-full bg-white" /> : <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />}
+                        </div>
+                        <span
+                          className={`text-[10px] sm:text-[11px] mt-1.5 text-center font-bold truncate max-w-[70px] ${
+                            isCurrent
+                              ? 'text-[#00A86B] font-black'
+                              : isDone
+                              ? 'text-gray-800'
+                              : 'text-gray-400 font-medium'
+                          }`}
+                        >
+                          {step}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Quick Map Tracker Link */}
+            {isActive && (
+              <Link
+                to={`/track/${encodeURIComponent(selectedOrder.orderNumber || selectedOrder.id)}`}
+                className="mt-4 flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-200 hover:bg-emerald-50/70 hover:border-emerald-200 transition-colors group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="w-7 h-7 rounded-full bg-[#00A86B] text-white flex items-center justify-center shadow-2xs">
+                    <Navigation size={13} className="fill-white" />
+                  </span>
+                  <div>
+                    <p className="text-xs font-extrabold text-gray-900 group-hover:text-emerald-900">
+                      Live tracking is active
+                    </p>
+                    <p className="text-[11px] text-gray-500">Tap to see rider on live map</p>
+                  </div>
+                </div>
+                <ChevronRight size={18} className="text-gray-400 group-hover:text-emerald-600" />
+              </Link>
             )}
           </div>
 
-          {canCancelOrder(selectedOrder.status) && (
-            <div className="pt-2">
+          {/* 2. DOORSTEP OTP CARD */}
+          {deliveryOtp && isActive && (
+            <div className="bg-emerald-50/80 border border-emerald-300 rounded-2xl p-4 flex items-center justify-between shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-[#00A86B]/20 text-[#00A86B] flex items-center justify-center shrink-0">
+                  <Lock size={18} className="text-[#00A86B]" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-black tracking-wider uppercase text-emerald-900 block">
+                    DOORSTEP CODE
+                  </span>
+                  <span className="text-xs text-gray-600 font-medium">
+                    Share with delivery partner at door
+                  </span>
+                </div>
+              </div>
+              <div className="bg-white border border-emerald-300 rounded-xl px-3.5 py-1.5 shadow-2xs font-mono font-black text-lg text-[#00A86B] tracking-widest">
+                {deliveryOtp.split('').join(' ')}
+              </div>
+            </div>
+          )}
+
+          {/* 3. ITEMS IN ORDER */}
+          <div className="bg-white rounded-2xl border border-gray-200/90 shadow-sm p-4 sm:p-5">
+            <h3 className="text-sm font-extrabold text-gray-900 mb-3">
+              Items in Order ({selectedOrder.items.length})
+            </h3>
+            <div className="flex flex-col divide-y divide-gray-100">
+              {selectedOrder.items.map((item: any, idx: number) => {
+                const nameVal = item.name || item.productName || item.title || 'Grocery Product';
+                const weightVal = item.weightSpec || item.weight || item.selectedWeight || '1 unit';
+                const qtyVal = Number(item.qty || item.quantity || item.units || 1);
+                const priceVal = Number(item.price || item.unitPrice || item.productPrice || 0);
+                const mrpVal = Number(item.mrp || item.originalPrice || (priceVal ? priceVal + 20 : 0));
+                const imgVal = item.image || item.imageUrl || item.productImage || 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop';
+                const lineTotal = priceVal * qtyVal;
+                const lineTotalMrp = mrpVal * qtyVal;
+
+                return (
+                  <div key={item.id || `ord_item_${idx}`} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-12 h-12 rounded-xl bg-gray-50 border border-gray-200 p-1 shrink-0 flex items-center justify-center">
+                        <img
+                          src={imgVal}
+                          alt={nameVal}
+                          className="w-full h-full object-contain"
+                          onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop'; }}
+                        />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <h4 className="text-xs sm:text-sm font-bold text-gray-900 leading-snug line-clamp-2">
+                          {nameVal}
+                        </h4>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px] font-semibold">
+                            {weightVal}
+                          </span>
+                          <span className="text-[11px] font-semibold text-gray-500">
+                            × {qtyVal}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className="text-xs sm:text-sm font-black text-gray-900 block font-display">
+                        ₹{lineTotal}
+                      </span>
+                      {mrpVal > priceVal && (
+                        <span className="text-[11px] text-gray-400 line-through font-medium block">
+                          ₹{lineTotalMrp}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 4. BILL SUMMARY */}
+          <div className="bg-white rounded-2xl border border-gray-200/90 shadow-sm p-4 sm:p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <FileText size={16} className="text-gray-700" />
+              <h3 className="text-sm font-extrabold text-gray-900 font-display">
+                Bill Summary
+              </h3>
+            </div>
+
+            <div className="flex flex-col gap-2.5 text-xs sm:text-sm">
+              <div className="flex items-center justify-between text-gray-600 font-medium">
+                <span>Item Total</span>
+                <div className="flex items-center gap-2">
+                  {displayItemMrpTotal > displayItemTotal && (
+                    <span className="line-through text-gray-400 text-xs">₹{displayItemMrpTotal}</span>
+                  )}
+                  <span className="font-bold text-gray-900">₹{displayItemTotal}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-gray-600 font-medium">
+                <span>Delivery Fee</span>
+                <div className="flex items-center gap-2">
+                  <span className="line-through text-gray-400 text-xs">₹30</span>
+                  <span className="font-extrabold text-[#00A86B]">FREE</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-gray-600 font-medium">
+                <span>Handling Fee</span>
+                <div className="flex items-center gap-2">
+                  <span className="line-through text-gray-400 text-xs">₹10</span>
+                  <span className="font-extrabold text-[#00A86B]">FREE</span>
+                </div>
+              </div>
+
+              <div className="border-t border-gray-100 my-1" />
+
+              <div className="flex items-center justify-between font-black text-sm sm:text-base text-gray-900">
+                <span className="font-display">Total Bill</span>
+                <span className="text-base font-black text-gray-900 font-display">₹{displayTotalAmount}</span>
+              </div>
+
+              {totalSavings > 0 && (
+                <div className="mt-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 flex items-center gap-2">
+                  <span className="text-sm">🎉</span>
+                  <span className="text-xs font-bold text-[#00A86B]">
+                    You saved ₹{totalSavings} on this order!
+                  </span>
+                </div>
+              )}
+
+              <div className="pt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => handleDownloadInvoice(selectedOrder)}
+                  className="inline-flex items-center gap-1.5 bg-[#F3E8FF] hover:bg-[#E9D5FF] text-[#8E24AA] font-extrabold text-xs px-4 py-2 rounded-xl transition-colors cursor-pointer shadow-2xs"
+                >
+                  <Download size={13} />
+                  <span>Download Invoice / Credit Note</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* 5. DELIVERY & PAYMENT DETAILS */}
+          <div className="bg-white rounded-2xl border border-gray-200/90 shadow-sm p-4 sm:p-5 flex flex-col gap-4">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-emerald-50 text-[#00A86B] flex items-center justify-center shrink-0 mt-0.5">
+                <MapPin size={16} />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs text-gray-500 font-bold">Delivery Address</span>
+                <p className="text-xs sm:text-sm font-semibold text-gray-800 leading-relaxed mt-0.5">
+                  {selectedOrder.deliveryAddress}
+                </p>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-100" />
+
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-purple-50 text-purple-700 flex items-center justify-center shrink-0 mt-0.5">
+                <CreditCard size={16} />
+              </div>
+              <div className="flex flex-col flex-1">
+                <span className="text-xs text-gray-500 font-bold">Payment Method</span>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-xs sm:text-sm font-bold text-gray-900">
+                    {selectedOrder.paymentMethod || 'Payment'}
+                  </span>
+                  <span
+                    className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
+                      isPaid
+                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                        : isCod
+                        ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    {isPaid ? 'PAID' : (selectedOrder.paymentStatus || 'PENDING')}
+                  </span>
+                </div>
+
+                {canSwitchToPrepaid(selectedOrder) && (
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      disabled={switchingPayment}
+                      onClick={() => handleSwitchToPrepaid(selectedOrder)}
+                      className="inline-flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-[#00A86B] disabled:opacity-60 px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-colors cursor-pointer border border-emerald-200"
+                    >
+                      {switchingPayment ? 'Processing…' : 'Switch to UPI / Card'}
+                    </button>
+                    {switchPaymentError && (
+                      <p className="text-[11px] text-rose-600 font-medium mt-1.5">{switchPaymentError}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* 6. STATUS TIMELINE (if present) */}
+          {Array.isArray(selectedOrder.trackingTimeline) && selectedOrder.trackingTimeline.length > 0 && (
+            <div className="bg-white rounded-2xl border border-gray-200/90 shadow-sm p-4 sm:p-5">
+              <h3 className="text-sm font-extrabold text-gray-900 mb-3">Order History</h3>
+              <ol className="flex flex-col">
+                {selectedOrder.trackingTimeline.map((t, i, arr) => (
+                  <li key={i} className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <span className="w-2 h-2 rounded-full bg-[#00A86B] shrink-0 mt-1.5" />
+                      {i !== arr.length - 1 && <span className="w-0.5 flex-1 min-h-[22px] bg-gray-200" />}
+                    </div>
+                    <div className="pb-3 min-w-0">
+                      <p className="text-xs font-bold text-gray-900">{normalizeStatus(t.status)}</p>
+                      {t.note && <p className="text-[11px] text-gray-500 leading-relaxed">{t.note}</p>}
+                      {t.at && (
+                        <p className="text-[10px] text-gray-400 mt-0.5">
+                          {new Date(t.at).toLocaleString('en-IN', {
+                            day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+                          })}
+                        </p>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+        </main>
+
+        {/* STICKY BOTTOM ACTION BAR (MOBILE RESPONSIVE) */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-200 py-3 px-4 z-40 shadow-lg">
+          <div className="max-w-xl mx-auto flex flex-col items-center gap-2">
+            {isActive ? (
+              <button
+                type="button"
+                onClick={() => navigate(`/track/${encodeURIComponent(selectedOrder.orderNumber || selectedOrder.id)}`)}
+                className="w-full bg-[#00A86B] hover:bg-[#00915c] text-white py-3.5 px-4 rounded-xl font-black text-sm flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer active:scale-[0.99]"
+              >
+                <Navigation size={18} className="fill-white" />
+                <span>Track Live Order 📍</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleReorder(selectedOrder)}
+                className="w-full bg-[#00A86B] hover:bg-[#00915c] text-white py-3.5 px-4 rounded-xl font-black text-sm flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer active:scale-[0.99]"
+              >
+                <RotateCcw size={16} />
+                <span>Reorder These Items</span>
+              </button>
+            )}
+
+            {canCancelOrder(selectedOrder.status) && (
               <button
                 type="button"
                 disabled={cancelling}
                 onClick={() => handleCancelOrder(selectedOrder)}
-                className="border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-60 px-5 py-2.5 rounded-xl text-xs font-extrabold transition-colors cursor-pointer shadow-2xs"
+                className="text-xs font-extrabold text-rose-600 hover:text-rose-700 disabled:opacity-60 cursor-pointer pt-1"
               >
                 {cancelling ? 'Cancelling…' : 'Cancel Order'}
               </button>
-              <p className="text-[11px] text-gray-400 font-medium mt-1.5">
-                You can cancel until the order leaves our store. Online payments are refunded to your wallet.
-              </p>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-
       </motion.div>
     );
   }
@@ -697,7 +913,7 @@ export const CustomerOrders: React.FC = () => {
         </div>
 
         {/* Status filter */}
-        <div className="w-full max-w-[900px] mx-auto pt-3">
+        <div className="w-full max-w-[900px] mx-auto pt-3 flex justify-end">
           <div className="relative inline-block" ref={filterRef}>
             <button
               onClick={() => setFilterOpen((o) => !o)}
@@ -714,9 +930,9 @@ export const CustomerOrders: React.FC = () => {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -6 }}
                   transition={{ duration: 0.15 }}
-                  className="absolute left-0 top-full mt-2 w-48 bg-white rounded-xl border border-gray-200 shadow-xl py-1.5 z-20"
+                  className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl border border-gray-200 shadow-xl py-1.5 z-20"
                 >
-                  {(['In Transit', 'Delivered', 'Cancelled'] as const).map((tab) => (
+                  {(['In Progress', 'Delivered', 'Cancelled'] as const).map((tab) => (
                     <button
                       key={tab}
                       onClick={() => { setFilter(tab); setFilterOpen(false); }}
@@ -801,7 +1017,7 @@ export const CustomerOrders: React.FC = () => {
                   </div>
 
                   {/* Status Badge */}
-                  {bucketOf(order.status) === 'In Transit' ? (
+                  {bucketOf(order.status) === 'In Progress' ? (
                     <div className="flex items-center gap-2">
                       <Link
                         to={`/track/${encodeURIComponent((order as any).orderId || order.orderNumber || order.id)}`}
@@ -812,7 +1028,7 @@ export const CustomerOrders: React.FC = () => {
                       </Link>
                       <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-1 rounded-full text-xs font-black flex items-center gap-1.5 animate-pulse">
                         <Zap size={14} className="fill-emerald-600 text-emerald-600" />
-                        <span>Arriving in {order.estimatedDelivery}</span>
+                        <span>{order.status || 'In Progress'}</span>
                       </div>
                     </div>
                   ) : bucketOf(order.status) === 'Delivered' ? (

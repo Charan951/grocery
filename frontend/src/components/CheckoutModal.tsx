@@ -182,7 +182,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         date:
           new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) +
           ` at ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`,
-        status: 'In Transit',
+        status: 'In Progress',
         paymentStatus,
         deliveryTime: '10 mins',
         totalAmount: finalPayable,

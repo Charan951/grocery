@@ -53,6 +53,18 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
   Widget build(BuildContext context) {
     final history = ref.watch(_historyProvider(_filters[_filterLabel]));
 
+    // Stable per-partner delivery numbers (#1 = their very first delivery),
+    // independent of whichever status filter is active — derived from the
+    // unfiltered lifetime list, which the backend returns newest-first.
+    final allHistory = ref.watch(_historyProvider(null)).valueOrNull;
+    final numberByOrderId = <String, int>{};
+    if (allHistory != null) {
+      final total = allHistory.length;
+      for (var i = 0; i < total; i++) {
+        numberByOrderId[allHistory[i].orderId] = total - i;
+      }
+    }
+
     return Scaffold(
       appBar: AppBar(
         leading: const TabBackButton(),
@@ -90,7 +102,9 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                   final e = _emptyHistory[_filterLabel]!;
                   return _empty(e.icon, e.title, e.sub);
                 }
-                return Column(children: orders.map((o) => _tile(o)).toList());
+                return Column(
+                  children: orders.map((o) => _tile(o, numberByOrderId[o.orderId])).toList(),
+                );
               },
             ),
           ],
@@ -112,8 +126,9 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
         ],
       );
 
-  Widget _tile(DeliveryOrder o) {
+  Widget _tile(DeliveryOrder o, int? number) {
     final subtitle = o.deliveryAddress.isEmpty ? o.status : o.deliveryAddress;
+    final label = number != null ? 'Delivery #$number' : o.orderId;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Card(
@@ -141,7 +156,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                       Row(
                         children: [
                           Flexible(
-                            child: Text(o.orderId,
+                            child: Text(label,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                           ),

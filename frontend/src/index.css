@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&family=Nunito+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@300;400;500;600;700;800&family=Rubik:wght@400;500;600;700;800&family=Nunito+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
 /* Festival campaign display faces — selected via the admin theme preset. */
 @import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Rozha+One&family=Cinzel+Decorative:wght@700;900&family=Satisfy&family=Pacifico&display=swap');
 @import "tailwindcss";
@@ -57,10 +57,13 @@
   --spacing-xxl: 3rem;
   --spacing-luxury: 4.5rem;
 
-  /* Fonts — app-wide pairing: Rubik (display/headings) + Nunito Sans (body).
-     Chosen for e-commerce readability (product copy) + friendly, modern tone. */
-  --font-sans: 'Nunito Sans', system-ui, -apple-system, sans-serif;
-  --font-display: 'Rubik', system-ui, sans-serif;
+  /* Fonts — FreshCart Premium Typography System:
+     Primary Brand & Display: Manrope (300, 400, 500, 600, 700, 800)
+     Secondary Content & UI:  Inter (400, 500, 600, 700) */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-display: 'Manrope', system-ui, sans-serif;
+  --font-manrope: 'Manrope', system-ui, sans-serif;
+  --font-inter: 'Inter', system-ui, -apple-system, sans-serif;
   
   /* Layout */
   --header-height: 80px;
@@ -99,8 +102,8 @@
   --admin-accent-on-light: #0E7A20;
   --admin-accent-soft: #DFF7E3;
 
-  --font-admin-display: 'Rubik', var(--font-sans);
-  --font-admin-body: 'Nunito Sans', var(--font-sans);
+  --font-admin-display: 'Rubik', system-ui, sans-serif;
+  --font-admin-body: 'Nunito Sans', system-ui, -apple-system, sans-serif;
   --font-admin-mono: 'IBM Plex Mono', ui-monospace, monospace;
 }
 
@@ -161,6 +164,258 @@
   --font-admin-display: var(--font-admin-display);
   --font-admin-body: var(--font-admin-body);
   --font-admin-mono: var(--font-admin-mono);
+  --font-display: var(--font-display);
+  --font-sans: var(--font-sans);
+  --font-manrope: var(--font-manrope);
+  --font-inter: var(--font-inter);
+}
+
+/* ============================================================
+   FRESHCART TYPOGRAPHY SYSTEM — SCALE & HIERARCHY CLASSES
+   Master Scale: [11, 12, 13, 14, 15, 16, 17, 18, 20, 22, 24, 28, 32, 36, 40]
+   Primary Font: Manrope (Headings, Prices, CTAs, Product Names, Nav)
+   Secondary Font: Inter (Body, Metadata, Forms, Delivery, Reviews)
+   ============================================================ */
+.font-display { font-family: var(--font-display); }
+.font-body { font-family: var(--font-sans); }
+.font-tabular { font-variant-numeric: tabular-nums; }
+
+/* Display Typography */
+.fc-display-large {
+  font-family: var(--font-display);
+  font-size: 40px;
+  line-height: 48px;
+  font-weight: 800;
+  letter-spacing: -1.0px;
+}
+.fc-display-medium {
+  font-family: var(--font-display);
+  font-size: 36px;
+  line-height: 44px;
+  font-weight: 800;
+  letter-spacing: -0.8px;
+}
+.fc-display-small {
+  font-family: var(--font-display);
+  font-size: 32px;
+  line-height: 40px;
+  font-weight: 700;
+  letter-spacing: -0.6px;
+}
+
+/* Page Headings */
+.fc-h1 {
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 36px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+.fc-h2 {
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+.fc-h3 {
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+.fc-h4 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+}
+
+/* Section Typography */
+.fc-section-large {
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+.fc-section-medium {
+  font-family: var(--font-display);
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+}
+.fc-section-small {
+  font-family: var(--font-display);
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 600;
+  letter-spacing: 0.0px;
+}
+
+/* Body Typography */
+.fc-body-large {
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 26px;
+  font-weight: 400;
+}
+.fc-body-medium {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 23px;
+  font-weight: 400;
+}
+.fc-body-small {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+}
+
+/* UI Label Typography */
+.fc-label-large {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+}
+.fc-label-medium {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 600;
+}
+.fc-label-small {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+}
+
+/* Captions */
+.fc-caption-large {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+}
+.fc-caption-small {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 500;
+}
+
+/* Product Typography */
+.fc-product-name {
+  font-family: var(--font-display);
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 600;
+}
+.fc-product-brand {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+}
+.fc-product-weight {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+}
+.fc-product-rating {
+  font-family: var(--font-display);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.fc-product-price {
+  font-family: var(--font-display);
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.fc-product-mrp {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+  text-decoration: line-through;
+  font-variant-numeric: tabular-nums;
+}
+.fc-product-discount {
+  font-family: var(--font-display);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.fc-product-cta {
+  font-family: var(--font-display);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+}
+
+/* Price Hierarchy */
+.fc-price-current {
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.fc-price-featured {
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.fc-price-total {
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 34px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Button Typography */
+.fc-btn-primary {
+  font-family: var(--font-display);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.fc-btn-secondary {
+  font-family: var(--font-display);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.fc-btn-text {
+  font-family: var(--font-display);
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.fc-btn-small {
+  font-family: var(--font-display);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 /* Global resets and helper classes */

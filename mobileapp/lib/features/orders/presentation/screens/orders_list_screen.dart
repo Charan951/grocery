@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
 import 'package:freshcart/core/constants/app_radius.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
+import 'package:freshcart/core/utils/invoice.dart';
 import 'package:freshcart/core/widgets/app_toast.dart';
 import 'package:freshcart/core/widgets/feedback_states.dart';
 import 'package:freshcart/core/widgets/skeletons.dart';
@@ -39,19 +40,19 @@ void reorder(WidgetRef ref, OrderModel order) {
   AppToast.success(added == 0 ? 'Items already at cart limit' : 'Added $added items to cart');
 }
 
-enum _OrdersTab { all, inTransit, delivered, cancelled }
+enum _OrdersTab { all, inProgress, delivered, cancelled }
 
 extension _OrdersTabX on _OrdersTab {
   String get label => switch (this) {
         _OrdersTab.all => 'All',
-        _OrdersTab.inTransit => 'In Transit',
+        _OrdersTab.inProgress => 'In Progress',
         _OrdersTab.delivered => 'Delivered',
         _OrdersTab.cancelled => 'Cancelled',
       };
 
   bool matches(OrderModel o) => switch (this) {
         _OrdersTab.all => true,
-        _OrdersTab.inTransit => o.isActive,
+        _OrdersTab.inProgress => o.isActive,
         _OrdersTab.delivered => o.status == OrderStatus.delivered,
         _OrdersTab.cancelled => o.status == OrderStatus.cancelled,
       };
@@ -66,6 +67,7 @@ class OrdersListScreen extends ConsumerStatefulWidget {
 
 class _OrdersListScreenState extends ConsumerState<OrdersListScreen> {
   _OrdersTab _tab = _OrdersTab.all;
+  bool _defaultTabSet = false;
 
   @override
   Widget build(BuildContext context) {
@@ -97,6 +99,24 @@ class _OrdersListScreenState extends ConsumerState<OrdersListScreen> {
               onAction: () => context.go('/'),
             );
           }
+
+          // Default the filter to whatever's most relevant: prefer "In
+          // Progress" (something to track), else "Delivered", else "All".
+          // Only applies once so it never stomps a manual filter change.
+          if (!_defaultTabSet) {
+            _defaultTabSet = true;
+            final preferred = orders.any(_OrdersTab.inProgress.matches)
+                ? _OrdersTab.inProgress
+                : orders.any(_OrdersTab.delivered.matches)
+                    ? _OrdersTab.delivered
+                    : null;
+            if (preferred != null) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) setState(() => _tab = preferred);
+              });
+            }
+          }
+
           final filtered = orders.where(_tab.matches).toList();
 
           return RefreshIndicator(
@@ -145,7 +165,7 @@ class _TabBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final fg = isDark ? AppColors.textPrimaryDark : AppColors.textPrimary;
     return Align(
-      alignment: Alignment.centerLeft,
+      alignment: Alignment.centerRight,
       child: PopupMenuButton<_OrdersTab>(
         initialValue: current,
         onSelected: onSelect,
@@ -220,9 +240,31 @@ class _OrderCard extends ConsumerWidget {
               children: [
                 Row(
                   children: [
-                    Icon(statusIcon(order.status), size: 16, color: c),
-                    const SizedBox(width: 6),
-                    Text(order.statusText, style: AppTypography.labelMedium(c)),
+                    if (order.isActive) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.12),
+                          borderRadius: AppRadius.brPill,
+                          border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.bolt_rounded, size: 14, color: AppColors.primary),
+                            const SizedBox(width: 4),
+                            Text(
+                              order.statusText.isEmpty ? 'In Progress' : order.statusText,
+                              style: AppTypography.labelSmall(AppColors.primaryText).copyWith(fontWeight: FontWeight.w800),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else ...[
+                      Icon(statusIcon(order.status), size: 16, color: c),
+                      const SizedBox(width: 6),
+                      Text(order.statusText, style: AppTypography.labelMedium(c)),
+                    ],
                     const Spacer(),
                     Text(
                       '${order.date.day}/${order.date.month}/${order.date.year}',
@@ -289,14 +331,14 @@ class _OrderCard extends ConsumerWidget {
                         ),
                       ),
                     const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => context.push('/order/${order.id}'),
-                        style: OutlinedButton.styleFrom(
-                          shape: RoundedRectangleBorder(borderRadius: AppRadius.brSm),
-                        ),
-                        child: const Text('Details'),
+                    _OrderInvoiceButton(order: order),
+                    const SizedBox(width: 8),
+                    OutlinedButton(
+                      onPressed: () => context.push('/order/${order.id}'),
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(borderRadius: AppRadius.brSm),
                       ),
+                      child: const Text('Details'),
                     ),
                   ],
                 ),
@@ -309,6 +351,45 @@ class _OrderCard extends ConsumerWidget {
   }
 }
 
+class _OrderInvoiceButton extends StatefulWidget {
+  final OrderModel order;
+  const _OrderInvoiceButton({required this.order});
+
+  @override
+  State<_OrderInvoiceButton> createState() => _OrderInvoiceButtonState();
+}
+
+class _OrderInvoiceButtonState extends State<_OrderInvoiceButton> {
+  bool _busy = false;
+
+  Future<void> _download() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await downloadInvoice(widget.order);
+    } catch (_) {
+      if (mounted) AppToast.error('Could not generate invoice. Please try again.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: _busy ? null : _download,
+      icon: _busy
+          ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2))
+          : const Icon(Icons.download_rounded, size: 15),
+      label: const Text('Invoice'),
+      style: OutlinedButton.styleFrom(
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.brSm),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+      ),
+    );
+  }
+}
+
 class _Thumbs extends StatelessWidget {
   final OrderModel order;
   final bool isDark;
@@ -316,12 +397,11 @@ class _Thumbs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imgs = order.items
-        .map((i) => i.product.imageUrl)
-        .where((u) => u.startsWith('http'))
+    final validItems = order.items
+        .where((i) => i.product.imageUrl.startsWith('http'))
         .take(3)
         .toList();
-    if (imgs.isEmpty) {
+    if (validItems.isEmpty) {
       return Container(
         width: 48,
         height: 48,
@@ -333,26 +413,48 @@ class _Thumbs extends StatelessWidget {
       );
     }
     return SizedBox(
-      width: 48 + (imgs.length - 1) * 16.0,
+      width: 48 + (validItems.length - 1) * 16.0,
       height: 48,
       child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          for (var i = 0; i < imgs.length; i++)
+          for (var i = 0; i < validItems.length; i++)
             Positioned(
               left: i * 16.0,
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  borderRadius: AppRadius.brSm,
-                  border: Border.all(color: isDark ? AppColors.surfaceDark : AppColors.surface, width: 2),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: CachedNetworkImage(
-                  imageUrl: imgs[i],
-                  fit: BoxFit.cover,
-                  errorWidget: (_, _, _) => const Icon(Icons.shopping_bag_outlined, size: 16),
-                ),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      borderRadius: AppRadius.brSm,
+                      border: Border.all(color: isDark ? AppColors.surfaceDark : AppColors.surface, width: 2),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: CachedNetworkImage(
+                      imageUrl: validItems[i].product.imageUrl,
+                      fit: BoxFit.cover,
+                      errorWidget: (_, _, _) => const Icon(Icons.shopping_bag_outlined, size: 16),
+                    ),
+                  ),
+                  if (validItems[i].quantity > 1)
+                    Positioned(
+                      top: -3,
+                      right: -3,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.black87 : const Color(0xFF1E293B),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'x${validItems[i].quantity}',
+                          style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
         ],

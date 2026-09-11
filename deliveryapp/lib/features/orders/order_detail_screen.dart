@@ -1,10 +1,14 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:freshcart_delivery/core/error/api_exception.dart';
 import 'package:freshcart_delivery/core/theme.dart';
+import 'package:freshcart_delivery/core/widgets/delivery_map.dart';
 import 'package:freshcart_delivery/features/orders/order_controller.dart';
 import 'package:freshcart_delivery/models/delivery_models.dart';
 
@@ -16,10 +20,48 @@ class OrderDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(orderProvider(orderId));
     return Scaffold(
-      appBar: AppBar(title: Text('Order $orderId')),
+      backgroundColor: kPaper,
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Order Details',
+              style: GoogleFonts.rubik(fontWeight: FontWeight.w700, fontSize: 17, color: kText),
+            ),
+            Text(
+              '#$orderId',
+              style: GoogleFonts.nunitoSans(fontSize: 12, fontWeight: FontWeight.w600, color: kTextMuted),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Copy Order ID',
+            icon: const Icon(Icons.copy_rounded, size: 19),
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: orderId));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  content: Text('Order ID #$orderId copied to clipboard'),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: async.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => _ErrorBox(message: '$e', onRetry: () => ref.read(orderProvider(orderId).notifier).load()),
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: kGreen, strokeWidth: 2.5),
+        ),
+        error: (e, _) => _ErrorBox(
+          message: '$e',
+          onRetry: () => ref.read(orderProvider(orderId).notifier).load(),
+        ),
         data: (o) => _Body(order: o),
       ),
     );
@@ -40,7 +82,13 @@ class _BodyState extends ConsumerState<_Body> {
 
   void _snack(String m) => ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(m)));
+    ..showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        content: Text(m),
+      ),
+    );
 
   Future<void> _do(Future<void> Function() f) async {
     setState(() => _busy = true);
@@ -51,6 +99,13 @@ class _BodyState extends ConsumerState<_Body> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  LatLng? _latLngFrom(Map<String, dynamic>? loc) {
+    final lat = loc?['lat'];
+    final lng = loc?['lng'];
+    if (lat is num && lng is num) return LatLng(lat.toDouble(), lng.toDouble());
+    return null;
   }
 
   Future<void> _navigateTo(Map<String, dynamic>? loc, String fallbackQuery) async {
@@ -65,14 +120,15 @@ class _BodyState extends ConsumerState<_Body> {
 
   Future<void> _call() async {
     final digits = o.customerPhone.replaceAll(RegExp(r'[^0-9+]'), '');
-    if (digits.contains('•') || digits.length < 6) return _snack('Number available once out for delivery');
+    if (digits.contains('•') || digits.length < 6) return _snack('Customer phone is available once out for delivery');
     await launchUrl(Uri.parse('tel:$digits'));
   }
 
   Future<void> _whatsapp() async {
     final digits = o.customerPhone.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.length < 10) return _snack('Number available once out for delivery');
-    await launchUrl(Uri.parse('https://wa.me/$digits'), mode: LaunchMode.externalApplication);
+    if (digits.length < 10) return _snack('Customer phone is available once out for delivery');
+    final waNumber = digits.length == 10 ? '91$digits' : digits;
+    await launchUrl(Uri.parse('https://wa.me/$waNumber'), mode: LaunchMode.externalApplication);
   }
 
   Future<void> _completeFlow() async {
@@ -83,27 +139,71 @@ class _BodyState extends ConsumerState<_Body> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: kSurface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSt) => Padding(
           padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text('Confirm delivery', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
-                const SizedBox(height: 4),
-                const Text('Ask the customer for their 4-digit code.', style: TextStyle(color: kTextMuted)),
-                const SizedBox(height: 14),
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(color: kLedgerLine, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(color: kGreenSoft, borderRadius: BorderRadius.circular(12)),
+                      child: const Icon(Icons.verified_user_rounded, color: kGreen, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Confirm Delivery', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: kText)),
+                          Text('Ask customer for their 4-digit code', style: TextStyle(color: kTextMuted, fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
                 TextField(
                   controller: otpCtrl,
                   keyboardType: TextInputType.number,
                   maxLength: 4,
-                  decoration: const InputDecoration(labelText: 'Delivery code', counterText: ''),
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.rubik(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: 8),
+                  decoration: InputDecoration(
+                    hintText: '• • • •',
+                    hintStyle: const TextStyle(color: kTextFaint, letterSpacing: 8),
+                    filled: true,
+                    fillColor: kPaper,
+                    counterText: '',
+                    contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: kLedgerLine)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: kLedgerLine)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: kGreen, width: 2)),
+                  ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: photoB64 != null ? kGreenSoft : Colors.transparent,
+                    side: BorderSide(color: photoB64 != null ? kGreen : kLedgerLine),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
                   onPressed: () async {
                     final XFile? img = await ImagePicker().pickImage(source: ImageSource.camera, imageQuality: 55, maxWidth: 1280);
                     if (img != null) {
@@ -111,13 +211,21 @@ class _BodyState extends ConsumerState<_Body> {
                       setSt(() => photoB64 = 'data:image/jpeg;base64,${base64Encode(bytes)}');
                     }
                   },
-                  icon: Icon(photoB64 == null ? Icons.photo_camera_outlined : Icons.check_circle),
-                  label: Text(photoB64 == null ? 'Add proof photo (optional)' : 'Photo attached'),
+                  icon: Icon(photoB64 == null ? Icons.photo_camera_outlined : Icons.check_circle_rounded, color: photoB64 != null ? kGreen : kTextMuted),
+                  label: Text(
+                    photoB64 == null ? 'Take Proof Photo (Optional)' : 'Proof Photo Attached',
+                    style: TextStyle(color: photoB64 != null ? kGreen : kText, fontWeight: FontWeight.w700),
+                  ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: kGreen,
+                    minimumSize: const Size.fromHeight(50),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
                   onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text('Mark delivered'),
+                  child: const Text('Complete & Handover', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
                 ),
               ],
             ),
@@ -133,42 +241,117 @@ class _BodyState extends ConsumerState<_Body> {
 
   Future<void> _failFlow() async {
     const reasons = [
-      'Customer not reachable',
+      'Customer not reachable / phone switched off',
       'Wrong / incomplete address',
       'Customer refused the order',
-      'Customer not available',
-      'Other',
+      'Customer not available at location',
+      'Damaged items / packaging issue',
+      'Other reason',
     ];
     final noteCtrl = TextEditingController();
     final picked = ValueNotifier<String?>(null);
     final ok = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      backgroundColor: kSurface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
           child: ValueListenableBuilder<String?>(
             valueListenable: picked,
             builder: (ctx, sel, _) => Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text('Mark as failed', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
-                const SizedBox(height: 8),
-                ...reasons.map((r) => ListTile(
-                      leading: Icon(sel == r ? Icons.radio_button_checked : Icons.radio_button_off,
-                          color: sel == r ? kBrand : kTextFaint),
-                      title: Text(r),
-                      onTap: () => picked.value = r,
-                    )),
-                if (sel == 'Other')
-                  TextField(controller: noteCtrl, decoration: const InputDecoration(labelText: 'Describe')),
-                const SizedBox(height: 12),
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(color: kLedgerLine, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(color: kRedSoft, borderRadius: BorderRadius.circular(12)),
+                      child: const Icon(Icons.report_problem_rounded, color: kRed, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Report Delivery Issue', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: kText)),
+                          Text('Select reason why order cannot be delivered', style: TextStyle(color: kTextMuted, fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                ...reasons.map((r) {
+                  final isSelected = sel == r;
+                  return InkWell(
+                    onTap: () => picked.value = r,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: isSelected ? kRedSoft.withValues(alpha: 0.6) : kPaper,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: isSelected ? kRed : kLedgerLine, width: isSelected ? 1.4 : 1),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                            color: isSelected ? kRed : kTextFaint,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              r,
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                color: isSelected ? kRed : kText,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+                if (sel == 'Other reason') ...[
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: noteCtrl,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      hintText: 'Explain the issue in detail...',
+                      filled: true,
+                      fillColor: kPaper,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kLedgerLine)),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 14),
                 FilledButton(
-                  style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: kRed,
+                    minimumSize: const Size.fromHeight(50),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
                   onPressed: sel == null ? null : () => Navigator.pop(ctx, true),
-                  child: const Text('Confirm failed delivery'),
+                  child: const Text('Confirm Delivery Failed', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
                 ),
               ],
             ),
@@ -178,7 +361,7 @@ class _BodyState extends ConsumerState<_Body> {
     );
     final sel = picked.value;
     if (ok == true && sel != null) {
-      final reason = sel == 'Other' && noteCtrl.text.trim().isNotEmpty ? noteCtrl.text.trim() : sel;
+      final reason = sel == 'Other reason' && noteCtrl.text.trim().isNotEmpty ? noteCtrl.text.trim() : sel;
       await _do(() => ref.read(orderProvider(o.orderId).notifier).fail(reason));
     }
   }
@@ -188,16 +371,16 @@ class _BodyState extends ConsumerState<_Body> {
     switch (o.status) {
       case 'Assigned':
       case 'Ready':
-        return (label: 'Arrived at store', icon: Icons.store_rounded, run: () => _do(ctl.pickupArrived));
+        return (label: 'Arrived at Store', icon: Icons.storefront_rounded, run: () => _do(ctl.pickupArrived));
       case 'Arrived At Store':
-        return (label: 'Picked up — start delivery', icon: Icons.check_rounded, run: () => _do(ctl.pickedUp));
+        return (label: 'Pickup Done — Start Delivery', icon: Icons.moped_rounded, run: () => _do(ctl.pickedUp));
       case 'Out For Delivery':
-        return (label: 'I have arrived', icon: Icons.pin_drop_rounded, run: () => _do(ctl.arrived));
+        return (label: 'I Have Arrived at Doorstep', icon: Icons.pin_drop_rounded, run: () => _do(ctl.arrived));
       case 'Arrived':
-        return (label: 'Complete delivery', icon: Icons.done_all_rounded, run: _completeFlow);
+        return (label: 'Collect OTP & Complete', icon: Icons.task_alt_rounded, run: _completeFlow);
       case 'Failed':
         if (o.needsReturn) {
-          return (label: 'Returned to store', icon: Icons.store_mall_directory_rounded, run: () => _do(ctl.markReturned));
+          return (label: 'Returned Order to Store', icon: Icons.store_mall_directory_rounded, run: () => _do(ctl.markReturned));
         }
         return null;
       default:
@@ -207,25 +390,65 @@ class _BodyState extends ConsumerState<_Body> {
 
   static const _pickupStatuses = ['Assigned', 'Ready', 'Arrived At Store'];
 
-  ({Color fg, Color bg, IconData icon, String next})? _statusMeta() {
+  ({Color fg, IconData icon, String title, String next}) _statusMeta() {
     switch (o.status) {
       case 'Assigned':
-        return (fg: kAmber, bg: kAmberSoft, icon: Icons.inventory_2_rounded, next: 'Head to the store to pick up this order.');
+        return (
+          fg: kAmber,
+          icon: Icons.assignment_ind_rounded,
+          title: 'Order Assigned',
+          next: 'Head to the store to collect this parcel.',
+        );
       case 'Ready':
-        return (fg: kAmber, bg: kAmberSoft, icon: Icons.inventory_2_rounded, next: 'Order is packed — go pick it up.');
+        return (
+          fg: kAmber,
+          icon: Icons.inventory_2_rounded,
+          title: 'Packed & Ready',
+          next: 'Order is ready at counter. Pick it up now.',
+        );
       case 'Arrived At Store':
-        return (fg: kAmber, bg: kAmberSoft, icon: Icons.storefront_rounded, next: 'Confirm pickup once you have the bag.');
+        return (
+          fg: kAmber,
+          icon: Icons.storefront_rounded,
+          title: 'At Store',
+          next: 'Confirm items in bag and tap "Pickup Done".',
+        );
       case 'Out For Delivery':
-        return (fg: kGreen, bg: kGreenSoft, icon: Icons.local_shipping_rounded, next: 'On the way to the customer.');
+        return (
+          fg: kGreen,
+          icon: Icons.delivery_dining_rounded,
+          title: 'Out for Delivery',
+          next: 'On the way to customer doorstep.',
+        );
       case 'Arrived':
-        return (fg: kGreen, bg: kGreenSoft, icon: Icons.pin_drop_rounded, next: 'At the drop-off — collect code & complete.');
+        return (
+          fg: kGreen,
+          icon: Icons.location_on_rounded,
+          title: 'Arrived at Location',
+          next: 'At drop-off. Ask customer for delivery code.',
+        );
       case 'Delivered':
-        return (fg: kGreen, bg: kGreenSoft, icon: Icons.task_alt_rounded, next: 'Delivered successfully.');
+        return (
+          fg: kGreen,
+          icon: Icons.task_alt_rounded,
+          title: 'Delivered Successfully',
+          next: 'Order delivered and payment verified.',
+        );
       case 'Failed':
       case 'Cancelled':
-        return (fg: kRed, bg: kRedSoft, icon: Icons.report_problem_rounded, next: o.needsReturn ? 'Return this order to the store.' : 'This delivery was not completed.');
+        return (
+          fg: kRed,
+          icon: Icons.report_problem_rounded,
+          title: 'Delivery Not Completed',
+          next: o.needsReturn ? 'Please return this parcel back to the store.' : 'This delivery was marked as cancelled or failed.',
+        );
       default:
-        return (fg: kTextMuted, bg: kLedgerLine, icon: Icons.local_shipping_rounded, next: '');
+        return (
+          fg: kTextMuted,
+          icon: Icons.local_shipping_rounded,
+          title: o.status,
+          next: '',
+        );
     }
   }
 
@@ -243,213 +466,705 @@ class _BodyState extends ConsumerState<_Body> {
             onRefresh: ctl.load,
             color: kGreen,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
               children: [
+                // 1. Status Hero Card
                 _statusHeader(),
-                const SizedBox(height: 12),
-                _section('Customer', [
-                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    CircleAvatar(
-                      radius: 20,
-                      backgroundColor: kGreenSoft,
-                      child: Text(
-                        (o.customerName.isEmpty ? 'C' : o.customerName.trim()[0]).toUpperCase(),
-                        style: const TextStyle(color: kGreen, fontWeight: FontWeight.w800, fontSize: 16),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(o.customerName.isEmpty ? 'Customer' : o.customerName,
-                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: kText)),
-                        const SizedBox(height: 2),
-                        Text(o.deliveryAddress, maxLines: 2, overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 13, color: kTextMuted, height: 1.35)),
-                      ]),
-                    ),
-                  ]),
-                  const SizedBox(height: 12),
-                  const Divider(height: 1),
-                  const SizedBox(height: 12),
-                  Row(children: [
-                    Icon(o.isCOD ? Icons.payments_rounded : Icons.check_circle_rounded,
-                        size: 16, color: o.isCOD ? kAmber : kGreen),
-                    const SizedBox(width: 8),
-                    Text('₹${o.totalAmount.toStringAsFixed(0)}',
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: kText)),
-                    const SizedBox(width: 8),
-                    _pill(o.isCOD ? 'COLLECT CASH' : o.paymentStatus, o.isCOD ? kAmber : kGreen, o.isCOD ? kAmberSoft : kGreenSoft),
-                  ]),
-                  const SizedBox(height: 12),
-                  Row(children: [
-                    Expanded(child: OutlinedButton.icon(onPressed: _call, icon: const Icon(Icons.call_rounded, size: 18), label: const Text('Call'))),
-                    const SizedBox(width: 10),
-                    Expanded(child: OutlinedButton.icon(onPressed: _whatsapp, icon: const Icon(Icons.chat_rounded, size: 18), label: const Text('WhatsApp'))),
-                  ]),
-                ]),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: kSurface,
-                    foregroundColor: kGreen,
-                    side: const BorderSide(color: kGreen, width: 1.4),
-                  ),
-                  onPressed: () => _navigateTo(
-                    isPickupLeg ? o.pickup : o.deliveryLocation,
-                    isPickupLeg ? (o.pickup?['name'] ?? 'store').toString() : o.deliveryAddress,
-                  ),
-                  icon: const Icon(Icons.navigation_rounded, size: 18),
-                  label: Text(isPickupLeg ? 'Navigate to store' : 'Navigate to customer'),
-                ),
-                const SizedBox(height: 12),
-                _section('Items · ${o.items.length}',
-                    [for (final i in o.items) _itemRow(i)], tight: true),
+                const SizedBox(height: 14),
+
+                // 2. Cash on Delivery / Payment Banner
+                _paymentCallout(),
+                const SizedBox(height: 14),
+
+                // 3. Customer & Drop-off Destination Card
+                _customerDestinationCard(isPickupLeg),
+                const SizedBox(height: 14),
+
+                // 4. Items in Order Card
+                _itemsCard(),
+                const SizedBox(height: 14),
+
+                // 5. Activity Timeline
                 if (o.timeline.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  _section('Timeline', _timelineRows(), tight: true),
+                  _timelineCard(),
+                  const SizedBox(height: 14),
                 ],
+
+                // 6. Failure Reason Card (if applicable)
                 if (o.status == 'Failed' && o.failureReason.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Card(
-                    color: kRedSoft,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: kRed.withValues(alpha: 0.25))),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Row(children: [
-                          const Icon(Icons.error_outline_rounded, size: 18, color: kRed),
-                          const SizedBox(width: 8),
-                          const Text('Failure reason', style: TextStyle(fontWeight: FontWeight.w800, color: kRed)),
-                        ]),
-                        const SizedBox(height: 8),
-                        Text(o.failureReason, style: const TextStyle(fontSize: 13.5, color: kText, height: 1.4)),
-                        if (o.needsReturn) ...[
-                          const SizedBox(height: 8),
-                          const Text('Bring this order back to the store, then tap "Returned to store".',
-                              style: TextStyle(fontSize: 13, color: kTextMuted, height: 1.4)),
-                        ],
-                      ]),
-                    ),
-                  ),
+                  _failureCard(),
                 ],
               ],
             ),
           ),
         ),
-        if (action != null || canFail)
-          DecoratedBox(
-            decoration: const BoxDecoration(
-              color: kSurface,
-              border: Border(top: BorderSide(color: kLedgerLine)),
-            ),
-            child: SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (action != null)
-                      FilledButton.icon(
-                        onPressed: _busy ? null : action.run,
-                        icon: _busy
-                            ? const SizedBox(
-                                width: 18, height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                              )
-                            : Icon(action.icon),
-                        label: Text(action.label),
-                      ),
-                    if (canFail) ...[
-                      const SizedBox(height: 4),
-                      TextButton.icon(
-                        onPressed: _busy ? null : _failFlow,
-                        icon: Icon(Icons.flag_outlined, size: 16, color: Colors.red.shade700),
-                        label: Text('Report a problem', style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.w700)),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ),
+
+        // 7. Ergonomic Sticky Bottom Action Bar
+        if (action != null || canFail) _bottomBar(action, canFail),
       ],
     );
   }
 
   Widget _statusHeader() {
-    final meta = _statusMeta()!;
-    return Card(
-      color: meta.bg,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: meta.fg.withValues(alpha: 0.2))),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(children: [
-          Container(
-            width: 44, height: 44,
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
-            child: Icon(meta.icon, color: meta.fg, size: 22),
+    final meta = _statusMeta();
+    return Container(
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kLedgerLine),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Text(o.status, style: TextStyle(fontWeight: FontWeight.w800, color: meta.fg, fontSize: 16, letterSpacing: -0.1)),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: meta.fg.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(meta.icon, color: meta.fg, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                          decoration: BoxDecoration(
+                            color: meta.fg.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            o.status.toUpperCase(),
+                            style: GoogleFonts.rubik(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              color: meta.fg,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        InkWell(
+                          onTap: () {
+                            Clipboard.setData(ClipboardData(text: o.orderId));
+                            _snack('Order ID copied');
+                          },
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                            decoration: BoxDecoration(
+                              color: kPaper,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: kLedgerLine),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  o.orderId.length > 12 ? '#${o.orderId.substring(0, 12)}…' : '#${o.orderId}',
+                                  style: GoogleFonts.nunitoSans(fontSize: 11, fontWeight: FontWeight.w700, color: kTextMuted),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.copy_rounded, size: 12, color: kTextFaint),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      meta.title,
+                      style: GoogleFonts.rubik(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 17,
+                        color: kText,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (meta.next.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Icon(Icons.info_outline_rounded, size: 15, color: kTextMuted),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(o.orderId, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12, color: kTextMuted, fontWeight: FontWeight.w600)),
+                  child: Text(
+                    meta.next,
+                    style: GoogleFonts.nunitoSans(
+                      fontSize: 12.5,
+                      color: kTextMuted,
+                      fontWeight: FontWeight.w600,
+                      height: 1.3,
+                    ),
+                  ),
                 ),
-              ]),
-              if (meta.next.isNotEmpty) ...[
-                const SizedBox(height: 3),
-                Text(meta.next, style: const TextStyle(fontSize: 12.5, color: kTextMuted, height: 1.3)),
               ],
-            ]),
-          ),
-        ]),
+            ),
+          ],
+        ],
       ),
     );
   }
 
-  Widget _pill(String label, Color fg, Color bg) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
-        child: Text(label,
-            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: fg, letterSpacing: 0.3)),
-      );
-
-  Widget _section(String title, List<Widget> children, {bool tight = false}) => Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title.toUpperCase(),
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11.5, color: kTextMuted, letterSpacing: 0.4)),
-              SizedBox(height: tight ? 10 : 8),
-              ...children,
-            ],
-          ),
+  Widget _paymentCallout() {
+    if (o.isCOD) {
+      return Container(
+        decoration: BoxDecoration(
+          color: kSurface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: kLedgerLine),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: kAmberSoft,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.payments_rounded, color: kAmber, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: kAmberSoft,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'COLLECT CASH',
+                          style: GoogleFonts.rubik(fontSize: 10, fontWeight: FontWeight.w800, color: kAmber, letterSpacing: 0.5),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '₹${o.totalAmount.toStringAsFixed(0)}',
+                        style: GoogleFonts.rubik(fontSize: 16, fontWeight: FontWeight.w800, color: kText),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Collect exact cash from customer before handing over the parcel.',
+                    style: GoogleFonts.nunitoSans(fontSize: 12, color: kTextMuted, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       );
+    }
 
-  Widget _itemRow(OrderItemLine i) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Row(children: [
+    return Container(
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kLedgerLine),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
           Container(
-            width: 24, height: 24,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(color: kGreenSoft, borderRadius: BorderRadius.circular(7)),
-            child: Text('${i.quantity}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: kGreen)),
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: kGreenSoft,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.check_circle_rounded, color: kGreen, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'PREPAID ONLINE',
+                      style: GoogleFonts.rubik(fontSize: 11, fontWeight: FontWeight.w800, color: kGreen, letterSpacing: 0.5),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '₹${o.totalAmount.toStringAsFixed(0)}',
+                      style: GoogleFonts.rubik(fontSize: 15, fontWeight: FontWeight.w800, color: kText),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Payment confirmed. Do NOT collect any cash from customer.',
+                  style: GoogleFonts.nunitoSans(fontSize: 12, color: kTextMuted, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _customerDestinationCard(bool isPickupLeg) {
+    final phone = o.customerPhone;
+    final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    final canContact = !phone.contains('•') && digits.length >= 10;
+    final destinationTitle = isPickupLeg ? 'Store Pickup Location' : 'Customer Drop-off';
+    final destinationAddress = isPickupLeg ? (o.pickup?['name'] ?? 'Store counter').toString() : o.deliveryAddress;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: kLedgerLine),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Section Title
+          Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: isPickupLeg ? kAmberSoft : kGreenSoft,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  isPickupLeg ? Icons.storefront_rounded : Icons.location_on_rounded,
+                  size: 16,
+                  color: isPickupLeg ? kAmber : kGreen,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                destinationTitle.toUpperCase(),
+                style: GoogleFonts.rubik(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 11.5,
+                  color: kTextMuted,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: kPaper,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: kLedgerLine),
+                ),
+                child: Text(
+                  isPickupLeg ? 'STORE' : 'DROP-OFF',
+                  style: GoogleFonts.nunitoSans(fontSize: 10.5, fontWeight: FontWeight.w800, color: kTextMuted),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Customer Profile Info
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF10B981), Color(0xFF059669)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  (o.customerName.isEmpty ? 'C' : o.customerName.trim()[0]).toUpperCase(),
+                  style: GoogleFonts.rubik(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      o.customerName.isEmpty ? 'Customer' : o.customerName,
+                      style: GoogleFonts.rubik(fontWeight: FontWeight.w800, fontSize: 16, color: kText),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      canContact ? phone : 'Phone active when out for delivery',
+                      style: GoogleFonts.nunitoSans(
+                        fontSize: 12.5,
+                        color: canContact ? kText : kTextFaint,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 14),
+
+          // Address Container
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: kPaper,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: kLedgerLine),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(top: 2),
+                  child: Icon(Icons.place_outlined, size: 18, color: kGreen),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    destinationAddress.isEmpty ? 'No address specified' : destinationAddress,
+                    style: GoogleFonts.nunitoSans(
+                      fontSize: 13.5,
+                      color: kText,
+                      fontWeight: FontWeight.w600,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          if (_latLngFrom(o.pickup) != null && _latLngFrom(o.deliveryLocation) != null) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                height: 160,
+                child: DeliveryMap(
+                  origin: _latLngFrom(o.pickup)!,
+                  destination: _latLngFrom(o.deliveryLocation)!,
+                  originLabel: 'Store',
+                  destinationLabel: 'Drop',
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
+
+          // Integrated Navigation CTA (Google Maps)
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kInk,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () => _navigateTo(
+                isPickupLeg ? o.pickup : o.deliveryLocation,
+                destinationAddress,
+              ),
+              icon: const Icon(Icons.directions_rounded, size: 19, color: Color(0xFF34D399)),
+              label: Text(
+                isPickupLeg ? 'Navigate to Store (Google Maps)' : 'Navigate to Customer (Google Maps)',
+                style: GoogleFonts.nunitoSans(fontWeight: FontWeight.w800, fontSize: 13.5),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          // Call & WhatsApp Actions
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 42,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: canContact ? kText : kTextFaint,
+                      side: BorderSide(color: canContact ? kLedgerLine : kLedgerLine.withValues(alpha: 0.5)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: canContact ? _call : null,
+                    icon: Icon(Icons.call_rounded, size: 17, color: canContact ? kGreen : kTextFaint),
+                    label: Text(
+                      'Call',
+                      style: GoogleFonts.nunitoSans(fontWeight: FontWeight.w700, fontSize: 13),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: SizedBox(
+                  height: 42,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: canContact ? const Color(0xFF075E54) : kTextFaint,
+                      backgroundColor: canContact ? const Color(0xFFE8F5E9) : Colors.transparent,
+                      side: BorderSide(color: canContact ? const Color(0xFF25D366).withValues(alpha: 0.4) : kLedgerLine),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: canContact ? _whatsapp : null,
+                    icon: Icon(Icons.chat_bubble_rounded, size: 16, color: canContact ? const Color(0xFF25D366) : kTextFaint),
+                    label: Text(
+                      'WhatsApp',
+                      style: GoogleFonts.nunitoSans(fontWeight: FontWeight.w700, fontSize: 13),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _itemsCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: kLedgerLine),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: kGreenSoft,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.shopping_bag_outlined, size: 16, color: kGreen),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'ORDER ITEMS (${o.items.length})',
+                style: GoogleFonts.rubik(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 11.5,
+                  color: kTextMuted,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: kPaper,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '${o.items.fold<int>(0, (sum, it) => sum + it.quantity)} units',
+                  style: GoogleFonts.nunitoSans(fontSize: 11, fontWeight: FontWeight.w700, color: kTextMuted),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          const SizedBox(height: 8),
+          ...o.items.map((i) => _itemRow(i)),
+          const SizedBox(height: 10),
+          const Divider(height: 1),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Order Total Bill',
+                style: GoogleFonts.rubik(fontWeight: FontWeight.w700, fontSize: 14, color: kText),
+              ),
+              Text(
+                '₹${o.totalAmount.toStringAsFixed(0)}',
+                style: GoogleFonts.rubik(fontWeight: FontWeight.w800, fontSize: 16, color: kText),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _itemRow(OrderItemLine i) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: kPaper,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: kLedgerLine),
+            ),
+            child: const Icon(Icons.eco_rounded, size: 20, color: kGreen),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  i.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.nunitoSans(fontSize: 13.5, fontWeight: FontWeight.w700, color: kText),
+                ),
+                if (i.weightSpec.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    i.weightSpec,
+                    style: GoogleFonts.nunitoSans(fontSize: 12, color: kTextMuted, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ],
+            ),
           ),
           const SizedBox(width: 10),
-          Expanded(
-            child: Text('${i.name}  ·  ${i.weightSpec}',
-                maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5, color: kText, fontWeight: FontWeight.w600)),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: kGreenSoft,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              '×${i.quantity}',
+              style: GoogleFonts.rubik(fontSize: 12, fontWeight: FontWeight.w800, color: kGreen),
+            ),
           ),
-        ]),
-      );
+        ],
+      ),
+    );
+  }
+
+  Widget _timelineCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: kLedgerLine),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: kGreenSoft,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.timeline_rounded, size: 16, color: kGreen),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'DELIVERY TIMELINE',
+                style: GoogleFonts.rubik(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 11.5,
+                  color: kTextMuted,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ..._timelineRows(),
+        ],
+      ),
+    );
+  }
 
   List<Widget> _timelineRows() {
     final events = o.timeline.reversed.toList();
@@ -457,38 +1172,173 @@ class _BodyState extends ConsumerState<_Body> {
       for (var idx = 0; idx < events.length; idx++)
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Column(children: [
-              Container(
-                width: 20, height: 20,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: idx == 0 ? kGreen : kGreenSoft,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(Icons.check_rounded, size: 13, color: idx == 0 ? Colors.white : kGreen),
-              ),
-              if (idx != events.length - 1)
-                Container(width: 1.5, height: 22, color: kLedgerLine, margin: const EdgeInsets.symmetric(vertical: 2)),
-            ]),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 1),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('${events[idx]['status']}',
-                      style: TextStyle(fontSize: 13.5, fontWeight: idx == 0 ? FontWeight.w800 : FontWeight.w600, color: kText)),
-                  if ((events[idx]['note'] ?? '').toString().isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text('${events[idx]['note']}', style: const TextStyle(fontSize: 12.5, color: kTextMuted, height: 1.3)),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Column(
+                children: [
+                  Container(
+                    width: 24,
+                    height: 24,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: idx == 0 ? kGreen : const Color(0xFFD1FAE5),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: idx == 0 ? const Color(0xFF34D399) : Colors.transparent,
+                        width: 2,
+                      ),
                     ),
-                ]),
+                    child: Icon(
+                      Icons.check_rounded,
+                      size: 14,
+                      color: idx == 0 ? Colors.white : kGreen,
+                    ),
+                  ),
+                  if (idx != events.length - 1)
+                    Container(
+                      width: 2,
+                      height: 26,
+                      color: kLedgerLine,
+                      margin: const EdgeInsets.symmetric(vertical: 2),
+                    ),
+                ],
               ),
-            ),
-          ]),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${events[idx]['status']}',
+                        style: GoogleFonts.rubik(
+                          fontSize: 14,
+                          fontWeight: idx == 0 ? FontWeight.w800 : FontWeight.w600,
+                          color: idx == 0 ? kText : kTextMuted,
+                        ),
+                      ),
+                      if ((events[idx]['note'] ?? '').toString().isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          '${events[idx]['note']}',
+                          style: GoogleFonts.nunitoSans(fontSize: 12.5, color: kTextMuted, height: 1.3),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
     ];
+  }
+
+  Widget _failureCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: kRedSoft,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kRed.withValues(alpha: 0.3)),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.error_outline_rounded, size: 20, color: kRed),
+              const SizedBox(width: 8),
+              Text(
+                'Failure Reason',
+                style: GoogleFonts.rubik(fontWeight: FontWeight.w800, color: kRed, fontSize: 14),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            o.failureReason,
+            style: GoogleFonts.nunitoSans(fontSize: 13.5, color: kText, height: 1.4, fontWeight: FontWeight.w600),
+          ),
+          if (o.needsReturn) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Please bring this order back to the store, then tap "Returned Order to Store".',
+              style: GoogleFonts.nunitoSans(fontSize: 12.5, color: kTextMuted, height: 1.3),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _bottomBar(dynamic action, bool canFail) {
+    return Container(
+      decoration: BoxDecoration(
+        color: kSurface,
+        border: const Border(top: BorderSide(color: kLedgerLine)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (action != null)
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kGreen,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    onPressed: _busy ? null : action.run,
+                    icon: _busy
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
+                          )
+                        : Icon(action.icon, size: 20),
+                    label: Text(
+                      action.label,
+                      style: GoogleFonts.nunitoSans(fontWeight: FontWeight.w800, fontSize: 15),
+                    ),
+                  ),
+                ),
+              if (canFail) ...[
+                const SizedBox(height: 6),
+                TextButton.icon(
+                  onPressed: _busy ? null : _failFlow,
+                  icon: Icon(Icons.flag_outlined, size: 16, color: Colors.red.shade700),
+                  label: Text(
+                    'Report a problem / Can\'t deliver',
+                    style: GoogleFonts.nunitoSans(
+                      color: Colors.red.shade700,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -500,13 +1350,27 @@ class _ErrorBox extends StatelessWidget {
   Widget build(BuildContext context) => Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.wifi_off_rounded, size: 44, color: kTextFaint),
-            const SizedBox(height: 10),
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 12),
-            FilledButton(onPressed: onRetry, child: const Text('Retry')),
-          ]),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.wifi_off_rounded, size: 48, color: kTextFaint),
+              const SizedBox(height: 12),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.nunitoSans(fontSize: 14, color: kTextMuted),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: kGreen,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: onRetry,
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
         ),
       );
 }

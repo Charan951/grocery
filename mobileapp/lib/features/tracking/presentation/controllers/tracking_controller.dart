@@ -34,6 +34,7 @@ class TrackingState {
   /// Ordered items + the amount actually charged, for the order-summary card.
   final List<CartItemModel> items;
   final double total;
+  final String deliveryOtp;
 
   const TrackingState({
     required this.orderId,
@@ -53,6 +54,7 @@ class TrackingState {
     this.routePoints = const [],
     this.items = const [],
     this.total = 0,
+    this.deliveryOtp = '',
   });
 
   TrackingState copyWith({
@@ -72,6 +74,7 @@ class TrackingState {
     List<LatLng>? routePoints,
     List<CartItemModel>? items,
     double? total,
+    String? deliveryOtp,
   }) {
     return TrackingState(
       orderId: orderId,
@@ -91,6 +94,7 @@ class TrackingState {
       routePoints: routePoints ?? this.routePoints,
       items: items ?? this.items,
       total: total ?? this.total,
+      deliveryOtp: deliveryOtp ?? this.deliveryOtp,
     );
   }
 }
@@ -138,7 +142,8 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
 
     _subs.add(_socket.orderStatusStream.listen((d) {
       if (d['orderId'] != null && d['orderId'] != orderId) return;
-      final raw = (d['status'] as String?) ?? state.status;
+      final incoming = (d['status'] as String?) ?? state.status;
+      final raw = incoming.toLowerCase() == 'in transit' ? 'In Progress' : incoming;
       state = state.copyWith(
         status: raw,
         statusBucket: orderStatusFrom(raw),
@@ -164,7 +169,8 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
     // A partner just accepted — show the rider + map immediately (no refetch wait).
     _subs.add(_socket.riderAssignedStream.listen((d) {
       if (d['orderId'] != null && d['orderId'] != orderId) return;
-      final raw = (d['status'] as String?) ?? state.status;
+      final incoming = (d['status'] as String?) ?? state.status;
+      final raw = incoming.toLowerCase() == 'in transit' ? 'In Progress' : incoming;
       final del = d['delivery'];
       final name = (del is Map ? del['partnerName'] as String? : null)?.trim() ?? '';
       final loc = del is Map ? del['location'] : null;
@@ -199,11 +205,15 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
         timeline: o.timeline.isNotEmpty ? o.timeline : state.timeline,
         items: o.items,
         total: o.total,
+        deliveryOtp: o.deliveryOtp,
       );
 
+      final dest = _latLngFrom(raw['deliveryLocation']) ?? state.destination ?? const LatLng(17.4474, 78.3762);
+      final store = _latLngFrom(raw['pickup']) ?? state.storeLocation ?? LatLng(dest.latitude - 0.0085, dest.longitude + 0.0075);
+
       state = state.copyWith(
-        destination: _latLngFrom(raw['deliveryLocation']) ?? state.destination,
-        storeLocation: _latLngFrom(raw['pickup']) ?? state.storeLocation,
+        destination: dest,
+        storeLocation: store,
       );
 
       // Server-side rider block (masked until Out For Delivery / Arrived).
@@ -237,12 +247,19 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
     return null;
   }
 
-  /// Re-fetch the rider → drop road path when the rider has moved enough
-  /// (and not more than once every ~8s). Straight line if OSRM is unreachable.
+  /// Re-fetch the origin (rider or store) → drop road path when moved enough.
+  /// Always provides a route line immediately so the map shows the route.
   Future<void> _maybeRefreshRoute() async {
-    final from = state.hasRider ? state.riderLocation : null;
-    final to = state.destination;
-    if (from == null || to == null || _routing) return;
+    final to = state.destination ?? const LatLng(17.4474, 78.3762);
+    final from = state.hasRider
+        ? state.riderLocation
+        : (state.storeLocation ?? LatLng(to.latitude - 0.0085, to.longitude + 0.0075));
+
+    if (state.routePoints.isEmpty) {
+      state = state.copyWith(routePoints: [from, to]);
+    }
+
+    if (_routing) return;
 
     final movedFar = _lastRouteFrom == null || _dist(_lastRouteFrom!, from) > 45;
     final coolOff = DateTime.now().difference(_lastRouteAt) > const Duration(seconds: 8);

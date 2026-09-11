@@ -625,7 +625,7 @@ const OrderDetailView: React.FC<OrderDetailViewProps> = ({
         <div className="bg-admin-surface border border-admin-ledger-line rounded-lg p-4 flex flex-col gap-3 dont-print">
           <div className="text-[11px] uppercase tracking-wide font-bold text-admin-text-faint font-admin-mono">Update status</div>
           <div className="flex flex-wrap gap-2">
-            {['Pending', 'In Transit', 'Accepted'].includes(order.status) && (
+            {['Pending', 'In Progress', 'In Transit', 'Accepted'].includes(order.status) && (
               <button onClick={() => onUpdateStatus(order.orderId, 'Packed')} className="bg-admin-ink text-white font-semibold px-3.5 py-2 rounded-md text-xs hover:opacity-90 cursor-pointer">Mark Packed</button>
             )}
             {order.status === 'Packed' && (
@@ -682,7 +682,7 @@ const OrderDetailView: React.FC<OrderDetailViewProps> = ({
           const s = order.status;
           let label = '';
           let tone = 'bg-admin-paper text-admin-text-muted';
-          if (['Pending', 'In Transit', 'Accepted', 'Packed'].includes(s)) {
+          if (['Pending', 'In Progress', 'In Transit', 'Accepted', 'Packed'].includes(s)) {
             label = 'Preparing — rider assignment begins when the order is marked Ready for Pickup';
           } else if (s === 'Ready' && !hasRider && order.assignmentStalled) {
             label = 'No rider available nearby — waiting / retryable. Order stays Ready.';
