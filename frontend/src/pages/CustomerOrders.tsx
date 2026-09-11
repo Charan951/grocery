@@ -5,6 +5,7 @@ import { useCartWishlist } from '../context/CartWishlistContext';
 import { useCMS } from '../context/CMSContext';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useSmartBack } from '../hooks/useSmartBack';
+import { useHideBottomNav } from '../context/BottomNavContext';
 import { downloadInvoice } from '../utils/invoice';
 import { apiUrl } from '../config/api';
 import { 
@@ -132,6 +133,7 @@ export const CustomerOrders: React.FC = () => {
   const { products } = useCMS();
   const navigate = useNavigate();
   const goBack = useSmartBack('/');
+  useHideBottomNav(!!selectedOrder);
 
   // Lazy-load the Razorpay SDK — only "Switch to UPI / Card" needs it, and it
   // may not have been loaded yet if the customer didn't check out on this tab.
@@ -518,7 +520,7 @@ export const CustomerOrders: React.FC = () => {
           </div>
         </header>
 
-        <main className="max-w-xl mx-auto px-4 py-4 md:py-6 flex flex-col gap-4">
+        <main className="max-w-3xl mx-auto px-4 py-4 md:py-6 flex flex-col gap-4">
           {/* 1. HERO STATUS CARD */}
           <div className="bg-white rounded-2xl border border-gray-200/90 shadow-sm p-4 sm:p-5">
             <div className="flex items-center justify-between gap-2 mb-3">
@@ -878,11 +880,11 @@ export const CustomerOrders: React.FC = () => {
 
         {/* STICKY BOTTOM ACTION BAR (MOBILE RESPONSIVE) */}
         <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-200 py-3 px-4 z-40 shadow-lg">
-          <div className="max-w-xl mx-auto flex flex-col items-center gap-2">
+          <div className="max-w-3xl mx-auto flex flex-col items-center gap-2">
             {isActive ? (
               <button
                 type="button"
-                onClick={() => navigate(`/track/${encodeURIComponent(selectedOrder.orderNumber || selectedOrder.id)}`)}
+                onClick={() => navigate(`/track/${encodeURIComponent(orderKey(selectedOrder))}`)}
                 className="w-full bg-[#00A86B] hover:bg-[#00915c] text-white py-3.5 px-4 rounded-xl font-black text-sm flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer active:scale-[0.99]"
               >
                 <Navigation size={18} className="fill-white" />

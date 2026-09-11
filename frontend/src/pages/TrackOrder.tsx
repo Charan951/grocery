@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useSmartBack } from '../hooks/useSmartBack';
+import { useHideBottomNav } from '../context/BottomNavContext';
 import { io } from 'socket.io-client';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -176,6 +178,8 @@ function customerOrderLabel(orderId: string): string {
 export const TrackOrder: React.FC = () => {
   const { orderId = '' } = useParams();
   const navigate = useNavigate();
+  const goBack = useSmartBack('/account/orders');
+  useHideBottomNav(true);
   const [order, setOrder] = useState<TrackedOrder | null>(null);
   const [err, setErr] = useState('');
   const [tick, setTick] = useState(0);
@@ -479,15 +483,16 @@ export const TrackOrder: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] pb-28">
-      <div className="max-w-xl mx-auto px-4 py-4 md:py-6 flex flex-col gap-4 font-sans text-gray-900">
+      <div className="max-w-3xl mx-auto px-4 py-4 md:py-6 flex flex-col gap-4 font-sans text-gray-900">
         {/* Top bar */}
         <div className="flex items-center justify-between">
-          <Link
-            to="/account/orders"
+          <button
+            type="button"
+            onClick={goBack}
             className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-600 hover:text-gray-900 bg-white border border-gray-200/80 px-3 py-1.5 rounded-full shadow-xs transition-colors"
           >
             <ArrowLeft size={14} /> Orders
-          </Link>
+          </button>
           <div className="flex items-center gap-2">
             <div
               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${
@@ -905,7 +910,7 @@ export const TrackOrder: React.FC = () => {
       {/* 10. Sticky Bottom Action Bar */}
       {order && (
         <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-200/80 py-3 px-4 z-30 shadow-lg">
-          <div className="max-w-xl mx-auto flex items-center gap-3">
+          <div className="max-w-3xl mx-auto flex items-center gap-3">
             <button
               onClick={() => navigate('/account/orders')}
               className="flex-1 py-3 px-4 rounded-xl border border-gray-300 text-gray-700 font-bold text-xs hover:bg-gray-50 active:scale-[0.98] transition-all text-center"

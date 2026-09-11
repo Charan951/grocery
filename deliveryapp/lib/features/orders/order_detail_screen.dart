@@ -22,6 +22,11 @@ class OrderDetailScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: kPaper,
       appBar: AppBar(
+        leading: IconButton(
+          tooltip: 'Back',
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

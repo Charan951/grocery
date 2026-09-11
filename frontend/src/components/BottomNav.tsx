@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { House, Grid3x3, Package, CircleUser } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useBottomNavVisibility } from '../context/BottomNavContext';
 
 const NAV_ITEMS = [
   {
@@ -33,6 +34,7 @@ const NAV_ITEMS = [
 export const BottomNav: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { hidden: forceHidden } = useBottomNavVisibility();
   const [hidden, setHidden] = useState(false);
   const lastScrollY = useRef(0);
 
@@ -74,6 +76,8 @@ export const BottomNav: React.FC = () => {
   ) {
     return null;
   }
+
+  if (forceHidden) return null;
 
   return (
     <motion.nav

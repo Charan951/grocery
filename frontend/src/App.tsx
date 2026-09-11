@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, Suspense, lazy } from 'rea
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { CMSProvider, useCMS } from './context/CMSContext';
 import { CartWishlistProvider } from './context/CartWishlistContext';
+import { BottomNavProvider } from './context/BottomNavContext';
 
 // Pages
 import { Home } from './pages/Home';
@@ -150,6 +151,7 @@ const AppContent: React.FC = () => {
   const isSearchPage = location.pathname === '/search' || location.pathname.startsWith('/search');
   const isProfilePage = location.pathname === '/profile' || location.pathname.startsWith('/account/profile');
   const isOrdersPage = location.pathname === '/orders' || location.pathname.startsWith('/orders/') || location.pathname.startsWith('/account/orders');
+  const isTrackOrderPage = location.pathname.startsWith('/track/');
   const isAddressesPage =
     location.pathname.startsWith('/locations') ||
     location.pathname.startsWith('/saved-addresses') ||
@@ -189,7 +191,7 @@ const AppContent: React.FC = () => {
       {/* Main Pages */}
       <main
         className="flex-grow"
-        style={{ paddingTop: isMobile && (isPDP || isProductsListingPage || isCategoriesPage || isSearchPage || isProfilePage || isOrdersPage || isAddressesPage) ? 0 : 'var(--sticky-header-h)' }}
+        style={{ paddingTop: isMobile && (isPDP || isProductsListingPage || isCategoriesPage || isSearchPage || isProfilePage || isOrdersPage || isAddressesPage || isTrackOrderPage) ? 0 : 'var(--sticky-header-h)' }}
       >
         <Routes>
           <Route path="/" element={<Home onQuickView={setQuickViewProduct} />} />
@@ -262,7 +264,9 @@ export const App: React.FC = () => {
     <CMSProvider>
       <CartWishlistProvider>
         <Router>
-          <AppContent />
+          <BottomNavProvider>
+            <AppContent />
+          </BottomNavProvider>
         </Router>
       </CartWishlistProvider>
     </CMSProvider>

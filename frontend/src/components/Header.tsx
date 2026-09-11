@@ -52,11 +52,13 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
   const isOrdersPage =
     location.pathname.startsWith('/orders') || location.pathname.startsWith('/account/orders');
 
+  const isTrackOrderPage = location.pathname.startsWith('/track/');
+
   const isCategoriesPage =
     location.pathname === '/categories' || location.pathname.startsWith('/categories/');
 
   const shouldHideCategoryAppbar =
-    isProductListingPage || isProductDetailPage || isProfilePage || isOrdersPage || isCategoriesPage;
+    isProductListingPage || isProductDetailPage || isProfilePage || isOrdersPage || isCategoriesPage || isTrackOrderPage;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
@@ -409,7 +411,7 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
   const isSearchPage =
     location.pathname === '/search' || location.pathname.startsWith('/search');
 
-  if (isMobile && (isProductListingPage || isProductDetailPage || isCategoriesPage || isOrdersPage || isAddressesPage || isSearchPage || isProfilePage)) {
+  if (isMobile && (isProductListingPage || isProductDetailPage || isCategoriesPage || isOrdersPage || isAddressesPage || isSearchPage || isProfilePage || isTrackOrderPage)) {
     return null;
   }
 
