@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:freshcart_delivery/core/config/app_config.dart';
 import 'package:freshcart_delivery/core/theme.dart';
+import 'package:freshcart_delivery/core/widgets/tab_back_button.dart';
 import 'package:freshcart_delivery/features/auth/auth_controller.dart';
 
 const _vehicles = <String, String>{
@@ -29,15 +30,8 @@ class ProfileScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
+        leading: const TabBackButton(),
         title: const Text('Profile'),
-        actions: [
-          if (p != null)
-            TextButton.icon(
-              onPressed: () => _openEdit(context, ref, p),
-              icon: const Icon(Icons.edit_outlined, size: 16),
-              label: const Text('Edit'),
-            ),
-        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -46,51 +40,46 @@ class ProfileScreen extends ConsumerWidget {
           Card(
             child: Padding(
               padding: const EdgeInsets.all(18),
-              child: Row(children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: kGreenSoft,
-                  child: Text(
-                    (p?.name.isNotEmpty == true ? p!.name[0] : 'P').toUpperCase(),
-                    style: const TextStyle(color: kGreen, fontWeight: FontWeight.w800, fontSize: 24),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Expanded(
+                    child: Text(p?.name ?? 'Partner',
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                        overflow: TextOverflow.ellipsis),
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Row(children: [
-                      Flexible(
-                        child: Text(p?.name ?? 'Partner',
-                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16.5),
-                            overflow: TextOverflow.ellipsis),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(statusText,
+                        style: TextStyle(
+                            color: statusColor, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.3)),
+                  ),
+                  if (p != null) ...[
+                    const SizedBox(width: 6),
+                    InkWell(
+                      onTap: () => _openEdit(context, ref, p),
+                      borderRadius: BorderRadius.circular(8),
+                      child: const Padding(
+                        padding: EdgeInsets.all(4),
+                        child: Icon(Icons.edit_outlined, size: 18, color: kTextFaint),
                       ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: statusColor.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        child: Text(statusText,
-                            style: TextStyle(
-                                color: statusColor, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.3)),
-                      ),
-                    ]),
-                    const SizedBox(height: 4),
-                    Row(children: [
-                      const Icon(Icons.star_rounded, size: 13, color: kAmber),
-                      Text(
-                        p?.ratingCount != null && p!.ratingCount > 0
-                            ? ' ${p.rating.toStringAsFixed(1)} · ${p.ratingCount} rating${p.ratingCount == 1 ? '' : 's'}'
-                            : ' No ratings yet',
-                        style: const TextStyle(color: kTextMuted, fontSize: 12.5),
-                      ),
-                    ]),
-                    const SizedBox(height: 2),
-                    Text(_vehicleLabel(p?.vehicleType),
-                        style: const TextStyle(color: kTextFaint, fontSize: 11.5)),
-                  ]),
-                ),
+                    ),
+                  ],
+                ]),
+                const SizedBox(height: 6),
+                Row(children: [
+                  const Icon(Icons.star_rounded, size: 14, color: kAmber),
+                  Text(
+                    p?.ratingCount != null && p!.ratingCount > 0
+                        ? ' ${p.rating.toStringAsFixed(1)} · ${p.ratingCount} rating${p.ratingCount == 1 ? '' : 's'}'
+                        : ' No ratings yet',
+                    style: const TextStyle(color: kTextMuted, fontSize: 12.5, fontWeight: FontWeight.w600),
+                  ),
+                ]),
               ]),
             ),
           ),
@@ -104,21 +93,19 @@ class ProfileScreen extends ConsumerWidget {
             const SizedBox(width: 10),
             _stat('Today', '₹${(p?.todayEarnings ?? 0).toStringAsFixed(0)}', kText),
           ]),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
           _sectionLabel('Details'),
           Card(
             child: Column(children: [
-              _detailRow(Icons.person_outline, 'Name', p?.name ?? 'Not set'),
-              const Divider(height: 1),
               _detailRow(Icons.phone_outlined, 'Phone', p?.phone.isNotEmpty == true ? p!.phone : 'Not set'),
               const Divider(height: 1),
-              _detailRow(Icons.mail_outline, 'Email', p?.email ?? 'Not set'),
+              _detailRow(Icons.mail_outline, 'Email', p?.email.isNotEmpty == true ? p!.email : 'Not set'),
               const Divider(height: 1),
               _detailRow(Icons.two_wheeler_outlined, 'Vehicle', _vehicleLabel(p?.vehicleType)),
             ]),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
           _sectionLabel('Shortcuts'),
           Card(
@@ -174,6 +161,11 @@ class ProfileScreen extends ConsumerWidget {
               await ref.read(authProvider.notifier).logout();
               if (context.mounted) context.go('/login');
             },
+            style: OutlinedButton.styleFrom(
+              foregroundColor: kRed,
+              backgroundColor: kRedSoft,
+              side: const BorderSide(color: kRed),
+            ),
             icon: const Icon(Icons.logout),
             label: const Text('Log out'),
           ),

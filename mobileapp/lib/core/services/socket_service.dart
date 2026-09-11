@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:freshcart/core/config/app_config.dart';
 
@@ -15,11 +14,16 @@ class SocketService {
 
   final _orderStatusController = StreamController<Map<String, dynamic>>.broadcast();
   final _riderLocationController = StreamController<Map<String, dynamic>>.broadcast();
+  final _riderAssignedController = StreamController<Map<String, dynamic>>.broadcast();
   final _supportMessageController = StreamController<Map<String, dynamic>>.broadcast();
   final _connectionController = StreamController<bool>.broadcast();
 
   Stream<Map<String, dynamic>> get orderStatusStream => _orderStatusController.stream;
   Stream<Map<String, dynamic>> get riderLocationStream => _riderLocationController.stream;
+
+  /// Fired the instant a delivery partner accepts — carries the rider card
+  /// (`delivery`) and their current position so tracking starts immediately.
+  Stream<Map<String, dynamic>> get riderAssignedStream => _riderAssignedController.stream;
   Stream<Map<String, dynamic>> get supportMessageStream => _supportMessageController.stream;
 
   /// Emits `true`/`false` as the socket connects / drops.
@@ -45,7 +49,6 @@ class SocketService {
       _socket!.connect();
 
       _socket!.onConnect((_) {
-        if (kDebugMode) print('⚡ Socket connected → $socketUrl');
         _connectionController.add(true);
         // Re-join every room after a reconnect.
         for (final r in _joinedRooms) {
@@ -54,7 +57,6 @@ class SocketService {
       });
 
       _socket!.onDisconnect((_) {
-        if (kDebugMode) print('⚡ Socket disconnected');
         _connectionController.add(false);
       });
       _socket!.onReconnect((_) => _connectionController.add(true));
@@ -66,12 +68,13 @@ class SocketService {
       _socket!.on('rider_location_update', (d) {
         if (d is Map) _riderLocationController.add(Map<String, dynamic>.from(d));
       });
+      _socket!.on('rider_assigned', (d) {
+        if (d is Map) _riderAssignedController.add(Map<String, dynamic>.from(d));
+      });
       _socket!.on('support_message_received', (d) {
         if (d is Map) _supportMessageController.add(Map<String, dynamic>.from(d));
       });
-    } catch (e) {
-      if (kDebugMode) print('SocketService.initSocket exception: $e');
-    }
+    } catch (_) {}
   }
 
   void joinOrderRoom(String orderId) {

@@ -205,91 +205,171 @@ class _BodyState extends ConsumerState<_Body> {
     }
   }
 
+  static const _pickupStatuses = ['Assigned', 'Ready', 'Arrived At Store'];
+
+  ({Color fg, Color bg, IconData icon, String next})? _statusMeta() {
+    switch (o.status) {
+      case 'Assigned':
+        return (fg: kAmber, bg: kAmberSoft, icon: Icons.inventory_2_rounded, next: 'Head to the store to pick up this order.');
+      case 'Ready':
+        return (fg: kAmber, bg: kAmberSoft, icon: Icons.inventory_2_rounded, next: 'Order is packed — go pick it up.');
+      case 'Arrived At Store':
+        return (fg: kAmber, bg: kAmberSoft, icon: Icons.storefront_rounded, next: 'Confirm pickup once you have the bag.');
+      case 'Out For Delivery':
+        return (fg: kGreen, bg: kGreenSoft, icon: Icons.local_shipping_rounded, next: 'On the way to the customer.');
+      case 'Arrived':
+        return (fg: kGreen, bg: kGreenSoft, icon: Icons.pin_drop_rounded, next: 'At the drop-off — collect code & complete.');
+      case 'Delivered':
+        return (fg: kGreen, bg: kGreenSoft, icon: Icons.task_alt_rounded, next: 'Delivered successfully.');
+      case 'Failed':
+      case 'Cancelled':
+        return (fg: kRed, bg: kRedSoft, icon: Icons.report_problem_rounded, next: o.needsReturn ? 'Return this order to the store.' : 'This delivery was not completed.');
+      default:
+        return (fg: kTextMuted, bg: kLedgerLine, icon: Icons.local_shipping_rounded, next: '');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ctl = ref.read(orderProvider(o.orderId).notifier);
     final action = _primaryAction();
     final canFail = !['Delivered', 'Failed', 'Cancelled'].contains(o.status);
+    final isPickupLeg = _pickupStatuses.contains(o.status);
 
     return Column(
       children: [
         Expanded(
           child: RefreshIndicator(
             onRefresh: ctl.load,
+            color: kGreen,
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               children: [
                 _statusHeader(),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
                 _section('Customer', [
-                  _kv(Icons.person_outline, o.customerName.isEmpty ? 'Customer' : o.customerName),
-                  _kv(Icons.location_on_outlined, o.deliveryAddress, maxLines: 3),
-                  _kv(Icons.payments_outlined,
-                      '₹${o.totalAmount.toStringAsFixed(0)}  ·  ${o.isCOD ? 'COLLECT CASH' : o.paymentStatus}'),
-                  const SizedBox(height: 6),
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: kGreenSoft,
+                      child: Text(
+                        (o.customerName.isEmpty ? 'C' : o.customerName.trim()[0]).toUpperCase(),
+                        style: const TextStyle(color: kGreen, fontWeight: FontWeight.w800, fontSize: 16),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(o.customerName.isEmpty ? 'Customer' : o.customerName,
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: kText)),
+                        const SizedBox(height: 2),
+                        Text(o.deliveryAddress, maxLines: 2, overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 13, color: kTextMuted, height: 1.35)),
+                      ]),
+                    ),
+                  ]),
+                  const SizedBox(height: 12),
+                  const Divider(height: 1),
+                  const SizedBox(height: 12),
                   Row(children: [
-                    Expanded(child: OutlinedButton.icon(onPressed: _call, icon: const Icon(Icons.call, size: 18), label: const Text('Call'))),
+                    Icon(o.isCOD ? Icons.payments_rounded : Icons.check_circle_rounded,
+                        size: 16, color: o.isCOD ? kAmber : kGreen),
+                    const SizedBox(width: 8),
+                    Text('₹${o.totalAmount.toStringAsFixed(0)}',
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: kText)),
+                    const SizedBox(width: 8),
+                    _pill(o.isCOD ? 'COLLECT CASH' : o.paymentStatus, o.isCOD ? kAmber : kGreen, o.isCOD ? kAmberSoft : kGreenSoft),
+                  ]),
+                  const SizedBox(height: 12),
+                  Row(children: [
+                    Expanded(child: OutlinedButton.icon(onPressed: _call, icon: const Icon(Icons.call_rounded, size: 18), label: const Text('Call'))),
                     const SizedBox(width: 10),
-                    Expanded(child: OutlinedButton.icon(onPressed: _whatsapp, icon: const Icon(Icons.chat, size: 18), label: const Text('WhatsApp'))),
+                    Expanded(child: OutlinedButton.icon(onPressed: _whatsapp, icon: const Icon(Icons.chat_rounded, size: 18), label: const Text('WhatsApp'))),
                   ]),
                 ]),
                 const SizedBox(height: 12),
-                _section('Navigate', [
-                  OutlinedButton.icon(
-                    onPressed: () => _navigateTo(
-                      ['Assigned', 'Ready', 'Arrived At Store'].contains(o.status) ? o.pickup : o.deliveryLocation,
-                      ['Assigned', 'Ready', 'Arrived At Store'].contains(o.status)
-                          ? (o.pickup?['name'] ?? 'store').toString()
-                          : o.deliveryAddress,
-                    ),
-                    icon: const Icon(Icons.navigation_rounded, size: 18),
-                    label: Text(['Assigned', 'Ready', 'Arrived At Store'].contains(o.status)
-                        ? 'Navigate to store'
-                        : 'Navigate to customer'),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: kSurface,
+                    foregroundColor: kGreen,
+                    side: const BorderSide(color: kGreen, width: 1.4),
                   ),
-                ]),
+                  onPressed: () => _navigateTo(
+                    isPickupLeg ? o.pickup : o.deliveryLocation,
+                    isPickupLeg ? (o.pickup?['name'] ?? 'store').toString() : o.deliveryAddress,
+                  ),
+                  icon: const Icon(Icons.navigation_rounded, size: 18),
+                  label: Text(isPickupLeg ? 'Navigate to store' : 'Navigate to customer'),
+                ),
                 const SizedBox(height: 12),
-                _section('Items (${o.items.length})',
-                    o.items.map((i) => _kv(Icons.circle, '${i.name}  ·  ${i.weightSpec}  ×${i.quantity}', small: true)).toList()),
+                _section('Items · ${o.items.length}',
+                    [for (final i in o.items) _itemRow(i)], tight: true),
                 if (o.timeline.isNotEmpty) ...[
                   const SizedBox(height: 12),
-                  _section('Timeline',
-                      o.timeline.reversed.map((t) => _kv(Icons.check, '${t['status']}  —  ${t['note'] ?? ''}', small: true)).toList()),
+                  _section('Timeline', _timelineRows(), tight: true),
                 ],
                 if (o.status == 'Failed' && o.failureReason.isNotEmpty) ...[
                   const SizedBox(height: 12),
-                  _section('Failure reason', [
-                    _kv(Icons.error_outline, o.failureReason),
-                    if (o.needsReturn)
-                      _kv(Icons.store_mall_directory_outlined,
-                          'Bring this order back to the store, then tap "Returned to store".'),
-                  ]),
+                  Card(
+                    color: kRedSoft,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: kRed.withValues(alpha: 0.25))),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(children: [
+                          const Icon(Icons.error_outline_rounded, size: 18, color: kRed),
+                          const SizedBox(width: 8),
+                          const Text('Failure reason', style: TextStyle(fontWeight: FontWeight.w800, color: kRed)),
+                        ]),
+                        const SizedBox(height: 8),
+                        Text(o.failureReason, style: const TextStyle(fontSize: 13.5, color: kText, height: 1.4)),
+                        if (o.needsReturn) ...[
+                          const SizedBox(height: 8),
+                          const Text('Bring this order back to the store, then tap "Returned to store".',
+                              style: TextStyle(fontSize: 13, color: kTextMuted, height: 1.4)),
+                        ],
+                      ]),
+                    ),
+                  ),
                 ],
               ],
             ),
           ),
         ),
         if (action != null || canFail)
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (action != null)
-                    FilledButton.icon(
-                      onPressed: _busy ? null : action.run,
-                      icon: Icon(action.icon),
-                      label: Text(action.label),
-                    ),
-                  if (canFail) ...[
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: _busy ? null : _failFlow,
-                      child: Text('Report a problem', style: TextStyle(color: Colors.red.shade700)),
-                    ),
+          DecoratedBox(
+            decoration: const BoxDecoration(
+              color: kSurface,
+              border: Border(top: BorderSide(color: kLedgerLine)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (action != null)
+                      FilledButton.icon(
+                        onPressed: _busy ? null : action.run,
+                        icon: _busy
+                            ? const SizedBox(
+                                width: 18, height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : Icon(action.icon),
+                        label: Text(action.label),
+                      ),
+                    if (canFail) ...[
+                      const SizedBox(height: 4),
+                      TextButton.icon(
+                        onPressed: _busy ? null : _failFlow,
+                        icon: Icon(Icons.flag_outlined, size: 16, color: Colors.red.shade700),
+                        label: Text('Report a problem', style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.w700)),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           ),
@@ -298,45 +378,118 @@ class _BodyState extends ConsumerState<_Body> {
   }
 
   Widget _statusHeader() {
-    final color = o.status == 'Delivered'
-        ? kBrand
-        : o.status == 'Failed' || o.status == 'Cancelled'
-            ? Colors.red.shade700
-            : Colors.orange.shade800;
+    final meta = _statusMeta()!;
     return Card(
+      color: meta.bg,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: meta.fg.withValues(alpha: 0.2))),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(children: [
-          Icon(Icons.local_shipping_rounded, color: color),
-          const SizedBox(width: 12),
-          Text(o.status, style: TextStyle(fontWeight: FontWeight.w800, color: color, fontSize: 16)),
+          Container(
+            width: 44, height: 44,
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+            child: Icon(meta.icon, color: meta.fg, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Text(o.status, style: TextStyle(fontWeight: FontWeight.w800, color: meta.fg, fontSize: 16, letterSpacing: -0.1)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(o.orderId, overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12, color: kTextMuted, fontWeight: FontWeight.w600)),
+                ),
+              ]),
+              if (meta.next.isNotEmpty) ...[
+                const SizedBox(height: 3),
+                Text(meta.next, style: const TextStyle(fontSize: 12.5, color: kTextMuted, height: 1.3)),
+              ],
+            ]),
+          ),
         ]),
       ),
     );
   }
 
-  Widget _section(String title, List<Widget> children) => Card(
+  Widget _pill(String label, Color fg, Color bg) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
+        child: Text(label,
+            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: fg, letterSpacing: 0.3)),
+      );
+
+  Widget _section(String title, List<Widget> children, {bool tight = false}) => Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
-              const SizedBox(height: 8),
+              Text(title.toUpperCase(),
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11.5, color: kTextMuted, letterSpacing: 0.4)),
+              SizedBox(height: tight ? 10 : 8),
               ...children,
             ],
           ),
         ),
       );
 
-  Widget _kv(IconData i, String t, {int maxLines = 1, bool small = false}) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Icon(i, size: small ? 8 : 16, color: kTextFaint),
+  Widget _itemRow(OrderItemLine i) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(children: [
+          Container(
+            width: 24, height: 24,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: kGreenSoft, borderRadius: BorderRadius.circular(7)),
+            child: Text('${i.quantity}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: kGreen)),
+          ),
           const SizedBox(width: 10),
-          Expanded(child: Text(t, maxLines: maxLines, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: small ? 13 : 14))),
+          Expanded(
+            child: Text('${i.name}  ·  ${i.weightSpec}',
+                maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5, color: kText, fontWeight: FontWeight.w600)),
+          ),
         ]),
       );
+
+  List<Widget> _timelineRows() {
+    final events = o.timeline.reversed.toList();
+    return [
+      for (var idx = 0; idx < events.length; idx++)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Column(children: [
+              Container(
+                width: 20, height: 20,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: idx == 0 ? kGreen : kGreenSoft,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.check_rounded, size: 13, color: idx == 0 ? Colors.white : kGreen),
+              ),
+              if (idx != events.length - 1)
+                Container(width: 1.5, height: 22, color: kLedgerLine, margin: const EdgeInsets.symmetric(vertical: 2)),
+            ]),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 1),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('${events[idx]['status']}',
+                      style: TextStyle(fontSize: 13.5, fontWeight: idx == 0 ? FontWeight.w800 : FontWeight.w600, color: kText)),
+                  if ((events[idx]['note'] ?? '').toString().isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text('${events[idx]['note']}', style: const TextStyle(fontSize: 12.5, color: kTextMuted, height: 1.3)),
+                    ),
+                ]),
+              ),
+            ),
+          ]),
+        ),
+    ];
+  }
 }
 
 class _ErrorBox extends StatelessWidget {

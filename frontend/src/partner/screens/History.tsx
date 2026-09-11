@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { partnerApi } from '../partnerApi';
-import { CenterState, PageHead, Pill, money } from '../ui';
+import { CenterState, FilterMenu, PageHead, Pill, money } from '../ui';
 
 const FILTERS = [
   { key: '', label: 'All' },
@@ -33,23 +33,20 @@ export const History: React.FC = () => {
     <div>
       <PageHead
         title="History"
-        meta={loading ? 'Past deliveries' : `${orders.length} record${orders.length === 1 ? '' : 's'}`}
+        meta={
+          loading
+            ? 'Past deliveries'
+            : `${orders.length} record${orders.length === 1 ? '' : 's'}${
+                filter ? ` · ${FILTERS.find((f) => f.key === filter)?.label}` : ''
+              }`
+        }
         actions={
-          <div className="flex gap-1 bg-admin-surface border border-admin-ledger-line rounded-md p-0.5">
-            {FILTERS.map((f) => (
-              <button
-                key={f.key}
-                onClick={() => setFilter(f.key)}
-                className={`font-admin-mono text-[10px] font-bold uppercase tracking-[0.08em] px-2.5 py-1.5 rounded transition-colors cursor-pointer ${
-                  filter === f.key
-                    ? 'bg-admin-ink text-white'
-                    : 'text-admin-text-muted hover:text-admin-text'
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
+          <FilterMenu
+            title="Filter history"
+            value={filter}
+            onChange={setFilter}
+            options={FILTERS.map((f) => ({ value: f.key, label: f.label }))}
+          />
         }
       />
 

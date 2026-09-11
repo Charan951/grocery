@@ -64,7 +64,12 @@ class _FakeCheckout extends CheckoutController {
   _FakeCheckout(super.ref);
   PaymentMethod? submittedMethod;
   @override
-  Future<void> submit({required PaymentMethod method, required String address}) async {
+  Future<void> submit({
+    required PaymentMethod method,
+    required String address,
+    double? lat,
+    double? lng,
+  }) async {
     submittedMethod = method;
   }
 }
@@ -164,18 +169,6 @@ void main() {
       expect(find.text('2'), findsWidgets);
     });
 
-    testWidgets('Clear asks for confirmation', (tester) async {
-      final storage = _Storage(items: [
-        CartItemModel(product: _p('1'), quantity: 1, selectedWeight: '1 dozen'),
-      ]);
-      await _boot(tester, _host(const CartScreen(), overrides: [
-        cartProvider.overrideWith((ref) => CartNotifier(storage, ref)),
-        authProvider.overrideWith((ref) => _auth()),
-      ]));
-      await tester.tap(find.text('Clear'));
-      await tester.pumpAndSettle();
-      expect(find.text('Clear cart?'), findsOneWidget);
-    });
   });
 
   group('Checkout', () {

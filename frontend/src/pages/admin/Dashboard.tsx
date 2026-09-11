@@ -159,7 +159,7 @@ export const Dashboard: React.FC = () => {
         actions={
           <button
             onClick={handleRefreshStats}
-            className="flex items-center gap-2 px-4 py-2 border border-admin-ledger-line rounded-md text-[11px] font-semibold bg-admin-surface hover:bg-admin-paper text-admin-text-muted hover:text-admin-text transition-all cursor-pointer font-admin-mono uppercase tracking-wide"
+            className="flex items-center gap-2 px-4 py-2 border border-admin-ledger-line rounded-md text-xs font-semibold bg-admin-surface hover:bg-admin-paper text-admin-text-muted hover:text-admin-text transition-all cursor-pointer font-admin-mono uppercase tracking-wide"
           >
             <RefreshCw size={13} className={isSyncing ? 'animate-spin text-admin-green' : ''} />
             <span>{isSyncing ? 'Syncing…' : 'Sync Live'}</span>
@@ -174,7 +174,7 @@ export const Dashboard: React.FC = () => {
             backgroundImage: 'repeating-linear-gradient(135deg, white 0, white 1px, transparent 1px, transparent 14px)'
           }} />
           <div className="relative flex items-center justify-between">
-            <span className="font-admin-mono text-[10px] font-semibold text-white/50 uppercase tracking-[0.12em]">Today's Revenue</span>
+            <span className="font-admin-mono text-[11px] font-semibold text-white/50 uppercase tracking-[0.12em]">Today's Revenue</span>
             <div className="w-8 h-8 rounded bg-white/10 flex items-center justify-center">
               <IndianRupee size={15} />
             </div>
@@ -194,7 +194,7 @@ export const Dashboard: React.FC = () => {
 
         <div className="bg-admin-surface border border-admin-ledger-line p-6 rounded-lg flex flex-col justify-between gap-4">
           <div className="flex items-center justify-between">
-            <span className="font-admin-mono text-[10px] font-semibold text-admin-text-faint uppercase tracking-[0.12em]">Today's Orders</span>
+            <span className="font-admin-mono text-[11px] font-semibold text-admin-text-faint uppercase tracking-[0.12em]">Today's Orders</span>
             <div className="w-8 h-8 rounded bg-admin-green-soft flex items-center justify-center text-admin-green">
               <ShoppingBag size={15} />
             </div>
@@ -220,17 +220,17 @@ export const Dashboard: React.FC = () => {
           return (
             <div key={m.label} className="bg-admin-surface border border-admin-ledger-line p-4 rounded-lg flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <span className="font-admin-mono text-[9px] font-semibold text-admin-text-faint uppercase tracking-wide leading-tight">{m.label}</span>
+                <span className="font-admin-mono text-[11px] font-semibold text-admin-text-faint uppercase tracking-wide leading-tight">{m.label}</span>
                 <Icon size={13} className="text-admin-text-faint shrink-0" />
               </div>
               <div className="font-admin-display text-lg font-bold text-admin-text tabular-nums">{m.value}</div>
               {m.trend ? (
-                <div className={`flex items-center gap-1 text-[9px] font-semibold ${m.trend.dir === 'up' ? 'text-admin-green' : 'text-admin-red'}`}>
+                <div className={`flex items-center gap-1 text-[11px] font-semibold ${m.trend.dir === 'up' ? 'text-admin-green' : 'text-admin-red'}`}>
                   {m.trend.dir === 'up' ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
                   <span className="truncate">{m.trend.label}</span>
                 </div>
               ) : (
-                <div className="text-[9px] font-medium text-admin-text-faint">No data yet</div>
+                <div className="text-[11px] font-medium text-admin-text-faint">No data yet</div>
               )}
             </div>
           );
@@ -244,7 +244,7 @@ export const Dashboard: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="font-admin-display font-semibold text-sm text-admin-text">Revenue Trend</h2>
-              <p className="font-admin-mono text-[10px] text-admin-text-faint font-medium uppercase tracking-wide mt-0.5">Daily transaction volume</p>
+              <p className="font-admin-mono text-[11px] text-admin-text-faint font-medium uppercase tracking-wide mt-0.5">Daily transaction volume</p>
             </div>
             <ShelfTag tone="green">Weekly view</ShelfTag>
           </div>
@@ -254,7 +254,7 @@ export const Dashboard: React.FC = () => {
               <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 bg-admin-surface/90 rounded-lg">
                 <Activity size={20} className="text-admin-text-faint" />
                 <p className="text-xs font-semibold text-admin-text-muted">No transactions yet</p>
-                <p className="font-admin-mono text-[10px] text-admin-text-faint">Revenue trend will populate as orders come in</p>
+                <p className="font-admin-mono text-[11px] text-admin-text-faint">Revenue trend will populate as orders come in</p>
               </div>
             )}
             <svg className={`w-full h-full ${!hasRevenueHistory ? 'opacity-30' : ''}`} viewBox="0 0 600 200">
@@ -278,7 +278,7 @@ export const Dashboard: React.FC = () => {
                 strokeWidth="2"
               />
             </svg>
-            <div className="absolute bottom-0 w-full flex justify-between px-1 font-admin-mono text-[9px] font-semibold text-admin-text-faint pt-2 uppercase">
+            <div className="absolute bottom-0 w-full flex justify-between px-1 font-admin-mono text-[11px] font-semibold text-admin-text-faint pt-2 uppercase">
               <span>Mon</span>
               <span>Tue</span>
               <span>Wed</span>
@@ -294,7 +294,7 @@ export const Dashboard: React.FC = () => {
         <div className="bg-admin-surface border border-admin-ledger-line p-6 rounded-lg flex flex-col justify-between gap-4">
           <div>
             <h2 className="font-admin-display font-semibold text-sm text-admin-text">Top Category Shares</h2>
-            <p className="font-admin-mono text-[10px] text-admin-text-faint font-medium uppercase tracking-wide mt-0.5">Sales by product line</p>
+            <p className="font-admin-mono text-[11px] text-admin-text-faint font-medium uppercase tracking-wide mt-0.5">Sales by product line</p>
           </div>
 
           {hasRevenueHistory ? (
@@ -304,12 +304,12 @@ export const Dashboard: React.FC = () => {
                   <div className="absolute inset-0 rounded-full border-[14px] border-admin-green border-t-transparent border-l-transparent" />
                   <div className="text-center">
                     <span className="font-admin-display text-xl font-bold text-admin-text">35%</span>
-                    <div className="font-admin-mono text-[8px] font-semibold text-admin-text-faint uppercase">Organic</div>
+                    <div className="font-admin-mono text-[11px] font-semibold text-admin-text-faint uppercase">Organic</div>
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 font-admin-mono text-[10px] font-medium text-admin-text-muted">
+              <div className="grid grid-cols-2 gap-2 font-admin-mono text-[11px] font-medium text-admin-text-muted">
                 <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-admin-green" /> Organic 35%</div>
                 <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-admin-amber" /> Veg 25%</div>
                 <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-admin-blue" /> Fruits 20%</div>
@@ -320,7 +320,7 @@ export const Dashboard: React.FC = () => {
             <div className="flex-1 flex flex-col items-center justify-center gap-1 py-6 text-center">
               <PackageOpen size={22} className="text-admin-text-faint" />
               <p className="text-xs font-semibold text-admin-text-muted">No category sales yet</p>
-              <p className="font-admin-mono text-[10px] text-admin-text-faint max-w-[180px]">Breakdown appears once orders start coming in</p>
+              <p className="font-admin-mono text-[11px] text-admin-text-faint max-w-[180px]">Breakdown appears once orders start coming in</p>
             </div>
           )}
         </div>
@@ -330,7 +330,7 @@ export const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Column 1: System diagnostics */}
         <div className="bg-admin-surface border border-admin-ledger-line p-5 rounded-lg flex flex-col gap-3.5">
-          <h3 className="font-admin-mono font-semibold text-[10px] text-admin-text-faint border-b border-admin-ledger-line pb-2.5 uppercase tracking-wide">System Health</h3>
+          <h3 className="font-admin-mono font-semibold text-[11px] text-admin-text-faint border-b border-admin-ledger-line pb-2.5 uppercase tracking-wide">System Health</h3>
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between text-xs">
               <span className="text-admin-text-muted font-medium flex items-center gap-2">
@@ -354,14 +354,14 @@ export const Dashboard: React.FC = () => {
               <span className="text-admin-text-muted font-medium flex items-center gap-2">
                 <Activity size={14} className="text-admin-text-faint" /> Latency Rate
               </span>
-              <span className="font-admin-mono font-semibold text-admin-text text-[10px]">{system.latency}</span>
+              <span className="font-admin-mono font-semibold text-admin-text text-[11px]">{system.latency}</span>
             </div>
           </div>
         </div>
 
         {/* Column 2: Low Stock Alerts */}
         <div className="bg-admin-surface border border-admin-ledger-line p-5 rounded-lg flex flex-col gap-3.5">
-          <h3 className="font-admin-mono font-semibold text-[10px] text-admin-text-faint border-b border-admin-ledger-line pb-2.5 uppercase tracking-wide flex items-center gap-1.5">
+          <h3 className="font-admin-mono font-semibold text-[11px] text-admin-text-faint border-b border-admin-ledger-line pb-2.5 uppercase tracking-wide flex items-center gap-1.5">
             <AlertTriangle className="text-admin-amber" size={13} /> Low Stock Alerts
           </h3>
           <div className="flex flex-col gap-2">
@@ -382,7 +382,7 @@ export const Dashboard: React.FC = () => {
 
         {/* Column 3: Recent Pending Orders */}
         <div className="bg-admin-surface border border-admin-ledger-line p-5 rounded-lg flex flex-col gap-3.5">
-          <h3 className="font-admin-mono font-semibold text-[10px] text-admin-text-faint border-b border-admin-ledger-line pb-2.5 uppercase tracking-wide">Recent Orders</h3>
+          <h3 className="font-admin-mono font-semibold text-[11px] text-admin-text-faint border-b border-admin-ledger-line pb-2.5 uppercase tracking-wide">Recent Orders</h3>
           <div className="flex flex-col gap-2.5">
             {pendingOrders.length === 0 && (
               <p className="text-xs text-admin-text-faint font-medium py-2">No pending orders right now.</p>
@@ -391,7 +391,7 @@ export const Dashboard: React.FC = () => {
               <div key={order.id} className="flex items-center justify-between text-xs">
                 <div>
                   <div className="font-admin-mono font-semibold text-admin-text">{order.id}</div>
-                  <div className="text-admin-text-faint font-medium text-[10px]">{order.name} • {order.time}</div>
+                  <div className="text-admin-text-faint font-medium text-[11px]">{order.name} • {order.time}</div>
                 </div>
                 <div className="text-right">
                   <div className="font-admin-mono font-semibold text-admin-text tabular-nums">₹{order.amount}</div>
@@ -405,7 +405,7 @@ export const Dashboard: React.FC = () => {
 
       {/* Quick Action Matrix */}
       <div className="bg-admin-surface border border-admin-ledger-line p-5 rounded-lg flex flex-col gap-3.5">
-        <h3 className="font-admin-mono font-semibold text-[10px] text-admin-text-faint uppercase tracking-wide">Quick Actions</h3>
+        <h3 className="font-admin-mono font-semibold text-[11px] text-admin-text-faint uppercase tracking-wide">Quick Actions</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           <button className="flex items-center gap-2 p-3 bg-admin-paper border border-admin-ledger-line rounded-md hover:border-admin-green/40 hover:bg-admin-green-soft/40 transition-all text-xs font-semibold text-admin-text cursor-pointer">
             <Plus size={15} className="text-admin-green" /> Add Product

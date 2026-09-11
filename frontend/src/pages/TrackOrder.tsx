@@ -27,6 +27,7 @@ interface TrackedOrder {
   delivery?: DeliveryBlock | null;
   deliveryPartnerName?: string;
   deliveryRating?: { stars: number; comment?: string; at?: string } | null;
+  deliveryOtp?: string;
 }
 
 function customerPhone(): string {
@@ -108,7 +109,10 @@ export const TrackOrder: React.FC = () => {
 
   const fetchOrder = async () => {
     try {
-      const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}`);
+      const token = localStorage.getItem('customer_token');
+      const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
       const data = await res.json();
       if (data.success && data.order) { setOrder(data.order); setErr(''); }
       else setErr(data.message || 'Order not found');
@@ -136,6 +140,24 @@ export const TrackOrder: React.FC = () => {
       const lat = Number(p.lat);
       const lng = Number(p.lng);
       if (Number.isFinite(lat) && Number.isFinite(lng)) setLiveRider({ lat, lng });
+    });
+    // A partner just accepted — render the rider card + map instantly, no refetch.
+    socket.on('rider_assigned', (p: any) => {
+      if (String(p?.orderId) !== String(orderId)) return;
+      setOrder((cur) =>
+        cur
+          ? {
+              ...cur,
+              status: p.status || cur.status,
+              estimatedDelivery: p.eta ?? cur.estimatedDelivery,
+              delivery: { ...(cur.delivery || {}), ...(p.delivery || {}) } as DeliveryBlock,
+            }
+          : cur,
+      );
+      const loc = p?.delivery?.location;
+      if (loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng)) setLiveRider({ lat: loc.lat, lng: loc.lng });
+      fetchOrder(); // reconcile the rest of the record
+      setTick((n) => n + 1);
     });
     socket.on('order_status_update', (p: any) => {
       if (String(p?.orderId) !== String(orderId)) return;
@@ -309,6 +331,16 @@ export const TrackOrder: React.FC = () => {
               </div>
             ))}
           </div>
+
+          {order.deliveryOtp && (
+            <div className="rounded-2xl border border-[#2E7D32]/25 bg-[#2E7D32]/5 p-4 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-bold text-[#2E7D32] uppercase tracking-wide">Delivery code</div>
+                <div className="text-xs text-gray-500 font-semibold mt-0.5">Share this with your delivery partner at the door</div>
+              </div>
+              <div className="text-2xl font-extrabold text-[#2E7D32] tracking-[0.3em] tabular-nums shrink-0">{order.deliveryOtp}</div>
+            </div>
+          )}
 
           {!terminal && (dest || rider) && (
             <div className="rounded-2xl overflow-hidden border border-gray-200">

@@ -135,13 +135,14 @@ void main() {
         _orderJson(id: 'A1', status: 'Out for Delivery'),
         _orderJson(id: 'P1', status: 'Delivered'),
       ])));
-      // Default "All" tab shows both, with the right per-card CTA.
-      expect(find.text('All'), findsOneWidget);
-      expect(find.text('In Transit'), findsOneWidget);
+      // Default filter ("All Orders") shows both, with the right per-card CTA.
+      expect(find.text('All Orders'), findsOneWidget);
       expect(find.text('Track order'), findsOneWidget);
       expect(find.text('Reorder'), findsOneWidget);
 
-      // Switching to "In Transit" hides the delivered order.
+      // Open the filter menu and switch to "In Transit" — hides the delivered order.
+      await tester.tap(find.text('All Orders'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('In Transit'));
       await tester.pumpAndSettle();
       expect(find.text('Track order'), findsOneWidget);

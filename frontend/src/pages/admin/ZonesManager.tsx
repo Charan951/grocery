@@ -115,9 +115,9 @@ export const ZonesManager: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="font-extrabold text-sm text-text-primary">Delivery zones</h3>
-          <p className="text-[10px] text-text-secondary font-medium">{zones.length} zone(s) • auto-assignment prefers a zone's tagged partners, then falls back to radius</p>
+          <p className="text-[11px] text-text-secondary font-medium">{zones.length} zone(s) • auto-assignment prefers a zone's tagged partners, then falls back to radius</p>
         </div>
-        <button onClick={() => setShowAdd(v => !v)} className="flex items-center gap-1 bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[10px] hover:bg-secondary cursor-pointer">
+        <button onClick={() => setShowAdd(v => !v)} className="flex items-center gap-1 bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[11px] hover:bg-secondary cursor-pointer">
           <Plus size={12} /> Add zone
         </button>
       </div>
@@ -136,13 +136,13 @@ export const ZonesManager: React.FC = () => {
               Clear points ({pts.length})
             </button>
           </div>
-          <p className="text-[10px] text-text-secondary font-medium">Click the map to drop boundary points (min 3), in order around the area.</p>
+          <p className="text-[11px] text-text-secondary font-medium">Click the map to drop boundary points (min 3), in order around the area.</p>
           <PolygonDraw points={pts} onChange={setPts} />
           <div className="flex gap-2">
-            <button onClick={save} disabled={busy} className="bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[10px] disabled:opacity-40 cursor-pointer">
+            <button onClick={save} disabled={busy} className="bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[11px] disabled:opacity-40 cursor-pointer">
               {busy ? 'Saving…' : 'Save zone'}
             </button>
-            <button onClick={() => { setShowAdd(false); setPts([]); }} className="bg-surface text-text-secondary border border-divider font-bold py-1.5 px-4 rounded-full text-[10px] cursor-pointer">Cancel</button>
+            <button onClick={() => { setShowAdd(false); setPts([]); }} className="bg-surface text-text-secondary border border-divider font-bold py-1.5 px-4 rounded-full text-[11px] cursor-pointer">Cancel</button>
           </div>
         </div>
       )}
@@ -158,7 +158,7 @@ export const ZonesManager: React.FC = () => {
                 <span className="text-text-tertiary">· {z.polygon?.coordinates?.[0]?.length ?? 0} pts</span>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <button onClick={() => toggle(z)} className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase ${z.active ? 'bg-success/10 text-success' : 'bg-divider text-text-secondary'} cursor-pointer`}>
+                <button onClick={() => toggle(z)} className={`rounded-full px-2 py-0.5 text-[11px] font-black uppercase ${z.active ? 'bg-success/10 text-success' : 'bg-divider text-text-secondary'} cursor-pointer`}>
                   {z.active ? 'Active' : 'Off'}
                 </button>
                 <button onClick={() => remove(z)} className="text-error hover:opacity-70 cursor-pointer" title="Delete zone">

@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:freshcart/core/di/injection.dart';
 import 'package:freshcart/core/services/api_service.dart';
 import 'package:freshcart/core/services/socket_service.dart';
+import 'package:freshcart/features/cart/data/models/cart_item_model.dart';
 import 'package:freshcart/features/home/presentation/controllers/catalog_providers.dart' show apiServiceProvider;
 import 'package:freshcart/features/orders/data/models/order_model.dart';
 
@@ -30,6 +31,10 @@ class TrackingState {
   /// destination] line when routing is unavailable.
   final List<LatLng> routePoints;
 
+  /// Ordered items + the amount actually charged, for the order-summary card.
+  final List<CartItemModel> items;
+  final double total;
+
   const TrackingState({
     required this.orderId,
     required this.status,
@@ -46,6 +51,8 @@ class TrackingState {
     this.destination,
     this.storeLocation,
     this.routePoints = const [],
+    this.items = const [],
+    this.total = 0,
   });
 
   TrackingState copyWith({
@@ -63,6 +70,8 @@ class TrackingState {
     LatLng? destination,
     LatLng? storeLocation,
     List<LatLng>? routePoints,
+    List<CartItemModel>? items,
+    double? total,
   }) {
     return TrackingState(
       orderId: orderId,
@@ -80,6 +89,8 @@ class TrackingState {
       destination: destination ?? this.destination,
       storeLocation: storeLocation ?? this.storeLocation,
       routePoints: routePoints ?? this.routePoints,
+      items: items ?? this.items,
+      total: total ?? this.total,
     );
   }
 }
@@ -150,6 +161,27 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
       _maybeRefreshRoute();
     }));
 
+    // A partner just accepted — show the rider + map immediately (no refetch wait).
+    _subs.add(_socket.riderAssignedStream.listen((d) {
+      if (d['orderId'] != null && d['orderId'] != orderId) return;
+      final raw = (d['status'] as String?) ?? state.status;
+      final del = d['delivery'];
+      final name = (del is Map ? del['partnerName'] as String? : null)?.trim() ?? '';
+      final loc = del is Map ? del['location'] : null;
+      state = state.copyWith(
+        status: raw,
+        statusBucket: orderStatusFrom(raw),
+        etaMinutes: _minsFrom(d['eta']) ?? state.etaMinutes,
+        riderName: name.isNotEmpty ? name : state.riderName,
+        hasRider: true,
+        riderLocation: (loc is Map && loc['lat'] is num && loc['lng'] is num)
+            ? LatLng((loc['lat'] as num).toDouble(), (loc['lng'] as num).toDouble())
+            : state.riderLocation,
+      );
+      _maybeRefreshRoute();
+      _refreshFromApi(); // reconcile the rest of the record
+    }));
+
     // Fallback: while the socket is down, poll the order every 15s.
     _poll = Timer.periodic(const Duration(seconds: 15), (_) {
       if (!_socket.isConnected) _refreshFromApi();
@@ -165,6 +197,8 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
         statusBucket: o.status,
         etaMinutes: _minsFrom(o.eta) ?? state.etaMinutes,
         timeline: o.timeline.isNotEmpty ? o.timeline : state.timeline,
+        items: o.items,
+        total: o.total,
       );
 
       state = state.copyWith(

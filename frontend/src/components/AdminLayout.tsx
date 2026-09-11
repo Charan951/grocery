@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, ShoppingBag, Package, FolderTree, Award, Boxes, Warehouse, 
   Users, Truck, UserCheck, Ticket, Tag, Megaphone, Layers, DollarSign, FileText, 
-  LineChart, Star, LifeBuoy, Bell, Settings, ShieldAlert, ChevronLeft, ChevronRight, ChevronDown, 
+  Star, LifeBuoy, Bell, Settings, ShieldAlert, ChevronLeft, ChevronRight, ChevronDown,
   Search, Sun, Moon, LogOut, CheckCircle2, AlertTriangle, Info
 } from 'lucide-react';
 
@@ -28,7 +28,7 @@ const sidebarSections: SidebarSection[] = [
     title: 'Overview & Performance',
     items: [
       { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
-      { name: 'Analytics', path: '/admin/analytics', icon: LineChart },
+      // Analytics: not needed yet — hidden from nav (route still exists in AdminApp.tsx).
     ]
   },
   {
@@ -118,7 +118,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, onLogout }) 
 
 
   return (
-    <div className="min-h-screen bg-admin-paper flex font-admin-body text-admin-text">
+    <div className="admin-shell min-h-screen bg-admin-paper flex font-admin-body text-admin-text">
       {/* SIDEBAR — control tower with accordions */}
       <aside
         className={`bg-admin-ink flex flex-col transition-all duration-300 z-30 fixed top-0 left-0 bottom-0 h-screen shrink-0 ${collapsed ? 'w-[72px]' : 'w-[248px]'}`}
@@ -133,8 +133,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, onLogout }) 
             >
               <img src="/logo.png" alt="FreshCart Logo" className="w-8 h-8 object-contain" />
               <div>
-                <div className="font-admin-display font-bold text-[12px] tracking-wide text-white leading-none">FRESHCART</div>
-                <div className="font-admin-mono text-[9px] font-medium text-admin-green tracking-[0.12em] uppercase mt-1">Ops Console</div>
+                <div className="font-admin-display font-bold text-xs tracking-wide text-white leading-none">FRESHCART</div>
+                <div className="font-admin-mono text-[11px] font-medium text-admin-accent tracking-[0.12em] uppercase mt-1">Ops Console</div>
               </div>
             </motion.div>
           )}
@@ -163,9 +163,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, onLogout }) 
                 {!collapsed && (
                   <button
                     onClick={() => toggleSection(section.id)}
-                    className="flex items-center justify-between px-2.5 py-1.5 text-[10px] font-bold text-white/40 hover:text-white/80 uppercase tracking-wider transition-colors cursor-pointer select-none"
+                    className="flex items-center justify-between px-2.5 py-1.5 text-[11px] font-bold text-white/40 hover:text-white/80 uppercase tracking-wider transition-colors cursor-pointer select-none"
                   >
-                    <span className={hasActiveChild ? 'text-admin-green' : ''}>{section.title}</span>
+                    <span className={hasActiveChild ? 'text-admin-accent' : ''}>{section.title}</span>
                     <ChevronDown
                       size={12}
                       className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
@@ -190,15 +190,14 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, onLogout }) 
                           <Link
                             key={item.name}
                             to={item.path}
-                            className={`relative flex items-center gap-3 px-3 py-2 rounded-md text-[12px] font-medium transition-all ${
+                            className={`relative flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-semibold transition-all ${
                               isActive
-                                ? 'bg-admin-ink-soft text-white'
+                                ? 'bg-admin-accent text-admin-ink shadow-[0_2px_10px_-2px_rgba(27,205,57,0.5)]'
                                 : 'text-white/60 hover:bg-white/5 hover:text-white'
                             }`}
                             title={collapsed ? item.name : undefined}
                           >
-                            {isActive && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r bg-admin-green" />}
-                            <Icon size={15} className={isActive ? 'text-admin-green' : 'text-white/40'} />
+                            <Icon size={15} className={isActive ? 'text-admin-ink' : 'text-white/40'} />
                             {!collapsed && <span>{item.name}</span>}
                           </Link>
                         );
@@ -215,7 +214,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, onLogout }) 
         <div className="p-2.5 border-t border-admin-ink-line">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-md text-[11px] font-semibold text-admin-red bg-admin-red/10 hover:bg-admin-red/15 cursor-pointer transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-md text-xs font-semibold text-admin-red bg-admin-red/10 hover:bg-admin-red/15 cursor-pointer transition-colors"
           >
             <LogOut size={14} />
             {!collapsed && <span>Sign Out</span>}
@@ -229,9 +228,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, onLogout }) 
         <header className="h-[72px] sticky top-0 z-20 bg-admin-paper/95 backdrop-blur-sm border-b border-admin-ledger-line flex items-center justify-between px-6">
           {/* Breadcrumbs / Page Title */}
           <div className="flex items-center gap-2 font-admin-mono">
-            <span className="text-[11px] font-medium text-admin-text-faint uppercase tracking-wide">Enterprise</span>
+            <span className="text-xs font-medium text-admin-text-faint uppercase tracking-wide">Enterprise</span>
             <span className="text-admin-text-faint">/</span>
-            <span className="text-[11px] font-semibold text-admin-text uppercase tracking-wide">
+            <span className="text-xs font-semibold text-admin-text uppercase tracking-wide">
               {allSidebarItems.find(item => item.path === location.pathname)?.name || 'Control Panel'}
             </span>
           </div>
@@ -246,7 +245,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, onLogout }) 
                 placeholder="Search orders, SKUs, customers…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 border border-admin-ledger-line rounded-md text-[12px] bg-admin-surface focus:outline-none focus:border-admin-green text-admin-text font-admin-body font-medium placeholder:text-admin-text-faint"
+                className="w-full pl-9 pr-4 py-2 border border-admin-ledger-line rounded-md text-xs bg-admin-surface focus:outline-none focus:border-admin-green text-admin-text font-admin-body font-medium placeholder:text-admin-text-faint"
               />
             </div>
 
@@ -272,19 +271,19 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, onLogout }) 
                       className="absolute right-0 mt-2.5 w-[320px] bg-admin-surface border border-admin-ledger-line rounded-lg p-3.5 shadow-lg z-50 flex flex-col gap-2.5"
                     >
                       <div className="flex items-center justify-between border-b border-admin-ledger-line pb-2">
-                        <span className="font-admin-display font-semibold text-[12px] text-admin-text">Alerts</span>
-                        <span className="font-admin-mono text-[10px] text-admin-green font-semibold cursor-pointer hover:underline uppercase tracking-wide">Mark all read</span>
+                        <span className="font-admin-display font-semibold text-xs text-admin-text">Alerts</span>
+                        <span className="font-admin-mono text-[11px] text-admin-green font-semibold cursor-pointer hover:underline uppercase tracking-wide">Mark all read</span>
                       </div>
                       <div className="flex flex-col gap-2 max-h-[250px] overflow-y-auto no-scrollbar">
                         {notifications.map(n => (
-                          <div key={n.id} className="p-2.5 rounded-md bg-admin-paper border border-admin-ledger-line flex items-start gap-2.5 text-[11px] leading-relaxed">
+                          <div key={n.id} className="p-2.5 rounded-md bg-admin-paper border border-admin-ledger-line flex items-start gap-2.5 text-xs leading-relaxed">
                             {n.type === 'warning' && <AlertTriangle className="text-admin-amber mt-0.5 shrink-0" size={14} />}
                             {n.type === 'success' && <CheckCircle2 className="text-admin-green mt-0.5 shrink-0" size={14} />}
                             {n.type === 'info' && <Info className="text-admin-blue mt-0.5 shrink-0" size={14} />}
                             <div className="flex-1">
                               <div className="font-semibold text-admin-text">{n.title}</div>
                               <div className="text-admin-text-muted font-medium">{n.body}</div>
-                              <div className="font-admin-mono text-[9px] text-admin-text-faint font-medium mt-1 uppercase tracking-wide">{n.time}</div>
+                              <div className="font-admin-mono text-[11px] text-admin-text-faint font-medium mt-1 uppercase tracking-wide">{n.time}</div>
                             </div>
                           </div>
                         ))}
@@ -316,20 +315,20 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, onLogout }) 
                       className="absolute right-0 mt-2.5 w-[200px] bg-admin-surface border border-admin-ledger-line rounded-lg p-1.5 shadow-lg z-50"
                     >
                       <div className="px-3 py-2.5 border-b border-admin-ledger-line">
-                        <div className="font-semibold text-[12px] text-admin-text">Rohan Murthy</div>
-                        <div className="font-admin-mono text-[10px] text-admin-text-muted">admin@freshcart.com</div>
+                        <div className="font-semibold text-xs text-admin-text">Rohan Murthy</div>
+                        <div className="font-admin-mono text-[11px] text-admin-text-muted">admin@freshcart.com</div>
                       </div>
                       <div className="p-1 flex flex-col gap-0.5">
                         <Link
                           to="/admin/settings"
                           onClick={() => setProfileOpen(false)}
-                          className="px-3 py-2 rounded-md text-[12px] font-medium text-admin-text-muted hover:text-admin-text hover:bg-admin-paper flex items-center gap-2.5"
+                          className="px-3 py-2 rounded-md text-xs font-medium text-admin-text-muted hover:text-admin-text hover:bg-admin-paper flex items-center gap-2.5"
                         >
                           <Settings size={14} /> Settings
                         </Link>
                         <button
                           onClick={() => { setProfileOpen(false); handleLogout(); }}
-                          className="w-full text-left px-3 py-2 rounded-md text-[12px] font-semibold text-admin-red hover:bg-admin-red/5 flex items-center gap-2.5 cursor-pointer"
+                          className="w-full text-left px-3 py-2 rounded-md text-xs font-semibold text-admin-red hover:bg-admin-red/5 flex items-center gap-2.5 cursor-pointer"
                         >
                           <LogOut size={14} /> Sign Out
                         </button>

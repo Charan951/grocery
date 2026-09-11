@@ -107,7 +107,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with WidgetsB
     final p = ref.watch(authProvider.select((s) => s.profile));
     final online = p?.isOnline ?? false;
     final active = ref.watch(activeOrdersProvider);
-    final historyAsync = ref.watch(recentHistoryProvider);
     final unread = ref.watch(unreadCountProvider).valueOrNull ?? 0;
 
     final partnerName = p?.name.isNotEmpty == true
@@ -115,7 +114,103 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with WidgetsB
         : 'Partner';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7FAF8),
+      appBar: AppBar(
+        titleSpacing: 18,
+        title: RichText(
+          text: const TextSpan(
+            children: [
+              TextSpan(
+                text: 'FreshCart ',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 20,
+                  color: kGreen,
+                  letterSpacing: -0.4,
+                ),
+              ),
+              TextSpan(
+                text: 'Delivery',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 20,
+                  color: kText,
+                  letterSpacing: -0.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          if (_toggling)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: Center(
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2.2, color: kGreen),
+                  ),
+                ),
+              ),
+            )
+          else
+            Row(
+              children: [
+                Text(
+                  online ? 'Online' : 'Offline',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12.5,
+                    color: online ? kGreen : kTextMuted,
+                  ),
+                ),
+                Transform.scale(
+                  scale: 0.85,
+                  child: Switch(
+                    value: online,
+                    onChanged: _toggle,
+                  ),
+                ),
+              ],
+            ),
+          GestureDetector(
+            onTap: () async {
+              await context.push('/notifications');
+              ref.invalidate(unreadCountProvider);
+            },
+            child: Padding(
+              padding: const EdgeInsets.only(right: 16, left: 4),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  const Icon(
+                    Icons.notifications_none_rounded,
+                    color: kText,
+                    size: 26,
+                  ),
+                  if (unread > 0)
+                    Positioned(
+                      top: 1,
+                      right: 1,
+                      child: Container(
+                        width: 9,
+                        height: 9,
+                        decoration: BoxDecoration(
+                          color: kRed,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 1.5),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
@@ -126,261 +221,29 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with WidgetsB
           child: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             children: [
-              // ── 1. Top Header: Single Line Greeting + Notifications Bell ───────
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Partner avatar
-                  Container(
-                    width: 46,
-                    height: 46,
-                    margin: const EdgeInsets.only(right: 12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFD1F2E2),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Center(
-                      child: Text(
-                        partnerName.isNotEmpty ? partnerName[0].toUpperCase() : 'P',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 18,
-                          color: kGreen,
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Greeting & Subtitle
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${_getGreeting()} $partnerName!',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 19,
-                            fontWeight: FontWeight.w800,
-                            color: kText,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        const Text(
-                          'Stay active, deliver more, earn more.',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            color: kTextMuted,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Notification bell floating button
-                  GestureDetector(
-                    onTap: () async {
-                      await context.push('/notifications');
-                      ref.invalidate(unreadCountProvider);
-                    },
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.06),
-                            blurRadius: 10,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                        border: Border.all(color: const Color(0xFFECEBE4)),
-                      ),
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          const Icon(
-                            Icons.notifications_none_rounded,
-                            color: kText,
-                            size: 24,
-                          ),
-                          if (unread > 0)
-                            Positioned(
-                              top: 10,
-                              right: 10,
-                              child: Container(
-                                width: 9,
-                                height: 9,
-                                decoration: BoxDecoration(
-                                  color: kRed,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white, width: 1.5),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 18),
-
-              // ── 2. Online Status Switch Card (Toggle Only) ───────────────
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                  border: Border.all(color: const Color(0xFFEAE8DE)),
+              // ── 1. Greeting (below app bar) ─────────────────────────────
+              Text(
+                '${_getGreeting()} $partnerName!',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.w800,
+                  color: kText,
                 ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: online
-                            ? kGreen.withValues(alpha: 0.15)
-                            : kTextFaint.withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: online ? kGreen : kTextFaint,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            online ? "You're online" : "You're offline",
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 15.5,
-                              color: kText,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            online
-                                ? 'Ready to receive orders'
-                                : 'Go online to receive orders',
-                            style: const TextStyle(
-                              color: kTextMuted,
-                              fontSize: 12.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (_toggling)
-                      const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2.4, color: kGreen),
-                      )
-                    else
-                      Transform.scale(
-                        scale: 0.9,
-                        child: Switch(
-                          value: online,
-                          onChanged: _toggle,
-                        ),
-                      ),
-                  ],
+              ),
+              const SizedBox(height: 3),
+              const Text(
+                'Stay active, deliver more, earn more.',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: kTextMuted,
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
-              // ── 3. Promo / next-delivery banner ─────────────────────────
-              _promoBanner(context),
-
-              const SizedBox(height: 16),
-
-              // ── 4. Stats card (4 columns in one surface) ────────────────
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                  border: Border.all(color: const Color(0xFFEAE8DE)),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    _statCol(
-                      iconBgColor: const Color(0xFFD1F2E2),
-                      iconColor: kGreen,
-                      icon: Icons.currency_rupee_rounded,
-                      value: '₹${(p?.todayEarnings ?? 0).toStringAsFixed(0)}',
-                      label: "Today's Earnings",
-                    ),
-                    _statDivider(),
-                    _statCol(
-                      iconBgColor: const Color(0xFFD6E6FE),
-                      iconColor: const Color(0xFF2563EB),
-                      icon: Icons.check_rounded,
-                      value: '${p?.completedCount ?? 0}',
-                      label: 'Delivered',
-                    ),
-                    _statDivider(),
-                    _statCol(
-                      iconBgColor: const Color(0xFFFFE5D0),
-                      iconColor: const Color(0xFFF97316),
-                      icon: Icons.star_rounded,
-                      value: (p?.rating ?? 5.0).toStringAsFixed(1),
-                      label: 'Rating',
-                    ),
-                    _statDivider(),
-                    _statCol(
-                      iconBgColor: const Color(0xFFE3DCFF),
-                      iconColor: const Color(0xFF7C3AED),
-                      icon: Icons.calendar_today_rounded,
-                      value: '0',
-                      label: 'This Week',
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 22),
-
-              // ── 4. Active Delivery Section ───────────────────────────────
+              // ── 2. Active Delivery Section ───────────────────────────────
               Row(
                 children: [
                   Container(
@@ -440,233 +303,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with WidgetsB
                 },
               ),
 
-              const SizedBox(height: 22),
-
-              // ── 5. Recent Activity Section (Real History) ────────────────
-              Row(
-                children: [
-                  Container(
-                    width: 28,
-                    height: 28,
-                    decoration: const BoxDecoration(
-                      color: kGreen,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.sensors_rounded,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  const Text(
-                    'Recent Activity',
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: kText),
-                  ),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: () => context.go('/orders'),
-                    child: const Row(
-                      children: [
-                        Text(
-                          'View all',
-                          style: TextStyle(
-                            color: kGreen,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                          ),
-                        ),
-                        SizedBox(width: 2),
-                        Icon(Icons.chevron_right_rounded, color: kGreen, size: 18),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              _recentActivityCard(online: online, historyAsync: historyAsync),
-
-              const SizedBox(height: 16),
-
-              // ── 6. Important Notice Banner ───────────────────────────────
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8F6F0),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: kGreen.withValues(alpha: 0.15)),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFD1F2E2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.campaign_rounded, color: kGreen, size: 22),
-                    ),
-                    const SizedBox(width: 14),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Important',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
-                              color: kText,
-                            ),
-                          ),
-                          SizedBox(height: 3),
-                          Text(
-                            'Keep your app active and be on time to get more deliveries and better earnings.',
-                            style: TextStyle(
-                              color: kTextMuted,
-                              fontSize: 12,
-                              height: 1.3,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Icon(Icons.chevron_right_rounded, color: kTextMuted, size: 20),
-                  ],
-                ),
-              ),
-
               const SizedBox(height: 20),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _promoBanner(BuildContext context) {
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFDDF3E4), Color(0xFFBEE7CE)],
-        ),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -10,
-            bottom: -6,
-            top: 0,
-            child: Opacity(
-              opacity: 0.9,
-              child: Image.asset(
-                'assets/images/partner_delivery.jpg',
-                fit: BoxFit.contain,
-                errorBuilder: (_, _, _) => const SizedBox(width: 120),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  "Let's get you\nyour next delivery!",
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 17,
-                    height: 1.2,
-                    color: kText,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Accept orders, deliver smiles.',
-                  style: TextStyle(fontSize: 12.5, color: kTextMuted),
-                ),
-                const SizedBox(height: 14),
-                FilledButton(
-                  onPressed: () => context.go('/orders'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: kGreen,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('View Orders',
-                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                      SizedBox(width: 6),
-                      Icon(Icons.arrow_forward_rounded, size: 16),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _statDivider() => Container(
-        width: 1,
-        height: 44,
-        color: const Color(0xFFEEECE2),
-      );
-
-  Widget _statCol({
-    required Color iconBgColor,
-    required Color iconColor,
-    required IconData icon,
-    required String value,
-    required String label,
-  }) {
-    return Expanded(
-      child: Column(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(color: iconBgColor, shape: BoxShape.circle),
-            child: Icon(icon, color: iconColor, size: 18),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 16,
-              color: kText,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: kTextMuted,
-              fontSize: 10.5,
-              fontWeight: FontWeight.w500,
-              height: 1.2,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -752,179 +392,4 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with WidgetsB
     );
   }
 
-  Widget _recentActivityCard({
-    required bool online,
-    required AsyncValue<List<DeliveryOrder>> historyAsync,
-  }) {
-    return historyAsync.when(
-      loading: () => Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFEAE8DE)),
-        ),
-        child: const Center(child: CircularProgressIndicator(color: kGreen)),
-      ),
-      error: (err, stack) => _recentActivityEmpty(online),
-      data: (historyOrders) {
-        if (historyOrders.isEmpty) {
-          return _recentActivityEmpty(online);
-        }
-
-        final displayOrders = historyOrders.take(3).toList();
-
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-            border: Border.all(color: const Color(0xFFEAE8DE)),
-          ),
-          child: Column(
-            children: List.generate(displayOrders.length, (index) {
-              final o = displayOrders[index];
-              final isLast = index == displayOrders.length - 1;
-
-              return InkWell(
-                onTap: () => context.push('/order/${o.orderId}'),
-                child: IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      SizedBox(
-                        width: 28,
-                        child: Column(
-                          children: [
-                            Container(
-                              width: 12,
-                              height: 12,
-                              margin: const EdgeInsets.only(top: 3),
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: kGreen,
-                              ),
-                            ),
-                            if (!isLast)
-                              Expanded(
-                                child: Container(
-                                  width: 2,
-                                  margin: const EdgeInsets.symmetric(vertical: 4),
-                                  color: kGreen.withValues(alpha: 0.35),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: Padding(
-                          padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Order #${o.orderId} · ${o.status.toUpperCase()}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 13.5,
-                                        color: kText,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '₹${o.totalAmount.toStringAsFixed(0)} · ${o.deliveryAddress}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: kTextMuted,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const Icon(
-                                Icons.chevron_right_rounded,
-                                color: kTextFaint,
-                                size: 20,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _recentActivityEmpty(bool online) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-        border: Border.all(color: const Color(0xFFEAE8DE)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 12,
-            height: 12,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: online ? kGreen : kTextFaint,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  online ? 'You are online' : 'You are offline',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13.5,
-                    color: kText,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  online ? 'Ready to receive orders' : 'Go online to start receiving orders',
-                  style: const TextStyle(
-                    color: kTextMuted,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

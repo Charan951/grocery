@@ -39,7 +39,7 @@ const Metric: React.FC<{
   lead?: boolean;
 }> = ({ label, value, hint, lead }) => (
   <div className="border-b border-r border-divider px-4 py-3.5 flex flex-col gap-1">
-    <span className="text-[9px] font-bold uppercase tracking-[0.09em] text-text-secondary">
+    <span className="text-[11px] font-bold uppercase tracking-[0.09em] text-text-secondary">
       {label}
     </span>
     <span
@@ -49,7 +49,7 @@ const Metric: React.FC<{
     >
       {value}
     </span>
-    {hint ? <span className="text-[10px] font-medium text-text-tertiary">{hint}</span> : null}
+    {hint ? <span className="text-[11px] font-medium text-text-tertiary">{hint}</span> : null}
   </div>
 );
 
@@ -83,7 +83,7 @@ const OfferFunnel: React.FC<{
   const total = Math.max(offered, accepted + rejected + expired, 0);
   if (total === 0) {
     return (
-      <p className="text-[11px] text-text-tertiary font-medium">No offers routed to this partner yet.</p>
+      <p className="text-xs text-text-tertiary font-medium">No offers routed to this partner yet.</p>
     );
   }
   const pct = (n: number) => `${(n / total) * 100}%`;
@@ -102,11 +102,11 @@ const OfferFunnel: React.FC<{
         {pending > 0 && <span className="bg-transparent" style={{ width: pct(pending) }} />}
       </div>
       <div className="flex flex-wrap gap-x-5 gap-y-1">
-        <span className="text-[10px] font-bold uppercase tracking-wide text-text-secondary">
+        <span className="text-[11px] font-bold uppercase tracking-wide text-text-secondary">
           {offered} offered
         </span>
         {legend.map(([label, n, dot]) => (
-          <span key={label} className="flex items-center gap-1.5 text-[10px] font-semibold text-text-secondary">
+          <span key={label} className="flex items-center gap-1.5 text-[11px] font-semibold text-text-secondary">
             <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
             {label} <b className="text-text-primary tabular-nums">{n}</b>
           </span>
@@ -315,7 +315,7 @@ export const PartnerDetail: React.FC = () => {
               </ShelfTag>
               <ShelfTag tone={availTone}>{availLabel}</ShelfTag>
             </div>
-            <p className="text-[11px] text-text-secondary font-medium mt-1 truncate">
+            <p className="text-xs text-text-secondary font-medium mt-1 truncate">
               {partner.email} &nbsp;·&nbsp; {partner.phone || 'no phone'} &nbsp;·&nbsp;{' '}
               <span className="capitalize">{partner.vehicleType}</span>
             </p>
@@ -379,7 +379,7 @@ export const PartnerDetail: React.FC = () => {
         </MetricGrid>
 
         <div className="flex flex-col gap-2.5">
-          <span className="text-[9px] font-bold uppercase tracking-[0.09em] text-text-secondary">
+          <span className="text-[11px] font-bold uppercase tracking-[0.09em] text-text-secondary">
             Offer response
           </span>
           <OfferFunnel
@@ -408,7 +408,7 @@ export const PartnerDetail: React.FC = () => {
           />
         </label>
         {allZones.length === 0 ? (
-          <p className="text-[11px] text-text-tertiary font-medium">
+          <p className="text-xs text-text-tertiary font-medium">
             No zones defined yet — add them from the Delivery Partners page.
           </p>
         ) : (
@@ -421,7 +421,7 @@ export const PartnerDetail: React.FC = () => {
                   onClick={() =>
                     setPartnerZones((p) => (on ? p.filter((x) => x !== z._id) : [...p, z._id]))
                   }
-                  className={`rounded-full px-3 py-1 text-[10px] font-bold border cursor-pointer transition-colors ${
+                  className={`rounded-full px-3 py-1 text-[11px] font-bold border cursor-pointer transition-colors ${
                     on
                       ? 'bg-primary/10 border-primary/40 text-primary'
                       : 'border-divider text-text-secondary hover:border-text-tertiary'
@@ -437,7 +437,7 @@ export const PartnerDetail: React.FC = () => {
         <button
           onClick={saveZones}
           disabled={zoneSaving}
-          className="self-start bg-primary text-white font-bold py-2 px-5 rounded-full text-[10px] hover:bg-secondary disabled:opacity-40 cursor-pointer transition-colors"
+          className="self-start bg-primary text-white font-bold py-2 px-5 rounded-full text-[11px] hover:bg-secondary disabled:opacity-40 cursor-pointer transition-colors"
         >
           {zoneSaving ? 'Saving…' : 'Save zones & capacity'}
         </button>
@@ -450,7 +450,7 @@ export const PartnerDetail: React.FC = () => {
             <button
               onClick={settleAll}
               disabled={settling || pendingPayout <= 0}
-              className="bg-primary text-white font-bold py-2 px-5 rounded-full text-[10px] hover:bg-secondary disabled:opacity-40 cursor-pointer transition-colors"
+              className="bg-primary text-white font-bold py-2 px-5 rounded-full text-[11px] hover:bg-secondary disabled:opacity-40 cursor-pointer transition-colors"
             >
               {settling ? 'Settling…' : 'Settle pending'}
             </button>
@@ -478,21 +478,21 @@ export const PartnerDetail: React.FC = () => {
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="text-text-tertiary">
-                    <th className="px-2 py-2 border-b border-divider font-bold uppercase text-[9px] tracking-wide">
+                    <th className="px-2 py-2 border-b border-divider font-bold uppercase text-[11px] tracking-wide">
                       Order
                     </th>
                     {['Base', 'Distance', 'Total'].map((h) => (
                       <th
                         key={h}
-                        className="px-2 py-2 border-b border-divider font-bold uppercase text-[9px] tracking-wide text-right"
+                        className="px-2 py-2 border-b border-divider font-bold uppercase text-[11px] tracking-wide text-right"
                       >
                         {h}
                       </th>
                     ))}
-                    <th className="px-2 py-2 border-b border-divider font-bold uppercase text-[9px] tracking-wide">
+                    <th className="px-2 py-2 border-b border-divider font-bold uppercase text-[11px] tracking-wide">
                       Status
                     </th>
-                    <th className="px-2 py-2 border-b border-divider font-bold uppercase text-[9px] tracking-wide text-right">
+                    <th className="px-2 py-2 border-b border-divider font-bold uppercase text-[11px] tracking-wide text-right">
                       Earned
                     </th>
                   </tr>
@@ -526,7 +526,7 @@ export const PartnerDetail: React.FC = () => {
               </table>
             </div>
           ) : (
-            <p className="text-[11px] text-text-tertiary font-medium">
+            <p className="text-xs text-text-tertiary font-medium">
               No settled or pending earnings yet.
             </p>
           )}
@@ -545,22 +545,22 @@ export const PartnerDetail: React.FC = () => {
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="text-text-tertiary">
-                <th className="px-4 sm:px-5 py-2.5 border-b border-divider font-bold uppercase text-[9px] tracking-wide">
+                <th className="px-4 sm:px-5 py-2.5 border-b border-divider font-bold uppercase text-[11px] tracking-wide">
                   Order
                 </th>
-                <th className="px-2 py-2.5 border-b border-divider font-bold uppercase text-[9px] tracking-wide">
+                <th className="px-2 py-2.5 border-b border-divider font-bold uppercase text-[11px] tracking-wide">
                   Status
                 </th>
-                <th className="px-2 py-2.5 border-b border-divider font-bold uppercase text-[9px] tracking-wide text-right">
+                <th className="px-2 py-2.5 border-b border-divider font-bold uppercase text-[11px] tracking-wide text-right">
                   Amount
                 </th>
-                <th className="px-2 py-2.5 border-b border-divider font-bold uppercase text-[9px] tracking-wide">
+                <th className="px-2 py-2.5 border-b border-divider font-bold uppercase text-[11px] tracking-wide">
                   Payment
                 </th>
-                <th className="px-2 py-2.5 border-b border-divider font-bold uppercase text-[9px] tracking-wide whitespace-nowrap">
+                <th className="px-2 py-2.5 border-b border-divider font-bold uppercase text-[11px] tracking-wide whitespace-nowrap">
                   Picked up
                 </th>
-                <th className="px-4 sm:px-5 py-2.5 border-b border-divider font-bold uppercase text-[9px] tracking-wide whitespace-nowrap">
+                <th className="px-4 sm:px-5 py-2.5 border-b border-divider font-bold uppercase text-[11px] tracking-wide whitespace-nowrap">
                   Delivered
                 </th>
               </tr>

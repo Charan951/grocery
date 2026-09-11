@@ -11,7 +11,7 @@ import { Customer } from '../src/models/Customer.js';
 import { DeliveryPartner } from '../src/models/DeliveryPartner.js';
 import { Order } from '../src/models/Order.js';
 import { Assignment } from '../src/models/Assignment.js';
-import { tryAssign, rejectOffer } from '../src/services/assignmentService.js';
+import { tryAssign, rejectOffer, acceptOffer } from '../src/services/assignmentService.js';
 import { DeviceToken } from '../src/models/DeviceToken.js';
 import { Notification } from '../src/models/Operations.js';
 import { DeliveryEarning } from '../src/models/DeliveryEarning.js';
@@ -276,7 +276,7 @@ const makeRemoteOrder = () =>
     status: 'Ready', pickup: TP, deliveryLocation: { lat: TP.lat + 0.01, lng: TP.lng + 0.01 },
   });
 
-test('GET /api/orders/:id exposes a masked rider block, revealed only Out For Delivery/Arrived', async () => {
+test('GET /api/orders/:id: rider identity + position from Assigned; phone/OTP only Out For Delivery', async () => {
   await DeliveryPartner.updateOne(
     { userId: riderUserId },
     { $set: { phone: '9876500000', currentLocation: { type: 'Point', coordinates: [78.37, 17.44] }, locationUpdatedAt: new Date() } },
@@ -293,9 +293,10 @@ test('GET /api/orders/:id exposes a masked rider block, revealed only Out For De
   assert.ok(r.body.order.delivery, 'delivery block present');
   assert.equal(r.body.order.delivery.partnerName, 'QA'); // first name only
   assert.equal(r.body.order.delivery.revealed, false);
-  assert.equal(r.body.order.delivery.phone, null);
-  assert.equal(r.body.order.delivery.location, null);
+  assert.equal(r.body.order.delivery.phone, null); // dialable number still hidden
   assert.match(r.body.order.delivery.phoneMasked, /••/);
+  // live position IS shown from Assigned so tracking starts on accept
+  assert.ok(r.body.order.delivery.location && r.body.order.delivery.location.lat === 17.44);
   assert.equal(r.body.order.deliveryOtp, undefined); // never to a non-owner
 
   // in the reveal window
@@ -381,6 +382,7 @@ test('auto-assign: order → Ready offers the nearest online partner (source=aut
   const r = await tryAssign(order.orderId);
   assert.equal(r.ok, true, JSON.stringify(r));
   assert.equal(r.partnerUserId, riderUserId);
+  assert.equal(r.count, 1); // only one partner online → one offer
 
   const a = await Assignment.findOne({ orderId: order.orderId, source: 'auto' });
   assert.ok(a);
@@ -395,29 +397,64 @@ test('auto-assign: order → Ready offers the nearest online partner (source=aut
   await Assignment.updateOne({ _id: a._id }, { $set: { status: 'cancelled' } });
 });
 
-test('auto-assign: decline rolls to the next candidate, then stalls when exhausted', async () => {
+test('auto-assign: broadcasts to every online partner in the ring; a partial decline does not re-broadcast', async () => {
   await bringOnline(riderUserId, TP.lat + 0.001, TP.lng + 0.001);
   await bringOnline(rider2UserId, TP.lat + 0.002, TP.lng + 0.002);
 
   const order = await makeRemoteOrder();
   const r1 = await tryAssign(order.orderId);
   assert.equal(r1.ok, true);
-  const first = r1.partnerUserId;
-  const a1 = await Assignment.findOne({ orderId: order.orderId, status: 'offered' });
+  assert.equal(r1.count, 2, 'both online partners get the offer at once');
 
-  // first partner declines → auto re-offer to the other one
-  await rejectOffer({ assignmentId: a1._id, user: { _id: first, name: 'x' } });
-  const a2 = await Assignment.findOne({ orderId: order.orderId, status: 'offered' });
-  assert.ok(a2, 're-offer should be live');
-  assert.notEqual(String(a2.partnerUserId), first);
-  assert.equal(a2.attempt, 2);
+  const offers = await Assignment.find({ orderId: order.orderId, status: 'offered' });
+  assert.equal(offers.length, 2);
+  assert.deepEqual(
+    [...new Set(offers.map((o) => o.attempt))],
+    [1],
+    'same batch → same attempt number'
+  );
 
-  // second partner declines too → no candidates left → stalled
-  await rejectOffer({ assignmentId: a2._id, user: { _id: String(a2.partnerUserId), name: 'y' } });
+  // one partner declines → the other offer is still live, no new broadcast
+  await rejectOffer({ assignmentId: offers[0]._id, user: { _id: String(offers[0].partnerUserId), name: 'x' } });
+  const stillLive = await Assignment.find({ orderId: order.orderId, status: 'offered' });
+  assert.equal(stillLive.length, 1);
+  assert.equal(String(stillLive[0]._id), String(offers[1]._id));
+
+  // the last partner declines too → batch exhausted, no one left → stalled
+  await rejectOffer({ assignmentId: offers[1]._id, user: { _id: String(offers[1].partnerUserId), name: 'y' } });
   assert.equal(await Assignment.findOne({ orderId: order.orderId, status: 'offered' }), null);
   const stalled = await Order.findOne({ orderId: order.orderId });
   assert.equal(stalled.assignmentStalled, true);
   assert.equal(stalled.deliveryPartnerUserId, undefined);
+});
+
+test('auto-assign: first partner to accept wins; the others’ offers are revoked', async () => {
+  await bringOnline(riderUserId, TP.lat + 0.001, TP.lng + 0.001);
+  await bringOnline(rider2UserId, TP.lat + 0.002, TP.lng + 0.002);
+
+  const order = await makeRemoteOrder();
+  const r1 = await tryAssign(order.orderId);
+  assert.equal(r1.count, 2);
+
+  const offers = await Assignment.find({ orderId: order.orderId, status: 'offered' });
+  const winner = offers[0];
+  const loser = offers[1];
+
+  const res = await acceptOffer({
+    assignmentId: winner._id,
+    user: { _id: String(winner.partnerUserId), name: 'winner' },
+  });
+  assert.equal(res.ok, true);
+
+  const orderAfter = await Order.findOne({ orderId: order.orderId });
+  assert.equal(orderAfter.status, 'Assigned');
+  assert.equal(String(orderAfter.deliveryPartnerUserId), String(winner.partnerUserId));
+
+  // the losing offers are revoked in a non-blocking cleanup — give it a tick
+  await new Promise((r) => setTimeout(r, 100));
+  const loserAfter = await Assignment.findById(loser._id);
+  assert.equal(loserAfter.status, 'cancelled', 'other offers revoked on accept');
+  assert.equal(await Assignment.findOne({ orderId: order.orderId, status: 'offered' }), null);
 });
 
 test('manual offer → partner accepts → order Assigned + partner queue updated', async () => {

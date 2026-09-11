@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freshcart_delivery/core/providers.dart';
 import 'package:freshcart_delivery/core/theme.dart';
+import 'package:freshcart_delivery/core/widgets/filter_sheet.dart';
+import 'package:freshcart_delivery/core/widgets/tab_back_button.dart';
 
 final _rangeProvider = StateProvider.autoDispose<String>((ref) => 'week');
 
@@ -20,22 +22,24 @@ class EarningsScreen extends ConsumerWidget {
     final async = ref.watch(earningsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Earnings')),
+      appBar: AppBar(
+        leading: const TabBackButton(),
+        title: const Text('Earnings'),
+        actions: [
+          FilterAction<String>(
+            title: 'Time range',
+            selected: range,
+            options: const [
+              FilterOption('today', 'Today'),
+              FilterOption('week', 'This week'),
+              FilterOption('month', 'This month'),
+            ],
+            onChanged: (v) => ref.read(_rangeProvider.notifier).state = v,
+          ),
+        ],
+      ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-            child: SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'today', label: Text('Today')),
-                ButtonSegment(value: 'week', label: Text('Week')),
-                ButtonSegment(value: 'month', label: Text('Month')),
-              ],
-              selected: {range},
-              onSelectionChanged: (s) =>
-                  ref.read(_rangeProvider.notifier).state = s.first,
-            ),
-          ),
           Expanded(
             child: async.when(
               loading: () => const Center(child: CircularProgressIndicator()),

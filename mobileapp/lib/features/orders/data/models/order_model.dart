@@ -63,6 +63,7 @@ class OrderModel {
   final List<OrderTimelineEntry> timeline;
   final String deliveryPartnerName;
   final int deliveryRatingStars; // 0 = not yet rated
+  final String deliveryOtp; // 4-digit doorstep code, only present once out for delivery
 
   const OrderModel({
     required this.id,
@@ -83,6 +84,7 @@ class OrderModel {
     this.timeline = const [],
     this.deliveryPartnerName = '',
     this.deliveryRatingStars = 0,
+    this.deliveryOtp = '',
   });
 
   String get statusText {
@@ -152,6 +154,7 @@ class OrderModel {
       deliveryRatingStars: (j['deliveryRating'] is Map)
           ? asInt((j['deliveryRating'] as Map)['stars'])
           : 0,
+      deliveryOtp: asString(j['deliveryOtp']),
     );
   }
 
@@ -225,6 +228,7 @@ class OrderModel {
       timeline: timeline,
       deliveryPartnerName: deliveryPartnerName,
       deliveryRatingStars: deliveryRatingStars ?? this.deliveryRatingStars,
+      deliveryOtp: deliveryOtp,
     );
   }
 }

@@ -9,6 +9,7 @@ import 'package:freshcart/core/theme/theme_controller.dart';
 import 'package:freshcart/core/widgets/app_modal.dart';
 import 'package:freshcart/core/widgets/app_toast.dart';
 import 'package:freshcart/core/widgets/buttons.dart';
+import 'package:freshcart/core/widgets/tab_back_button.dart';
 import 'package:freshcart/features/authentication/presentation/controllers/auth_controller.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -30,6 +31,7 @@ class ProfileScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
       appBar: AppBar(
+        leading: const TabBackButton(),
         title: const Text('Account'),
         centerTitle: false,
         scrolledUnderElevation: 0,

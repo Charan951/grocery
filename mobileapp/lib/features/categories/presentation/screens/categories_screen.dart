@@ -9,6 +9,7 @@ import 'package:freshcart/core/constants/app_radius.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
 import 'package:freshcart/core/widgets/feedback_states.dart';
 import 'package:freshcart/core/widgets/skeletons.dart';
+import 'package:freshcart/core/widgets/tab_back_button.dart';
 import 'package:freshcart/features/categories/data/models/category_model.dart';
 import 'package:freshcart/features/home/presentation/controllers/catalog_providers.dart';
 import 'package:freshcart/features/products/data/models/product_model.dart';
@@ -92,6 +93,7 @@ class CategoriesScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
       appBar: AppBar(
+        leading: const TabBackButton(),
         title: const Text('Categories'),
         centerTitle: false,
         scrolledUnderElevation: 0,

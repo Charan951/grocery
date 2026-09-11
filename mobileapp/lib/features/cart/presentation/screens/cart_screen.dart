@@ -1,4 +1,4 @@
-// ignore_for_file: unnecessary_underscores
+﻿// ignore_for_file: unnecessary_underscores
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -8,7 +8,6 @@ import 'package:freshcart/core/constants/app_colors.dart';
 import 'package:freshcart/core/constants/app_radius.dart';
 import 'package:freshcart/core/error/api_exception.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
-import 'package:freshcart/core/widgets/app_modal.dart';
 import 'package:freshcart/core/widgets/app_scaffold.dart';
 import 'package:freshcart/core/widgets/app_text_field.dart';
 import 'package:freshcart/core/widgets/app_toast.dart';
@@ -68,32 +67,6 @@ class CartScreen extends ConsumerWidget {
 
     return AppScaffold(
       title: 'Checkout',
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.search_rounded),
-          onPressed: () => context.push('/search'),
-        ),
-        TextButton(
-          onPressed: () async {
-            final ok = await AppModal.confirm(
-              context,
-              title: 'Clear cart?',
-              message:
-                  'This removes all ${cart.totalItemsCount} items from your cart.',
-              confirmLabel: 'Clear',
-              destructive: true,
-            );
-            if (ok) {
-              notifier.clearCart();
-              AppToast.info('Cart cleared');
-            }
-          },
-          child: Text(
-            'Clear',
-            style: AppTypography.labelMedium(AppColors.error),
-          ),
-        ),
-      ],
       bottomNavigationBar: CheckoutBar(
         label: 'To pay',
         amount: cart.totalPayableAmount,
@@ -174,32 +147,7 @@ class CartScreen extends ConsumerWidget {
           _CouponSection(),
           const SizedBox(height: 16),
 
-          // 6. Delivery Instructions (No donations per user request)
-          _DeliveryInstructionsSection(
-            selected: cart.selectedInstructions,
-            onToggle: notifier.toggleInstruction,
-            isDark: isDark,
-          ),
-          const SizedBox(height: 16),
-
-          // 7. Delivery Partner Tip
-          _DeliveryPartnerTipSection(
-            selectedTip: cart.tipAmount,
-            onSelectTip: notifier.setTipAmount,
-            isDark: isDark,
-          ),
-          const SizedBox(height: 16),
-
-          // 8. Gift Packaging (Default ₹30 fee added to total when selected)
-          _GiftPackagingSection(
-            isSelected: cart.hasGiftPackaging,
-            fee: cart.giftPackagingFee,
-            onToggle: notifier.toggleGiftPackaging,
-            isDark: isDark,
-          ),
-          const SizedBox(height: 16),
-
-          // 9. Cancellation Policy
+          // 6. Cancellation Policy
           _CancellationPolicyCard(isDark: isDark),
         ],
       ),
@@ -627,350 +575,6 @@ class _YouMightAlsoLikeShelf extends StatelessWidget {
   }
 }
 
-class _DeliveryInstructionsSection extends StatelessWidget {
-  final Set<String> selected;
-  final ValueChanged<String> onToggle;
-  final bool isDark;
-
-  const _DeliveryInstructionsSection({
-    required this.selected,
-    required this.onToggle,
-    required this.isDark,
-  });
-
-  static const _instructions = [
-    ('Record', 'Press here and hold', Icons.mic_none_rounded),
-    ('Avoid calling', 'Keep phone free', Icons.phone_disabled_outlined),
-    (
-      'Don\'t ring the bell',
-      'Silent delivery',
-      Icons.notifications_off_outlined,
-    ),
-    ('Leave at door', 'Drop outside', Icons.door_front_door_outlined),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Delivery instructions',
-          style: AppTypography.title(
-            isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-          ).copyWith(fontWeight: FontWeight.w900, fontSize: 16),
-        ),
-        const SizedBox(height: 10),
-        SizedBox(
-          height: 95,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: _instructions.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 10),
-            itemBuilder: (context, idx) {
-              final (title, subtitle, icon) = _instructions[idx];
-              final isSelected = selected.contains(title);
-              return GestureDetector(
-                onTap: () => onToggle(title),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: 125,
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? AppColors.primary.withOpacity(0.08)
-                        : (isDark ? AppColors.surfaceDark : AppColors.surface),
-                    borderRadius: AppRadius.brLg,
-                    border: Border.all(
-                      color: isSelected
-                          ? AppColors.primary
-                          : (isDark
-                                ? AppColors.dividerDark
-                                : AppColors.divider),
-                      width: isSelected ? 1.5 : 1.0,
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Icon(
-                            icon,
-                            size: 20,
-                            color: isSelected
-                                ? AppColors.primary
-                                : AppColors.textSecondary,
-                          ),
-                          Icon(
-                            isSelected
-                                ? Icons.check_box_rounded
-                                : Icons.check_box_outline_blank_rounded,
-                            size: 18,
-                            color: isSelected
-                                ? AppColors.primary
-                                : AppColors.textSecondary,
-                          ),
-                        ],
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            style:
-                                AppTypography.labelSmall(
-                                  isDark
-                                      ? AppColors.textPrimaryDark
-                                      : AppColors.textPrimary,
-                                ).copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 11,
-                                ),
-                          ),
-                          Text(
-                            subtitle,
-                            style: AppTypography.bodySmall(
-                              isDark
-                                  ? AppColors.textSecondaryDark
-                                  : AppColors.textSecondary,
-                            ).copyWith(fontSize: 9),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _DeliveryPartnerTipSection extends StatelessWidget {
-  final int selectedTip;
-  final ValueChanged<int> onSelectTip;
-  final bool isDark;
-
-  const _DeliveryPartnerTipSection({
-    required this.selectedTip,
-    required this.onSelectTip,
-    required this.isDark,
-  });
-
-  static const _tips = [(20, '😄'), (30, '🤩'), (50, '😍')];
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : AppColors.surface,
-        borderRadius: AppRadius.brLg,
-        border: Border.all(
-          color: isDark ? AppColors.dividerDark : AppColors.divider,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Tip your delivery partner',
-                      style: AppTypography.title(
-                        isDark
-                            ? AppColors.textPrimaryDark
-                            : AppColors.textPrimary,
-                      ).copyWith(fontWeight: FontWeight.w900, fontSize: 15),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Your kindness means a lot! 100% of your tip will go directly to your delivery partner.',
-                      style: AppTypography.bodySmall(
-                        isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondary,
-                      ).copyWith(fontSize: 11, height: 1.3),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.amber.withOpacity(0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.two_wheeler_rounded,
-                  color: Colors.amber,
-                  size: 24,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              for (final (amt, emoji) in _tips)
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => onSelectTip(amt),
-                    child: Container(
-                      margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                        color: selectedTip == amt
-                            ? AppColors.primary.withOpacity(0.1)
-                            : (isDark ? Colors.white10 : AppColors.background),
-                        borderRadius: AppRadius.brMd,
-                        border: Border.all(
-                          color: selectedTip == amt
-                              ? AppColors.primary
-                              : (isDark
-                                    ? AppColors.dividerDark
-                                    : AppColors.divider),
-                          width: selectedTip == amt ? 1.5 : 1.0,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(emoji, style: const TextStyle(fontSize: 14)),
-                          const SizedBox(width: 4),
-                          Text(
-                            '₹$amt',
-                            style:
-                                AppTypography.labelMedium(
-                                  selectedTip == amt
-                                      ? AppColors.primaryText
-                                      : (isDark
-                                            ? AppColors.textPrimaryDark
-                                            : AppColors.textPrimary),
-                                ).copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _GiftPackagingSection extends StatelessWidget {
-  final bool isSelected;
-  final double fee;
-  final VoidCallback onToggle;
-  final bool isDark;
-
-  const _GiftPackagingSection({
-    required this.isSelected,
-    required this.fee,
-    required this.onToggle,
-    required this.isDark,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : AppColors.surface,
-        borderRadius: AppRadius.brLg,
-        border: Border.all(
-          color: isSelected
-              ? AppColors.primary
-              : (isDark ? AppColors.dividerDark : AppColors.divider),
-          width: isSelected ? 1.5 : 1.0,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.purple.withOpacity(0.1),
-              borderRadius: AppRadius.brMd,
-            ),
-            child: const Icon(
-              Icons.card_giftcard_rounded,
-              color: Colors.purple,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Gift Packaging',
-                  style: AppTypography.labelLarge(
-                    isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                  ).copyWith(fontWeight: FontWeight.w900, fontSize: 14),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Get your items in a special gift bag for just ₹${fee.toStringAsFixed(0)}',
-                  style: AppTypography.bodySmall(
-                    isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondary,
-                  ).copyWith(fontSize: 11),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          OutlinedButton(
-            onPressed: onToggle,
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(
-                color: isSelected ? AppColors.primary : AppColors.primaryText,
-                width: 1.5,
-              ),
-              backgroundColor: isSelected
-                  ? AppColors.primary.withOpacity(0.1)
-                  : Colors.transparent,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: Text(
-              isSelected ? 'Added' : 'Select',
-              style: TextStyle(
-                fontWeight: FontWeight.w900,
-                color: isSelected ? AppColors.primary : AppColors.primaryText,
-                fontSize: 12,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _CancellationPolicyCard extends StatelessWidget {
   final bool isDark;
 
@@ -987,21 +591,43 @@ class _CancellationPolicyCard extends StatelessWidget {
           color: isDark ? AppColors.dividerDark : AppColors.divider,
         ),
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Cancellation Policy',
-            style: AppTypography.labelLarge(
-              isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-            ).copyWith(fontWeight: FontWeight.w900, fontSize: 14),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.shield_outlined,
+              color: AppColors.primaryText,
+              size: 18,
+            ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Once order placed, any cancellation may result in a fee. In case of unexpected delays leading to order cancellation, a complete refund will be provided.',
-            style: AppTypography.bodySmall(
-              isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-            ).copyWith(fontSize: 11, height: 1.3),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Cancellation policy',
+                  style: AppTypography.labelLarge(
+                    isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                  ).copyWith(fontWeight: FontWeight.w900, fontSize: 14),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Once placed, cancelling may attract a fee. If we delay or fail to deliver, you get a full refund.',
+                  style: AppTypography.bodySmall(
+                    isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondary,
+                  ).copyWith(fontSize: 11.5, height: 1.4),
+                ),
+              ],
+            ),
           ),
         ],
       ),

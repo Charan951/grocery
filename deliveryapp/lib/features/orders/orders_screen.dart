@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:freshcart_delivery/core/providers.dart';
 import 'package:freshcart_delivery/core/theme.dart';
+import 'package:freshcart_delivery/core/widgets/filter_sheet.dart';
+import 'package:freshcart_delivery/core/widgets/tab_back_button.dart';
 import 'package:freshcart_delivery/models/delivery_models.dart';
 
 final _historyProvider =
@@ -53,11 +55,14 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: const TabBackButton(),
         title: const Text('Orders'),
         actions: [
-          IconButton(
-            onPressed: () => ref.invalidate(_historyProvider),
-            icon: const Icon(Icons.refresh_rounded, size: 20),
+          FilterAction<String>(
+            title: 'Filter history',
+            selected: _filterLabel,
+            options: _filters.keys.map((label) => FilterOption(label, label)).toList(),
+            onChanged: (label) => setState(() => _filterLabel = label),
           ),
         ],
       ),
@@ -67,9 +72,15 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
           children: [
-            _label('History', history.valueOrNull?.length),
-            const SizedBox(height: 12),
-            _segmented(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _label('History', history.valueOrNull?.length),
+                if (_filterLabel != 'All')
+                  Text(_filterLabel,
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: kGreen)),
+              ],
+            ),
             const SizedBox(height: 12),
             history.when(
               loading: _loader,
@@ -99,41 +110,6 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                 style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: kTextFaint)),
           ],
         ],
-      );
-
-  Widget _segmented() => Container(
-        padding: const EdgeInsets.all(2),
-        decoration: BoxDecoration(
-          color: kSurface,
-          border: Border.all(color: kLedgerLine),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          children: _filters.keys.map((label) {
-            final sel = label == _filterLabel;
-            return Expanded(
-              child: GestureDetector(
-                onTap: () => setState(() => _filterLabel = label),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  decoration: BoxDecoration(
-                    color: sel ? kInk : Colors.transparent,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: sel ? Colors.white : kTextMuted,
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
       );
 
   Widget _tile(DeliveryOrder o) {

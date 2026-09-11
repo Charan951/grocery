@@ -30,15 +30,23 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       };
 
   void _placeOrder() {
-    final address = (ref.read(authProvider).user?.selectedAddress?['addressLine'] ??
-            ref.read(authProvider).user?.selectedAddress?['fullAddress'] ??
-            '')
-        .toString();
+    final selected = ref.read(authProvider).user?.selectedAddress;
+    final address = (selected?['addressLine'] ?? selected?['fullAddress'] ?? '').toString();
     if (address.isEmpty) {
       AppToast.error('Add a delivery address to continue');
       return;
     }
-    ref.read(checkoutControllerProvider.notifier).submit(method: _paymentMethod, address: address);
+    // Without these the order never gets a deliveryLocation, which is what
+    // the live tracking map keys off — the customer would place an order and
+    // never see a map until (if ever) a rider's live position came through.
+    final lat = (selected?['lat'] as num?)?.toDouble();
+    final lng = (selected?['lng'] as num?)?.toDouble();
+    ref.read(checkoutControllerProvider.notifier).submit(
+          method: _paymentMethod,
+          address: address,
+          lat: lat,
+          lng: lng,
+        );
   }
 
   @override
@@ -83,16 +91,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             _AddressCard(address: addr, isDark: isDark, onChange: () => context.push('/addresses')),
             const SizedBox(height: 24),
 
-            _sectionTitle('Delivery', isDark),
-            const SizedBox(height: 10),
-            _tile(
-              isDark,
-              icon: Icons.bolt_rounded,
-              title: cart.selectedDeliverySlot,
-              subtitle: 'Dropped at your door by our rider',
-            ),
-            const SizedBox(height: 24),
-
             _sectionTitle('Payment method', isDark),
             const SizedBox(height: 10),
             _PayTile(label: 'UPI / Google Pay', value: 'UPI', icon: Icons.qr_code_rounded, group: _method, onTap: _set),
@@ -124,35 +122,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
       ));
 
-  Widget _tile(bool isDark, {required IconData icon, required String title, required String subtitle}) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : AppColors.surface,
-        borderRadius: AppRadius.brMd,
-        border: Border.all(color: isDark ? AppColors.dividerDark : AppColors.divider),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.primary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: AppTypography.labelLarge(
-                  isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                )),
-                Text(subtitle, style: AppTypography.bodySmall(
-                  isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                )),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _AddressCard extends StatelessWidget {

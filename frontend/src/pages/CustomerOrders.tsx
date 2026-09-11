@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SEO } from '../components/SEO';
 import { useCartWishlist } from '../context/CartWishlistContext';
 import { useCMS } from '../context/CMSContext';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useSmartBack } from '../hooks/useSmartBack';
+import { downloadInvoice } from '../utils/invoice';
 import { 
   Package, 
   Clock, 
@@ -19,7 +20,9 @@ import {
   MessageSquare,
   Copy,
   Check,
-  FileText
+  FileText,
+  SlidersHorizontal,
+  ChevronDown
 } from 'lucide-react';
 
 interface OrderItem {
@@ -55,6 +58,8 @@ interface MockOrder {
   totalAmount: number;
   deliveryAddress: string;
   paymentMethod: string;
+  paymentStatus?: string;
+  orderId?: string;
   trackingTimeline?: TimelineEntry[];
   createdAt?: string;
 }
@@ -81,6 +86,15 @@ export const CustomerOrders: React.FC = () => {
   const userPhoneKey = customerUser?.phone ? customerUser.phone.replace(/\D/g, '') : 'default';
 
   const [filter, setFilter] = useState<'All' | 'In Transit' | 'Delivered' | 'Cancelled'>('All');
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const onClickOutside = (e: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) setFilterOpen(false);
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, []);
   const [orders, setOrders] = useState<MockOrder[]>(() => {
     const cached = localStorage.getItem(`customer_orders_${userPhoneKey}`);
     if (cached) return JSON.parse(cached);
@@ -89,6 +103,8 @@ export const CustomerOrders: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<MockOrder | null>(null);
   const [copied, setCopied] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [switchingPayment, setSwitchingPayment] = useState(false);
+  const [switchPaymentError, setSwitchPaymentError] = useState<string | null>(null);
   // Only show the loading skeleton on a genuine first fetch (no cached
   // orders to render yet) — avoids a jarring "No orders found" flash
   // before the real orders arrive for a customer opening this on a new device.
@@ -98,6 +114,18 @@ export const CustomerOrders: React.FC = () => {
   const { products } = useCMS();
   const navigate = useNavigate();
   const goBack = useSmartBack('/');
+
+  // Lazy-load the Razorpay SDK — only "Switch to UPI / Card" needs it, and it
+  // may not have been loaded yet if the customer didn't check out on this tab.
+  React.useEffect(() => {
+    if (!window.Razorpay && !document.getElementById('rzp-checkout-js')) {
+      const script = document.createElement('script');
+      script.id = 'rzp-checkout-js';
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
 
   React.useEffect(() => {
     if (customerUser?.phone) {
@@ -125,6 +153,136 @@ export const CustomerOrders: React.FC = () => {
     navigator.clipboard.writeText(id);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownloadInvoice = (order: MockOrder) => {
+    downloadInvoice({
+      orderNumber: order.orderNumber,
+      orderPlacedAt: order.orderPlacedAt,
+      createdAt: order.createdAt,
+      items: order.items.map((it: any) => ({
+        name: it.name,
+        weightSpec: it.weightSpec,
+        price: Number(it.price || it.unitPrice || 0),
+        mrp: Number(it.mrp || it.originalPrice || 0),
+        qty: Number(it.qty || it.quantity || 1),
+      })),
+      itemTotal: Number(order.itemTotal || 0),
+      itemTotalMrp: Number(order.itemTotalMrp || 0),
+      deliveryFee: Number(order.deliveryFee || 0),
+      handlingFee: Number(order.handlingFee || 0),
+      totalAmount: Number(order.totalAmount || 0),
+      deliveryAddress: order.deliveryAddress,
+      paymentMethod: order.paymentMethod,
+    });
+  };
+
+  /** A still-unpaid COD order (not yet Delivered/Cancelled) can switch to a
+   * prepaid method. Mirrors the same gating in the mobile app. */
+  const canSwitchToPrepaid = (order: MockOrder) => {
+    const isCod = /cod|cash/i.test(order.paymentMethod || '');
+    const isPaid = (order.paymentStatus || '').toLowerCase() === 'paid';
+    return isCod && !isPaid && bucketOf(order.status) !== 'Delivered' && bucketOf(order.status) !== 'Cancelled';
+  };
+
+  /** Runs the same Razorpay create-order → checkout → verify flow as
+   * CheckoutModal, but against an *existing* order — `paymentMethod` on the
+   * verify call switches the order's stored payment method server-side, so
+   * the admin console (which reads the same Order document) reflects it too. */
+  const handleSwitchToPrepaid = async (order: MockOrder) => {
+    if (switchingPayment) return;
+    const id = order.orderId || order.orderNumber || order.id;
+    setSwitchingPayment(true);
+    setSwitchPaymentError(null);
+    try {
+      const co = await fetch('/api/payment/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: order.totalAmount, receipt: id }),
+      }).then((r) => r.json());
+      if (!co?.success) throw new Error(co?.message || 'Could not start the payment.');
+      const { key, orderId: rzpOrderId, amount, currency, testMode } = co;
+
+      const applyPaid = (order: MockOrder): MockOrder => ({
+        ...order,
+        paymentMethod: 'Razorpay UPI/Card',
+        paymentStatus: 'Paid',
+      });
+      const onVerified = () => {
+        setOrders((prev) => {
+          const next = prev.map((o) => (o.id === order.id ? applyPaid(o) : o));
+          localStorage.setItem(`customer_orders_${userPhoneKey}`, JSON.stringify(next));
+          return next;
+        });
+        setSelectedOrder((prev) => (prev && prev.id === order.id ? applyPaid(prev) : prev));
+        setSwitchingPayment(false);
+      };
+
+      // Local-dev path: backend in test mode with no usable key — skip the sheet.
+      if (testMode && !key) {
+        await fetch('/api/payment/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            razorpay_order_id: rzpOrderId,
+            razorpay_payment_id: `pay_sim_${Date.now()}`,
+            razorpay_signature: 'simulated',
+            orderId: id,
+            paymentMethod: 'Razorpay UPI/Card',
+          }),
+        });
+        onVerified();
+        return;
+      }
+
+      let waited = 0;
+      while (!window.Razorpay && waited < 5000) {
+        await new Promise((res) => setTimeout(res, 150));
+        waited += 150;
+      }
+      if (!window.Razorpay) throw new Error('Payment could not load. Check your connection and retry.');
+
+      const rzp = new window.Razorpay({
+        key,
+        order_id: rzpOrderId,
+        amount,
+        currency: currency || 'INR',
+        name: 'FreshCart',
+        description: `Order ${id}`,
+        image: '/logo.png',
+        prefill: {
+          name: customerUser?.name || '',
+          contact: userPhoneKey,
+          email: customerUser?.email || '',
+        },
+        theme: { color: '#2E7D32' },
+        handler: async (resp: any) => {
+          try {
+            const v = await fetch('/api/payment/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpay_order_id: resp.razorpay_order_id,
+                razorpay_payment_id: resp.razorpay_payment_id,
+                razorpay_signature: resp.razorpay_signature,
+                orderId: id,
+                paymentMethod: 'Razorpay UPI/Card',
+              }),
+            }).then((r) => r.json());
+            if (!v?.verified) throw new Error('Could not verify your payment.');
+            onVerified();
+          } catch (e: any) {
+            setSwitchingPayment(false);
+            setSwitchPaymentError(e?.message || 'Could not verify your payment.');
+          }
+        },
+        modal: { ondismiss: () => setSwitchingPayment(false) },
+      });
+      rzp.open();
+    } catch (e: any) {
+      setSwitchingPayment(false);
+      setSwitchPaymentError(e?.message || 'Could not start the payment. Please try again.');
+    }
   };
 
   const handleCancelOrder = async (order: MockOrder) => {
@@ -404,7 +562,7 @@ export const CustomerOrders: React.FC = () => {
                 <div className="pt-3 flex justify-end">
                   <button
                     type="button"
-                    onClick={() => alert(`Downloading Invoice for Order #${selectedOrder.orderNumber}...`)}
+                    onClick={() => handleDownloadInvoice(selectedOrder)}
                     className="bg-[#F3E8FF] hover:bg-[#E9D5FF] text-[#8E24AA] font-extrabold text-xs px-5 py-2.5 rounded-xl transition-colors cursor-pointer shadow-2xs"
                   >
                     Download Invoice / Credit Note
@@ -454,6 +612,29 @@ export const CustomerOrders: React.FC = () => {
               <span className="font-semibold text-gray-900">{selectedOrder.orderArrivedAt}</span>
             </div>
           )}
+
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-gray-500 font-semibold">Payment Method</span>
+            <span className="font-semibold text-gray-900">
+              {selectedOrder.paymentMethod || 'Payment'}
+              {selectedOrder.paymentStatus ? ` · ${selectedOrder.paymentStatus}` : ''}
+            </span>
+            {canSwitchToPrepaid(selectedOrder) && (
+              <div className="pt-1.5">
+                <button
+                  type="button"
+                  disabled={switchingPayment}
+                  onClick={() => handleSwitchToPrepaid(selectedOrder)}
+                  className="inline-flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-[#2E7D32] disabled:opacity-60 px-4 py-2 rounded-xl text-xs font-extrabold transition-colors cursor-pointer"
+                >
+                  {switchingPayment ? 'Processing…' : 'Switch to UPI / Card'}
+                </button>
+                {switchPaymentError && (
+                  <p className="text-[11px] text-rose-600 font-medium mt-1.5">{switchPaymentError}</p>
+                )}
+              </div>
+            )}
+          </div>
 
           {canCancelOrder(selectedOrder.status) && (
             <div className="pt-2">
@@ -514,21 +695,50 @@ export const CustomerOrders: React.FC = () => {
           </button>
         </div>
 
-        {/* Category Filter Tabs */}
-        <div className="w-full max-w-[900px] mx-auto flex items-center gap-2 overflow-x-auto pt-3 scrollbar-none">
-          {(['All', 'In Transit', 'Delivered', 'Cancelled'] as const).map((tab) => (
+        {/* Status filter */}
+        <div className="w-full max-w-[900px] mx-auto pt-3">
+          <div className="relative inline-block" ref={filterRef}>
             <button
-              key={tab}
-              onClick={() => setFilter(tab)}
-              className={`px-4 py-1.5 rounded-full text-xs font-extrabold transition-all cursor-pointer shrink-0 ${
-                filter === tab
-                  ? 'bg-gray-900 text-white shadow-2xs'
-                  : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-              }`}
+              onClick={() => setFilterOpen((o) => !o)}
+              className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-extrabold text-xs px-4 py-2 rounded-full transition-colors cursor-pointer"
             >
-              {tab === 'All' ? 'All Orders' : tab}
+              <SlidersHorizontal size={13} />
+              <span>{filter === 'All' ? 'All Orders' : filter}</span>
+              <ChevronDown size={14} className={`transition-transform duration-200 ${filterOpen ? 'rotate-180' : ''}`} />
             </button>
-          ))}
+            <AnimatePresence>
+              {filterOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute left-0 top-full mt-2 w-48 bg-white rounded-xl border border-gray-200 shadow-xl py-1.5 z-20"
+                >
+                  {(['In Transit', 'Delivered', 'Cancelled'] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => { setFilter(tab); setFilterOpen(false); }}
+                      className={`w-full text-left px-4 py-2.5 text-xs font-bold cursor-pointer transition-colors ${
+                        filter === tab ? 'text-emerald-700 bg-emerald-50' : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                  <div className="my-1 border-t border-gray-100" />
+                  <button
+                    onClick={() => { setFilter('All'); setFilterOpen(false); }}
+                    className={`w-full text-left px-4 py-2.5 text-xs font-bold cursor-pointer transition-colors ${
+                      filter === 'All' ? 'text-emerald-700 bg-emerald-50' : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    All Orders
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </header>
 
@@ -667,7 +877,7 @@ export const CustomerOrders: React.FC = () => {
 
                   <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     <button
-                      onClick={() => alert(`Downloading Invoice for ${order.orderNumber}...`)}
+                      onClick={() => handleDownloadInvoice(order)}
                       className="flex items-center gap-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 font-extrabold text-xs px-3.5 py-2 rounded-xl transition-colors cursor-pointer"
                     >
                       <Download size={13} />

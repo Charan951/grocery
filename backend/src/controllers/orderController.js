@@ -12,7 +12,7 @@ import { Coupon, Offer, Payment, WalletTransaction } from '../models/Finance.js'
 import { FestivalCampaign } from '../models/FestivalCampaign.js';
 import { Review, Notification, CMSPage, Blog, Settings, AuditLog, SupportTicket } from '../models/Operations.js';
 import { uploadToCloudinary } from '../config/cloudinary.js';
-import { cancelForOrder, tryAssign } from '../services/assignmentService.js';
+import { cancelForOrder, completeForOrder, tryAssign } from '../services/assignmentService.js';
 import { sendDeliveryCredentials } from '../services/mailService.js';
 import { registerDeviceToken, removeDeviceToken, sendToOwner } from '../services/pushService.js';
 import { signToken, maskPhone, isPaymentsTestMode, razorpayInstance, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, logAudit } from './_shared.js';
@@ -42,7 +42,10 @@ export const orderController = {
   getCustomerOrders: async (req, res) => {
     try {
       const { phone } = req.params;
-      const list = await Order.find({ customerPhone: phone }).sort({ createdAt: -1 });
+      const phone10 = String(phone || '').replace(/\D/g, '').slice(-10);
+      const list = await Order.find(
+        phone10 ? { customerPhone: new RegExp(phone10 + '$') } : { customerPhone: phone }
+      ).sort({ createdAt: -1 });
       res.json({ success: true, orders: list });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
@@ -88,7 +91,10 @@ export const orderController = {
       if (!(isOwner && REVEAL.includes(order.status))) delete view.deliveryOtp;
       if (!isOwner) view.customerPhone = maskPhone(order.customerPhone);
 
-      // Rider tracking block for the customer map — masked until the reveal window.
+      // Rider tracking block for the customer map. Identity + live position are
+      // shown from the moment a partner is assigned (so tracking starts the
+      // instant the offer is accepted); the dialable phone number and OTP stay
+      // masked until the order is actually out for delivery.
       if (order.deliveryPartnerUserId && !['Delivered', 'Cancelled', 'Returned', 'Refunded'].includes(order.status)) {
         const partner = await DeliveryPartner.findOne({ userId: order.deliveryPartnerUserId }).lean();
         const revealed = REVEAL.includes(order.status);
@@ -101,10 +107,10 @@ export const orderController = {
           revealed,
           vehicleType: partner?.vehicleType || null,
           rating: partner?.rating ?? null,
-          location: revealed && partner?.currentLocation?.coordinates
+          location: partner?.currentLocation?.coordinates
             ? { lat: partner.currentLocation.coordinates[1], lng: partner.currentLocation.coordinates[0] }
             : null,
-          locationUpdatedAt: revealed ? partner?.locationUpdatedAt || null : null,
+          locationUpdatedAt: partner?.locationUpdatedAt || null,
         };
       }
       view.pickup = view.pickup || null;
@@ -149,12 +155,22 @@ export const orderController = {
       const validatedItems = await Promise.all(
         rawItems.map(async (it) => {
           const prodId = String(it.productId || it.id || 'p_1');
+          const prodIdIsObjectId = mongoose.Types.ObjectId.isValid(prodId);
           let dbProduct = null;
-          if (mongoose.Types.ObjectId.isValid(prodId)) {
+          if (prodIdIsObjectId) {
             dbProduct = await Product.findById(prodId);
           }
           if (!dbProduct) {
-            dbProduct = await Product.findOne({ $or: [{ id: prodId }, { _id: prodId }] });
+            // Only match `_id` when prodId is actually a valid ObjectId —
+            // otherwise Mongoose throws a CastError on this query (the `_id`
+            // field's type is ObjectId even inside $or), which used to abort
+            // the whole order silently. A placeholder id like 'p_1' (the
+            // client's fallback when a cart item has no real product id)
+            // must fall through to a price-from-request order line instead
+            // of crashing order creation entirely.
+            dbProduct = await Product.findOne({
+              $or: [{ id: prodId }, ...(prodIdIsObjectId ? [{ _id: prodId }] : [])],
+            });
           }
 
           const basePrice = dbProduct ? Number(dbProduct.price || 50) : Number(it.price || 50);
@@ -239,33 +255,34 @@ export const orderController = {
         ];
       }
 
-      let order;
-      try {
-        order = await Order.create(normalizedOrder);
-        // Reconciliation record (best-effort).
-        Payment.create({
-          transactionId: normalizedOrder.paymentId || `txn_${normalizedOrder.orderId}`,
-          orderId: normalizedOrder.orderId,
-          customerId: normalizedOrder.customerId,
-          amount: normalizedOrder.totalAmount,
-          status: normalizedOrder.paymentStatus === 'Paid' ? 'Success' : 'Pending',
-          gateway: normalizedOrder.paymentMethod?.toLowerCase().includes('wallet') ? 'Wallet' : 'Razorpay',
-        }).catch(() => {});
-        if (normalizedOrder.items && Array.isArray(normalizedOrder.items)) {
-          for (const item of normalizedOrder.items) {
-            if (item.productId) {
-              // Product.stock is an object { status, quantity } — decrement the
-              // nested quantity, not the object itself.
-              await Product.updateOne(
-                { id: item.productId },
-                { $inc: { 'stock.quantity': -Number(item.quantity || 0) } }
-              ).catch(() => { });
-            }
+      // An order that isn't actually persisted must never be reported as a
+      // success — the customer has paid (or committed to COD) and the admin
+      // console reads straight from the DB, so a swallowed write here means a
+      // paid order that silently doesn't exist anywhere. Let a DB failure
+      // propagate to the outer catch as a real error instead of faking a
+      // 201 with an unsaved mock order.
+      const order = await Order.create(normalizedOrder);
+
+      // Reconciliation record (best-effort — doesn't gate the order itself).
+      Payment.create({
+        transactionId: normalizedOrder.paymentId || `txn_${normalizedOrder.orderId}`,
+        orderId: normalizedOrder.orderId,
+        customerId: normalizedOrder.customerId,
+        amount: normalizedOrder.totalAmount,
+        status: normalizedOrder.paymentStatus === 'Paid' ? 'Success' : 'Pending',
+        gateway: normalizedOrder.paymentMethod?.toLowerCase().includes('wallet') ? 'Wallet' : 'Razorpay',
+      }).catch(() => {});
+      if (normalizedOrder.items && Array.isArray(normalizedOrder.items)) {
+        for (const item of normalizedOrder.items) {
+          if (item.productId) {
+            // Product.stock is an object { status, quantity } — decrement the
+            // nested quantity, not the object itself.
+            await Product.updateOne(
+              { id: item.productId },
+              { $inc: { 'stock.quantity': -Number(item.quantity || 0) } }
+            ).catch(() => { });
           }
         }
-      } catch (dbErr) {
-        console.warn('Order DB create note:', dbErr.message);
-        order = { ...normalizedOrder, _id: 'ord_mock_' + Date.now() };
       }
 
       const io = req.app.get('io');
@@ -281,8 +298,8 @@ export const orderController = {
 
       res.status(201).json({ success: true, order });
     } catch (err) {
-      console.warn('createOrder fallback note:', err.message);
-      res.status(201).json({ success: true, order: { orderId: 'PNNHJHTYP' + Date.now(), status: 'In Transit' } });
+      console.error('createOrder failed — order NOT saved:', err.message);
+      res.status(500).json({ success: false, message: 'Could not place your order. Please try again.' });
     }
   },
 
@@ -460,6 +477,14 @@ export const orderController = {
         await cancelForOrder(order.orderId, `order ${status.toLowerCase()}`).catch(() => {});
         order.deliveryPartnerUserId = undefined;
         order.assignmentId = undefined;
+      }
+
+      // Admin marking Delivered/Failed directly (bypassing the partner app's
+      // own completion flow) must still free the partner — otherwise the
+      // order stays stuck in their activeOrderIds and they can never go
+      // offline again even though the order shows as finished.
+      if (['Delivered', 'Failed'].includes(status) && order.deliveryPartnerUserId) {
+        await completeForOrder(order.orderId, status).catch(() => {});
       }
 
       await order.save();

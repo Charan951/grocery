@@ -31,9 +31,7 @@ class PushService {
       FirebaseMessaging.onMessageOpenedApp.listen(_handleTap);
       final initial = await m.getInitialMessage();
       if (initial != null) _handleTap(initial);
-    } catch (e) {
-      if (kDebugMode) debugPrint('[push] init skipped: $e');
-    }
+    } catch (_) {}
   }
 
   void _handleTap(RemoteMessage msg) {

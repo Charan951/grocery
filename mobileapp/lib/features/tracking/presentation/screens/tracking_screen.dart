@@ -98,50 +98,71 @@ class TrackingScreen extends ConsumerWidget {
                             ),
                           ),
                         ),
-                      Positioned(
-                        top: 20,
-                        left: 20,
-                        right: 20,
-                        child: GlassCard(
-                          padding: const EdgeInsets.all(16),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Estimated arrival',
-                                    style: AppTypography.bodySmall(
-                                      isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${t.etaMinutes} min',
-                                    style: AppTypography.h2(
-                                      isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                                    ).copyWith(fontSize: 18),
-                                  ),
-                                ],
-                              ),
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withOpacity(0.12),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.electric_bolt_rounded,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
                     ],
                   ),
+                ),
+              ),
+            ),
+
+            // Estimated arrival — sits below the map, driven live by
+            // `t.etaMinutes` (updated from the rider-location/status socket
+            // streams in TrackingNotifier, not a fixed value).
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: GlassCard(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.electric_bolt_rounded,
+                        color: AppColors.primary,
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Estimated arrival',
+                            style: AppTypography.bodySmall(
+                              isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            bucket == OrderStatus.delivered ? 'Delivered' : '${t.etaMinutes} min',
+                            style: AppTypography.h2(
+                              isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                            ).copyWith(fontSize: 18),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: t.connected ? AppColors.primary : AppColors.warning,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      t.connected ? 'Live' : 'Reconnecting',
+                      style: AppTypography.labelSmall(
+                        t.connected ? AppColors.primaryText : AppColors.warningText,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -215,6 +236,104 @@ class TrackingScreen extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(height: 24),
+
+                      if (t.items.isNotEmpty) ...[
+                        Text(
+                          'Order details',
+                          style: AppTypography.title(
+                            isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        GlassCard(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          child: Column(
+                            children: [
+                              for (final item in t.items) ...[
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 26,
+                                        height: 26,
+                                        alignment: Alignment.center,
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primary.withOpacity(0.10),
+                                          borderRadius: BorderRadius.circular(7),
+                                        ),
+                                        child: Text(
+                                          '${item.quantity}',
+                                          style: AppTypography.labelSmall(AppColors.primary)
+                                              .copyWith(fontWeight: FontWeight.w700),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              item.product.name,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: AppTypography.bodyMedium(
+                                                isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                                              ),
+                                            ),
+                                            if (item.selectedWeight.isNotEmpty)
+                                              Text(
+                                                item.selectedWeight,
+                                                style: AppTypography.bodySmall(
+                                                  isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        '₹${item.totalPrice.toStringAsFixed(0)}',
+                                        style: AppTypography.labelLarge(
+                                          isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (item != t.items.last)
+                                  Divider(
+                                    height: 1,
+                                    color: isDark ? Colors.white10 : Colors.black.withOpacity(0.06),
+                                  ),
+                              ],
+                              Divider(
+                                height: 1,
+                                color: isDark ? Colors.white10 : Colors.black.withOpacity(0.06),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Order total',
+                                      style: AppTypography.labelLarge(
+                                        isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                                      ),
+                                    ),
+                                    Text(
+                                      '₹${t.total.toStringAsFixed(0)}',
+                                      style: AppTypography.title(AppColors.primary),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
 
                       Text(
                         'Order progress',

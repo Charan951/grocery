@@ -57,6 +57,8 @@ class CheckoutController extends StateNotifier<CheckoutState> {
   Future<void> submit({
     required PaymentMethod method,
     required String address,
+    double? lat,
+    double? lng,
   }) async {
     if (state.isProcessing) return;
 
@@ -152,6 +154,8 @@ class CheckoutController extends StateNotifier<CheckoutState> {
             tax: cart.taxAmount,
             total: total,
             address: address,
+            lat: lat,
+            lng: lng,
             paymentMethod: paymentLabel,
             paid: paid,
             paymentId: paymentId,

@@ -427,16 +427,22 @@ class ApiService {
   }
 
   /// `POST /api/payment/verify` → `{ verified: bool, testMode: bool }`.
+  /// [orderId] + [paymentMethod] let this also switch an existing order's
+  /// payment method (e.g. COD → UPI) once the payment is verified.
   Future<Map<String, dynamic>> verifyPayment({
     String? razorpayOrderId,
     String? paymentId,
     String? signature,
+    String? orderId,
+    String? paymentMethod,
   }) async {
     try {
       final body = <String, dynamic>{};
       if (razorpayOrderId != null) body['razorpay_order_id'] = razorpayOrderId;
       if (paymentId != null) body['razorpay_payment_id'] = paymentId;
       if (signature != null) body['razorpay_signature'] = signature;
+      if (orderId != null) body['orderId'] = orderId;
+      if (paymentMethod != null) body['paymentMethod'] = paymentMethod;
       final res = await _dio.post('/payment/verify', data: body);
       return Map<String, dynamic>.from(res.data as Map);
     } on DioException catch (e) {

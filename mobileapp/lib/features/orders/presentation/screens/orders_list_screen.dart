@@ -8,6 +8,7 @@ import 'package:freshcart/core/theme/app_typography.dart';
 import 'package:freshcart/core/widgets/app_toast.dart';
 import 'package:freshcart/core/widgets/feedback_states.dart';
 import 'package:freshcart/core/widgets/skeletons.dart';
+import 'package:freshcart/core/widgets/tab_back_button.dart';
 import 'package:freshcart/features/cart/presentation/controllers/cart_controller.dart';
 import 'package:freshcart/features/orders/data/models/order_model.dart';
 import 'package:freshcart/features/orders/presentation/controllers/orders_controller.dart';
@@ -74,6 +75,7 @@ class _OrdersListScreenState extends ConsumerState<OrdersListScreen> {
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
       appBar: AppBar(
+        leading: const TabBackButton(),
         title: const Text('Orders'),
         centerTitle: false,
         scrolledUnderElevation: 0,
@@ -131,6 +133,8 @@ class _OrdersListScreenState extends ConsumerState<OrdersListScreen> {
   }
 }
 
+/// A single filter control (not a row of tabs) — matches the web orders page.
+/// Defaults to "All", with the three real status filters plus a reset to All.
 class _TabBar extends StatelessWidget {
   final _OrdersTab current;
   final bool isDark;
@@ -139,29 +143,51 @@ class _TabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          for (final t in _OrdersTab.values)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: ChoiceChip(
-                label: Text(t.label),
-                selected: t == current,
-                onSelected: (_) => onSelect(t),
-                showCheckmark: false,
-                labelStyle: AppTypography.labelMedium(
-                  t == current
-                      ? Colors.white
-                      : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondary),
-                ),
-                selectedColor: AppColors.primary,
-                backgroundColor: isDark ? AppColors.surfaceDark : AppColors.surface,
-                side: BorderSide(color: isDark ? AppColors.dividerDark : AppColors.divider),
+    final fg = isDark ? AppColors.textPrimaryDark : AppColors.textPrimary;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: PopupMenuButton<_OrdersTab>(
+        initialValue: current,
+        onSelected: onSelect,
+        offset: const Offset(0, 44),
+        color: isDark ? AppColors.surfaceDark : AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.brMd, side: BorderSide(color: isDark ? AppColors.dividerDark : AppColors.divider)),
+        itemBuilder: (context) => [
+          for (final t in _OrdersTab.values.where((t) => t != _OrdersTab.all))
+            PopupMenuItem(
+              value: t,
+              child: Text(
+                t.label,
+                style: AppTypography.labelMedium(t == current ? AppColors.primary : fg),
               ),
             ),
+          const PopupMenuDivider(height: 9),
+          PopupMenuItem(
+            value: _OrdersTab.all,
+            child: Text(
+              'All Orders',
+              style: AppTypography.labelMedium(current == _OrdersTab.all ? AppColors.primary : fg),
+            ),
+          ),
         ],
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.surfaceDark : AppColors.surface,
+            borderRadius: AppRadius.brPill,
+            border: Border.all(color: isDark ? AppColors.dividerDark : AppColors.divider),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.tune_rounded, size: 15, color: fg),
+              const SizedBox(width: 7),
+              Text(current == _OrdersTab.all ? 'All Orders' : current.label, style: AppTypography.labelMedium(fg)),
+              const SizedBox(width: 4),
+              Icon(Icons.keyboard_arrow_down_rounded, size: 17, color: fg),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Delivery-partner app theme, pinned 1:1 to the web rider console
-/// (`frontend/src/partner/ui.tsx` + the `--admin-*` tokens): the FreshCart
-/// "control tower" identity — Space Grotesk display, IBM Plex Sans body,
-/// deep-forest ink chrome on warm ledger paper, one emerald signal green.
+/// Delivery-partner app theme: the FreshCart "control tower" identity —
+/// Rubik display / Nunito Sans body (matching the admin console type
+/// scale), deep-forest ink chrome on warm ledger paper, one emerald
+/// signal green.
 
 // ── Ink chrome (dark) ────────────────────────────────────────────────────
 const kInk = Color(0xFF0F2A1B); // sidebar / slide-control ground
@@ -12,7 +12,7 @@ const kInkSoft = Color(0xFF17402A); // hover / active on ink
 const kInkLine = Color(0xFF234F35); // hairline on ink
 
 // ── Paper surfaces (light) ───────────────────────────────────────────────
-const kPaper = Color(0xFFF5F5F0); // scaffold canvas, warm
+const kPaper = Color(0xFFF7FAF8); // scaffold canvas (matches Home)
 const kSurface = Color(0xFFFFFFFF); // cards / sheets
 const kLedgerLine = Color(0xFFE4E1D5); // hairline divider on paper
 const kText = Color(0xFF171B16); // primary ink text
@@ -39,8 +39,8 @@ ThemeData buildTheme() {
     error: kRed,
   ).copyWith(surfaceTint: Colors.transparent);
 
-  final display = GoogleFonts.spaceGrotesk();
-  final body = GoogleFonts.ibmPlexSansTextTheme(
+  final display = GoogleFonts.rubik();
+  final body = GoogleFonts.nunitoSansTextTheme(
     ThemeData(brightness: Brightness.light).textTheme,
   ).apply(bodyColor: kText, displayColor: kText);
 
@@ -56,11 +56,11 @@ ThemeData buildTheme() {
       labelLarge: body.labelLarge?.copyWith(fontWeight: FontWeight.w700),
     ),
     appBarTheme: AppBarTheme(
-      backgroundColor: kPaper,
-      surfaceTintColor: Colors.transparent,
+      backgroundColor: kSurface,
+      surfaceTintColor: kSurface,
       foregroundColor: kText,
       elevation: 0,
-      scrolledUnderElevation: 0,
+      scrolledUnderElevation: 0.5,
       centerTitle: false,
       titleTextStyle: display.copyWith(fontWeight: FontWeight.w700, fontSize: 18, color: kText, letterSpacing: -0.2),
       shape: const Border(bottom: BorderSide(color: kLedgerLine)),
@@ -83,7 +83,7 @@ ThemeData buildTheme() {
         disabledBackgroundColor: kGreen.withValues(alpha: 0.4),
         minimumSize: const Size.fromHeight(50),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        textStyle: GoogleFonts.ibmPlexSans(fontWeight: FontWeight.w700, fontSize: 14),
+        textStyle: GoogleFonts.nunitoSans(fontWeight: FontWeight.w700, fontSize: 14),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -92,11 +92,11 @@ ThemeData buildTheme() {
         minimumSize: const Size.fromHeight(50),
         side: const BorderSide(color: kLedgerLine),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        textStyle: GoogleFonts.ibmPlexSans(fontWeight: FontWeight.w700, fontSize: 14),
+        textStyle: GoogleFonts.nunitoSans(fontWeight: FontWeight.w700, fontSize: 14),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
-      style: TextButton.styleFrom(foregroundColor: kGreen, textStyle: GoogleFonts.ibmPlexSans(fontWeight: FontWeight.w600)),
+      style: TextButton.styleFrom(foregroundColor: kGreen, textStyle: GoogleFonts.nunitoSans(fontWeight: FontWeight.w600)),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
@@ -135,7 +135,7 @@ ThemeData buildTheme() {
         (s) => IconThemeData(size: 22, color: s.contains(WidgetState.selected) ? kGreen : kTextFaint),
       ),
       labelTextStyle: WidgetStateProperty.resolveWith(
-        (s) => GoogleFonts.ibmPlexSans(
+        (s) => GoogleFonts.nunitoSans(
           fontSize: 11,
           fontWeight: FontWeight.w700,
           color: s.contains(WidgetState.selected) ? kGreen : kTextFaint,
@@ -144,7 +144,7 @@ ThemeData buildTheme() {
     ),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: kInk,
-      contentTextStyle: GoogleFonts.ibmPlexSans(color: Colors.white, fontSize: 13),
+      contentTextStyle: GoogleFonts.nunitoSans(color: Colors.white, fontSize: 13),
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),

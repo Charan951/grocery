@@ -82,7 +82,6 @@ export const CategoriesModule: React.FC = () => {
       } catch (err) {
         console.warn('Backend update skipped, saved locally');
       }
-      alert('Category updated successfully!');
     } else {
       // Add Mode
       const catId = 'cat_' + cName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '');
@@ -109,14 +108,11 @@ export const CategoriesModule: React.FC = () => {
         const data = await res.json();
         if (data.success) {
           addCategory(data.category || catData);
-          alert(`Category '${cName}' created successfully on backend!`);
         } else {
           addCategory(catData);
-          alert(`Category '${cName}' saved locally!`);
         }
       } catch (err) {
         addCategory(catData);
-        alert(`Category '${cName}' added locally! (Offline mode)`);
       }
     }
 
@@ -136,14 +132,11 @@ export const CategoriesModule: React.FC = () => {
       const data = await res.json();
       if (data.success) {
         deleteCategory(id);
-        alert('Category deleted successfully on backend!');
       } else {
         deleteCategory(id);
-        alert('Category deleted locally!');
       }
     } catch (err) {
       deleteCategory(id);
-      alert('Category deleted locally! (Offline mode)');
     }
   };
 
@@ -206,7 +199,7 @@ export const CategoriesModule: React.FC = () => {
       <div className="flex justify-between items-center pb-3 border-b border-divider">
         <div>
           <h2 className="font-extrabold text-sm text-text-primary">Categories Directory</h2>
-          <p className="text-[10px] text-text-secondary font-medium">Manage product departments and hierarchy</p>
+          <p className="text-[11px] text-text-secondary font-medium">Manage product departments and hierarchy</p>
         </div>
         <button onClick={handleOpenAdd} className="flex items-center gap-1 bg-primary text-white font-bold py-2 px-5 rounded-full text-xs hover:bg-secondary transition-colors cursor-pointer shadow-md">
           <Plus size={14} /> Add Category
@@ -239,7 +232,7 @@ export const CategoriesModule: React.FC = () => {
 
             <div className="flex flex-col gap-4">
               <div>
-                <label className="text-[11px] font-bold text-text-secondary uppercase mb-1.5 block">Department Name</label>
+                <label className="text-xs font-bold text-text-secondary uppercase mb-1.5 block">Department Name</label>
                 <input
                   type="text"
                   placeholder="e.g. Dairy, Bread & Eggs"
@@ -247,11 +240,11 @@ export const CategoriesModule: React.FC = () => {
                   onChange={(e) => setCName(e.target.value)}
                   className="w-full px-4 py-2.5 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary font-semibold"
                 />
-                <p className="text-[10px] text-text-tertiary font-medium mt-1">Internal name used across the admin panel and URLs.</p>
+                <p className="text-[11px] text-text-tertiary font-medium mt-1">Internal name used across the admin panel and URLs.</p>
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-text-secondary uppercase mb-1.5 block">Display Name (shown on Home page & app bar)</label>
+                <label className="text-xs font-bold text-text-secondary uppercase mb-1.5 block">Display Name (shown on Home page & app bar)</label>
                 <input
                   type="text"
                   placeholder="Leave blank to use the department name above"
@@ -259,11 +252,11 @@ export const CategoriesModule: React.FC = () => {
                   onChange={(e) => setCDisplayName(e.target.value)}
                   className="w-full px-4 py-2.5 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary font-semibold"
                 />
-                <p className="text-[10px] text-text-tertiary font-medium mt-1">A shorter or customer-friendly label customers see on the Home page and top nav bar.</p>
+                <p className="text-[11px] text-text-tertiary font-medium mt-1">A shorter or customer-friendly label customers see on the Home page and top nav bar.</p>
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-text-secondary uppercase mb-1.5 block">Background Colour (app bar & home page icon)</label>
+                <label className="text-xs font-bold text-text-secondary uppercase mb-1.5 block">Background Colour (app bar & home page icon)</label>
                 <div className="flex items-center gap-3">
                   <input
                     type="color"
@@ -279,11 +272,11 @@ export const CategoriesModule: React.FC = () => {
                     className="flex-1 px-4 py-2.5 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary font-semibold uppercase"
                   />
                 </div>
-                <p className="text-[10px] text-text-tertiary font-medium mt-1">Tint shown behind this category's icon in the app bar and Home page rail.</p>
+                <p className="text-[11px] text-text-tertiary font-medium mt-1">Tint shown behind this category's icon in the app bar and Home page rail.</p>
               </div>
 
               <div className="flex flex-col gap-2">
-                <label className="text-[11px] font-bold text-text-secondary uppercase">Category Icon / Image (Cloudinary or URL)</label>
+                <label className="text-xs font-bold text-text-secondary uppercase">Category Icon / Image (Cloudinary or URL)</label>
                 <div className="flex gap-2 items-center">
                   <input 
                     type="text" 
@@ -306,7 +299,6 @@ export const CategoriesModule: React.FC = () => {
                             try {
                               const uploadedUrl = await uploadImage(reader.result as string, 'freshcart/categories');
                               setCIcon(uploadedUrl);
-                              alert('✅ Category image uploaded to Cloudinary!');
                             } catch (err: any) {
                               alert('❌ Upload Error: ' + err.message);
                             }
@@ -321,7 +313,7 @@ export const CategoriesModule: React.FC = () => {
                 {/* Big Live Image Preview (100x148px 25:37) */}
                 {cIcon && (cIcon.startsWith('http') || cIcon.startsWith('data:') || cIcon.startsWith('/')) && (
                   <div className="mt-2 flex items-center justify-between p-4 bg-background rounded-2xl border border-divider">
-                    <span className="text-[11px] font-bold text-text-secondary uppercase">Big Preview (100 × 148 px):</span>
+                    <span className="text-xs font-bold text-text-secondary uppercase">Big Preview (100 × 148 px):</span>
                     <div className="w-[100px] h-[148px] min-w-[100px] min-h-[148px] rounded-2xl border border-divider overflow-hidden bg-surface p-1 shadow-md flex items-center justify-center">
                       <img 
                         src={cIcon} 
@@ -388,10 +380,10 @@ export const CategoriesModule: React.FC = () => {
                   <div>
                     <div className="font-extrabold text-base text-text-primary group-hover:text-primary transition-colors">{c.name}</div>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[11px] text-text-secondary font-bold uppercase">{c.productCount || 0} Products</span>
-                      <span className="text-[11px] text-emerald-600 font-bold uppercase">• {subList.length} Subcategories</span>
+                      <span className="text-xs text-text-secondary font-bold uppercase">{c.productCount || 0} Products</span>
+                      <span className="text-xs text-emerald-600 font-bold uppercase">• {subList.length} Subcategories</span>
                     </div>
-                    <div className="inline-block mt-1 px-2.5 py-0.5 rounded-full bg-primary/10 text-[10px] font-bold text-primary">Order Position #{index + 1}</div>
+                    <div className="inline-block mt-1 px-2.5 py-0.5 rounded-full bg-primary/10 text-[11px] font-bold text-primary">Order Position #{index + 1}</div>
                   </div>
                 </div>
 
@@ -790,7 +782,7 @@ export const SubCategoriesModule: React.FC = () => {
             <div className="px-4 py-2 rounded-xl text-xs font-black bg-primary text-white shadow-xs flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-white" />
               <span>{currentSelectedCat.name}</span>
-              <span className="bg-white/20 px-2 py-0.5 rounded-full text-[10px]">
+              <span className="bg-white/20 px-2 py-0.5 rounded-full text-[11px]">
                 {filteredSubCategories.length} Subcategories
               </span>
             </div>
@@ -818,7 +810,7 @@ export const SubCategoriesModule: React.FC = () => {
       <div className="overflow-x-auto rounded-2xl border border-divider bg-surface">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="border-b border-divider bg-background/50 text-[11px] font-extrabold text-text-secondary uppercase tracking-wider">
+            <tr className="border-b border-divider bg-background/50 text-xs font-extrabold text-text-secondary uppercase tracking-wider">
               <th className="p-4 w-20 text-center">Order #</th>
               <th className="p-4">Image</th>
               <th className="p-4">Subcategory Name</th>
@@ -889,12 +881,12 @@ export const SubCategoriesModule: React.FC = () => {
                         <Tag size={12} className="text-primary" />
                         <span>{item.name}</span>
                       </div>
-                      <div className="font-mono text-[10px] text-text-secondary mt-0.5">{item.slug}</div>
+                      <div className="font-mono text-[11px] text-text-secondary mt-0.5">{item.slug}</div>
                     </td>
 
                     {/* Parent Department */}
                     <td className="p-4">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-background border border-divider text-text-primary">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-background border border-divider text-text-primary">
                         <span className="w-2 h-2 rounded-full" style={{ backgroundColor: item.categoryColor }} />
                         {item.categoryName}
                       </span>
@@ -902,7 +894,7 @@ export const SubCategoriesModule: React.FC = () => {
 
                     {/* Mapped Products */}
                     <td className="p-4 font-bold text-text-primary">
-                      <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-700 font-extrabold text-[11px]">
+                      <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-700 font-extrabold text-xs">
                         {item.productCount} Products
                       </span>
                     </td>
@@ -911,7 +903,7 @@ export const SubCategoriesModule: React.FC = () => {
                     <td className="p-4">
                       <button
                         onClick={() => handleToggleHomeDisplay(item.categoryId, item.subId, item.name, item.showOnHome)}
-                        className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                        className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
                           item.showOnHome
                             ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/25'
                             : 'bg-surface border-divider text-text-tertiary hover:bg-background'
@@ -937,7 +929,7 @@ export const SubCategoriesModule: React.FC = () => {
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => handleOpenAdd(item.categoryId, item)}
-                          className="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-[11px] font-bold text-emerald-700 hover:bg-emerald-500/20 transition-colors flex items-center gap-1 cursor-pointer"
+                          className="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-bold text-emerald-700 hover:bg-emerald-500/20 transition-colors flex items-center gap-1 cursor-pointer"
                           title={`Insert new subcategory directly after ${item.name}`}
                         >
                           <Plus size={13} />
@@ -954,7 +946,7 @@ export const SubCategoriesModule: React.FC = () => {
                             displayOrder: item.displayOrder || 1,
                             promoImage: item.promoImage || ''
                           })}
-                          className="px-2.5 py-1.5 rounded-xl bg-background border border-divider text-[11px] font-bold text-text-secondary hover:text-primary hover:bg-primary/10 transition-colors flex items-center gap-1 cursor-pointer"
+                          className="px-2.5 py-1.5 rounded-xl bg-background border border-divider text-xs font-bold text-text-secondary hover:text-primary hover:bg-primary/10 transition-colors flex items-center gap-1 cursor-pointer"
                           title="Edit Subcategory"
                         >
                           <Edit2 size={13} />
@@ -962,7 +954,7 @@ export const SubCategoriesModule: React.FC = () => {
                         </button>
                         <button
                           onClick={() => handleDeleteSubCategorySubmit(item.categoryId, item.subId, item.name)}
-                          className="px-2.5 py-1.5 rounded-xl bg-background border border-divider text-[11px] font-bold text-text-secondary hover:text-error hover:bg-error/10 transition-colors flex items-center gap-1 cursor-pointer"
+                          className="px-2.5 py-1.5 rounded-xl bg-background border border-divider text-xs font-bold text-text-secondary hover:text-error hover:bg-error/10 transition-colors flex items-center gap-1 cursor-pointer"
                           title="Delete Subcategory"
                         >
                           <Trash2 size={13} />
@@ -1012,7 +1004,7 @@ export const SubCategoriesModule: React.FC = () => {
                 </div>
               )}
               <div>
-                <label className="text-[11px] font-bold text-text-secondary uppercase mb-1.5 block">Parent Department</label>
+                <label className="text-xs font-bold text-text-secondary uppercase mb-1.5 block">Parent Department</label>
                 <select
                   value={targetCatId}
                   onChange={(e) => setTargetCatId(e.target.value)}
@@ -1027,7 +1019,7 @@ export const SubCategoriesModule: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-text-secondary uppercase mb-1.5 block">Subcategory Name</label>
+                <label className="text-xs font-bold text-text-secondary uppercase mb-1.5 block">Subcategory Name</label>
                 <input
                   type="text"
                   placeholder="e.g. Cold Pressed Oil, Organic Atta, Exotic Fruits..."
@@ -1039,7 +1031,7 @@ export const SubCategoriesModule: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-text-secondary uppercase mb-1.5 block">Display Order Number (Position)</label>
+                <label className="text-xs font-bold text-text-secondary uppercase mb-1.5 block">Display Order Number (Position)</label>
                 <input
                   type="number"
                   min="1"
@@ -1052,7 +1044,7 @@ export const SubCategoriesModule: React.FC = () => {
 
               {/* Subcategory Image Upload & Field */}
               <div className="flex flex-col gap-2">
-                <label className="text-[11px] font-bold text-text-secondary uppercase">Subcategory Image / Icon (Cloudinary or URL)</label>
+                <label className="text-xs font-bold text-text-secondary uppercase">Subcategory Image / Icon (Cloudinary or URL)</label>
                 <div className="flex gap-2 items-center">
                   <input 
                     type="text" 
@@ -1075,7 +1067,6 @@ export const SubCategoriesModule: React.FC = () => {
                             try {
                               const uploadedUrl = await uploadImage(reader.result as string, 'freshcart/subcategories');
                               setSubImageInput(uploadedUrl);
-                              alert('✅ Subcategory image uploaded to Cloudinary!');
                             } catch (err: any) {
                               alert('❌ Upload Error: ' + err.message);
                             }
@@ -1090,7 +1081,7 @@ export const SubCategoriesModule: React.FC = () => {
                 {/* Subcategory Image Preview Box */}
                 {subImageInput && (
                   <div className="mt-1 flex items-center justify-between p-3 bg-background rounded-2xl border border-divider">
-                    <span className="text-[11px] font-bold text-text-secondary uppercase">Image Preview:</span>
+                    <span className="text-xs font-bold text-text-secondary uppercase">Image Preview:</span>
                     <div className="w-14 h-14 rounded-xl border border-divider overflow-hidden bg-surface p-0.5 shadow-sm">
                       <img 
                         src={subImageInput} 
@@ -1105,10 +1096,10 @@ export const SubCategoriesModule: React.FC = () => {
 
               {/* Promo / Special Banner (Image Only) Field */}
               <div className="flex flex-col gap-2 p-3 bg-background rounded-2xl border border-divider">
-                <label className="text-[11px] font-bold text-text-primary uppercase flex items-center gap-1">
+                <label className="text-xs font-bold text-text-primary uppercase flex items-center gap-1">
                   <span>Promo / Special Banner (Image Only)</span>
                 </label>
-                <p className="text-[10px] text-text-secondary font-medium">
+                <p className="text-[11px] text-text-secondary font-medium">
                   Attach a promo banner image for this subcategory. Clicking it will redirect customers to this subcategory's products.
                 </p>
                 <div className="flex gap-2 items-center">
@@ -1133,7 +1124,6 @@ export const SubCategoriesModule: React.FC = () => {
                             try {
                               const uploadedUrl = await uploadImage(reader.result as string, 'freshcart/promos');
                               setSubPromoImageInput(uploadedUrl);
-                              alert('✅ Promo Banner image uploaded to Cloudinary!');
                             } catch (err: any) {
                               alert('❌ Upload Error: ' + err.message);
                             }
@@ -1146,7 +1136,7 @@ export const SubCategoriesModule: React.FC = () => {
                 </div>
                 {subPromoImageInput && (
                   <div className="mt-1 flex items-center justify-between p-2 bg-surface rounded-xl border border-divider">
-                    <span className="text-[10px] font-bold text-text-secondary">Promo Preview:</span>
+                    <span className="text-[11px] font-bold text-text-secondary">Promo Preview:</span>
                     <div className="w-24 h-12 rounded-lg border border-divider overflow-hidden bg-background shadow-xs">
                       <img src={subPromoImageInput} alt="Promo Preview" className="w-full h-full object-cover" />
                     </div>
@@ -1158,7 +1148,7 @@ export const SubCategoriesModule: React.FC = () => {
               <label className="flex items-center justify-between p-3 rounded-2xl bg-background border border-divider cursor-pointer select-none">
                 <div>
                   <div className="text-xs font-extrabold text-text-primary">Display on Customer Home Page?</div>
-                  <div className="text-[10px] text-text-secondary font-medium">Toggle whether this subcategory appears in the Home page chips/grid</div>
+                  <div className="text-[11px] text-text-secondary font-medium">Toggle whether this subcategory appears in the Home page chips/grid</div>
                 </div>
                 <input
                   type="checkbox"
@@ -1209,7 +1199,7 @@ export const SubCategoriesModule: React.FC = () => {
 
             <div className="flex flex-col gap-4">
               <div>
-                <label className="text-[11px] font-bold text-text-secondary uppercase mb-1.5 block">Subcategory Name</label>
+                <label className="text-xs font-bold text-text-secondary uppercase mb-1.5 block">Subcategory Name</label>
                 <input
                   type="text"
                   value={editingSub.name}
@@ -1220,7 +1210,7 @@ export const SubCategoriesModule: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-text-secondary uppercase mb-1.5 block">Display Order Number (Position)</label>
+                <label className="text-xs font-bold text-text-secondary uppercase mb-1.5 block">Display Order Number (Position)</label>
                 <input
                   type="number"
                   min="1"
@@ -1232,7 +1222,7 @@ export const SubCategoriesModule: React.FC = () => {
 
               {/* Subcategory Image Upload & Field */}
               <div className="flex flex-col gap-2">
-                <label className="text-[11px] font-bold text-text-secondary uppercase">Subcategory Image / Icon (Cloudinary or URL)</label>
+                <label className="text-xs font-bold text-text-secondary uppercase">Subcategory Image / Icon (Cloudinary or URL)</label>
                 <div className="flex gap-2 items-center">
                   <input 
                     type="text" 
@@ -1255,7 +1245,6 @@ export const SubCategoriesModule: React.FC = () => {
                             try {
                               const uploadedUrl = await uploadImage(reader.result as string, 'freshcart/subcategories');
                               setEditingSub({ ...editingSub, image: uploadedUrl });
-                              alert('✅ Subcategory image uploaded to Cloudinary!');
                             } catch (err: any) {
                               alert('❌ Upload Error: ' + err.message);
                             }
@@ -1270,7 +1259,7 @@ export const SubCategoriesModule: React.FC = () => {
                 {/* Subcategory Image Preview Box */}
                 {editingSub.image && (
                   <div className="mt-1 flex items-center justify-between p-3 bg-background rounded-2xl border border-divider">
-                    <span className="text-[11px] font-bold text-text-secondary uppercase">Image Preview:</span>
+                    <span className="text-xs font-bold text-text-secondary uppercase">Image Preview:</span>
                     <div className="w-14 h-14 rounded-xl border border-divider overflow-hidden bg-surface p-0.5 shadow-sm">
                       <img 
                         src={editingSub.image} 
@@ -1285,10 +1274,10 @@ export const SubCategoriesModule: React.FC = () => {
 
               {/* Promo / Special Banner (Image Only) Field */}
               <div className="flex flex-col gap-2 p-3 bg-background rounded-2xl border border-divider">
-                <label className="text-[11px] font-bold text-text-primary uppercase flex items-center gap-1">
+                <label className="text-xs font-bold text-text-primary uppercase flex items-center gap-1">
                   <span>Promo / Special Banner (Image Only)</span>
                 </label>
-                <p className="text-[10px] text-text-secondary font-medium">
+                <p className="text-[11px] text-text-secondary font-medium">
                   Attach a promo banner image for this subcategory. Clicking it will redirect customers to this subcategory's products.
                 </p>
                 <div className="flex gap-2 items-center">
@@ -1313,7 +1302,6 @@ export const SubCategoriesModule: React.FC = () => {
                             try {
                               const uploadedUrl = await uploadImage(reader.result as string, 'freshcart/promos');
                               setEditingSub({ ...editingSub, promoImage: uploadedUrl });
-                              alert('✅ Promo Banner image uploaded to Cloudinary!');
                             } catch (err: any) {
                               alert('❌ Upload Error: ' + err.message);
                             }
@@ -1326,7 +1314,7 @@ export const SubCategoriesModule: React.FC = () => {
                 </div>
                 {editingSub.promoImage && (
                   <div className="mt-1 flex items-center justify-between p-2 bg-surface rounded-xl border border-divider">
-                    <span className="text-[10px] font-bold text-text-secondary">Promo Preview:</span>
+                    <span className="text-[11px] font-bold text-text-secondary">Promo Preview:</span>
                     <div className="w-24 h-12 rounded-lg border border-divider overflow-hidden bg-background shadow-xs">
                       <img src={editingSub.promoImage} alt="Promo Preview" className="w-full h-full object-cover" />
                     </div>
@@ -1338,7 +1326,7 @@ export const SubCategoriesModule: React.FC = () => {
               <label className="flex items-center justify-between p-3 rounded-2xl bg-background border border-divider cursor-pointer select-none">
                 <div>
                   <div className="text-xs font-extrabold text-text-primary">Display on Customer Home Page?</div>
-                  <div className="text-[10px] text-text-secondary font-medium">Toggle whether this subcategory appears in the Home page chips/grid</div>
+                  <div className="text-[11px] text-text-secondary font-medium">Toggle whether this subcategory appears in the Home page chips/grid</div>
                 </div>
                 <input
                   type="checkbox"
@@ -1542,19 +1530,19 @@ export const InventoryModule: React.FC = () => {
       {/* Overview Stat Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="p-3.5 rounded-2xl bg-background border border-divider flex flex-col gap-1">
-          <span className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Total Products</span>
+          <span className="text-xs font-bold text-text-secondary uppercase tracking-wider">Total Products</span>
           <span className="text-xl font-extrabold text-text-primary">{totalProducts}</span>
         </div>
         <div className="p-3.5 rounded-2xl bg-success/10 border border-success/20 flex flex-col gap-1">
-          <span className="text-[11px] font-bold text-success uppercase tracking-wider">In Stock</span>
+          <span className="text-xs font-bold text-success uppercase tracking-wider">In Stock</span>
           <span className="text-xl font-extrabold text-success">{inStockCount}</span>
         </div>
         <div className="p-3.5 rounded-2xl bg-warning/10 border border-warning/20 flex flex-col gap-1">
-          <span className="text-[11px] font-bold text-warning uppercase tracking-wider">Low Stock (&lt;15)</span>
+          <span className="text-xs font-bold text-warning uppercase tracking-wider">Low Stock (&lt;15)</span>
           <span className="text-xl font-extrabold text-warning">{lowStockCount}</span>
         </div>
         <div className="p-3.5 rounded-2xl bg-error/10 border border-error/20 flex flex-col gap-1">
-          <span className="text-[11px] font-bold text-error uppercase tracking-wider">Out of Stock</span>
+          <span className="text-xs font-bold text-error uppercase tracking-wider">Out of Stock</span>
           <span className="text-xl font-extrabold text-error">{outOfStockCount}</span>
         </div>
       </div>
@@ -1590,7 +1578,7 @@ export const InventoryModule: React.FC = () => {
           <div className="flex bg-surface p-1 rounded-xl border border-divider gap-1">
             <button
               onClick={() => setStockFilter('all')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 stockFilter === 'all' ? 'bg-primary text-white' : 'text-text-secondary hover:text-text-primary'
               }`}
             >
@@ -1598,7 +1586,7 @@ export const InventoryModule: React.FC = () => {
             </button>
             <button
               onClick={() => setStockFilter('low')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 stockFilter === 'low' ? 'bg-warning text-white' : 'text-text-secondary hover:text-text-primary'
               }`}
             >
@@ -1606,7 +1594,7 @@ export const InventoryModule: React.FC = () => {
             </button>
             <button
               onClick={() => setStockFilter('out')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 stockFilter === 'out' ? 'bg-error text-white' : 'text-text-secondary hover:text-text-primary'
               }`}
             >
@@ -1650,7 +1638,7 @@ export const InventoryModule: React.FC = () => {
                   <tr key={p.id} className="hover:bg-background/40 transition-colors">
                     {/* Product ID */}
                     <td className="p-3.5 font-mono font-bold text-primary">
-                      <span className="bg-primary/10 px-2 py-1 rounded-lg text-[11px]">{p.id}</span>
+                      <span className="bg-primary/10 px-2 py-1 rounded-lg text-xs">{p.id}</span>
                     </td>
 
                     {/* Product Name & Image */}
@@ -1663,7 +1651,7 @@ export const InventoryModule: React.FC = () => {
                         />
                         <div className="flex flex-col">
                           <span className="font-bold text-text-primary text-xs">{p.name}</span>
-                          <span className="text-[10px] font-medium text-text-secondary">
+                          <span className="text-[11px] font-medium text-text-secondary">
                             {p.category || p.categoryId || 'General'}
                           </span>
                         </div>
@@ -1672,7 +1660,7 @@ export const InventoryModule: React.FC = () => {
 
                     {/* Batch ID */}
                     <td className="p-3.5 font-mono font-bold text-text-secondary">
-                      <span className="bg-background border border-divider px-2 py-0.5 rounded text-[11px]">{batch}</span>
+                      <span className="bg-background border border-divider px-2 py-0.5 rounded text-xs">{batch}</span>
                     </td>
 
                     {/* Stock Level Badge */}
@@ -1690,10 +1678,10 @@ export const InventoryModule: React.FC = () => {
                           {qty} units
                         </span>
                         {isLow && (
-                          <span className="text-[10px] text-warning font-semibold bg-warning/10 px-1.5 py-0.5 rounded">Low</span>
+                          <span className="text-[11px] text-warning font-semibold bg-warning/10 px-1.5 py-0.5 rounded">Low</span>
                         )}
                         {isOut && (
-                          <span className="text-[10px] text-error font-semibold bg-error/10 px-1.5 py-0.5 rounded">Empty</span>
+                          <span className="text-[11px] text-error font-semibold bg-error/10 px-1.5 py-0.5 rounded">Empty</span>
                         )}
                       </div>
                     </td>
@@ -1703,21 +1691,21 @@ export const InventoryModule: React.FC = () => {
                       <div className="flex items-center justify-end gap-1">
                         <button 
                           onClick={() => handleAdjust(p, -10)} 
-                          className="px-2 py-1 rounded-lg bg-error/10 text-error hover:bg-error/20 cursor-pointer font-bold text-[10px] transition-all"
+                          className="px-2 py-1 rounded-lg bg-error/10 text-error hover:bg-error/20 cursor-pointer font-bold text-[11px] transition-all"
                           title="Decrease by 10"
                         >
                           -10
                         </button>
                         <button 
                           onClick={() => handleAdjust(p, -5)} 
-                          className="px-2 py-1 rounded-lg bg-error/15 text-error hover:bg-error/25 cursor-pointer font-bold text-[10px] transition-all"
+                          className="px-2 py-1 rounded-lg bg-error/15 text-error hover:bg-error/25 cursor-pointer font-bold text-[11px] transition-all"
                           title="Decrease by 5"
                         >
                           -5
                         </button>
                         <button 
                           onClick={() => handleAdjust(p, -1)} 
-                          className="px-2 py-1 rounded-lg bg-error/20 text-error hover:bg-error/30 cursor-pointer font-bold text-[10px] transition-all"
+                          className="px-2 py-1 rounded-lg bg-error/20 text-error hover:bg-error/30 cursor-pointer font-bold text-[11px] transition-all"
                           title="Decrease by 1"
                         >
                           -1
@@ -1725,7 +1713,7 @@ export const InventoryModule: React.FC = () => {
 
                         <button 
                           onClick={() => handleDirectSetStock(p)} 
-                          className="px-2 py-1 rounded-lg bg-background border border-divider text-text-primary hover:bg-surface cursor-pointer font-bold text-[10px] transition-all mx-0.5"
+                          className="px-2 py-1 rounded-lg bg-background border border-divider text-text-primary hover:bg-surface cursor-pointer font-bold text-[11px] transition-all mx-0.5"
                           title="Set exact stock value"
                         >
                           Set
@@ -1733,21 +1721,21 @@ export const InventoryModule: React.FC = () => {
 
                         <button 
                           onClick={() => handleAdjust(p, 1)} 
-                          className="px-2 py-1 rounded-lg bg-success/20 text-success hover:bg-success/30 cursor-pointer font-bold text-[10px] transition-all"
+                          className="px-2 py-1 rounded-lg bg-success/20 text-success hover:bg-success/30 cursor-pointer font-bold text-[11px] transition-all"
                           title="Increase by 1"
                         >
                           +1
                         </button>
                         <button 
                           onClick={() => handleAdjust(p, 5)} 
-                          className="px-2 py-1 rounded-lg bg-success/15 text-success hover:bg-success/25 cursor-pointer font-bold text-[10px] transition-all"
+                          className="px-2 py-1 rounded-lg bg-success/15 text-success hover:bg-success/25 cursor-pointer font-bold text-[11px] transition-all"
                           title="Increase by 5"
                         >
                           +5
                         </button>
                         <button 
                           onClick={() => handleAdjust(p, 10)} 
-                          className="px-2 py-1 rounded-lg bg-success/10 text-success hover:bg-success/20 cursor-pointer font-bold text-[10px] transition-all"
+                          className="px-2 py-1 rounded-lg bg-success/10 text-success hover:bg-success/20 cursor-pointer font-bold text-[11px] transition-all"
                           title="Increase by 10"
                         >
                           +10
@@ -1820,7 +1808,6 @@ export const CustomersModule: React.FC = () => {
       const data = await res.json();
       if (data.success) {
         setCustomers(prev => prev.map(c => c.customerId === id ? { ...c, walletBalance: data.walletBalance } : c));
-        alert('Wallet balance updated successfully on backend!');
       } else {
         alert('Failed to update wallet: ' + (data.message || 'Unknown error'));
       }
@@ -1833,7 +1820,7 @@ export const CustomersModule: React.FC = () => {
     <div className="bg-surface border border-divider p-6 rounded-[28px] shadow-card flex flex-col gap-6">
       <div className="pb-3 border-b border-divider">
         <h2 className="font-extrabold text-sm text-text-primary">Customers Registry</h2>
-        <p className="text-[10px] text-text-secondary font-medium">Adjust wallets, review membership hierarchies, and track timelines</p>
+        <p className="text-[11px] text-text-secondary font-medium">Adjust wallets, review membership hierarchies, and track timelines</p>
       </div>
 
       <div className="overflow-x-auto">
@@ -1857,17 +1844,17 @@ export const CustomersModule: React.FC = () => {
                   <td className="p-3 font-mono font-bold text-primary">{c.customerId}</td>
                   <td className="p-3">
                     <div className="font-extrabold text-text-primary">{c.name}</div>
-                    <div className="text-[10px] text-text-secondary">{c.email}</div>
+                    <div className="text-[11px] text-text-secondary">{c.email}</div>
                   </td>
                   <td className="p-3">
-                    <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${isVip ? 'text-amber-600 bg-amber-500/10' : 'text-text-secondary bg-background border border-divider'}`}>
+                    <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${isVip ? 'text-amber-600 bg-amber-500/10' : 'text-text-secondary bg-background border border-divider'}`}>
                       {isVip ? '⭐ VIP Premium' : 'Regular Member'}
                     </span>
                   </td>
                   <td className="p-3 font-bold text-text-secondary">{custOrders} orders</td>
                   <td className="p-3 font-extrabold text-text-primary">₹{c.walletBalance}</td>
                   <td className="p-3 text-right">
-                    <button onClick={() => handleWalletAdjust(c.customerId)} className="text-primary hover:underline font-bold text-[10px] cursor-pointer">Adjust Wallet</button>
+                    <button onClick={() => handleWalletAdjust(c.customerId)} className="text-primary hover:underline font-bold text-[11px] cursor-pointer">Adjust Wallet</button>
                   </td>
                 </tr>
               );
@@ -2063,7 +2050,6 @@ export const DeliveryModule: React.FC = () => {
       if (data.success) {
         closeAdd();
         fetchPartners();
-        alert(`Delivery partner created. Login credentials were emailed to ${em}.`);
       } else {
         setAddErr(data.message || 'Could not create the partner.');
       }
@@ -2104,7 +2090,7 @@ export const DeliveryModule: React.FC = () => {
         body: JSON.stringify({ password: pw }),
       });
       const data = await res.json();
-      alert(res.ok && data.success ? 'Password reset.' : (data.message || 'Reset failed'));
+      if (!res.ok || !data.success) alert(data.message || 'Reset failed');
     } catch {
       alert('Reset failed');
     } finally {
@@ -2162,7 +2148,7 @@ export const DeliveryModule: React.FC = () => {
   const fa = analytics?.fleet;
   const stat = (label: string, value: string) => (
     <div className="flex flex-col gap-0.5">
-      <span className="text-[9px] font-bold uppercase tracking-wide text-text-tertiary">{label}</span>
+      <span className="text-[11px] font-bold uppercase tracking-wide text-text-tertiary">{label}</span>
       <span className="text-sm font-extrabold text-text-primary tabular-nums">{value}</span>
     </div>
   );
@@ -2204,7 +2190,7 @@ export const DeliveryModule: React.FC = () => {
       <div className="bg-surface border border-divider p-4 sm:p-6 rounded-[28px] shadow-card flex flex-col gap-4">
         <div className="flex items-baseline justify-between">
           <h2 className="font-extrabold text-sm text-text-primary">Fleet performance</h2>
-          <span className="text-[10px] text-text-secondary font-semibold">last {analytics!.rangeDays} days</span>
+          <span className="text-[11px] text-text-secondary font-semibold">last {analytics!.rangeDays} days</span>
         </div>
         <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-3">
           {stat('Partners', `${fa.totalPartners}`)}
@@ -2217,7 +2203,7 @@ export const DeliveryModule: React.FC = () => {
         </div>
         {analytics!.leaderboard.length > 0 && (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-[11px] mt-1">
+            <table className="w-full text-left border-collapse text-xs mt-1">
               <thead>
                 <tr className="text-text-tertiary">
                   {['Partner', 'Delivered', 'Acceptance', 'Avg time', 'Rating', 'Distance'].map(h => (
@@ -2240,7 +2226,7 @@ export const DeliveryModule: React.FC = () => {
                     <td className="p-2 tabular-nums font-semibold text-text-primary whitespace-nowrap">
                       ★ {Number(r.rating || 0).toFixed(1)}
                       {r.ratingCount >= 3 && Number(r.rating) < 4 && (
-                        <span className="ml-1 rounded-full bg-error/10 text-error text-[8px] font-black uppercase px-1 py-0.5 align-middle">Low</span>
+                        <span className="ml-1 rounded-full bg-error/10 text-error text-[11px] font-black uppercase px-1 py-0.5 align-middle">Low</span>
                       )}
                     </td>
                     <td className="p-2 tabular-nums text-text-secondary">{r.distanceKm == null ? '—' : `${r.distanceKm} km`}</td>
@@ -2258,13 +2244,13 @@ export const DeliveryModule: React.FC = () => {
         <h3 className="font-extrabold text-sm text-text-primary">
           Returns & re-attempts
           {returns.awaiting > 0 && (
-            <span className="ml-2 rounded-full bg-warning/15 text-warning text-[9px] font-black uppercase px-2 py-0.5 align-middle">
+            <span className="ml-2 rounded-full bg-warning/15 text-warning text-[11px] font-black uppercase px-2 py-0.5 align-middle">
               {returns.awaiting} awaiting return
             </span>
           )}
         </h3>
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-[11px]">
+          <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="text-text-tertiary">
                 {['Order', 'State', 'Partner', 'Reason', 'Amount', ''].map(h => (
@@ -2277,7 +2263,7 @@ export const DeliveryModule: React.FC = () => {
                 <tr key={o.orderId} className="border-t border-divider/60">
                   <td className="p-2 font-bold text-text-primary">{o.orderId}</td>
                   <td className="p-2">
-                    <span className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase ${o.needsReturn ? 'bg-warning/15 text-warning' : 'bg-success/10 text-success'}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-black uppercase ${o.needsReturn ? 'bg-warning/15 text-warning' : 'bg-success/10 text-success'}`}>
                       {o.needsReturn ? 'Awaiting return' : o.status}
                     </span>
                   </td>
@@ -2288,7 +2274,7 @@ export const DeliveryModule: React.FC = () => {
                     <button
                       onClick={() => requeue(o.orderId)}
                       disabled={o.needsReturn || reqBusy === o.orderId}
-                      className="rounded-full bg-primary text-white font-bold text-[10px] px-3 py-1 hover:bg-secondary disabled:opacity-40 cursor-pointer"
+                      className="rounded-full bg-primary text-white font-bold text-[11px] px-3 py-1 hover:bg-secondary disabled:opacity-40 cursor-pointer"
                       title={o.needsReturn ? 'Wait for the parcel to be returned first' : 'Send back into the assignment queue'}
                     >
                       {reqBusy === o.orderId ? 'Requeuing…' : 'Requeue'}
@@ -2307,12 +2293,12 @@ export const DeliveryModule: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 pb-3 border-b border-divider">
         <div>
           <h2 className="font-extrabold text-sm text-text-primary">Delivery Partners</h2>
-          <p className="text-[10px] text-text-secondary font-medium">
+          <p className="text-[11px] text-text-secondary font-medium">
             {partners.length} registered • {online} online • {onDelivery} on delivery
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center rounded-full border border-divider overflow-hidden text-[10px] font-bold">
+          <div className="flex items-center rounded-full border border-divider overflow-hidden text-[11px] font-bold">
             {([
               ['all', `All (${partners.length})`],
               ['online', `Online (${online})`],
@@ -2331,10 +2317,10 @@ export const DeliveryModule: React.FC = () => {
               </button>
             ))}
           </div>
-          <button onClick={refreshPartners} className="flex items-center gap-1 border border-divider text-text-secondary font-bold py-1.5 px-3 rounded-full text-[10px] hover:bg-background cursor-pointer">
+          <button onClick={refreshPartners} className="flex items-center gap-1 border border-divider text-text-secondary font-bold py-1.5 px-3 rounded-full text-[11px] hover:bg-background cursor-pointer">
             <RefreshCw size={12} /> Refresh
           </button>
-          <button onClick={() => { resetAddForm(); setShowAdd(true); }} className="flex items-center gap-1 bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[10px] hover:bg-secondary cursor-pointer">
+          <button onClick={() => { resetAddForm(); setShowAdd(true); }} className="flex items-center gap-1 bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[11px] hover:bg-secondary cursor-pointer">
             <Plus size={12} /> Add Partner
           </button>
         </div>
@@ -2352,7 +2338,7 @@ export const DeliveryModule: React.FC = () => {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="font-extrabold text-sm text-text-primary">Register delivery partner</h3>
-                <p className="text-[10px] text-text-secondary font-medium mt-0.5">
+                <p className="text-[11px] text-text-secondary font-medium mt-0.5">
                   Login credentials are emailed to the partner on save.
                 </p>
               </div>
@@ -2367,14 +2353,14 @@ export const DeliveryModule: React.FC = () => {
             </div>
 
             {addErr && (
-              <div className="rounded-xl bg-error/10 border border-error/20 px-3 py-2 text-[11px] font-bold text-error">
+              <div className="rounded-xl bg-error/10 border border-error/20 px-3 py-2 text-xs font-bold text-error">
                 {addErr}
               </div>
             )}
 
             <div className="flex flex-col gap-3">
               <label className="flex flex-col gap-1">
-                <span className="text-[10px] font-bold uppercase tracking-wide text-text-secondary">Full name</span>
+                <span className="text-[11px] font-bold uppercase tracking-wide text-text-secondary">Full name</span>
                 <input
                   type="text"
                   value={name}
@@ -2385,7 +2371,7 @@ export const DeliveryModule: React.FC = () => {
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-[10px] font-bold uppercase tracking-wide text-text-secondary">Email (login)</span>
+                <span className="text-[11px] font-bold uppercase tracking-wide text-text-secondary">Email (login)</span>
                 <input
                   type="email"
                   value={email}
@@ -2395,7 +2381,7 @@ export const DeliveryModule: React.FC = () => {
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-[10px] font-bold uppercase tracking-wide text-text-secondary">Phone</span>
+                <span className="text-[11px] font-bold uppercase tracking-wide text-text-secondary">Phone</span>
                 <input
                   type="tel"
                   inputMode="numeric"
@@ -2406,7 +2392,7 @@ export const DeliveryModule: React.FC = () => {
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-[10px] font-bold uppercase tracking-wide text-text-secondary">Password</span>
+                <span className="text-[11px] font-bold uppercase tracking-wide text-text-secondary">Password</span>
                 <div className="relative">
                   <input
                     type={showPw ? 'text' : 'password'}
@@ -2431,7 +2417,7 @@ export const DeliveryModule: React.FC = () => {
               <button
                 type="submit"
                 disabled={adding}
-                className="bg-primary text-white font-bold py-2 px-5 rounded-full text-[10px] hover:bg-secondary disabled:opacity-40 cursor-pointer"
+                className="bg-primary text-white font-bold py-2 px-5 rounded-full text-[11px] hover:bg-secondary disabled:opacity-40 cursor-pointer"
               >
                 {adding ? 'Creating…' : 'Create & email credentials'}
               </button>
@@ -2439,7 +2425,7 @@ export const DeliveryModule: React.FC = () => {
                 type="button"
                 onClick={closeAdd}
                 disabled={adding}
-                className="bg-surface text-text-secondary border border-divider font-bold py-2 px-5 rounded-full text-[10px] hover:bg-background disabled:opacity-40 cursor-pointer"
+                className="bg-surface text-text-secondary border border-divider font-bold py-2 px-5 rounded-full text-[11px] hover:bg-background disabled:opacity-40 cursor-pointer"
               >
                 Cancel
               </button>
@@ -2467,7 +2453,7 @@ export const DeliveryModule: React.FC = () => {
             <thead>
               <tr className="text-text-tertiary">
                 {['Partner', 'Status', 'Active orders', 'Completed / Failed', 'Rating', 'Last seen', 'Actions'].map(h => (
-                  <th key={h} className="p-2.5 border-b border-divider font-bold uppercase text-[9px] tracking-wide">{h}</th>
+                  <th key={h} className="p-2.5 border-b border-divider font-bold uppercase text-[11px] tracking-wide">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -2479,16 +2465,16 @@ export const DeliveryModule: React.FC = () => {
                       <button onClick={() => navigate(`/admin/delivery/${p.userId}`)} className="font-extrabold text-text-primary hover:text-primary hover:underline cursor-pointer text-left">{p.name}</button>
                       {p.isOnline && <Bike size={13} className="text-success shrink-0" aria-label="Online" />}
                     </div>
-                    <div className="text-[10px] text-text-secondary">{p.email}</div>
-                    <div className="text-[10px] text-text-secondary">{p.phone || '—'} • {p.vehicleType}</div>
+                    <div className="text-[11px] text-text-secondary">{p.email}</div>
+                    <div className="text-[11px] text-text-secondary">{p.phone || '—'} • {p.vehicleType}</div>
                   </td>
                   <td className="p-2.5">
-                    <span className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full ${availTone(p)}`}>{availLabel(p)}</span>
+                    <span className={`text-[11px] font-extrabold uppercase px-2 py-0.5 rounded-full ${availTone(p)}`}>{availLabel(p)}</span>
                   </td>
                   <td className="p-2.5 font-bold text-text-primary tabular-nums">
                     {p.activeOrderIds.length}/{p.maxConcurrent}
                     {p.activeOrderIds.length > 0 && (
-                      <div className="text-[9px] font-medium text-text-secondary truncate max-w-[140px]">{p.activeOrderIds.join(', ')}</div>
+                      <div className="text-[11px] font-medium text-text-secondary truncate max-w-[140px]">{p.activeOrderIds.join(', ')}</div>
                     )}
                   </td>
                   <td className="p-2.5 tabular-nums text-text-secondary font-semibold">
@@ -2496,12 +2482,12 @@ export const DeliveryModule: React.FC = () => {
                   </td>
                   <td className="p-2.5 font-bold text-text-primary tabular-nums whitespace-nowrap">
                     ★ {Number(p.rating || 0).toFixed(1)}
-                    {(p.ratingCount ?? 0) > 0 && <span className="text-[10px] text-text-tertiary font-semibold"> ({p.ratingCount})</span>}
+                    {(p.ratingCount ?? 0) > 0 && <span className="text-[11px] text-text-tertiary font-semibold"> ({p.ratingCount})</span>}
                     {(p.ratingCount ?? 0) >= 3 && Number(p.rating) < 4 && (
-                      <span className="ml-1.5 rounded-full bg-error/10 text-error text-[9px] font-black uppercase px-1.5 py-0.5 align-middle">Low</span>
+                      <span className="ml-1.5 rounded-full bg-error/10 text-error text-[11px] font-black uppercase px-1.5 py-0.5 align-middle">Low</span>
                     )}
                   </td>
-                  <td className="p-2.5 text-[10px] text-text-secondary font-semibold">{relTime(p.lastSeenAt || p.locationUpdatedAt)}</td>
+                  <td className="p-2.5 text-[11px] text-text-secondary font-semibold">{relTime(p.lastSeenAt || p.locationUpdatedAt)}</td>
                   <td className="p-2.5">
                     <div className="flex gap-1.5">
                       <button disabled={busyId === p.userId} onClick={() => resetPassword(p)} title="Reset password" className="p-1.5 rounded-lg border border-divider text-text-secondary hover:text-primary hover:bg-primary/5 cursor-pointer disabled:opacity-40">
@@ -2538,12 +2524,12 @@ export const DeliveryModule: React.FC = () => {
                   <button onClick={() => navigate(`/admin/delivery/${p.userId}`)} className="font-extrabold text-xs text-text-primary hover:text-primary hover:underline cursor-pointer text-left">{p.name}</button>
                   {p.isOnline && <Bike size={12} className="text-success shrink-0" aria-label="Online" />}
                 </div>
-                <div className="text-[10px] text-text-secondary">{p.email}</div>
-                <div className="text-[10px] text-text-secondary">{p.phone || '—'} • {p.vehicleType}</div>
+                <div className="text-[11px] text-text-secondary">{p.email}</div>
+                <div className="text-[11px] text-text-secondary">{p.phone || '—'} • {p.vehicleType}</div>
               </div>
-              <span className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full ${availTone(p)}`}>{availLabel(p)}</span>
+              <span className={`text-[11px] font-extrabold uppercase px-2 py-0.5 rounded-full ${availTone(p)}`}>{availLabel(p)}</span>
             </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-text-secondary font-semibold">
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-text-secondary font-semibold">
               <span>Active: <b className="text-text-primary">{p.activeOrderIds.length}/{p.maxConcurrent}</b></span>
               <span>Done: <b className="text-success">{p.completedCount}</b></span>
               <span>Failed: <b className="text-error">{p.failedCount}</b></span>
@@ -2554,19 +2540,19 @@ export const DeliveryModule: React.FC = () => {
               <span>Seen {relTime(p.lastSeenAt || p.locationUpdatedAt)}</span>
             </div>
             <div className="flex gap-2 pt-1">
-              <button disabled={busyId === p.userId} onClick={() => resetPassword(p)} className="flex-1 flex items-center justify-center gap-1 border border-divider text-text-secondary font-bold py-1.5 rounded-full text-[10px] cursor-pointer disabled:opacity-40">
+              <button disabled={busyId === p.userId} onClick={() => resetPassword(p)} className="flex-1 flex items-center justify-center gap-1 border border-divider text-text-secondary font-bold py-1.5 rounded-full text-[11px] cursor-pointer disabled:opacity-40">
                 <Key size={11} /> Reset PW
               </button>
               {p.accountStatus === 'Active' ? (
-                <button disabled={busyId === p.userId} onClick={() => setAccount(p, false)} className="flex-1 flex items-center justify-center gap-1 border border-error/40 text-error font-bold py-1.5 rounded-full text-[10px] cursor-pointer disabled:opacity-40">
+                <button disabled={busyId === p.userId} onClick={() => setAccount(p, false)} className="flex-1 flex items-center justify-center gap-1 border border-error/40 text-error font-bold py-1.5 rounded-full text-[11px] cursor-pointer disabled:opacity-40">
                   <UserMinus size={11} /> Deactivate
                 </button>
               ) : (
-                <button disabled={busyId === p.userId} onClick={() => setAccount(p, true)} className="flex-1 flex items-center justify-center gap-1 border border-success/40 text-success font-bold py-1.5 rounded-full text-[10px] cursor-pointer disabled:opacity-40">
+                <button disabled={busyId === p.userId} onClick={() => setAccount(p, true)} className="flex-1 flex items-center justify-center gap-1 border border-success/40 text-success font-bold py-1.5 rounded-full text-[11px] cursor-pointer disabled:opacity-40">
                   <UserCheck size={11} /> Activate
                 </button>
               )}
-              <button disabled={busyId === p.userId || p.activeOrderIds.length > 0} onClick={() => deletePartner(p)} title={p.activeOrderIds.length > 0 ? 'Reassign active deliveries first' : 'Delete partner'} className="flex items-center justify-center gap-1 border border-error/40 text-error font-bold py-1.5 px-3 rounded-full text-[10px] cursor-pointer disabled:opacity-40">
+              <button disabled={busyId === p.userId || p.activeOrderIds.length > 0} onClick={() => deletePartner(p)} title={p.activeOrderIds.length > 0 ? 'Reassign active deliveries first' : 'Delete partner'} className="flex items-center justify-center gap-1 border border-error/40 text-error font-bold py-1.5 px-3 rounded-full text-[11px] cursor-pointer disabled:opacity-40">
                 <Trash2 size={11} />
               </button>
             </div>
@@ -2632,7 +2618,6 @@ export const EmployeesModule: React.FC = () => {
       const data = await res.json();
       if (data.success) {
         setEmployees(prev => [...prev, data.employee]);
-        alert('Employee created successfully on backend!');
       } else {
         alert('Failed to save employee: ' + (data.message || 'Unknown error'));
       }
@@ -2658,7 +2643,6 @@ export const EmployeesModule: React.FC = () => {
       const data = await res.json();
       if (data.success) {
         setEmployees(prev => prev.filter(emp => emp._id !== id));
-        alert('Employee deleted successfully!');
       }
     } catch (err) {
       alert('Delete failed.');
@@ -2670,9 +2654,9 @@ export const EmployeesModule: React.FC = () => {
       <div className="flex justify-between items-center pb-3 border-b border-divider">
         <div>
           <h2 className="font-extrabold text-sm text-text-primary">Corporate Employees Registry</h2>
-          <p className="text-[10px] text-text-secondary font-medium">Add, update, and manage permissions of administrative system users</p>
+          <p className="text-[11px] text-text-secondary font-medium">Add, update, and manage permissions of administrative system users</p>
         </div>
-        <button onClick={() => setShowAdd(true)} className="flex items-center gap-1 bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[10px] hover:bg-secondary cursor-pointer">
+        <button onClick={() => setShowAdd(true)} className="flex items-center gap-1 bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[11px] hover:bg-secondary cursor-pointer">
           <Plus size={12} /> Add Employee
         </button>
       </div>
@@ -2692,8 +2676,8 @@ export const EmployeesModule: React.FC = () => {
             </select>
           </div>
           <div className="flex gap-2">
-            <button type="submit" className="bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[10px] cursor-pointer">Save</button>
-            <button type="button" onClick={() => setShowAdd(false)} className="bg-surface text-text-secondary border border-divider font-bold py-1.5 px-4 rounded-full text-[10px] cursor-pointer">Cancel</button>
+            <button type="submit" className="bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[11px] cursor-pointer">Save</button>
+            <button type="button" onClick={() => setShowAdd(false)} className="bg-surface text-text-secondary border border-divider font-bold py-1.5 px-4 rounded-full text-[11px] cursor-pointer">Cancel</button>
           </div>
         </form>
       )}
@@ -2715,16 +2699,16 @@ export const EmployeesModule: React.FC = () => {
                 <td className="p-3 font-extrabold text-text-primary">{emp.name}</td>
                 <td className="p-3 font-semibold text-text-secondary">{emp.email}</td>
                 <td className="p-3">
-                  <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
+                  <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
                     emp.role === 'Admin' ? 'text-rose-600 bg-rose-500/10' :
                     emp.role === 'Manager' ? 'text-amber-600 bg-amber-500/10' : 'text-blue-600 bg-blue-500/10'
                   }`}>
                     🛡️ {emp.role}
                   </span>
                 </td>
-                <td className="p-3"><span className="text-[10px] text-success font-bold">Active</span></td>
+                <td className="p-3"><span className="text-[11px] text-success font-bold">Active</span></td>
                 <td className="p-3 text-right">
-                  <button onClick={() => handleDelete(emp._id)} className="text-error hover:underline font-bold text-[10px] cursor-pointer">Remove</button>
+                  <button onClick={() => handleDelete(emp._id)} className="text-error hover:underline font-bold text-[11px] cursor-pointer">Remove</button>
                 </td>
               </tr>
             ))}
@@ -2790,7 +2774,6 @@ export const CouponsModule: React.FC = () => {
         });
         const data = await res.json();
         if (data.success) {
-          alert('Coupon updated successfully on backend!');
           window.location.reload();
         }
       } catch (err) {
@@ -2809,11 +2792,9 @@ export const CouponsModule: React.FC = () => {
         const data = await res.json();
         if (data.success) {
           addCoupon(data.coupon || couponData);
-          alert(`Coupon code '${code.toUpperCase()}' created on backend!`);
         }
       } catch (err) {
         addCoupon(couponData);
-        alert(`Coupon code '${code.toUpperCase()}' added locally!`);
       }
     }
 
@@ -2833,11 +2814,9 @@ export const CouponsModule: React.FC = () => {
       const data = await res.json();
       if (data.success) {
         deleteCoupon(couponCode);
-        alert('Coupon deleted on backend!');
       }
     } catch (err) {
       deleteCoupon(couponCode);
-      alert('Coupon deleted locally!');
     }
   };
 
@@ -2846,9 +2825,9 @@ export const CouponsModule: React.FC = () => {
       <div className="flex justify-between items-center pb-3 border-b border-divider">
         <div>
           <h2 className="font-extrabold text-sm text-text-primary">Promo Codes Engine</h2>
-          <p className="text-[10px] text-text-secondary font-medium">Create promotional vouchers and adjust savings rules</p>
+          <p className="text-[11px] text-text-secondary font-medium">Create promotional vouchers and adjust savings rules</p>
         </div>
-        <button onClick={handleOpenAdd} className="flex items-center gap-1 bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[10px] hover:bg-secondary cursor-pointer">
+        <button onClick={handleOpenAdd} className="flex items-center gap-1 bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[11px] hover:bg-secondary cursor-pointer">
           <Plus size={12} /> Add Coupon
         </button>
       </div>
@@ -2856,15 +2835,15 @@ export const CouponsModule: React.FC = () => {
       {showForm && (
         <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-background p-4 border border-divider rounded-2xl">
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold text-text-secondary">Coupon Code</label>
+            <label className="text-[11px] font-bold text-text-secondary">Coupon Code</label>
             <input type="text" value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. MONSOON40" className="px-3 py-1.5 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary uppercase font-bold" required disabled={!!editingCoupon} />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold text-text-secondary">Flat Value Amount (₹)</label>
+            <label className="text-[11px] font-bold text-text-secondary">Flat Value Amount (₹)</label>
             <input type="number" value={val} onChange={(e) => setVal(Number(e.target.value))} className="px-3 py-1.5 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary font-bold" required />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold text-text-secondary">Min Order threshold (₹)</label>
+            <label className="text-[11px] font-bold text-text-secondary">Min Order threshold (₹)</label>
             <input type="number" value={minOrder} onChange={(e) => setMinOrder(Number(e.target.value))} className="px-3 py-1.5 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary font-bold" required />
           </div>
           <div className="flex gap-2 self-end h-9">
@@ -2889,8 +2868,8 @@ export const CouponsModule: React.FC = () => {
                 <td className="p-3 font-bold text-text-primary font-mono">{c.code}</td>
                 <td className="p-3 font-semibold text-text-secondary">{c.discount} • Min order: ₹{c.minOrder}</td>
                 <td className="p-3 text-right flex justify-end gap-2">
-                  <button onClick={() => handleOpenEdit(c)} className="text-primary hover:underline font-bold text-[10px] cursor-pointer">Edit</button>
-                  <button onClick={() => handleDelete(c.code)} className="text-error hover:underline font-bold text-[10px] cursor-pointer">Remove</button>
+                  <button onClick={() => handleOpenEdit(c)} className="text-primary hover:underline font-bold text-[11px] cursor-pointer">Edit</button>
+                  <button onClick={() => handleDelete(c.code)} className="text-error hover:underline font-bold text-[11px] cursor-pointer">Remove</button>
                 </td>
               </tr>
             ))}
@@ -2966,11 +2945,10 @@ export const CMSModule: React.FC = () => {
         const data = await res.json();
         if (data.success) {
           updateBlog(editingBlog.id, data.blog || payload);
-          alert('Article updated on backend!');
           window.location.reload();
         }
       } catch (err) {
-        alert('Offline fallback update.');
+        console.warn('Article update fallback to local state', err);
       }
     } else {
       const newId = 'blog_' + Date.now();
@@ -2990,12 +2968,10 @@ export const CMSModule: React.FC = () => {
         const data = await res.json();
         if (data.success) {
           addBlog(data.blog || newBlog);
-          alert('Article created on backend!');
           window.location.reload();
         }
       } catch (err) {
         addBlog(newBlog);
-        alert('Article created locally!');
       }
     }
 
@@ -3014,11 +2990,9 @@ export const CMSModule: React.FC = () => {
       const data = await res.json();
       if (data.success) {
         deleteBlog(id);
-        alert('Article deleted successfully on backend!');
       }
     } catch (err) {
       deleteBlog(id);
-      alert('Article deleted locally!');
     }
   };
 
@@ -3027,9 +3001,9 @@ export const CMSModule: React.FC = () => {
       <div className="flex justify-between items-center pb-3 border-b border-divider">
         <div>
           <h2 className="font-extrabold text-sm text-text-primary">CMS & Blog Publisher</h2>
-          <p className="text-[10px] text-text-secondary font-medium">Update health blogs and customer sitemaps</p>
+          <p className="text-[11px] text-text-secondary font-medium">Update health blogs and customer sitemaps</p>
         </div>
-        <button onClick={handleOpenAdd} className="flex items-center gap-1 bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[10px] hover:bg-secondary cursor-pointer">
+        <button onClick={handleOpenAdd} className="flex items-center gap-1 bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[11px] hover:bg-secondary cursor-pointer">
           <Plus size={12} /> Add Article
         </button>
       </div>
@@ -3045,8 +3019,8 @@ export const CMSModule: React.FC = () => {
             <textarea placeholder="Article Content..." value={content} onChange={(e) => setContent(e.target.value)} className="px-3 py-1.5 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary sm:col-span-2 h-24" required />
           </div>
           <div className="flex gap-2">
-            <button type="submit" className="bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[10px] cursor-pointer">Publish</button>
-            <button type="button" onClick={() => { setShowForm(false); setEditingBlog(null); }} className="bg-surface text-text-secondary border border-divider font-bold py-1.5 px-4 rounded-full text-[10px] cursor-pointer">Cancel</button>
+            <button type="submit" className="bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[11px] cursor-pointer">Publish</button>
+            <button type="button" onClick={() => { setShowForm(false); setEditingBlog(null); }} className="bg-surface text-text-secondary border border-divider font-bold py-1.5 px-4 rounded-full text-[11px] cursor-pointer">Cancel</button>
           </div>
         </form>
       )}
@@ -3058,7 +3032,7 @@ export const CMSModule: React.FC = () => {
               <img src={b.coverImage} alt={b.title} className="w-12 h-12 object-cover rounded-xl bg-white border border-divider" />
               <div>
                 <div className="font-extrabold text-xs text-text-primary line-clamp-1">{b.title}</div>
-                <div className="text-[9px] text-text-secondary font-semibold mt-0.5">{b.author?.name} • {b.date} • {b.category}</div>
+                <div className="text-[11px] text-text-secondary font-semibold mt-0.5">{b.author?.name} • {b.date} • {b.category}</div>
               </div>
             </div>
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
@@ -3110,7 +3084,7 @@ export const FinanceModule: React.FC = () => {
     <div className="bg-surface border border-divider p-6 rounded-[28px] shadow-card flex flex-col gap-6">
       <div className="pb-3 border-b border-divider">
         <h2 className="font-extrabold text-sm text-text-primary">Finance Transaction Ledger</h2>
-        <p className="text-[10px] text-text-secondary font-medium">Verify daily transaction records, taxes, and settlements</p>
+        <p className="text-[11px] text-text-secondary font-medium">Verify daily transaction records, taxes, and settlements</p>
       </div>
 
       <div className="overflow-x-auto">
@@ -3151,7 +3125,7 @@ export const AnalyticsModule: React.FC = () => {
     <div className="bg-surface border border-divider p-6 rounded-[28px] shadow-card flex flex-col gap-6">
       <div className="pb-3 border-b border-divider">
         <h2 className="font-extrabold text-sm text-text-primary">Hyperlocal Sales Trend</h2>
-        <p className="text-[10px] text-text-secondary font-medium">Visual heatmaps and stock forecast trajectories</p>
+        <p className="text-[11px] text-text-secondary font-medium">Visual heatmaps and stock forecast trajectories</p>
       </div>
 
       <div className="h-[200px] w-full flex items-end relative pt-4">
@@ -3170,7 +3144,7 @@ export const AnalyticsModule: React.FC = () => {
           <rect x="515" y="90" width="30" height="110" fill="#4CAF50" rx="4" />
         </svg>
       </div>
-      <div className="flex justify-between px-6 text-[9px] font-bold text-text-secondary mt-1">
+      <div className="flex justify-between px-6 text-[11px] font-bold text-text-secondary mt-1">
         <span>Bengaluru (Central)</span>
         <span>Bengaluru (South)</span>
         <span>Mumbai (West)</span>
@@ -3281,11 +3255,11 @@ export const ReviewsModule: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-divider">
         <div>
           <h2 className="font-extrabold text-sm text-text-primary">Customer Review Moderation</h2>
-          <p className="text-[10px] text-text-secondary font-medium">
+          <p className="text-[11px] text-text-secondary font-medium">
             {counts.Pending} pending • {counts.Approved} approved • {counts.Rejected} rejected
           </p>
         </div>
-        <button onClick={fetchReviews} className="flex items-center gap-1 border border-divider text-text-secondary font-bold py-1.5 px-3 rounded-full text-[10px] hover:bg-background cursor-pointer w-fit">
+        <button onClick={fetchReviews} className="flex items-center gap-1 border border-divider text-text-secondary font-bold py-1.5 px-3 rounded-full text-[11px] hover:bg-background cursor-pointer w-fit">
           <RefreshCw size={12} /> Refresh
         </button>
       </div>
@@ -3295,7 +3269,7 @@ export const ReviewsModule: React.FC = () => {
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-3 py-1 rounded-full text-[10px] font-bold border transition-colors ${
+            className={`px-3 py-1 rounded-full text-[11px] font-bold border transition-colors ${
               tab === t ? 'bg-admin-ink text-white border-admin-ink' : 'bg-background text-text-secondary border-divider hover:border-primary/40'
             }`}
           >
@@ -3306,7 +3280,7 @@ export const ReviewsModule: React.FC = () => {
 
       {visible.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 bg-background border border-divider rounded-xl px-3 py-2">
-          <label className="flex items-center gap-1.5 text-[11px] font-semibold text-text-secondary cursor-pointer">
+          <label className="flex items-center gap-1.5 text-xs font-semibold text-text-secondary cursor-pointer">
             <input
               type="checkbox"
               checked={allShownSelected}
@@ -3314,10 +3288,10 @@ export const ReviewsModule: React.FC = () => {
             />
             Select all ({visible.length})
           </label>
-          <span className="text-[11px] text-text-tertiary">{selected.size} selected</span>
+          <span className="text-xs text-text-tertiary">{selected.size} selected</span>
           <div className="flex gap-2 ml-auto">
-            <button disabled={!selected.size || busy} onClick={() => bulk('Approved')} className="bg-primary text-white font-bold py-1 px-3 rounded-full text-[10px] cursor-pointer disabled:opacity-40">Approve selected</button>
-            <button disabled={!selected.size || busy} onClick={() => bulk('Rejected')} className="border border-error text-error bg-error/5 font-bold py-1 px-3 rounded-full text-[10px] cursor-pointer disabled:opacity-40">Reject selected</button>
+            <button disabled={!selected.size || busy} onClick={() => bulk('Approved')} className="bg-primary text-white font-bold py-1 px-3 rounded-full text-[11px] cursor-pointer disabled:opacity-40">Approve selected</button>
+            <button disabled={!selected.size || busy} onClick={() => bulk('Rejected')} className="border border-error text-error bg-error/5 font-bold py-1 px-3 rounded-full text-[11px] cursor-pointer disabled:opacity-40">Reject selected</button>
           </div>
         </div>
       )}
@@ -3330,11 +3304,11 @@ export const ReviewsModule: React.FC = () => {
                 <input type="checkbox" className="mt-0.5" checked={selected.has(r._id)} onChange={() => toggle(r._id)} />
                 <span>
                   <span className="font-extrabold text-xs text-text-primary">{r.customerName || 'Anonymous Customer'}</span>
-                  <span className="text-[10px] text-text-secondary font-semibold ml-2">item: {r.productId}</span>
+                  <span className="text-[11px] text-text-secondary font-semibold ml-2">item: {r.productId}</span>
                 </span>
               </label>
               <div className="flex items-center gap-2">
-                <span className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full ${tone(r.status)}`}>{r.status}</span>
+                <span className={`text-[11px] font-extrabold uppercase px-2 py-0.5 rounded-full ${tone(r.status)}`}>{r.status}</span>
                 <button onClick={() => handleDelete(r._id)} className="p-1.5 rounded-lg bg-surface border border-divider text-text-secondary hover:text-error hover:bg-error/10 cursor-pointer" title="Delete Review"><Trash2 size={11} /></button>
               </div>
             </div>
@@ -3346,10 +3320,10 @@ export const ReviewsModule: React.FC = () => {
             {r.comment && <p className="text-xs text-text-secondary font-medium leading-relaxed italic">"{r.comment}"</p>}
             <div className="flex gap-2">
               {r.status !== 'Approved' && (
-                <button onClick={() => setOne(r._id, 'Approved')} className="bg-primary text-white font-bold py-1 px-4 rounded-full text-[10px] cursor-pointer">Approve</button>
+                <button onClick={() => setOne(r._id, 'Approved')} className="bg-primary text-white font-bold py-1 px-4 rounded-full text-[11px] cursor-pointer">Approve</button>
               )}
               {r.status !== 'Rejected' && (
-                <button onClick={() => setOne(r._id, 'Rejected')} className="bg-surface border border-divider text-text-secondary font-bold py-1 px-4 rounded-full text-[10px] cursor-pointer hover:bg-error/10 hover:text-error">Reject</button>
+                <button onClick={() => setOne(r._id, 'Rejected')} className="bg-surface border border-divider text-text-secondary font-bold py-1 px-4 rounded-full text-[11px] cursor-pointer hover:bg-error/10 hover:text-error">Reject</button>
               )}
             </div>
           </div>
@@ -3434,7 +3408,6 @@ export const SupportModule: React.FC = () => {
       const data = await res.json();
       if (data.success) {
         setActiveTicket(data.ticket);
-        alert(`Ticket status updated to ${newStatus}!`);
         fetchTickets();
       }
     } catch (err) {
@@ -3455,14 +3428,14 @@ export const SupportModule: React.FC = () => {
                 activeTicket?.ticketId === t.ticketId ? 'border-primary bg-primary/5' : 'border-divider hover:bg-background/40'
               }`}
             >
-              <div className="flex justify-between items-center text-[10px] font-bold">
+              <div className="flex justify-between items-center text-[11px] font-bold">
                 <span className="text-text-primary">{t.ticketId}</span>
-                <span className={`px-1.5 py-0.5 rounded text-[8px] uppercase ${
+                <span className={`px-1.5 py-0.5 rounded text-[11px] uppercase ${
                   t.status === 'Resolved' ? 'text-success bg-success/10' : 'text-error bg-error/10'
                 }`}>{t.status}</span>
               </div>
               <div className="font-extrabold text-xs text-text-primary mt-1 line-clamp-1">{t.subject}</div>
-              <div className="text-[10px] text-text-secondary mt-0.5">{t.customerName}</div>
+              <div className="text-[11px] text-text-secondary mt-0.5">{t.customerName}</div>
             </div>
           ))}
           {tickets.length === 0 && (
@@ -3477,13 +3450,13 @@ export const SupportModule: React.FC = () => {
             <div className="pb-3 border-b border-divider flex justify-between items-center">
               <div>
                 <h2 className="font-extrabold text-sm text-text-primary">{activeTicket.subject}</h2>
-                <p className="text-[10px] text-text-secondary font-medium">Customer: {activeTicket.customerName} • Ticket ID: {activeTicket.ticketId}</p>
+                <p className="text-[11px] text-text-secondary font-medium">Customer: {activeTicket.customerName} • Ticket ID: {activeTicket.ticketId}</p>
               </div>
               <div className="flex gap-2">
                 <select 
                   value={activeTicket.status} 
                   onChange={(e) => handleStatusChange(e.target.value)}
-                  className="px-2.5 py-1 border border-divider rounded-xl text-[10px] font-bold bg-background text-text-primary focus:outline-none"
+                  className="px-2.5 py-1 border border-divider rounded-xl text-[11px] font-bold bg-background text-text-primary focus:outline-none"
                 >
                   <option value="Open">Open</option>
                   <option value="In Progress">In Progress</option>
@@ -3500,7 +3473,7 @@ export const SupportModule: React.FC = () => {
                     : 'bg-primary text-white self-end rounded-tr-none'
                 }`}>
                   <span>{chat.content}</span>
-                  <span className={`text-[8px] font-bold mt-1 self-end ${chat.sender === 'Customer' ? 'text-text-tertiary' : 'text-white/80'}`}>
+                  <span className={`text-[11px] font-bold mt-1 self-end ${chat.sender === 'Customer' ? 'text-text-tertiary' : 'text-white/80'}`}>
                     {new Date(chat.timestamp).toLocaleTimeString()}
                   </span>
                 </div>
@@ -3562,7 +3535,6 @@ export const AuditLogsModule: React.FC = () => {
       const data = await res.json();
       if (data.success) {
         setLogs([]);
-        alert('Audit log trail successfully cleared.');
       }
     } catch (e) {
       alert('Clear logs operation failed.');
@@ -3574,9 +3546,9 @@ export const AuditLogsModule: React.FC = () => {
       <div className="flex justify-between items-center pb-3 border-b border-divider">
         <div>
           <h2 className="font-extrabold text-sm text-text-primary">System Audit Log Trail</h2>
-          <p className="text-[10px] text-text-secondary font-medium">Audit logs recording administrative user actions</p>
+          <p className="text-[11px] text-text-secondary font-medium">Audit logs recording administrative user actions</p>
         </div>
-        <button onClick={handleClearLogs} className="bg-error/15 text-error hover:bg-error/20 border border-error/20 font-bold py-1.5 px-4 rounded-full text-[10px] cursor-pointer">
+        <button onClick={handleClearLogs} className="bg-error/15 text-error hover:bg-error/20 border border-error/20 font-bold py-1.5 px-4 rounded-full text-[11px] cursor-pointer">
           Clear Log Trail
         </button>
       </div>
@@ -3596,7 +3568,7 @@ export const AuditLogsModule: React.FC = () => {
             {logs.map((log, idx) => (
               <tr key={idx} className="border-b border-divider hover:bg-background/20 transition-all">
                 <td className="p-3 font-extrabold text-text-primary">{log.userName || log.userId}</td>
-                <td className="p-3"><span className="px-2 py-0.5 rounded text-[9px] font-bold bg-primary/10 text-primary uppercase">{log.action}</span></td>
+                <td className="p-3"><span className="px-2 py-0.5 rounded text-[11px] font-bold bg-primary/10 text-primary uppercase">{log.action}</span></td>
                 <td className="p-3 font-semibold text-text-secondary">{log.details}</td>
                 <td className="p-3 font-mono font-semibold text-text-tertiary">{log.ipAddress || 'Internal'}</td>
                 <td className="p-3 text-right text-text-secondary font-semibold">{new Date(log.timestamp).toLocaleString()}</td>
@@ -3704,7 +3676,7 @@ export const SettingsModule: React.FC = () => {
         method: 'PUT', headers: { 'Content-Type': 'application/json', ...getAuthHeader() }, body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (data.success) { alert('Delivery & dispatch settings saved.'); fetchSettings(); }
+      if (data.success) { fetchSettings(); }
       else alert(data.message || 'Save failed');
     } catch {
       alert('Save failed');
@@ -3735,7 +3707,6 @@ export const SettingsModule: React.FC = () => {
       });
       const data = await res.json();
       if (data.success) {
-        alert('Enterprise settings successfully updated on database!');
         fetchSettings();
       }
     } catch (err) {
@@ -3744,30 +3715,29 @@ export const SettingsModule: React.FC = () => {
   };
 
   const handleBackup = () => {
-    alert('DB backup snapshot requested. Creating cloud backup compression...');
   };
 
   return (
     <div className="bg-surface border border-divider p-6 rounded-[28px] shadow-card flex flex-col gap-6">
       <div className="pb-3 border-b border-divider">
         <h2 className="font-extrabold text-sm text-text-primary">General Enterprise Settings</h2>
-        <p className="text-[10px] text-text-secondary font-medium">Update tax percent, gateway keys, and initiate backups</p>
+        <p className="text-[11px] text-text-secondary font-medium">Update tax percent, gateway keys, and initiate backups</p>
       </div>
 
       <form onSubmit={handleSave} className="flex flex-col gap-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-bold text-text-primary">Registered Business Name</label>
+            <label className="text-xs font-bold text-text-primary">Registered Business Name</label>
             <input type="text" value={bName} onChange={(e) => setBName(e.target.value)} className="w-full px-3 py-2 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary font-bold" required />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-bold text-text-primary">Support Dispatcher Email</label>
+            <label className="text-xs font-bold text-text-primary">Support Dispatcher Email</label>
             <input type="email" value={bEmail} onChange={(e) => setBEmail(e.target.value)} className="w-full px-3 py-2 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary" required />
           </div>
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-[11px] font-bold text-text-primary">Razorpay Live API Token Key</label>
+          <label className="text-xs font-bold text-text-primary">Razorpay Live API Token Key</label>
           <div className="relative">
             <Key className="absolute left-3 top-2.5 text-text-secondary" size={15} />
             <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} className="w-full pl-9 pr-4 py-2 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary font-mono" required />
@@ -3782,7 +3752,7 @@ export const SettingsModule: React.FC = () => {
 
       <div className="pt-5 border-t border-divider">
         <h2 className="font-extrabold text-sm text-text-primary">Delivery &amp; dispatch</h2>
-        <p className="text-[10px] text-text-secondary font-medium">Auto-assignment radius, offer timing, batching, partner earning rates, customer delivery fee, dark-store origin</p>
+        <p className="text-[11px] text-text-secondary font-medium">Auto-assignment radius, offer timing, batching, partner earning rates, customer delivery fee, dark-store origin</p>
       </div>
       <form onSubmit={saveDelivery} className="flex flex-col gap-4">
         <label className="flex items-center gap-2 text-xs font-bold text-text-primary">
@@ -3802,7 +3772,7 @@ export const SettingsModule: React.FC = () => {
             { k: 'freeDeliveryThreshold', label: 'Free delivery above (₹)', step: '10' },
           ].map(f => (
             <div key={f.k} className="flex flex-col gap-1">
-              <label className="text-[11px] font-bold text-text-primary">{f.label}</label>
+              <label className="text-xs font-bold text-text-primary">{f.label}</label>
               <input type="number" step={f.step} min={0} value={(dcfg as any)[f.k]}
                 onChange={dNum(f.k as keyof DeliveryCfg)}
                 className="w-full px-3 py-2 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary font-bold" />
@@ -3811,17 +3781,17 @@ export const SettingsModule: React.FC = () => {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-bold text-text-primary">Dark-store name</label>
+            <label className="text-xs font-bold text-text-primary">Dark-store name</label>
             <input type="text" value={dcfg.storeName} onChange={e => setDcfg(c => ({ ...c, storeName: e.target.value }))}
               className="w-full px-3 py-2 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary" />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-bold text-text-primary">Store latitude</label>
+            <label className="text-xs font-bold text-text-primary">Store latitude</label>
             <input type="number" step="any" value={dcfg.storeLat} onChange={dNum('storeLat')}
               className="w-full px-3 py-2 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary font-mono" />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-bold text-text-primary">Store longitude</label>
+            <label className="text-xs font-bold text-text-primary">Store longitude</label>
             <input type="number" step="any" value={dcfg.storeLng} onChange={dNum('storeLng')}
               className="w-full px-3 py-2 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary font-mono" />
           </div>

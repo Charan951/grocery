@@ -43,6 +43,8 @@ class OrdersNotifier extends StateNotifier<AsyncValue<List<OrderModel>>> {
     required double tax,
     required double total,
     required String address,
+    double? lat,
+    double? lng,
     required String paymentMethod,
     required bool paid,
     String? paymentId,
@@ -72,6 +74,12 @@ class OrdersNotifier extends StateNotifier<AsyncValue<List<OrderModel>>> {
       'paymentStatus': paid ? 'Paid' : 'Pending',
       'status': 'Pending',
       'deliveryAddress': address,
+      // Without these the order never gets a deliveryLocation, which is what
+      // the live tracking map keys off — the customer would place an order
+      // and never see a map until (if ever) a rider's live position came
+      // through.
+      'deliveryLat': ?lat,
+      'deliveryLng': ?lng,
       'paymentId': paymentId,
       'paymentRef': paymentRef,
     };

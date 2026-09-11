@@ -58,7 +58,7 @@ export const PartnerShell: React.FC<Props> = ({ children }) => {
         {/* Top bar */}
         <header className="sticky top-0 z-20 h-14 bg-admin-surface/95 backdrop-blur-sm border-b border-admin-ledger-line flex items-center justify-between px-4 gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="w-6 h-6 rounded bg-admin-green text-white font-admin-display font-bold text-[11px] flex items-center justify-center shrink-0">
+            <span className="w-6 h-6 rounded bg-admin-accent text-admin-ink font-admin-display font-bold text-[11px] flex items-center justify-center shrink-0">
               F
             </span>
             <span className="font-admin-display font-semibold text-[14px] text-admin-text truncate">
@@ -97,7 +97,7 @@ export const PartnerShell: React.FC<Props> = ({ children }) => {
 
             <button
               onClick={() => navigate('/partner/profile')}
-              className="w-7 h-7 rounded-md bg-admin-green text-white font-admin-display font-bold text-[11px] flex items-center justify-center shrink-0"
+              className="w-7 h-7 rounded-md bg-admin-accent text-admin-ink font-admin-display font-bold text-[11px] flex items-center justify-center shrink-0"
               aria-label="Profile"
             >
               {(partner?.name || 'P').slice(0, 1).toUpperCase()}
@@ -135,10 +135,11 @@ export const PartnerShell: React.FC<Props> = ({ children }) => {
                 <NavLink
                   key={to}
                   to={to}
-                  className={`flex flex-col items-center justify-center gap-0.5 font-admin-mono text-[9px] font-bold uppercase tracking-[0.08em] transition-colors ${
-                    active ? 'text-admin-green' : 'text-admin-text-faint'
+                  className={`relative flex flex-col items-center justify-center gap-0.5 font-admin-mono text-[9px] font-bold uppercase tracking-[0.08em] transition-colors ${
+                    active ? 'text-admin-accent-on-light' : 'text-admin-text-faint'
                   }`}
                 >
+                  {active && <span className="absolute top-0 h-[3px] w-6 rounded-b bg-admin-accent" />}
                   <Icon size={19} />
                   {label}
                 </NavLink>

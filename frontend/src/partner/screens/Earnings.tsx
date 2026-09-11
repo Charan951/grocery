@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, CenterState, PageHead, SectionLabel, money } from '../ui';
+import { Card, CenterState, FilterMenu, PageHead, SectionLabel, money } from '../ui';
 import { partnerApi } from '../partnerApi';
 
 const RANGES: Array<'today' | 'week' | 'month' | 'all'> = ['today', 'week', 'month', 'all'];
@@ -26,21 +26,12 @@ export const Earnings: React.FC = () => {
         title="Earnings"
         meta={s ? `${s.count} deliver${s.count === 1 ? 'y' : 'ies'} · ${range}` : 'Payout ledger'}
         actions={
-          <div className="flex gap-1 bg-admin-surface border border-admin-ledger-line rounded-md p-0.5">
-            {RANGES.map((r) => (
-              <button
-                key={r}
-                onClick={() => setRange(r)}
-                className={`font-admin-mono text-[10px] font-bold uppercase tracking-[0.08em] px-2.5 py-1.5 rounded transition-colors cursor-pointer ${
-                  range === r
-                    ? 'bg-admin-ink text-white'
-                    : 'text-admin-text-muted hover:text-admin-text'
-                }`}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
+          <FilterMenu
+            title="Time range"
+            value={range}
+            onChange={setRange}
+            options={RANGES.map((r) => ({ value: r, label: r.charAt(0).toUpperCase() + r.slice(1) }))}
+          />
         }
       />
 

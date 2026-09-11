@@ -1,10 +1,12 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
 import 'package:freshcart/core/constants/app_radius.dart';
 import 'package:freshcart/core/error/api_exception.dart';
+import 'package:freshcart/core/services/payment_service.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
 import 'package:freshcart/core/widgets/app_modal.dart';
 import 'package:freshcart/core/widgets/app_scaffold.dart';
@@ -13,6 +15,9 @@ import 'package:freshcart/core/widgets/buttons.dart';
 import 'package:freshcart/core/widgets/feedback_states.dart';
 import 'package:freshcart/core/widgets/glass_card.dart';
 import 'package:freshcart/core/widgets/skeletons.dart';
+import 'package:freshcart/core/utils/invoice.dart';
+import 'package:freshcart/features/authentication/presentation/controllers/auth_controller.dart';
+import 'package:freshcart/features/checkout/presentation/controllers/checkout_controller.dart' show paymentGatewayProvider;
 import 'package:freshcart/features/home/presentation/controllers/catalog_providers.dart' show apiServiceProvider;
 import 'package:freshcart/features/orders/data/models/order_model.dart';
 import 'package:freshcart/features/orders/presentation/controllers/orders_controller.dart';
@@ -29,6 +34,15 @@ class OrderDetailScreen extends ConsumerWidget {
 
     return AppScaffold(
       title: 'Order #$orderId',
+      actions: async.maybeWhen(
+        data: (order) => [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: _DownloadInvoiceButton(order: order),
+          ),
+        ],
+        orElse: () => null,
+      ),
       body: async.when(
         loading: () => const _DetailSkeleton(),
         error: (e, _) => ErrorState(onRetry: () => ref.invalidate(orderDetailProvider(orderId))),
@@ -39,12 +53,21 @@ class OrderDetailScreen extends ConsumerWidget {
             physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
             children: [
-              _StatusHeader(order: order, isDark: isDark),
-              const SizedBox(height: 20),
+              // The generic "In Transit" bucket label is redundant once the
+              // step-by-step timeline below shows the real status — only
+              // show this banner for a final, unambiguous outcome.
+              if (!order.isActive) ...[
+                _StatusHeader(order: order, isDark: isDark),
+                const SizedBox(height: 20),
+              ],
               if (order.timeline.isNotEmpty) ...[
                 _title('Status', isDark),
                 const SizedBox(height: 8),
                 _Timeline(entries: order.timeline, isDark: isDark),
+                const SizedBox(height: 20),
+              ],
+              if (order.deliveryOtp.isNotEmpty) ...[
+                _DeliveryOtpCard(otp: order.deliveryOtp, isDark: isDark),
                 const SizedBox(height: 20),
               ],
               _title('Items (${order.items.length})', isDark),
@@ -129,6 +152,13 @@ class OrderDetailScreen extends ConsumerWidget {
                         isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
                       ),
                     ),
+                    if (_canSwitchToPrepaid(order)) ...[
+                      const SizedBox(height: 10),
+                      _ChangePaymentMethodButton(
+                        order: order,
+                        onChanged: () => ref.invalidate(orderDetailProvider(orderId)),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -172,6 +202,14 @@ class OrderDetailScreen extends ConsumerWidget {
   static bool _canCancel(OrderStatus s) =>
       s == OrderStatus.placed || s == OrderStatus.processing;
 
+  /// A COD order still awaiting payment (i.e. not delivered/cancelled and
+  /// never paid online) can be switched to a prepaid method — mirrors the
+  /// admin console reading the same `paymentMethod`/`paymentStatus` fields.
+  static bool _canSwitchToPrepaid(OrderModel o) {
+    final isCod = RegExp('cod|cash', caseSensitive: false).hasMatch(o.paymentMethod);
+    return o.isActive && isCod && o.paymentStatus.toLowerCase() != 'paid';
+  }
+
   Widget _title(String t, bool isDark) => Text(t, style: AppTypography.title(
         isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
       ));
@@ -191,6 +229,142 @@ class OrderDetailScreen extends ConsumerWidget {
                   ? AppTypography.labelLarge(isDark ? AppColors.textPrimaryDark : AppColors.textPrimary)
                   : AppTypography.labelMedium(isDark ? AppColors.textPrimaryDark : AppColors.textPrimary))),
         ],
+      ),
+    );
+  }
+}
+
+/// Lets the customer switch a still-unpaid COD order to a prepaid method
+/// (Razorpay UPI/Card). On success the order document's `paymentMethod` /
+/// `paymentStatus` are updated server-side — the same fields the admin
+/// console's Orders list reads, so the change shows up there immediately.
+class _ChangePaymentMethodButton extends ConsumerStatefulWidget {
+  final OrderModel order;
+  final VoidCallback onChanged;
+  const _ChangePaymentMethodButton({required this.order, required this.onChanged});
+
+  @override
+  ConsumerState<_ChangePaymentMethodButton> createState() => _ChangePaymentMethodButtonState();
+}
+
+class _ChangePaymentMethodButtonState extends ConsumerState<_ChangePaymentMethodButton> {
+  bool _busy = false;
+
+  Future<void> _pay() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final api = ref.read(apiServiceProvider);
+      final order = widget.order;
+
+      final rzp = await api.createRazorpayOrder(amount: order.total, receipt: order.id);
+      final key = (rzp['key'] ?? '').toString();
+      final rzpOrderId = (rzp['orderId'] ?? '').toString();
+      final testMode = rzp['testMode'] == true;
+      final gateway = (testMode && key.isEmpty) || kIsWeb
+          ? SimulatedGateway()
+          : ref.read(paymentGatewayProvider);
+
+      final user = ref.read(authProvider).user;
+      final result = await gateway.pay(PaymentRequest(
+        keyId: key,
+        razorpayOrderId: rzpOrderId,
+        amountPaise: (order.total * 100).round(),
+        name: 'FreshCart',
+        description: 'Order ${order.id}',
+        contact: user?.phone ?? '',
+        email: user?.email ?? '',
+      ));
+
+      if (result is PaymentFailure) {
+        if (mounted) AppToast.error(result.cancelled ? 'Payment cancelled.' : result.message);
+        return;
+      }
+      final ok = result as PaymentSuccess;
+
+      final verify = await api.verifyPayment(
+        razorpayOrderId: ok.razorpayOrderId,
+        paymentId: ok.paymentId,
+        signature: ok.signature,
+        orderId: order.id,
+        paymentMethod: 'Razorpay UPI/Card',
+      );
+      if (verify['verified'] != true) {
+        if (mounted) AppToast.error('Could not verify your payment. Your order is still Cash on Delivery.');
+        return;
+      }
+
+      if (mounted) AppToast.success('Payment method updated — paid via UPI/Card.');
+      widget.onChanged();
+    } on ApiException catch (e) {
+      if (mounted) AppToast.error(e.message);
+    } catch (_) {
+      if (mounted) AppToast.error('Could not update the payment method. Please try again.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton.icon(
+      onPressed: _busy ? null : _pay,
+      icon: _busy
+          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+          : const Icon(Icons.sync_alt_rounded, size: 16),
+      label: Text(_busy ? 'Processing…' : 'Switch to UPI / Card'),
+      style: TextButton.styleFrom(
+        foregroundColor: AppColors.primaryText,
+        backgroundColor: AppColors.primary.withOpacity(0.10),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+    );
+  }
+}
+
+class _DownloadInvoiceButton extends StatefulWidget {
+  final OrderModel order;
+  const _DownloadInvoiceButton({required this.order});
+
+  @override
+  State<_DownloadInvoiceButton> createState() => _DownloadInvoiceButtonState();
+}
+
+class _DownloadInvoiceButtonState extends State<_DownloadInvoiceButton> {
+  bool _busy = false;
+
+  Future<void> _run() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await downloadInvoice(widget.order);
+    } catch (_) {
+      if (mounted) AppToast.error('Could not generate the invoice. Please try again.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: _busy ? null : _run,
+      tooltip: 'Download Invoice / Credit Note',
+      icon: _busy
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF8E24AA)),
+            )
+          : const Icon(Icons.download_rounded, size: 20),
+      style: IconButton.styleFrom(
+        foregroundColor: const Color(0xFF8E24AA),
+        backgroundColor: const Color(0xFFF3E8FF),
+        shape: const CircleBorder(),
       ),
     );
   }
@@ -227,6 +401,47 @@ class _StatusHeader extends StatelessWidget {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DeliveryOtpCard extends StatelessWidget {
+  final String otp;
+  final bool isDark;
+  const _DeliveryOtpCard({required this.otp, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.08),
+        borderRadius: AppRadius.brLg,
+        border: Border.all(color: AppColors.primary.withOpacity(0.25)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('DELIVERY CODE', style: AppTypography.labelSmall(AppColors.primaryText)
+                    .copyWith(letterSpacing: 0.4, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 2),
+                Text('Share this with your delivery partner at the door', style: AppTypography.bodySmall(
+                  isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                )),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(otp, style: AppTypography.title(AppColors.primaryText).copyWith(
+            letterSpacing: 6,
+            fontWeight: FontWeight.w800,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          )),
         ],
       ),
     );

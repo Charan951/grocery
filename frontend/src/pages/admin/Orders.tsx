@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  ShoppingBag, Eye, Printer, UserPlus, UserMinus, Clock, ArrowRight, CheckCircle2,
+  ShoppingBag, Printer, UserPlus, UserMinus, Clock, ArrowRight, CheckCircle2,
   XCircle, Truck, FileText, ChevronRight, X, AlertCircle
 } from 'lucide-react';
 import { PageHeader } from '../../components/admin/PageHeader';
@@ -47,6 +47,9 @@ import { useCMS } from '../../context/CMSContext';
 export const Orders: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [activeTab, setActiveTab] = useState<string>('All');
+  // Date filter: 'all' | 'today' | 'yesterday' | 'week' | 'custom'
+  const [dateFilter, setDateFilter] = useState<string>('all');
+  const [customDate, setCustomDate] = useState<string>('');
   
   // Selection / Modal States
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -259,7 +262,6 @@ export const Orders: React.FC = () => {
         }
       }
       fetchOrders();
-      alert(`Order status updated to ${newStatus}.`);
       return;
     } catch (e) {
       // Local Sync in Offline Mode
@@ -280,7 +282,6 @@ export const Orders: React.FC = () => {
         return o;
       }));
     }
-    alert(`Order ORD status updated to ${newStatus}!`);
   };
 
 
@@ -290,9 +291,37 @@ export const Orders: React.FC = () => {
 
   const tabs = ['All', 'Pending', 'Accepted', 'Packed', 'Ready', 'Assigned', 'Out For Delivery', 'Delivered', 'Cancelled'];
 
-  const filteredOrders = orders.filter(o => {
-    return activeTab === 'All' || o.status === activeTab;
-  });
+  const sameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+  const matchesDate = (createdAt: string): boolean => {
+    if (dateFilter === 'all') return true;
+    const d = new Date(createdAt);
+    if (Number.isNaN(d.getTime())) return false;
+    const now = new Date();
+    if (dateFilter === 'today') return sameDay(d, now);
+    if (dateFilter === 'yesterday') {
+      const y = new Date(now);
+      y.setDate(now.getDate() - 1);
+      return sameDay(d, y);
+    }
+    if (dateFilter === 'week') {
+      const weekAgo = new Date(now);
+      weekAgo.setDate(now.getDate() - 7);
+      return d >= weekAgo && d <= now;
+    }
+    if (dateFilter === 'custom') {
+      if (!customDate) return true;
+      const [yy, mm, dd] = customDate.split('-').map(Number);
+      return sameDay(d, new Date(yy, mm - 1, dd));
+    }
+    return true;
+  };
+
+  const filteredOrders = orders
+    .filter(o => activeTab === 'All' || o.status === activeTab)
+    .filter(o => matchesDate(o.createdAt))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const statusTone = (status: string): 'green' | 'amber' | 'red' | 'blue' | 'neutral' => {
     if (status === 'Delivered') return 'green';
@@ -300,6 +329,92 @@ export const Orders: React.FC = () => {
     if (status === 'Pending') return 'amber';
     return 'blue';
   };
+
+  const ALL_STATUSES = ['Pending', 'Accepted', 'Packed', 'Ready', 'Assigned', 'Out For Delivery', 'Delivered', 'Cancelled', 'Returned', 'Refunded'];
+
+  const fmtDate = (v?: string) => {
+    if (!v) return '—';
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+
+  if (selectedOrder) {
+    return (
+      <OrderDetailView
+        order={selectedOrder}
+        onBack={() => setSelectedOrder(null)}
+        onPrint={printInvoice}
+        onUpdateStatus={handleUpdateStatus}
+        onAssign={() => openAssign(false)}
+        onReassign={() => openAssign(true)}
+        onUnassign={handleUnassign}
+        statusTone={statusTone}
+        allStatuses={ALL_STATUSES}
+        fmtDate={fmtDate}
+        riderModal={showRiderModal && createPortal(
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ width: '100vw', height: '100vh' }}>
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-xs" onClick={() => !assignBusy && setShowRiderModal(false)} />
+            <div
+              className="bg-admin-surface rounded-2xl border border-admin-ledger-line p-6 max-w-sm w-full relative z-10 shadow-2xl flex flex-col gap-4"
+              style={{ width: '100%', maxWidth: '24rem', minWidth: '280px', boxSizing: 'border-box', flexShrink: 0 }}
+            >
+              <h3 className="font-bold text-sm text-admin-text uppercase font-admin-mono">
+                {reassignMode ? 'Reassign' : 'Assign'} delivery partner
+              </h3>
+              <p className="text-xs text-admin-text-muted leading-normal">
+                Order <b>{selectedOrder.orderId}</b>. An offer is sent to the partner's app; they must accept it. Force-assign skips the offer.
+              </p>
+              <div className="flex flex-col gap-2">
+                <label className="text-[11px] font-bold text-admin-text-muted uppercase font-admin-mono">Select partner (online first)</label>
+                <select
+                  value={selectedPartnerId}
+                  onChange={(e) => setSelectedPartnerId(e.target.value)}
+                  className="px-3 py-2 border border-admin-ledger-line rounded-lg text-xs bg-admin-paper focus:outline-none focus:border-admin-green text-admin-text"
+                >
+                  <option value="">-- Choose partner --</option>
+                  {partners.map((p) => {
+                    const state = p.accountStatus === 'Suspended' ? 'suspended'
+                      : !p.isOnline ? 'offline'
+                      : p.availability === 'busy' ? 'on delivery' : 'available';
+                    return (
+                      <option key={p.userId} value={p.userId} disabled={p.accountStatus === 'Suspended'}>
+                        {p.name} — {state} • {p.activeOrderIds.length}/{p.maxConcurrent} active • ★{Number(p.rating || 0).toFixed(1)}
+                      </option>
+                    );
+                  })}
+                </select>
+                {partners.length === 0 && (
+                  <span className="text-[11px] text-admin-red font-semibold">No delivery partners found. Add one in Modules → Delivery.</span>
+                )}
+              </div>
+              <label className="flex items-center gap-2 text-xs text-admin-text-muted font-semibold cursor-pointer">
+                <input type="checkbox" checked={forceAssign} onChange={(e) => setForceAssign(e.target.checked)} />
+                Force-assign (skip offer / partner acceptance)
+              </label>
+              {assignMsg && <div className="text-xs font-semibold text-admin-green">{assignMsg}</div>}
+              <div className="flex gap-2.5 mt-1">
+                <button
+                  onClick={handleAssign}
+                  disabled={!selectedPartnerId || assignBusy}
+                  className="flex-1 bg-admin-ink text-white font-bold py-2 rounded-lg text-xs hover:opacity-90 cursor-pointer disabled:opacity-50"
+                >
+                  {assignBusy ? 'Working…' : reassignMode ? 'Confirm reassign' : forceAssign ? 'Force-assign' : 'Send offer'}
+                </button>
+                <button
+                  onClick={() => setShowRiderModal(false)}
+                  disabled={assignBusy}
+                  className="flex-1 bg-admin-paper text-admin-text-muted border border-admin-ledger-line font-bold py-2 rounded-lg text-xs hover:bg-admin-surface cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -313,7 +428,7 @@ export const Orders: React.FC = () => {
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-3.5 py-2 rounded text-[10px] font-semibold uppercase tracking-wide transition-all cursor-pointer ${
+            className={`px-3.5 py-2 rounded text-[11px] font-semibold uppercase tracking-wide transition-all cursor-pointer ${
               activeTab === tab ? 'bg-admin-ink text-white' : 'text-admin-text-muted hover:text-admin-text'
             }`}
           >
@@ -322,31 +437,64 @@ export const Orders: React.FC = () => {
         ))}
       </div>
 
+      {/* Date filter */}
+      <div className="flex flex-wrap items-center gap-1 font-admin-mono -mt-2">
+        {[
+          { key: 'all', label: 'All dates' },
+          { key: 'today', label: 'Today' },
+          { key: 'yesterday', label: 'Yesterday' },
+          { key: 'week', label: 'Last 7 days' },
+        ].map(f => (
+          <button
+            key={f.key}
+            onClick={() => setDateFilter(f.key)}
+            className={`px-3 py-1.5 rounded text-[11px] font-semibold uppercase tracking-wide transition-all cursor-pointer border ${
+              dateFilter === f.key
+                ? 'bg-admin-ink text-white border-admin-ink'
+                : 'text-admin-text-muted hover:text-admin-text border-admin-ledger-line'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+        <input
+          type="date"
+          value={customDate}
+          onChange={(e) => { setCustomDate(e.target.value); setDateFilter(e.target.value ? 'custom' : 'all'); }}
+          className={`px-3 py-1.5 rounded text-[11px] font-semibold bg-admin-surface transition-all cursor-pointer border ${
+            dateFilter === 'custom' ? 'border-admin-ink text-admin-text' : 'border-admin-ledger-line text-admin-text-muted'
+          }`}
+        />
+      </div>
+
       {/* Orders Ledger Table */}
       <div className="bg-admin-surface border border-admin-ledger-line rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="font-admin-mono">
-                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide">ID</th>
-                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide">Customer</th>
-                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide">Items</th>
-                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide">Total</th>
-                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide">Payment</th>
-                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide">Rider</th>
-                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide">Status</th>
-                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide text-right">Actions</th>
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[11px] tracking-wide">ID</th>
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[11px] tracking-wide">Customer</th>
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[11px] tracking-wide">Items</th>
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[11px] tracking-wide">Total</th>
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[11px] tracking-wide">Payment</th>
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[11px] tracking-wide">Rider</th>
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[11px] tracking-wide">Status</th>
               </tr>
             </thead>
             <tbody>
               {filteredOrders.map((o) => {
                 const totalItems = o.items.reduce((sum, item) => sum + item.quantity, 0);
                 return (
-                  <tr key={o.orderId} className="hover:bg-admin-paper/70 transition-colors border-b border-admin-ledger-line last:border-b-0">
+                  <tr
+                    key={o.orderId}
+                    onClick={() => setSelectedOrder(o)}
+                    className="hover:bg-admin-paper/70 transition-colors border-b border-admin-ledger-line last:border-b-0 cursor-pointer"
+                  >
                     <td className="p-3.5 font-admin-mono font-semibold text-admin-text">{o.orderId}</td>
                     <td className="p-3.5">
                       <div className="font-semibold text-admin-text">{o.customerName}</div>
-                      <div className="font-admin-mono text-[10px] text-admin-text-faint font-medium">{o.customerPhone}</div>
+                      <div className="font-admin-mono text-[11px] text-admin-text-faint font-medium">{o.customerPhone}</div>
                     </td>
                     <td className="p-3.5 font-medium text-admin-text-muted">{totalItems} items</td>
                     <td className="p-3.5 font-admin-mono font-semibold text-admin-text tabular-nums">₹{o.grandTotal}</td>
@@ -359,28 +507,19 @@ export const Orders: React.FC = () => {
                     <td className="p-3.5 text-admin-text-muted font-medium">
                       {o.deliveryPartnerName || 'Unassigned'}
                       {o.assignmentStalled && (
-                        <span className="ml-1 text-[9px] font-bold uppercase text-error">• offer declined</span>
+                        <span className="ml-1 text-[11px] font-bold uppercase text-error">• offer declined</span>
                       )}
                     </td>
                     <td className="p-3.5">
                       <ShelfTag tone={statusTone(o.status)}>{o.status}</ShelfTag>
-                    </td>
-                    <td className="p-3.5 text-right">
-                      <button
-                        onClick={() => setSelectedOrder(o)}
-                        className="px-2.5 py-1.5 rounded text-admin-text-muted hover:text-admin-green hover:bg-admin-green-soft transition-all cursor-pointer inline-flex items-center gap-1.5"
-                      >
-                        <Eye size={14} />
-                        <span className="text-[10px] font-semibold uppercase tracking-wide font-admin-mono">Process</span>
-                      </button>
                     </td>
                   </tr>
                 );
               })}
               {filteredOrders.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-admin-text-faint font-medium">
-                    No orders found matching status tab.
+                  <td colSpan={7} className="p-8 text-center text-admin-text-faint font-medium">
+                    No orders found for this filter.
                   </td>
                 </tr>
               )}
@@ -389,292 +528,341 @@ export const Orders: React.FC = () => {
         </div>
       </div>
 
-      {/* DETAIL INVOICE & TIMELINE PROCESS DRAWER */}
-      {selectedOrder && createPortal(
-        <div className="fixed inset-0 z-[60] bg-surface overflow-y-auto">
-          <div className="relative mx-auto w-full max-w-4xl min-h-full flex flex-col p-6 md:p-10 printable-area">
-            {/* Drawer Header */}
-            <div className="flex items-center justify-between border-b border-divider pb-4 mb-4 dont-print">
-              <h2 className="text-base font-extrabold text-text-primary">Order dispatch cockpit</h2>
-              <div className="flex gap-2">
-                <button onClick={printInvoice} className="p-1.5 rounded-lg border border-divider hover:bg-background cursor-pointer text-text-secondary hover:text-primary"><Printer size={15} /></button>
-                <button onClick={() => setSelectedOrder(null)} className="p-1.5 rounded-lg border border-divider hover:bg-background cursor-pointer"><X size={15} /></button>
-              </div>
-            </div>
-
-            {/* INVOICE BILL LAYOUT */}
-            <div className="flex flex-col gap-6 font-sans">
-              {/* Receipt Header */}
-              <div className="flex justify-between items-start border-b border-divider pb-4">
-                <div>
-                  <h3 className="text-lg font-extrabold text-primary tracking-wide">FRESHCART</h3>
-                  <p className="text-[10px] text-text-secondary font-medium">South Hub • Bangalore, India</p>
-                  <p className="text-[10px] text-text-secondary font-medium">GSTIN: 29AAAAA1111A1Z1</p>
-                </div>
-                <div className="text-right">
-                  <h4 className="text-sm font-extrabold text-text-primary">{selectedOrder.orderId}</h4>
-                  <p className="text-[9px] text-text-secondary font-semibold">Date: {new Date(selectedOrder.createdAt).toLocaleString()}</p>
-                  <p className="text-[9px] text-text-secondary font-semibold">Payment: {selectedOrder.paymentMethod} ({selectedOrder.paymentStatus})</p>
-                </div>
-              </div>
-
-              {/* Delivery Info */}
-              <div className="grid grid-cols-2 gap-4 text-xs border-b border-divider pb-4">
-                <div>
-                  <span className="text-[10px] font-bold text-text-secondary uppercase">Customer Info</span>
-                  <div className="font-extrabold text-text-primary mt-1">{selectedOrder.customerName}</div>
-                  <div className="text-text-secondary font-medium mt-0.5">{selectedOrder.customerPhone}</div>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-text-secondary uppercase">Shipping Address</span>
-                  <div className="font-semibold text-text-primary mt-1">{selectedOrder.deliveryAddress.street}</div>
-                  <div className="text-text-secondary font-medium mt-0.5">{selectedOrder.deliveryAddress.city} - {selectedOrder.deliveryAddress.pincode}</div>
-                </div>
-              </div>
-
-              {/* Items List */}
-              <div className="flex flex-col gap-2">
-                <span className="text-[10px] font-bold text-text-secondary uppercase">Bill Items</span>
-                <div className="border border-divider rounded-xl overflow-hidden">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-background">
-                        <th className="p-2 border-b border-divider font-bold text-text-primary">Item Description</th>
-                        <th className="p-2 border-b border-divider font-bold text-text-primary text-center">Qty</th>
-                        <th className="p-2 border-b border-divider font-bold text-text-primary text-right">Price</th>
-                        <th className="p-2 border-b border-divider font-bold text-text-primary text-right">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedOrder.items.map((item, idx) => (
-                        <tr key={idx} className="border-b border-divider">
-                          <td className="p-2 font-medium text-text-primary">{item.name} <span className="text-[9px] text-text-secondary">({item.weight})</span></td>
-                          <td className="p-2 text-center text-text-secondary font-bold">{item.quantity}</td>
-                          <td className="p-2 text-right text-text-secondary font-semibold">₹{item.price}</td>
-                          <td className="p-2 text-right text-text-primary font-bold">₹{item.price * item.quantity}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Totals Summary */}
-              <div className="flex justify-end text-xs border-b border-divider pb-4">
-                <div className="w-[200px] flex flex-col gap-1.5">
-                  <div className="flex justify-between text-text-secondary font-medium"><span>Subtotal:</span> <span>₹{selectedOrder.subTotal}</span></div>
-                  {selectedOrder.discount > 0 && (
-                    <div className="flex justify-between text-error font-bold"><span>Discount:</span> <span>-₹{selectedOrder.discount}</span></div>
-                  )}
-                  <div className="flex justify-between text-text-secondary font-medium"><span>Delivery:</span> <span>₹{selectedOrder.deliveryCharges}</span></div>
-                  <div className="flex justify-between text-text-primary font-extrabold text-sm border-t border-divider pt-1.5"><span>Total Due:</span> <span>₹{selectedOrder.grandTotal}</span></div>
-                </div>
-              </div>
-
-              {/* ACTION: Shift Status / Assign Rider */}
-              <div className="flex flex-col gap-3 dont-print">
-                <span className="text-[10px] font-bold text-text-secondary uppercase">Dispatch Action Panel</span>
-                {(() => {
-                  const s = selectedOrder.status;
-                  const hasRider = !!selectedOrder.deliveryPartnerUserId;
-                  let label = '';
-                  let tone = 'bg-background text-text-secondary';
-                  if (['Pending', 'In Transit', 'Accepted', 'Packed'].includes(s)) {
-                    label = 'Preparing — rider assignment begins when the order is marked Ready for Pickup';
-                  } else if (s === 'Ready' && !hasRider && selectedOrder.assignmentStalled) {
-                    label = 'No rider available nearby — waiting / retryable. Order stays Ready.';
-                    tone = 'bg-error/10 text-error';
-                  } else if (s === 'Ready' && !hasRider) {
-                    label = 'Ready for Pickup — searching for a nearby rider…';
-                    tone = 'bg-primary/10 text-primary';
-                  } else if (s === 'Ready' && hasRider) {
-                    label = `Rider assigned: ${selectedOrder.deliveryPartnerName}`;
-                    tone = 'bg-success/10 text-success';
-                  } else if (s === 'Assigned') {
-                    label = `Rider assigned: ${selectedOrder.deliveryPartnerName} — heading to store`;
-                    tone = 'bg-success/10 text-success';
-                  } else if (s === 'Arrived At Store') {
-                    label = `${selectedOrder.deliveryPartnerName} at store — picking up`;
-                    tone = 'bg-success/10 text-success';
-                  } else if (s === 'Out For Delivery') {
-                    label = `Out for delivery with ${selectedOrder.deliveryPartnerName}`;
-                    tone = 'bg-success/10 text-success';
-                  } else if (s === 'Arrived') {
-                    label = `${selectedOrder.deliveryPartnerName} arrived at customer`;
-                    tone = 'bg-success/10 text-success';
-                  } else if (s === 'Delivered') {
-                    label = `Delivered by ${selectedOrder.deliveryPartnerName || 'rider'}`;
-                    tone = 'bg-success/10 text-success';
-                  } else {
-                    return null;
-                  }
-                  return (
-                    <div className={`text-[11px] font-semibold rounded-lg px-3 py-2 ${tone}`}>
-                      <span className="uppercase text-[9px] font-bold opacity-70 mr-1.5">Rider assignment</span>
-                      {label}
-                    </div>
-                  );
-                })()}
-                {selectedOrder.deliveryPartnerName && (
-                  <div className={`text-[11px] font-semibold rounded-lg px-3 py-2 ${selectedOrder.assignmentStalled ? 'bg-error/10 text-error' : 'bg-background text-text-secondary'}`}>
-                    Partner: <b className="text-text-primary">{selectedOrder.deliveryPartnerName}</b>
-                    {selectedOrder.assignmentStalled && ' — last offer was declined/expired. Reassign.'}
-                  </div>
-                )}
-                {selectedOrder.deliveryPartnerUserId &&
-                  !['Delivered', 'Cancelled', 'Returned', 'Refunded', 'Failed'].includes(selectedOrder.status) && (
-                    <OrderRiderMap
-                      key={selectedOrder.orderId}
-                      orderId={selectedOrder.orderId}
-                      partnerUserId={selectedOrder.deliveryPartnerUserId}
-                    />
-                  )}
-                <div className="grid grid-cols-2 gap-2">
-                  {['Pending', 'In Transit', 'Accepted'].includes(selectedOrder.status) && (
-                    <button
-                      onClick={() => handleUpdateStatus(selectedOrder.orderId, 'Packed')}
-                      className="bg-primary text-white font-bold py-2 rounded-xl text-xs hover:bg-secondary cursor-pointer"
-                    >
-                      Mark Packed
-                    </button>
-                  )}
-                  {selectedOrder.status === 'Packed' && (
-                    <button
-                      onClick={() => handleUpdateStatus(selectedOrder.orderId, 'Ready')}
-                      className="bg-primary text-white font-bold py-2 rounded-xl text-xs hover:bg-secondary cursor-pointer"
-                    >
-                      Mark Ready for Pickup
-                    </button>
-                  )}
-                  {selectedOrder.status === 'Ready' && !selectedOrder.deliveryPartnerUserId && (
-                    <button
-                      onClick={() => openAssign(false)}
-                      className="bg-primary text-white font-bold py-2 rounded-xl text-xs hover:bg-secondary cursor-pointer flex items-center justify-center gap-1.5"
-                    >
-                      <UserPlus size={14} /> Assign Partner Manually
-                    </button>
-                  )}
-                  {selectedOrder.deliveryPartnerUserId && !['Delivered', 'Cancelled', 'Returned', 'Refunded'].includes(selectedOrder.status) && (
-                    <>
-                      <button
-                        onClick={() => openAssign(true)}
-                        className="border border-primary text-primary bg-primary/5 font-bold py-2 rounded-xl text-xs hover:bg-primary/10 cursor-pointer flex items-center justify-center gap-1.5"
-                      >
-                        <UserPlus size={14} /> Reassign
-                      </button>
-                      <button
-                        onClick={handleUnassign}
-                        className="border border-error text-error bg-error/5 font-bold py-2 rounded-xl text-xs hover:bg-error/10 cursor-pointer flex items-center justify-center gap-1.5"
-                      >
-                        <UserMinus size={14} /> Unassign
-                      </button>
-                    </>
-                  )}
-                  {selectedOrder.status === 'Out For Delivery' && (
-                    <button 
-                      onClick={() => handleUpdateStatus(selectedOrder.orderId, 'Delivered')}
-                      className="bg-success text-white font-bold py-2 rounded-xl text-xs hover:bg-success/90 cursor-pointer"
-                    >
-                      Mark Delivered
-                    </button>
-                  )}
-                  {selectedOrder.status !== 'Delivered' && selectedOrder.status !== 'Cancelled' && (
-                    <button 
-                      onClick={() => handleUpdateStatus(selectedOrder.orderId, 'Cancelled')}
-                      className="border border-error text-error bg-error/5 font-bold py-2 rounded-xl text-xs hover:bg-error/10 cursor-pointer"
-                    >
-                      Cancel Order
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* TIMELINE PROGRESS TRACKER */}
-              <div className="flex flex-col gap-3">
-                <span className="text-[10px] font-bold text-text-secondary uppercase">Order Progress Timeline</span>
-                <div className="flex flex-col gap-3 pl-3.5 border-l border-divider relative">
-                  {selectedOrder.trackingTimeline.map((t, idx) => (
-                    <div key={idx} className="relative text-xs">
-                      {/* Timeline Dot */}
-                      <span className="absolute -left-[20px] top-1 w-2.5 h-2.5 rounded-full bg-primary border-2 border-white shadow-sm" />
-                      <div className="font-bold text-text-primary">{t.status}</div>
-                      <div className="text-text-secondary font-medium text-[10px] mt-0.5">{t.note}</div>
-                      <div className="text-[9px] text-text-tertiary font-semibold mt-0.5">{new Date(t.timestamp).toLocaleTimeString()}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* PARTNER ASSIGNMENT MODAL OVERLAY */}
-      {showRiderModal && selectedOrder && createPortal(
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-xs" onClick={() => !assignBusy && setShowRiderModal(false)} />
-          <div className="bg-surface rounded-[28px] border border-divider p-6 max-w-sm w-full relative z-10 shadow-premium flex flex-col gap-4">
-            <h3 className="font-extrabold text-sm text-text-primary uppercase">
-              {reassignMode ? 'Reassign' : 'Assign'} delivery partner
-            </h3>
-            <p className="text-[11px] text-text-secondary leading-normal">
-              Order <b>{selectedOrder.orderId}</b>. An offer is sent to the partner's app; they must accept it.
-              Force-assign skips the offer.
-            </p>
-
-            <div className="flex flex-col gap-2">
-              <label className="text-[10px] font-bold text-text-secondary uppercase">Select partner (online first)</label>
-              <select
-                value={selectedPartnerId}
-                onChange={(e) => setSelectedPartnerId(e.target.value)}
-                className="px-3 py-2 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary"
-              >
-                <option value="">-- Choose partner --</option>
-                {partners.map((p) => {
-                  const state = p.accountStatus === 'Suspended' ? 'suspended'
-                    : !p.isOnline ? 'offline'
-                    : p.availability === 'busy' ? 'on delivery' : 'available';
-                  return (
-                    <option key={p.userId} value={p.userId} disabled={p.accountStatus === 'Suspended'}>
-                      {p.name} — {state} • {p.activeOrderIds.length}/{p.maxConcurrent} active • ★{Number(p.rating || 0).toFixed(1)}
-                    </option>
-                  );
-                })}
-              </select>
-              {partners.length === 0 && (
-                <span className="text-[10px] text-error font-semibold">No delivery partners found. Add one in Modules → Delivery.</span>
-              )}
-            </div>
-
-            <label className="flex items-center gap-2 text-[11px] text-text-secondary font-semibold cursor-pointer">
-              <input type="checkbox" checked={forceAssign} onChange={(e) => setForceAssign(e.target.checked)} />
-              Force-assign (skip offer / partner acceptance)
-            </label>
-
-            {assignMsg && <div className="text-[11px] font-semibold text-primary">{assignMsg}</div>}
-
-            <div className="flex gap-2.5 mt-1">
-              <button
-                onClick={handleAssign}
-                disabled={!selectedPartnerId || assignBusy}
-                className="flex-1 bg-primary text-white font-bold py-2 rounded-full text-xs hover:bg-secondary cursor-pointer disabled:opacity-50"
-              >
-                {assignBusy ? 'Working…' : reassignMode ? 'Confirm reassign' : forceAssign ? 'Force-assign' : 'Send offer'}
-              </button>
-              <button
-                onClick={() => setShowRiderModal(false)}
-                disabled={assignBusy}
-                className="flex-1 bg-background text-text-secondary border border-divider font-bold py-2 rounded-full text-xs hover:bg-surface cursor-pointer disabled:opacity-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
     </div>
   );
 };
+
+interface OrderDetailViewProps {
+  order: Order;
+  onBack: () => void;
+  onPrint: () => void;
+  onUpdateStatus: (orderId: string, status: string) => void;
+  onAssign: () => void;
+  onReassign: () => void;
+  onUnassign: () => void;
+  statusTone: (s: string) => 'green' | 'amber' | 'red' | 'blue' | 'neutral';
+  allStatuses: string[];
+  fmtDate: (v?: string) => string;
+  riderModal: React.ReactNode;
+}
+
+const OrderDetailView: React.FC<OrderDetailViewProps> = ({
+  order, onBack, onPrint, onUpdateStatus, onAssign, onReassign, onUnassign,
+  statusTone, allStatuses, fmtDate, riderModal,
+}) => {
+  const hasRider = !!order.deliveryPartnerUserId;
+  const closed = ['Delivered', 'Cancelled', 'Returned', 'Refunded', 'Failed'].includes(order.status);
+
+  return (
+    <div className="flex flex-col gap-6 printable-area">
+      {/* Page header */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-md border border-admin-ledger-line bg-admin-surface text-admin-text-muted hover:text-admin-text text-[11px] font-semibold uppercase tracking-wide font-admin-mono cursor-pointer dont-print"
+          >
+            <ChevronRight size={14} className="rotate-180" /> Back to orders
+          </button>
+          <div className="min-w-0">
+            <div className="font-admin-mono text-lg font-bold text-admin-text truncate">{order.orderId}</div>
+            <div className="text-xs text-admin-text-faint font-medium">Placed {fmtDate(order.createdAt)}</div>
+          </div>
+          <ShelfTag tone={statusTone(order.status)}>{order.status}</ShelfTag>
+        </div>
+        <button
+          onClick={onPrint}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-md border border-admin-ledger-line bg-admin-surface text-admin-text-muted hover:text-admin-text text-[11px] font-semibold uppercase tracking-wide font-admin-mono cursor-pointer dont-print"
+        >
+          <Printer size={14} /> Print
+        </button>
+      </div>
+
+      {/* Summary strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-admin-ledger-line border border-admin-ledger-line rounded-lg overflow-hidden">
+        {[
+          { k: 'Items', v: `${order.items.reduce((s, i) => s + i.quantity, 0)}` },
+          { k: 'Payment', v: `${order.paymentMethod} · ${order.paymentStatus}` },
+          { k: 'Rider', v: order.deliveryPartnerName || 'Unassigned' },
+          { k: 'Order total', v: `₹${order.grandTotal}` },
+        ].map(c => (
+          <div key={c.k} className="bg-admin-surface px-3 py-2.5">
+            <div className="text-[11px] uppercase tracking-wide font-bold text-admin-text-faint font-admin-mono">{c.k}</div>
+            <div className="text-xs font-semibold text-admin-text mt-1 truncate">{c.v}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Timeline + status update, side by side */}
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-4 items-start">
+        {/* Order progress timeline — horizontal stepper */}
+        <div className="bg-admin-surface border border-admin-ledger-line rounded-lg p-4 flex flex-col gap-3">
+          <div className="text-[11px] uppercase tracking-wide font-bold text-admin-text-faint font-admin-mono">Order progress timeline</div>
+          <div className="overflow-x-auto">
+            <ol className="flex items-start min-w-max gap-0">
+              {order.trackingTimeline.map((t, idx) => {
+                const isLast = idx === order.trackingTimeline.length - 1;
+                return (
+                  <li key={idx} className="flex flex-col items-center relative px-4 first:pl-0 last:pr-0" style={{ minWidth: 132 }}>
+                    <div className="flex items-center w-full">
+                      <span className={`h-px flex-1 ${idx === 0 ? 'bg-transparent' : 'bg-admin-green'}`} />
+                      <span className="w-3 h-3 rounded-full bg-admin-green border-2 border-admin-surface shrink-0 shadow-[0_0_0_1px_var(--color-admin-green)]" />
+                      <span className={`h-px flex-1 ${isLast ? 'bg-transparent' : 'bg-admin-green'}`} />
+                    </div>
+                    <div className="mt-2 text-center">
+                      <div className="text-xs font-semibold text-admin-text leading-tight">{t.status}</div>
+                      <div className="text-[11px] text-admin-text-faint font-admin-mono mt-0.5">{fmtDate(t.timestamp)}</div>
+                      {t.note && <div className="text-[11px] text-admin-text-muted mt-0.5 max-w-[140px] leading-snug">{t.note}</div>}
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        </div>
+
+        {/* Status update */}
+        <div className="bg-admin-surface border border-admin-ledger-line rounded-lg p-4 flex flex-col gap-3 dont-print">
+          <div className="text-[11px] uppercase tracking-wide font-bold text-admin-text-faint font-admin-mono">Update status</div>
+          <div className="flex flex-wrap gap-2">
+            {['Pending', 'In Transit', 'Accepted'].includes(order.status) && (
+              <button onClick={() => onUpdateStatus(order.orderId, 'Packed')} className="bg-admin-ink text-white font-semibold px-3.5 py-2 rounded-md text-xs hover:opacity-90 cursor-pointer">Mark Packed</button>
+            )}
+            {order.status === 'Packed' && (
+              <button onClick={() => onUpdateStatus(order.orderId, 'Ready')} className="bg-admin-ink text-white font-semibold px-3.5 py-2 rounded-md text-xs hover:opacity-90 cursor-pointer">Mark Ready for Pickup</button>
+            )}
+            {order.status === 'Out For Delivery' && (
+              <button onClick={() => onUpdateStatus(order.orderId, 'Delivered')} className="bg-admin-green text-white font-semibold px-3.5 py-2 rounded-md text-xs hover:opacity-90 cursor-pointer">Mark Delivered</button>
+            )}
+            {order.status !== 'Delivered' && order.status !== 'Cancelled' && (
+              <button onClick={() => onUpdateStatus(order.orderId, 'Cancelled')} className="border border-admin-red text-admin-red bg-admin-red-soft font-semibold px-3.5 py-2 rounded-md text-xs hover:opacity-90 cursor-pointer">Cancel Order</button>
+            )}
+          </div>
+          <label className="flex items-center gap-2 text-[11px] font-bold text-admin-text-muted uppercase font-admin-mono">
+            Set manually
+            <select
+              value={order.status}
+              onChange={(e) => { if (e.target.value !== order.status) onUpdateStatus(order.orderId, e.target.value); }}
+              className="px-2.5 py-1.5 border border-admin-ledger-line rounded-md text-xs bg-admin-paper text-admin-text font-admin-body normal-case font-medium cursor-pointer focus:outline-none focus:border-admin-green"
+            >
+              {allStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </label>
+          {/* Delivery flow reference — which status the order moves through */}
+          <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[11px] font-admin-mono">
+            {['Pending', 'Accepted', 'Packed', 'Ready', 'Assigned', 'Out For Delivery', 'Delivered'].map((s, i, arr) => (
+              <React.Fragment key={s}>
+                <span className={s === order.status ? 'text-admin-green font-bold' : 'text-admin-text-faint'}>{s}</span>
+                {i < arr.length - 1 && <ChevronRight size={11} className="text-admin-text-faint" />}
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Customer + Location */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="bg-admin-surface border border-admin-ledger-line rounded-lg p-4">
+          <div className="text-[11px] uppercase tracking-wide font-bold text-admin-text-faint font-admin-mono">Customer</div>
+          <div className="font-semibold text-admin-text mt-1.5 text-sm">{order.customerName}</div>
+          <a href={`tel:${order.customerPhone}`} className="text-xs text-admin-green font-medium font-admin-mono hover:underline">{order.customerPhone}</a>
+        </div>
+        <div className="bg-admin-surface border border-admin-ledger-line rounded-lg p-4">
+          <div className="text-[11px] uppercase tracking-wide font-bold text-admin-text-faint font-admin-mono">Delivery location</div>
+          <div className="text-xs font-semibold text-admin-text mt-1.5">{order.deliveryAddress.type}</div>
+          <div className="text-xs text-admin-text-muted mt-0.5 leading-relaxed">{order.deliveryAddress.street}</div>
+          <div className="text-xs text-admin-text-muted">{order.deliveryAddress.city} — {order.deliveryAddress.pincode}</div>
+        </div>
+      </div>
+
+      {/* Dispatch / rider */}
+      <div className="bg-admin-surface border border-admin-ledger-line rounded-lg p-4 flex flex-col gap-3 dont-print">
+        <div className="text-[11px] uppercase tracking-wide font-bold text-admin-text-faint font-admin-mono">Dispatch &amp; rider</div>
+        {(() => {
+          const s = order.status;
+          let label = '';
+          let tone = 'bg-admin-paper text-admin-text-muted';
+          if (['Pending', 'In Transit', 'Accepted', 'Packed'].includes(s)) {
+            label = 'Preparing — rider assignment begins when the order is marked Ready for Pickup';
+          } else if (s === 'Ready' && !hasRider && order.assignmentStalled) {
+            label = 'No rider available nearby — waiting / retryable. Order stays Ready.';
+            tone = 'bg-admin-red-soft text-admin-red';
+          } else if (s === 'Ready' && !hasRider) {
+            label = 'Ready for Pickup — searching for a nearby rider…';
+            tone = 'bg-admin-blue-soft text-admin-blue';
+          } else if (['Ready', 'Assigned', 'Arrived At Store', 'Out For Delivery', 'Arrived', 'Delivered'].includes(s)) {
+            label = `Rider: ${order.deliveryPartnerName || 'assigned'}`;
+            tone = 'bg-admin-green-soft text-admin-green';
+          } else {
+            label = order.deliveryPartnerName
+              ? `Order ${s.toLowerCase()} — last rider was ${order.deliveryPartnerName}.`
+              : `Order ${s.toLowerCase()} — no rider was assigned.`;
+          }
+          return (
+            <div className={`text-xs font-semibold rounded-md px-3 py-2 ${tone}`}>
+              <span className="uppercase text-[11px] font-bold opacity-70 mr-1.5">Rider assignment</span>
+              {label}
+            </div>
+          );
+        })()}
+        {order.deliveryPartnerName && (
+          <div className={`text-xs font-semibold rounded-md px-3 py-2 ${order.assignmentStalled ? 'bg-admin-red-soft text-admin-red' : 'bg-admin-paper text-admin-text-muted'}`}>
+            Partner: <b className="text-admin-text">{order.deliveryPartnerName}</b>
+            {order.assignmentStalled && ' — last offer was declined/expired. Reassign.'}
+          </div>
+        )}
+        {order.deliveryPartnerUserId && !closed && (
+          <OrderRiderMap key={order.orderId} orderId={order.orderId} partnerUserId={order.deliveryPartnerUserId} />
+        )}
+        <div className="flex flex-wrap gap-2">
+          {order.status === 'Ready' && !order.deliveryPartnerUserId && (
+            <button onClick={onAssign} className="bg-admin-ink text-white font-semibold px-3.5 py-2 rounded-md text-xs hover:opacity-90 cursor-pointer flex items-center gap-1.5">
+              <UserPlus size={14} /> Assign Partner Manually
+            </button>
+          )}
+          {order.deliveryPartnerUserId && !['Delivered', 'Cancelled', 'Returned', 'Refunded'].includes(order.status) && (
+            <>
+              <button onClick={onReassign} className="border border-admin-ink text-admin-text bg-admin-paper font-semibold px-3.5 py-2 rounded-md text-xs hover:bg-admin-ledger-line/40 cursor-pointer flex items-center gap-1.5">
+                <UserPlus size={14} /> Reassign
+              </button>
+              <button onClick={onUnassign} className="border border-admin-red text-admin-red bg-admin-red-soft font-semibold px-3.5 py-2 rounded-md text-xs hover:opacity-90 cursor-pointer flex items-center gap-1.5">
+                <UserMinus size={14} /> Unassign
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Items */}
+      <div className="bg-admin-surface border border-admin-ledger-line rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="font-admin-mono">
+                <th className="p-3 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[11px] tracking-wide">Item</th>
+                <th className="p-3 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[11px] tracking-wide text-center">Qty</th>
+                <th className="p-3 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[11px] tracking-wide text-right">Price</th>
+                <th className="p-3 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[11px] tracking-wide text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {order.items.map((item, idx) => (
+                <tr key={idx} className="border-b border-admin-ledger-line last:border-b-0">
+                  <td className="p-3 font-medium text-admin-text">{item.name} <span className="text-[11px] text-admin-text-faint">({item.weight})</span></td>
+                  <td className="p-3 text-center text-admin-text-muted font-semibold tabular-nums">{item.quantity}</td>
+                  <td className="p-3 text-right text-admin-text-muted font-admin-mono tabular-nums">₹{item.price}</td>
+                  <td className="p-3 text-right text-admin-text font-admin-mono font-semibold tabular-nums">₹{item.price * item.quantity}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex justify-end p-3 border-t border-admin-ledger-line bg-admin-paper">
+          <div className="w-56 flex flex-col gap-1.5 text-xs font-admin-mono tabular-nums">
+            <div className="flex justify-between text-admin-text-muted"><span>Subtotal</span><span>₹{order.subTotal}</span></div>
+            {order.discount > 0 && (
+              <div className="flex justify-between text-admin-red"><span>Discount</span><span>-₹{order.discount}</span></div>
+            )}
+            <div className="flex justify-between text-admin-text-muted"><span>Delivery</span><span>₹{order.deliveryCharges}</span></div>
+            <div className="flex justify-between text-admin-text font-bold text-sm border-t border-admin-ledger-line pt-1.5"><span>Total</span><span>₹{order.grandTotal}</span></div>
+          </div>
+        </div>
+      </div>
+
+      {riderModal}
+
+      {/* PRINT-ONLY INVOICE (hidden on screen; the only thing window.print() outputs) */}
+      <div className="print-invoice">
+        <table style={{ marginBottom: 24 }}>
+          <tbody>
+            <tr>
+              <td style={{ verticalAlign: 'top' }}>
+                <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: '0.02em' }}>FRESHCART</div>
+                <div style={{ fontSize: 11, color: '#555', marginTop: 2 }}>South Hub · Bengaluru, Karnataka, India</div>
+                <div style={{ fontSize: 11, color: '#555' }}>GSTIN: 29ABCDE1234F1Z5 · support@freshcart.example</div>
+              </td>
+              <td style={{ textAlign: 'right', verticalAlign: 'top' }}>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>TAX INVOICE</div>
+                <div style={{ fontSize: 12, marginTop: 4 }}><b>{order.orderId}</b></div>
+                <div style={{ fontSize: 11, color: '#555' }}>Placed: {fmtDate(order.createdAt)}</div>
+                <div style={{ fontSize: 11, color: '#555' }}>Printed: {fmtDate(new Date().toISOString())}</div>
+                <div style={{ fontSize: 11, marginTop: 2 }}>Status: <b>{order.status}</b></div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <table style={{ marginBottom: 20 }}>
+          <tbody>
+            <tr>
+              <td style={{ verticalAlign: 'top', width: '50%', paddingRight: 16 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#888', letterSpacing: '0.08em' }}>Bill to</div>
+                <div style={{ fontSize: 13, fontWeight: 700, marginTop: 4 }}>{order.customerName}</div>
+                <div style={{ fontSize: 11, color: '#555' }}>{order.customerPhone}</div>
+              </td>
+              <td style={{ verticalAlign: 'top', width: '50%' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#888', letterSpacing: '0.08em' }}>Deliver to</div>
+                <div style={{ fontSize: 12, fontWeight: 600, marginTop: 4 }}>{order.deliveryAddress.type}</div>
+                <div style={{ fontSize: 11, color: '#555' }}>{order.deliveryAddress.street}</div>
+                <div style={{ fontSize: 11, color: '#555' }}>{order.deliveryAddress.city} — {order.deliveryAddress.pincode}</div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <table>
+          <thead>
+            <tr>
+              <th style={{ textAlign: 'left', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#555', borderBottom: '1.5px solid #111', padding: '6px 8px' }}>Item</th>
+              <th style={{ textAlign: 'center', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#555', borderBottom: '1.5px solid #111', padding: '6px 8px' }}>Qty</th>
+              <th style={{ textAlign: 'right', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#555', borderBottom: '1.5px solid #111', padding: '6px 8px' }}>Unit price</th>
+              <th style={{ textAlign: 'right', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#555', borderBottom: '1.5px solid #111', padding: '6px 8px' }}>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {order.items.map((item, idx) => (
+              <tr key={idx}>
+                <td style={{ fontSize: 12, padding: '6px 8px', borderBottom: '1px solid #ddd' }}>{item.name} <span style={{ color: '#888', fontSize: 10 }}>({item.weight})</span></td>
+                <td style={{ fontSize: 12, padding: '6px 8px', borderBottom: '1px solid #ddd', textAlign: 'center' }}>{item.quantity}</td>
+                <td style={{ fontSize: 12, padding: '6px 8px', borderBottom: '1px solid #ddd', textAlign: 'right' }}>₹{item.price}</td>
+                <td style={{ fontSize: 12, padding: '6px 8px', borderBottom: '1px solid #ddd', textAlign: 'right' }}>₹{item.price * item.quantity}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <table style={{ marginTop: 12 }}>
+          <tbody>
+            <tr>
+              <td style={{ width: '60%' }}></td>
+              <td style={{ width: '40%' }}>
+                <table>
+                  <tbody>
+                    <tr><td style={{ fontSize: 12, padding: '3px 8px', color: '#555' }}>Subtotal</td><td style={{ fontSize: 12, padding: '3px 8px', textAlign: 'right' }}>₹{order.subTotal}</td></tr>
+                    {order.discount > 0 && (
+                      <tr><td style={{ fontSize: 12, padding: '3px 8px', color: '#555' }}>Discount</td><td style={{ fontSize: 12, padding: '3px 8px', textAlign: 'right' }}>-₹{order.discount}</td></tr>
+                    )}
+                    <tr><td style={{ fontSize: 12, padding: '3px 8px', color: '#555' }}>Delivery</td><td style={{ fontSize: 12, padding: '3px 8px', textAlign: 'right' }}>₹{order.deliveryCharges}</td></tr>
+                    <tr>
+                      <td style={{ fontSize: 14, fontWeight: 800, padding: '6px 8px', borderTop: '1.5px solid #111' }}>Grand total</td>
+                      <td style={{ fontSize: 14, fontWeight: 800, padding: '6px 8px', borderTop: '1.5px solid #111', textAlign: 'right' }}>₹{order.grandTotal}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div style={{ fontSize: 11, marginTop: 16 }}>
+          Payment: <b>{order.paymentMethod}</b> ({order.paymentStatus})
+        </div>
+        <div style={{ fontSize: 10, color: '#888', marginTop: 24, borderTop: '1px solid #ddd', paddingTop: 8 }}>
+          This is a computer-generated invoice and does not require a signature. Thank you for shopping with FreshCart.
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default Orders;

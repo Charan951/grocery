@@ -120,7 +120,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         </div>
 
         {/* Diagnostic Sandbox Notice */}
-        <div className="bg-primary/5 border border-primary/10 p-3.5 rounded-2xl flex gap-3 text-[11px] leading-relaxed text-text-secondary">
+        <div className="bg-primary/5 border border-primary/10 p-3.5 rounded-2xl flex gap-3 text-xs leading-relaxed text-text-secondary">
           <Info className="text-primary shrink-0 mt-0.5" size={16} />
           <div>
             <span className="font-bold text-text-primary">Admin Credentials Seeding:</span> No registration required. Access with <code className="bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold">admin@freshcart.com</code> / <code className="bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold">admin123</code>.
@@ -146,7 +146,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 exit={{ opacity: 0, height: 0 }}
                 className="flex flex-col gap-1.5"
               >
-                <label className="text-[11px] font-bold text-text-secondary uppercase">Full Name</label>
+                <label className="text-xs font-bold text-text-secondary uppercase">Full Name</label>
                 <div className="relative">
                   <User className="absolute left-3 top-2.5 text-text-secondary" size={15} />
                   <input 
@@ -163,7 +163,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           </AnimatePresence>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-bold text-text-secondary uppercase">Corporate Email</label>
+            <label className="text-xs font-bold text-text-secondary uppercase">Corporate Email</label>
             <div className="relative">
               <Mail className="absolute left-3 top-2.5 text-text-secondary" size={15} />
               <input 
@@ -178,7 +178,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-bold text-text-secondary uppercase">Password</label>
+            <label className="text-xs font-bold text-text-secondary uppercase">Password</label>
             <div className="relative">
               <Lock className="absolute left-3 top-2.5 text-text-secondary" size={15} />
               <input 
@@ -207,7 +207,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 exit={{ opacity: 0, height: 0 }}
                 className="flex flex-col gap-1.5"
               >
-                <label className="text-[11px] font-bold text-text-secondary uppercase">Access Role</label>
+                <label className="text-xs font-bold text-text-secondary uppercase">Access Role</label>
                 <div className="relative">
                   <Shield className="absolute left-3 top-2.5 text-text-secondary" size={15} />
                   <select 
@@ -237,7 +237,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         <div className="border-t border-divider pt-4 text-center">
           <button 
             onClick={() => setIsLogin(!isLogin)}
-            className="text-[11px] text-primary hover:underline font-bold cursor-pointer"
+            className="text-xs text-primary hover:underline font-bold cursor-pointer"
           >
             {isLogin ? 'Need operator account? Register here' : 'Already registered? Sign in here'}
           </button>

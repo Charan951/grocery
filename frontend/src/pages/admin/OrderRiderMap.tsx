@@ -160,7 +160,7 @@ export const OrderRiderMap: React.FC<{ orderId: string; partnerUserId?: string }
   return (
     <div className="rounded-xl overflow-hidden border border-divider">
       <div ref={elRef} className="h-[220px] w-full bg-background" />
-      <div className="px-3 py-1.5 text-[9px] font-semibold text-text-secondary bg-background border-t border-divider flex items-center gap-1.5">
+      <div className="px-3 py-1.5 text-[11px] font-semibold text-text-secondary bg-background border-t border-divider flex items-center gap-1.5">
         <span
           className={`inline-block w-1.5 h-1.5 rounded-full ${rider ? 'bg-[#2563EB]' : 'bg-text-tertiary'}`}
         />

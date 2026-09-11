@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useCartWishlist, getProductStockQuantity } from '../context/CartWishlistContext';
 import { useCMS } from '../context/CMSContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ShoppingBag, Plus, Minus, Trash2, Tag, AlertCircle, Heart, PiggyBank, Zap, Clock, ShieldCheck, ArrowRight, Gift, Mic, PhoneOff, BellOff, Home, MapPin, Bike, Search, Share2 } from 'lucide-react';
+import { X, ShoppingBag, Plus, Minus, Trash2, Tag, AlertCircle, Heart, PiggyBank, Zap, Clock, ShieldCheck, ArrowRight, Home, MapPin, Share2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { CheckoutModal } from './CheckoutModal';
 import { getProductImage } from '../utils/imageUtils';
@@ -25,18 +25,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
   const [couponError, setCouponError] = useState('');
-
-  // Blinkit Cart State Options
-  const [tipAmount, setTipAmount] = useState<number>(0);
-  const [hasGiftPackaging, setHasGiftPackaging] = useState<boolean>(false);
-  const giftPackagingFee = 30;
-  const [selectedInstructions, setSelectedInstructions] = useState<string[]>([]);
-
-  const toggleInstruction = (inst: string) => {
-    setSelectedInstructions((prev) =>
-      prev.includes(inst) ? prev.filter((i) => i !== inst) : [...prev, inst]
-    );
-  };
 
   const handleApplyCoupon = () => {
     setCouponError('');
@@ -72,7 +60,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   };
 
   const discount = calculateDiscount();
-  const total = Math.max(cartSubtotal - discount + tipAmount + (hasGiftPackaging ? giftPackagingFee : 0), 0);
+  const total = Math.max(cartSubtotal - discount, 0);
 
   const navigate = useNavigate();
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
@@ -141,16 +129,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                   <X size={20} />
                 </button>
                 <h3 className="text-base font-black text-gray-900">Checkout</h3>
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => { onClose(); navigate('/search'); }} className="p-2 text-gray-600 hover:bg-gray-100 rounded-full" title="Search">
-                  <Search size={18} />
-                </button>
-                {cart.length > 0 && (
-                  <button onClick={clearCart} className="text-xs text-rose-600 font-bold hover:underline px-2">
-                    Clear
-                  </button>
-                )}
               </div>
             </div>
 
@@ -298,20 +276,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                       <span className="text-emerald-700 font-extrabold">FREE</span>
                     </div>
 
-                    {tipAmount > 0 && (
-                      <div className="flex justify-between text-emerald-700 font-semibold">
-                        <span>Delivery Partner Tip</span>
-                        <span>₹{tipAmount}</span>
-                      </div>
-                    )}
-
-                    {hasGiftPackaging && (
-                      <div className="flex justify-between text-gray-700 font-semibold">
-                        <span>Gift Packaging</span>
-                        <span>₹{giftPackagingFee}</span>
-                      </div>
-                    )}
-
                     <div className="flex justify-between text-sm font-black text-gray-900 border-t border-gray-100 pt-2.5 mt-1">
                       <span>To Pay</span>
                       <span className="text-emerald-700">₹{total}</span>
@@ -352,92 +316,17 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                     )}
                   </div>
 
-                  {/* 6. Delivery Instructions (NO DONATIONS as requested) */}
-                  <div className="bg-white p-3.5 rounded-2xl border border-gray-100 shadow-xs">
-                    <h4 className="text-xs font-black text-gray-900 mb-2">Delivery instructions</h4>
-                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-                      {[
-                        { id: 'record', title: 'Record', sub: 'Press here and hold', icon: <Mic size={14} /> },
-                        { id: 'no_call', title: 'Avoid calling', sub: 'Keep phone free', icon: <PhoneOff size={14} /> },
-                        { id: 'no_bell', title: 'Don\'t ring bell', sub: 'Silent delivery', icon: <BellOff size={14} /> },
-                      ].map((item) => {
-                        const active = selectedInstructions.includes(item.id);
-                        return (
-                          <button
-                            key={item.id}
-                            onClick={() => toggleInstruction(item.id)}
-                            className={`w-28 shrink-0 p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all ${active ? 'border-emerald-600 bg-emerald-50/50 shadow-xs' : 'border-gray-100 bg-gray-50'}`}
-                          >
-                            <div className="flex justify-between items-center mb-2">
-                              <span className={active ? 'text-emerald-700' : 'text-gray-500'}>{item.icon}</span>
-                              <input type="checkbox" checked={active} readOnly className="accent-emerald-600 w-3.5 h-3.5 rounded" />
-                            </div>
-                            <div>
-                              <span className="text-xs font-bold text-gray-900 block leading-tight">{item.title}</span>
-                              <span className="text-[9px] text-gray-500">{item.sub}</span>
-                            </div>
-                          </button>
-                        );
-                      })}
+                  {/* 6. Cancellation Policy */}
+                  <div className="bg-white p-3.5 rounded-2xl border border-gray-100 shadow-xs flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
+                      <ShieldCheck size={17} />
                     </div>
-                  </div>
-
-                  {/* 7. Tip Your Delivery Partner */}
-                  <div className="bg-white p-3.5 rounded-2xl border border-gray-100 shadow-xs">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <h4 className="text-xs font-black text-gray-900">Tip your delivery partner</h4>
-                        <p className="text-[11px] text-gray-500 mt-0.5 leading-snug">
-                          Your kindness means a lot! 100% of your tip will go directly to your delivery partner.
-                        </p>
-                      </div>
-                      <div className="p-2 bg-amber-50 rounded-full text-amber-600 shrink-0">
-                        <Bike size={22} />
-                      </div>
+                    <div>
+                      <h4 className="text-xs font-black text-gray-900 mb-1">Cancellation policy</h4>
+                      <p className="text-[11px] text-gray-500 leading-relaxed">
+                        Once placed, cancelling may attract a fee. If we delay or fail to deliver, you get a full refund.
+                      </p>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 mt-3">
-                      {[
-                        { amt: 20, emoji: '😄' },
-                        { amt: 30, emoji: '🤩' },
-                        { amt: 50, emoji: '😍' },
-                      ].map((t) => (
-                        <button
-                          key={t.amt}
-                          onClick={() => setTipAmount(tipAmount === t.amt ? 0 : t.amt)}
-                          className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1 ${tipAmount === t.amt ? 'border-emerald-600 bg-emerald-50 text-emerald-800 shadow-xs' : 'border-gray-100 bg-gray-50 text-gray-800'}`}
-                        >
-                          <span>{t.emoji}</span>
-                          <span>₹{t.amt}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* 8. Gift Packaging (Default ₹30 fee adds to total when selected) */}
-                  <div className={`bg-white p-3.5 rounded-2xl border transition-all shadow-xs flex items-center justify-between ${hasGiftPackaging ? 'border-purple-500 bg-purple-50/20' : 'border-gray-100'}`}>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-                        <Gift size={20} />
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-black text-gray-900">Gift Packaging</h4>
-                        <p className="text-[11px] text-gray-500">Get your items in a special gift bag for just ₹{giftPackagingFee}</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setHasGiftPackaging(!hasGiftPackaging)}
-                      className={`px-3.5 py-1.5 rounded-lg text-xs font-black border transition-all ${hasGiftPackaging ? 'bg-purple-600 text-white border-purple-600 shadow-xs' : 'border-emerald-700 text-emerald-700 hover:bg-emerald-50'}`}
-                    >
-                      {hasGiftPackaging ? 'Added' : 'Select'}
-                    </button>
-                  </div>
-
-                  {/* 9. Cancellation Policy */}
-                  <div className="bg-white p-3.5 rounded-2xl border border-gray-100 shadow-xs">
-                    <h4 className="text-xs font-black text-gray-900 mb-1">Cancellation Policy</h4>
-                    <p className="text-[11px] text-gray-500 leading-relaxed">
-                      Once order placed, any cancellation may result in a fee. In case of unexpected delays leading to order cancellation, a complete refund will be provided.
-                    </p>
                   </div>
                 </>
               )}

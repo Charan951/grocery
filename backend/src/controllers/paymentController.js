@@ -55,10 +55,12 @@ export const paymentController = {
 
   verifyPayment: async (req, res) => {
     try {
-      const { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderId } = req.body;
+      const { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderId, paymentMethod } = req.body;
 
       // Mark our own Order (if the caller told us which one) so the payment state
-      // is persisted here as well as by the async webhook.
+      // is persisted here as well as by the async webhook. `paymentMethod` lets a
+      // customer switch an existing COD order to prepaid (e.g. UPI) — the admin
+      // console reads the same Order document, so the change is visible there too.
       const markOrder = async (paymentStatus) => {
         if (!orderId) return;
         try {
@@ -69,6 +71,7 @@ export const paymentController = {
                 paymentStatus,
                 ...(paymentStatus === 'Paid' && razorpay_payment_id ? { paymentId: razorpay_payment_id } : {}),
                 ...(razorpay_order_id ? { paymentRef: razorpay_order_id } : {}),
+                ...(paymentStatus === 'Paid' && paymentMethod ? { paymentMethod: String(paymentMethod).slice(0, 60) } : {}),
               },
             },
           );

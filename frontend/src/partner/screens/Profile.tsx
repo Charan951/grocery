@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  LogOut, Star, Bike, Phone, Mail, KeyRound, PackageCheck, XCircle,
-  Wallet, Bell, ChevronRight, Pencil, Check, X, User as UserIcon,
+  LogOut, Star, Mail, Phone, Bike, KeyRound, PackageCheck, XCircle,
+  Wallet, Bell, ChevronRight, Pencil, Check, X,
 } from 'lucide-react';
 import { usePartner } from '../PartnerContext';
 import { Btn, Card, PageHead, SectionLabel, Stat, Pill, Field, money } from '../ui';
@@ -67,17 +67,7 @@ export const Profile: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
   return (
     <div>
-      <PageHead
-        title="Profile"
-        meta="Account & session"
-        actions={
-          !editing && (
-            <Btn variant="ghost" onClick={openEdit}>
-              <Pencil size={13} /> Edit
-            </Btn>
-          )
-        }
-      />
+      <PageHead title="Profile" meta="Account & session" />
 
       {saved && (
         <div className="mb-3 flex items-center gap-2 rounded-md border border-admin-green/30 bg-admin-green-soft px-3 py-2 text-[12px] font-medium text-admin-green">
@@ -87,31 +77,26 @@ export const Profile: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
       {/* Identity */}
       <Card className="p-5">
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-xl bg-admin-green-soft text-admin-green flex items-center justify-center font-admin-display font-bold text-[26px] shrink-0">
-            {(partner?.name || 'P').charAt(0).toUpperCase()}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <h2 className="font-admin-display font-semibold text-[17px] text-admin-text truncate">
-                {partner?.name || 'Partner'}
-              </h2>
-              <Pill tone={statusTone as any}>{statusText}</Pill>
-            </div>
-            <p className="text-[12px] text-admin-text-muted flex items-center gap-1 mt-1">
-              <Star size={12} className="text-admin-amber" />
-              {ratingText}
-            </p>
-            <p className="text-[11px] text-admin-text-faint mt-0.5">
-              {vehicleLabel(partner?.vehicleType)}
-              {partner?.lastSeenAt
-                ? ` · last seen ${new Date(partner.lastSeenAt).toLocaleString('en-IN', {
-                    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-                  })}`
-                : ''}
-            </p>
-          </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <h2 className="font-admin-display font-semibold text-[18px] text-admin-text truncate">
+            {partner?.name || 'Partner'}
+          </h2>
+          <Pill tone={statusTone as any}>{statusText}</Pill>
+          {!editing && (
+            <button
+              type="button"
+              onClick={openEdit}
+              title="Edit profile"
+              className="ml-auto text-admin-text-faint hover:text-admin-text transition-colors cursor-pointer"
+            >
+              <Pencil size={15} />
+            </button>
+          )}
         </div>
+        <p className="text-[12px] text-admin-text-muted flex items-center gap-1 mt-1.5">
+          <Star size={12} className="text-admin-amber" />
+          {ratingText}
+        </p>
       </Card>
 
       {/* Stats */}
@@ -122,9 +107,36 @@ export const Profile: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         <Stat Icon={Wallet} label="Today" value={money(partner?.todayEarnings)} tone="neutral" />
       </div>
 
-      {/* Details — read or edit */}
-      <SectionLabel className="mt-7 mb-2">Details</SectionLabel>
-      {editing ? (
+      {/* Details */}
+      {!editing && (
+        <>
+          <SectionLabel className="mt-7 mb-2">Details</SectionLabel>
+          <Card className="divide-y divide-admin-ledger-line overflow-hidden">
+            {(
+              [
+                [Phone, 'Phone', partner?.phone || 'Not set'],
+                [Mail, 'Email', partner?.email || 'Not set'],
+                [Bike, 'Vehicle', vehicleLabel(partner?.vehicleType)],
+              ] as Array<[React.ComponentType<{ size?: number; className?: string }>, string, string]>
+            ).map(([Icon, label, value]) => (
+              <div key={label} className="flex items-center gap-3 px-4 py-3">
+                <Icon size={15} className="text-admin-text-faint" />
+                <span className="font-admin-mono text-[10px] uppercase tracking-[0.1em] text-admin-text-faint w-16">
+                  {label}
+                </span>
+                <span className="text-[13px] font-medium text-admin-text flex-1 text-right truncate">
+                  {value}
+                </span>
+              </div>
+            ))}
+          </Card>
+        </>
+      )}
+
+      {/* Edit profile (name / phone / vehicle) — opened via the Edit action */}
+      {editing && (
+        <>
+        <SectionLabel className="mt-7 mb-2">Edit profile</SectionLabel>
         <Card className="p-4 space-y-4">
           <Field
             label="Full name"
@@ -181,27 +193,7 @@ export const Profile: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
             </Btn>
           </div>
         </Card>
-      ) : (
-        <Card className="divide-y divide-admin-ledger-line overflow-hidden">
-          {([
-            [UserIcon, 'Name', partner?.name || 'Not set'],
-            [Phone, 'Phone', partner?.phone || 'Not set'],
-            [Mail, 'Email', partner?.email || 'Not set'],
-            [Bike, 'Vehicle', vehicleLabel(partner?.vehicleType)],
-          ] as Array<[React.ComponentType<{ size?: number; className?: string }>, string, string]>).map(
-            ([Icon, label, value]) => (
-              <div key={label} className="flex items-center gap-3 px-4 py-3">
-                <Icon size={15} className="text-admin-text-faint" />
-                <span className="font-admin-mono text-[10px] uppercase tracking-[0.1em] text-admin-text-faint w-20">
-                  {label}
-                </span>
-                <span className="text-[13px] font-medium text-admin-text flex-1 text-right truncate">
-                  {value}
-                </span>
-              </div>
-            ),
-          )}
-        </Card>
+        </>
       )}
 
       {/* Shortcuts */}

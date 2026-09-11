@@ -79,7 +79,6 @@ export const Products: React.FC = () => {
 
     contextDelete(id);
     setProductsList(prev => prev.filter(p => p.id !== id));
-    alert('Product deleted successfully!');
   };
 
   // Active Category Object for SubCategories
@@ -140,7 +139,6 @@ export const Products: React.FC = () => {
     setSubCategory(newSubCategoryName.trim());
     setNewSubCategoryName('');
     setShowSubCatModal(false);
-    alert(`Subcategory "${newSubCategoryName.trim()}" created successfully!`);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -197,7 +195,6 @@ export const Products: React.FC = () => {
 
       contextUpdate(editingProduct.id, pData);
       setProductsList(prev => prev.map(p => p.id === editingProduct.id ? { ...p, ...pData } : p));
-      alert('Product updated successfully!');
     } else {
       const newId = 'prod_' + Date.now();
       const newP: Product = {
@@ -218,7 +215,6 @@ export const Products: React.FC = () => {
 
       contextAdd(newP);
       setProductsList(prev => [newP, ...prev]);
-      alert('Product added successfully!');
     }
 
     setDrawerOpen(false);
@@ -243,7 +239,6 @@ export const Products: React.FC = () => {
       setProductsList(prev => [...parsed, ...prev]);
       setImportOpen(false);
       setImportJson('');
-      alert(`Imported ${parsed.length} products successfully!`);
     } catch (err: any) {
       alert('Failed to parse JSON. Error: ' + err.message);
     }
@@ -272,21 +267,21 @@ export const Products: React.FC = () => {
           <>
             <button
               onClick={handleBulkExport}
-              className="flex items-center gap-2 px-3.5 py-2 border border-admin-ledger-line rounded-md text-[11px] font-semibold bg-admin-surface hover:bg-admin-paper text-admin-text-muted hover:text-admin-text transition-all cursor-pointer font-admin-mono uppercase tracking-wide"
+              className="flex items-center gap-2 px-3.5 py-2 border border-admin-ledger-line rounded-md text-xs font-semibold bg-admin-surface hover:bg-admin-paper text-admin-text-muted hover:text-admin-text transition-all cursor-pointer font-admin-mono uppercase tracking-wide"
             >
               <Download size={13} />
               <span>Export</span>
             </button>
             <button
               onClick={() => setImportOpen(true)}
-              className="flex items-center gap-2 px-3.5 py-2 border border-admin-ledger-line rounded-md text-[11px] font-semibold bg-admin-surface hover:bg-admin-paper text-admin-text-muted hover:text-admin-text transition-all cursor-pointer font-admin-mono uppercase tracking-wide"
+              className="flex items-center gap-2 px-3.5 py-2 border border-admin-ledger-line rounded-md text-xs font-semibold bg-admin-surface hover:bg-admin-paper text-admin-text-muted hover:text-admin-text transition-all cursor-pointer font-admin-mono uppercase tracking-wide"
             >
               <Upload size={13} />
               <span>Import</span>
             </button>
             <button
               onClick={handleOpenAdd}
-              className="flex items-center gap-2 px-4 py-2 rounded-md text-[11px] font-semibold bg-admin-ink text-white hover:bg-admin-ink-soft transition-all cursor-pointer font-admin-mono uppercase tracking-wide"
+              className="flex items-center gap-2 px-4 py-2 rounded-md text-xs font-semibold bg-admin-ink text-white hover:bg-admin-ink-soft transition-all cursor-pointer font-admin-mono uppercase tracking-wide"
             >
               <Plus size={13} />
               <span>Add Product</span>
@@ -325,13 +320,13 @@ export const Products: React.FC = () => {
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="font-admin-mono">
-                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide whitespace-nowrap">Image</th>
-                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide whitespace-nowrap">Product</th>
-                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide whitespace-nowrap">Category</th>
-                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide whitespace-nowrap">Price / MRP</th>
-                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide whitespace-nowrap">Stock</th>
-                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide whitespace-nowrap">Type</th>
-                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[10px] tracking-wide whitespace-nowrap text-right">Actions</th>
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[11px] tracking-wide whitespace-nowrap">Image</th>
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[11px] tracking-wide whitespace-nowrap">Product</th>
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[11px] tracking-wide whitespace-nowrap">Category</th>
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[11px] tracking-wide whitespace-nowrap">Price / MRP</th>
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[11px] tracking-wide whitespace-nowrap">Stock</th>
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[11px] tracking-wide whitespace-nowrap">Type</th>
+                <th className="p-3.5 bg-admin-paper border-b border-admin-ledger-line font-semibold text-admin-text-faint uppercase text-[11px] tracking-wide whitespace-nowrap text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -347,7 +342,7 @@ export const Products: React.FC = () => {
                     </td>
                     <td className="p-3.5">
                       <div className="font-semibold text-admin-text">{p.name}</div>
-                      <div className="font-admin-mono text-[10px] text-admin-text-faint font-medium uppercase mt-0.5">{p.brand} • {weightText}</div>
+                      <div className="font-admin-mono text-[11px] text-admin-text-faint font-medium uppercase mt-0.5">{p.brand} • {weightText}</div>
                     </td>
                     <td className="p-3.5">
                       <ShelfTag tone="neutral">{catObj?.name || p.categoryId}</ShelfTag>
@@ -355,7 +350,7 @@ export const Products: React.FC = () => {
                     <td className="p-3.5">
                       <div className="font-admin-mono font-semibold text-admin-text tabular-nums">₹{p.price}</div>
                       {(p.originalPrice || p.mrp) > p.price && (
-                        <div className="font-admin-mono text-[10px] text-admin-text-faint line-through tabular-nums">₹{p.originalPrice || p.mrp}</div>
+                        <div className="font-admin-mono text-[11px] text-admin-text-faint line-through tabular-nums">₹{p.originalPrice || p.mrp}</div>
                       )}
                     </td>
                     <td className="p-3.5">
@@ -409,18 +404,18 @@ export const Products: React.FC = () => {
             
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-bold text-text-primary">Product Title</label>
+                <label className="text-xs font-bold text-text-primary">Product Title</label>
                 <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Sweet Potato" className="w-full px-3 py-2 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary" required />
               </div>
 
               <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-bold text-text-primary">Brand Name</label>
+                <label className="text-xs font-bold text-text-primary">Brand Name</label>
                 <input type="text" value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="e.g. FreshFarm" className="w-full px-3 py-2 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary" />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1">
-                  <label className="text-[11px] font-bold text-text-primary">Category</label>
+                  <label className="text-xs font-bold text-text-primary">Category</label>
                   <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full px-3 py-2 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary">
                     {categories.map(c => (
                       <option key={c.id} value={c.slug || c.id}>{c.name}</option>
@@ -428,7 +423,7 @@ export const Products: React.FC = () => {
                   </select>
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-[11px] font-bold text-text-primary">SubCategory</label>
+                  <label className="text-xs font-bold text-text-primary">SubCategory</label>
                   <select value={subCategory} onChange={(e) => setSubCategory(e.target.value)} className="w-full px-3 py-2 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary">
                     <option value="">Select Subcategory</option>
                     {currentCategoryObj?.subCategories?.map(sc => (
@@ -440,26 +435,26 @@ export const Products: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1">
-                  <label className="text-[11px] font-bold text-text-primary">Net Quantity</label>
+                  <label className="text-xs font-bold text-text-primary">Net Quantity</label>
                   <input type="text" value={netQuantity} onChange={(e) => setNetQuantity(e.target.value)} placeholder="e.g. 500 g" className="w-full px-3 py-2 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary" required />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-[11px] font-bold text-text-primary">Stock Quantity</label>
+                  <label className="text-xs font-bold text-text-primary">Stock Quantity</label>
                   <input type="number" value={stock} onChange={(e) => setStock(Number(e.target.value))} className="w-full px-3 py-2 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary" required />
                 </div>
               </div>
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="flex flex-col gap-1">
-                  <label className="text-[11px] font-bold text-text-primary">Price (₹)</label>
+                  <label className="text-xs font-bold text-text-primary">Price (₹)</label>
                   <input type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} className="w-full px-3 py-2 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary" required />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-[11px] font-bold text-text-primary">MRP (₹)</label>
+                  <label className="text-xs font-bold text-text-primary">MRP (₹)</label>
                   <input type="number" value={mrp} onChange={(e) => setMrp(Number(e.target.value))} className="w-full px-3 py-2 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary" required />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-[11px] font-bold text-text-primary">Initial Stock (Qty)</label>
+                  <label className="text-xs font-bold text-text-primary">Initial Stock (Qty)</label>
                   <input type="number" value={stock} onChange={(e) => setStock(Number(e.target.value))} className="w-full px-3 py-2 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary" required />
                 </div>
               </div>
@@ -467,8 +462,8 @@ export const Products: React.FC = () => {
               {/* Multi-Image Gallery Section */}
               <div className="flex flex-col gap-2 p-3 bg-background/60 rounded-2xl border border-divider">
                 <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-bold text-text-primary uppercase tracking-wider">Product Gallery Images ({imagesList.length})</label>
-                  <span className="text-[10px] text-text-secondary font-medium">Primary image shown on product cards</span>
+                  <label className="text-xs font-bold text-text-primary uppercase tracking-wider">Product Gallery Images ({imagesList.length})</label>
+                  <span className="text-[11px] text-text-secondary font-medium">Primary image shown on product cards</span>
                 </div>
 
                 {/* Primary Image Input & File Upload */}
@@ -507,7 +502,6 @@ export const Products: React.FC = () => {
                             } catch (err) {}
                             setImg(uploadedUrl);
                             setImagesList(prev => [uploadedUrl, ...prev.filter(x => x !== uploadedUrl)]);
-                            alert('✅ Image uploaded successfully!');
                           };
                           reader.readAsDataURL(file);
                         }
@@ -523,7 +517,7 @@ export const Products: React.FC = () => {
                     value={newImageUrl}
                     onChange={(e) => setNewImageUrl(e.target.value)}
                     placeholder="Paste additional image URL (e.g. back view, side view)..."
-                    className="flex-1 px-3 py-1.5 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary font-mono text-[11px]"
+                    className="flex-1 px-3 py-1.5 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary font-mono text-xs"
                   />
                   <button
                     type="button"
@@ -552,7 +546,7 @@ export const Products: React.FC = () => {
                         <div key={idx} className={`relative group w-16 h-16 rounded-xl border-2 overflow-hidden bg-white shadow-2xs ${isMain ? 'border-emerald-600 ring-2 ring-emerald-500/20' : 'border-divider'}`}>
                           <img src={url} alt={`Thumb ${idx}`} className="w-full h-full object-cover" />
                           {isMain && (
-                            <span className="absolute top-0.5 left-0.5 bg-emerald-600 text-white text-[8px] font-black px-1 rounded-sm leading-tight">
+                            <span className="absolute top-0.5 left-0.5 bg-emerald-600 text-white text-[11px] font-black px-1 rounded-sm leading-tight">
                               MAIN
                             </span>
                           )}
@@ -562,7 +556,7 @@ export const Products: React.FC = () => {
                                 type="button"
                                 onClick={() => setImg(url)}
                                 title="Set as Main Image"
-                                className="p-1 bg-emerald-600 text-white rounded-md text-[9px] font-bold cursor-pointer hover:bg-emerald-700"
+                                className="p-1 bg-emerald-600 text-white rounded-md text-[11px] font-bold cursor-pointer hover:bg-emerald-700"
                               >
                                 Main
                               </button>
@@ -577,7 +571,7 @@ export const Products: React.FC = () => {
                                 }
                               }}
                               title="Remove Image"
-                              className="p-1 bg-rose-600 text-white rounded-md text-[9px] font-bold cursor-pointer hover:bg-rose-700"
+                              className="p-1 bg-rose-600 text-white rounded-md text-[11px] font-bold cursor-pointer hover:bg-rose-700"
                             >
                               <X size={12} />
                             </button>
@@ -590,7 +584,7 @@ export const Products: React.FC = () => {
               </div>
 
               <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-bold text-text-primary">Description</label>
+                <label className="text-xs font-bold text-text-primary">Description</label>
                 <textarea rows={3} value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Write details here..." className="w-full px-3 py-2 border border-divider rounded-xl text-xs bg-background focus:outline-none focus:border-primary text-text-primary" required />
               </div>
 
@@ -618,7 +612,7 @@ export const Products: React.FC = () => {
               <button onClick={() => setImportOpen(false)} className="p-1.5 rounded-lg border border-divider hover:bg-background cursor-pointer"><X size={16} /></button>
             </div>
             <div className="flex flex-col gap-4 flex-1">
-              <p className="text-[11px] text-text-secondary leading-relaxed font-medium">
+              <p className="text-xs text-text-secondary leading-relaxed font-medium">
                 {"Paste a JSON array of products matching the catalog structure. Ex: [{\"id\":\"p1\", \"name\":\"Apple\", \"brand\":\"...\", \"categoryId\":\"cat_fruits\", \"price\":150, \"mrp\":180, \"defaultWeight\":\"1kg\", \"description\":\"...\", \"imageUrl\":\"...\"}]"}
               </p>
 

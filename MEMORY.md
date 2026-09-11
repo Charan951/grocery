@@ -161,6 +161,177 @@
 
 ## 5. Completed Major Work
 
+- **2026-09-11 (follow-up 3) — Tax Invoice PDF download parity (web + mobile), switch COD to prepaid via Razorpay, customer delivery OTP card, filter menus, and auto-dispatch broadcast dispatch.**
+  - **Tax Invoice / Credit Note PDF Generation & Download (Web + Mobile parity):**
+    - **Web** (`frontend/src/utils/invoice.ts` + `CustomerOrders.tsx` / `TrackOrder.tsx`): integrated `jspdf` (`downloadInvoice`) to generate and download client-side tax invoices without extra server roundtrips. Features brand header (`FreshCart`, South Hub / GSTIN, green branding), order metadata (Order ID, date, payment method, delivery address), itemized table with weight specifications, quantity, unit price, and line amount, plus breakdown of Item Total, Delivery Fee, Handling Fee, Discount, and Total Bill. Connected to "Download Invoice / Credit Note" button on `CustomerOrders` and `TrackOrder`.
+    - **Mobile** (`mobileapp/lib/core/utils/invoice.dart` + `order_detail_screen.dart`): added `pdf` and `printing` packages (`Printing.layoutPdf` opens browser print/save-as-PDF dialog on web and native share/print sheet on mobile). 1:1 parity with the web PDF layout and styling. Added `_DownloadInvoiceButton` to `order_detail_screen.dart`.
+    - **Admin Print Invoice** (`frontend/src/pages/admin/Orders.tsx` + `index.css`): Added print-only tax invoice layout (`.print-invoice` media query styles in `index.css`) designed exclusively for `window.print()` (clean print table, buyer/seller blocks, tax details, itemized totals).
+  - **Switch COD to Prepaid (UPI / Card via Razorpay) for active orders:**
+    - **Web** (`CustomerOrders.tsx`): Active/in-transit COD orders display a "Switch to UPI / Card" action. It initializes Razorpay checkout, verifies HMAC signature with `/api/payment/verify`, updates payment status to paid, and hides the switch button.
+    - **Mobile** (`order_detail_screen.dart`): Added `_SwitchToPrepaidButton` for active COD orders, invoking Razorpay and syncing verified payment status.
+  - **Delivery OTP Card & Live Tracking Order Breakdown (Mobile):**
+    - Customer app `order_detail_screen.dart` and live `tracking_screen.dart`: When delivery OTP is present, renders a prominent `_DeliveryOtpCard` ("DELIVERY CODE - Share this with your delivery partner at the door") with tabular bold OTP digits.
+    - Live tracking screen (`tracking_screen.dart`) also gained an embedded Order Details breakdown (items list with weight specs, quantities, prices, and order total) and floating live ETA chip.
+  - **Orders List Filter Modernization (Web + Mobile):**
+    - Web `CustomerOrders.tsx`: Replaced horizontal category tabs with a compact dropdown popover (`SlidersHorizontal` + `AnimatePresence` menu with In Transit, Delivered, Cancelled, All Orders).
+    - Mobile `orders_list_screen.dart`: Replaced horizontal chip row with a compact `PopupMenuButton` (`Icons.tune_rounded`, In Transit, Delivered, Cancelled, All Orders) matching web filter aesthetics.
+  - **Backend Auto-Dispatch Broadcast Dispatch & Fleet Assignment:**
+    - `backend/src/services/assignmentService.js`: Reworked `tryAssign` from sequential 1-by-1 offers to **broadcast dispatch** across all eligible candidates in the radius ring (`maxFanout`), expanding outward by base radius on subsequent retry batches.
+    - Atomic acceptance: First partner to accept claims the order; losing active offers for that order are cancelled immediately and revoked over WebSocket (`delivery_offer_revoked`).
+    - Early live tracking: Rider identity and live location coordinates are emitted starting from `Assigned` status so customer tracking initiates as soon as the rider accepts the order.
+    - `completeForOrder(orderId, status)`: Ensures admin force-completing or failing an order frees the assigned partner from `activeOrderIds` and updates assignment & fleet stats.
+    - One-off reconciliation script `backend/scripts/fix-stuck-active-orders.js` provided for existing DB partner records.
+    - Added test coverage in `backend/test/delivery.test.js` for broadcast dispatch, multi-candidate decline, and concurrent acceptance.
+  - **Delivery App (`deliveryapp`) Dashboard & Order Details Refresh:**
+    - `dashboard_screen.dart`: Streamlined dashboard layout, removing redundant duplicate stats and empty states.
+    - `order_detail_screen.dart`: Modernized with status badge card, items list with weight specs, delivery address, interactive timeline, and fail/problem report flow.
+    - `filter_sheet.dart`: Reusable filter bottom sheet for Orders/Earnings screens.
+  - **Verification:**
+    - Backend: `npm test` passing (55 pass / 6 baseline pre-existing failures in delivery test).
+    - Frontend: `tsc -b && vite build` built clean (production bundle generated).
+    - Delivery app: `flutter analyze` clean (0 issues), `flutter test` 6/6 pass.
+    - Mobile app: `flutter analyze lib/` clean (0 issues), `flutter test` 123/123 pass.
+
+- **2026-09-11 (follow-up 2) — Customer `mobileapp/` tab-root screens gained a
+  visible back-to-Home button, matching `deliveryapp/`'s pattern.**
+  `deliveryapp` already had `core/widgets/tab_back_button.dart`
+  (`TabBackButton`: `leading` icon on Orders/Earnings/Profile AppBars,
+  `context.go('/')`) alongside `MainShell`'s `PopScope` (hardware back → Home
+  first, exits only from Home). The customer app's `MainScaffold`
+  (`features/home/presentation/screens/main_shell.dart`) already had the
+  equivalent — and better — hardware-back handling (`_handleBack`: non-Home
+  tab → Home; Home → double-tap-to-exit snackbar) but its 3 non-Home tab
+  roots (Categories `/categories`, Orders `/orders`, Account `/account`) had
+  **no visible back arrow** — `AppBar.leading` only auto-shows when
+  `Navigator.canPop` is true, which it never is for a `StatefulShellBranch`
+  root. Ported `TabBackButton` into `mobileapp/lib/core/widgets/
+  tab_back_button.dart` (same `context.go('/')`) and added `leading: const
+  TabBackButton()` to `categories_screen.dart`, `orders_list_screen.dart`,
+  `profile_screen.dart` — Home (index `kHomeNavIndex = 1`) doesn't get one,
+  since it's the destination, not a tab that needs escaping. Also removed a
+  now-stale `checkout_flow_test.dart` test ("Clear asks for confirmation")
+  covering the cart-screen Clear button that was intentionally removed in an
+  earlier pass this session. Verified: `flutter analyze` clean, `flutter
+  test` **123/123**. Web `frontend/` has no tab-root/back-arrow concept to
+  mirror (its bottom nav lives inside one SPA route tree with normal browser
+  back) — mobile-only by design, not a skipped side.
+
+- **2026-09-11 (follow-up) — Critical bug: paid/placed orders could silently
+  never reach the DB (admin console showed nothing).** Root cause was two
+  layers of "fake success" masking real order-creation failures:
+  1. `orderController.createOrder` (`backend/src/controllers/
+     orderController.js`) wrapped `Order.create()` in a try/catch that, on
+     *any* DB error, fabricated an **unsaved** mock order object and still
+     returned `201 {success:true, order}` — the customer saw a normal success
+     screen for an order that was never written. The specific trigger:
+     `validatedItems` mapping ran `Product.findOne({$or:[{id:prodId},
+     {_id:prodId}]})` unconditionally — Mongoose casts `_id` against its
+     ObjectId schema type even inside `$or`, so any placeholder id (`'p_1'`,
+     the client's own fallback for a cart item with no real product id, or
+     test ids like `'p1'`) threw a CastError that hit this swallow-and-fake
+     path. Fixed: only include `{_id: prodId}` in the `$or` when
+     `mongoose.Types.ObjectId.isValid(prodId)`; the outer catch now returns a
+     real `500 {success:false, message}` instead of a fake order.
+  2. The DB-down offline-fallback middleware (`backend/src/routes/api.js`)
+     treated `POST/PUT/PATCH /orders` the same as CMS/catalog writes — faking
+     `{success:true, offlineMode:true, message:'Saved successfully'}` with no
+     `order` object. Orders are money-and-inventory critical, unlike catalog
+     data; fixed to return a real `503` for order writes while the DB is
+     unreachable instead of pretending to save.
+  3. **Web client never checked the response at all** —
+     `frontend/src/components/CheckoutModal.tsx` `placeOrder()` did a bare
+     `await fetch(...)` and ignored the result entirely, so `finish()` (the
+     order-success screen) always ran regardless of what the backend actually
+     did. Fixed to parse the JSON and throw when `!res.ok || !data.success ||
+     !data.order?.orderId`, so `runCod`/`runRazorpay`'s existing catch blocks
+     now correctly show an error and never call `finish()` for a
+     non-persisted order. **Mobile (`api_service.dart createOrder`) already
+     validated `data['order'] is Map`** — it was safe once the backend
+     stopped shipping a fake `order` field, no mobile client change needed.
+  - Payment routing itself (COD → order-placed; UPI/Card → Razorpay →
+    verify → order-placed; failure/cancel → stays on Checkout with an inline
+    error) was already correct on both surfaces — see the follow-up bullet
+    below; this bug was purely "the write silently failed while everything
+    downstream assumed it succeeded."
+  - Verified: `node --test test/api.test.js` went from **18 pass / 9 fail
+    (before this fix) → 24 pass / 3 fail (after)** — several previously
+    "unrelated-looking" failures (order-dependent setup in cart/wallet-refund
+    tests) were actually this same bug; the remaining 3 (`catalog is public,
+    orders/reviews are staff-only`, `customer can cancel...wallet` amount
+    mismatch, `legacy DELETE /customers/:id`) are pre-existing on baseline
+    too — unrelated RBAC/shared-state flakiness, not caused by this change.
+    `delivery.test.js` 55/61 pass (same 3 pre-existing zone/analytics/settings
+    failures documented below). `frontend` `tsc --noEmit` + `npm run build`
+    clean.
+
+- **2026-09-11 — Customer cart/checkout decluttered (mobile + web parity) +
+  delivery-partner assign-modal/profile/orders fixes.**
+  - **Customer cart & checkout, `mobileapp/` + `frontend/`:** removed
+    Delivery Instructions / Tip Your Delivery Partner / Gift Packaging
+    sections from the cart screen (`mobileapp/lib/features/cart/presentation/
+    screens/cart_screen.dart` `_DeliveryInstructionsSection`/
+    `_DeliveryPartnerTipSection`/`_GiftPackagingSection` deleted; web mirror
+    `frontend/src/components/CartDrawer.tsx` sections 6–8 + their
+    `tipAmount`/`hasGiftPackaging`/`selectedInstructions` state removed, bill
+    total simplified to `subtotal − discount`); removed the Search icon +
+    Clear button from both cart headers; Cancellation Policy redesigned as an
+    icon-led card (was plain text) on both surfaces. Checkout/payment screen
+    (`mobileapp/lib/features/checkout/presentation/screens/checkout_screen.dart`)
+    lost its standalone "Delivery" (Instant 10–15 min) tile — web
+    `CheckoutModal.tsx` never had an equivalent standalone section (delivery
+    ETA is inline in its order-summary header), so nothing to remove there.
+    Payment routing already matched the requested UX and needed no change:
+    COD → `submit()` → order placed → `/order-placed/:id`; UPI/Card →
+    Razorpay → verify → same success screen; failure/cancel → inline error,
+    stays on Checkout (`checkout_controller.dart` `_fail()` +
+    `checkout_screen.dart` `ref.listen`).
+  - **⚠ Tooling incident + fix:** a PowerShell `Get-Content`/`Set-Content`
+    line-range deletion on `cart_screen.dart` (no `-Encoding utf8` on the
+    *read* side) corrupted every `₹` in the file to `â‚¹` — not just the
+    edited region. Caught from a garbled product price on screen, fixed with
+    an `Edit` `replace_all`. **Lesson saved to global memory**
+    (`feedback-powershell-file-encoding.md`): never bulk-edit a file with
+    non-ASCII chars via PowerShell `Get-Content`/`Set-Content` without
+    `-Encoding utf8` on both ends — prefer the `Edit`/`Write` tool for
+    anything with ₹/emoji/curly-quotes.
+  - **Delivery-partner admin/app fixes, same session:**
+    - Admin "Assign Delivery Partner" modal (`frontend/src/pages/admin/
+      Orders.tsx`) hardened against width-collapse with explicit inline
+      `width`/`maxWidth`/`minWidth`/`flexShrink` (defensive — root cause
+      unconfirmed, Tailwind class application suspected).
+    - **Real bug found & fixed:** admin marking an order `Delivered`/`Failed`
+      directly (bypassing the partner app's own completion flow) never freed
+      the partner from `activeOrderIds` — they'd stay stuck unable to go
+      offline forever even though the order showed finished. Fixed in
+      `orderController.updateStatus` via new `assignmentService.
+      completeForOrder(orderId, status)` (mirrors `cancelForOrder`: marks the
+      `accepted` Assignment completed/failed, frees `activeOrderIds`, bumps
+      completed/failedCount). One-off reconciliation script
+      `backend/scripts/fix-stuck-active-orders.js` run once to un-stick
+      already-affected partners in the live DB.
+    - `deliveryapp/` Orders/Earnings screens: replaced permanent segmented
+      tab rows with a single "three lines" filter icon
+      (`Icons.filter_list_rounded`) opening a bottom sheet — new reusable
+      `deliveryapp/lib/core/widgets/filter_sheet.dart`
+      (`FilterAction`/`showFilterSheet`), web mirror `FilterMenu` added to
+      `frontend/src/partner/ui.tsx`, wired into `History.tsx`/`Earnings.tsx`.
+      Orders screen refresh icon removed from the AppBar (pull-to-refresh via
+      swipe still works).
+    - Partner Profile (both surfaces): iterated per user feedback — first
+      trimmed to identity-only, then reverted to show avatar-free identity +
+      full Details list (Phone/Email/Vehicle) per explicit "show all details,
+      no avatar" ask; Edit action moved out of the AppBar/PageHead into an
+      inline pencil icon next to the name (user: "edit should not be in app
+      bar"); Log out given a red/danger style on mobile
+      (`OutlinedButton.styleFrom(foregroundColor: kRed, backgroundColor:
+      kRedSoft, side: BorderSide(color: kRed))`) — web already had this via
+      `Btn variant="danger"`.
+  - Verified: `flutter analyze` + `flutter test` clean on both `deliveryapp/`
+    and `mobileapp/`; `tsc --noEmit` + `npm run build` clean on `frontend/`;
+    backend `node --test test/delivery.test.js` — same 29 pass / 3
+    pre-existing unrelated failures as baseline (§7), one new test added and
+    passing (admin-Delivered frees the partner).
+
 - **2026-09-09 — Delivery-partner self-service profile edit + redesigned Profile
   screen (all surfaces).**
   - **Backend**: new `PUT /api/delivery/me` (`protectDelivery`,

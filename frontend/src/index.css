@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&family=Nunito+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
 /* Festival campaign display faces — selected via the admin theme preset. */
 @import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Rozha+One&family=Cinzel+Decorative:wght@700;900&family=Satisfy&family=Pacifico&display=swap');
 @import "tailwindcss";
@@ -57,9 +57,10 @@
   --spacing-xxl: 3rem;
   --spacing-luxury: 4.5rem;
 
-  /* Fonts */
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-display: 'Plus Jakarta Sans', system-ui, sans-serif;
+  /* Fonts — app-wide pairing: Rubik (display/headings) + Nunito Sans (body).
+     Chosen for e-commerce readability (product copy) + friendly, modern tone. */
+  --font-sans: 'Nunito Sans', system-ui, -apple-system, sans-serif;
+  --font-display: 'Rubik', system-ui, sans-serif;
   
   /* Layout */
   --header-height: 80px;
@@ -90,8 +91,16 @@
   --admin-signal-blue: #4CAF50;  /* informational — mapped to brand --primary (no blue in logo palette) */
   --admin-signal-blue-soft: #E7F5E8;
 
-  --font-admin-display: 'Space Grotesk', var(--font-sans);
-  --font-admin-body: 'IBM Plex Sans', var(--font-sans);
+  /* Sidebar / shell accent — admin left nav + partner (rider) chrome. Requested
+     hex used directly wherever it sits on the dark ink surface (full contrast
+     there); on light surfaces (partner bottom-tab labels, filled badges) a
+     same-hue deepened variant keeps it legible at small sizes. */
+  --admin-accent: #1BCD39;
+  --admin-accent-on-light: #0E7A20;
+  --admin-accent-soft: #DFF7E3;
+
+  --font-admin-display: 'Rubik', var(--font-sans);
+  --font-admin-body: 'Nunito Sans', var(--font-sans);
   --font-admin-mono: 'IBM Plex Mono', ui-monospace, monospace;
 }
 
@@ -146,6 +155,9 @@
   --color-admin-red-soft: var(--admin-signal-red-soft);
   --color-admin-blue: var(--admin-signal-blue);
   --color-admin-blue-soft: var(--admin-signal-blue-soft);
+  --color-admin-accent: var(--admin-accent);
+  --color-admin-accent-on-light: var(--admin-accent-on-light);
+  --color-admin-accent-soft: var(--admin-accent-soft);
   --font-admin-display: var(--font-admin-display);
   --font-admin-body: var(--font-admin-body);
   --font-admin-mono: var(--font-admin-mono);
@@ -211,18 +223,87 @@ h1, h2, h3, h4, h5, h6 {
   -ms-overflow-style: none; /* IE/Edge */
 }
 
+/* ---- Admin Console type scale ----------------------------------------------
+   One modular scale for the whole Ops Console. Sizes: 11 / 12 / 13 / 14 / 16
+   / 18 / 22px. Body copy never goes below 12px; 11px is reserved for short,
+   letter-spaced uppercase labels where it still reads cleanly. Use these
+   classes instead of arbitrary text-[Npx] values. */
+.admin-shell {
+  font-family: var(--font-admin-body);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--admin-text);
+  -webkit-font-smoothing: antialiased;
+}
+.admin-h1 {
+  font-family: var(--font-admin-display);
+  font-size: 1.375rem;   /* 22px */
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.014em;
+  color: var(--admin-text);
+}
+.admin-h2 {
+  font-family: var(--font-admin-display);
+  font-size: 1rem;       /* 16px */
+  line-height: 1.35;
+  font-weight: 650;
+  letter-spacing: -0.006em;
+  color: var(--admin-text);
+}
+.admin-h3 {
+  font-family: var(--font-admin-body);
+  font-size: 0.875rem;   /* 14px */
+  line-height: 1.4;
+  font-weight: 600;
+  color: var(--admin-text);
+}
+.admin-body   { font-size: 0.8125rem; line-height: 1.55; font-weight: 400; }  /* 13px */
+.admin-strong { font-size: 0.8125rem; line-height: 1.5;  font-weight: 600; }  /* 13px */
+.admin-small  { font-size: 0.75rem;   line-height: 1.5;  font-weight: 500; color: var(--admin-text-muted); } /* 12px */
+.admin-label {
+  font-family: var(--font-admin-mono);
+  font-size: 0.6875rem;  /* 11px */
+  line-height: 1.4;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--admin-text-faint);
+}
+.admin-num { font-variant-numeric: tabular-nums; font-family: var(--font-admin-mono); }
+
+/* ---- Print: isolate a dedicated invoice document ----------------------------
+   The admin invoice (`.print-invoice`) is `hidden` on screen and becomes the
+   only thing that prints. Everything else — sidebar, header, action panels —
+   is hidden. Keeps `window.print()` producing a clean A4 bill. */
+.print-invoice { display: none; }
+@media print {
+  @page { size: A4; margin: 14mm; }
+  html, body { background: #fff !important; }
+  body * { visibility: hidden !important; }
+  .print-invoice, .print-invoice * { visibility: visible !important; }
+  .print-invoice {
+    display: block !important;
+    position: absolute;
+    left: 0; top: 0; width: 100%;
+    color: #111;
+    font-family: var(--font-sans);
+  }
+  .print-invoice table { width: 100%; border-collapse: collapse; }
+}
+
 /* ---- Admin Shelf Tag (signature status chip, punched-hole produce-label motif) ---- */
 .shelf-tag {
   position: relative;
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
-  padding: 0.25rem 0.625rem 0.25rem 1.125rem;
+  padding: 0.3125rem 0.6875rem 0.3125rem 1.125rem;
   border-radius: 4px;
   font-family: var(--font-admin-mono);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   line-height: 1.4;
   white-space: nowrap;

@@ -128,32 +128,67 @@ export const acceptOffer = async ({ assignmentId, user }) => {
     return { ok: false, code: 'order_taken', message: 'Another partner already took this order.' };
   }
 
-  // Free the partner's queue + availability.
+  // Attach the order to the partner's active queue.
   const partner = await DeliveryPartner.findOne({ userId: user._id });
   if (partner) {
     if (!(partner.activeOrderIds || []).includes(order.orderId)) partner.activeOrderIds.push(order.orderId);
     partner.availability = availabilityFor(partner);
     await partner.save();
-    emit('admin_fleet', 'fleet_update', fleetPayload(partner, user.name));
   }
 
-  // Revoke any other live offer for this order.
-  const others = await Assignment.find({ orderId: a.orderId, status: 'offered', _id: { $ne: a._id } });
-  if (others.length) {
-    await Assignment.updateMany(
-      { _id: { $in: others.map((o) => o._id) } },
-      { $set: { status: 'cancelled', reason: 'order assigned to another partner' } }
-    );
-    for (const o of others) {
-      emit('partner:' + String(o.partnerUserId), 'delivery_offer_revoked', { assignmentId: String(o._id), orderId: a.orderId });
-    }
-  }
+  const riderLoc = partner?.currentLocation?.coordinates
+    ? { lat: partner.currentLocation.coordinates[1], lng: partner.currentLocation.coordinates[0] }
+    : null;
+  const firstName = String(user.name || 'Delivery partner').split(' ')[0];
+  const at = new Date().toISOString();
 
+  // --- Sync every client watching this order (customer web + mobile) NOW ---
   emit('partner:' + String(user._id), 'assignment_confirmed', { assignmentId: String(a._id), orderId: order.orderId });
   emit(order.orderId, 'order_status_update', {
     orderId: order.orderId, status: order.status, note: `Assigned to ${user.name}`,
-    eta: order.estimatedDelivery, timeline: order.trackingTimeline, at: new Date().toISOString(),
+    eta: order.estimatedDelivery, timeline: order.trackingTimeline, at,
   });
+  // Rich rider card for the customer — no extra REST round-trip needed.
+  emit(order.orderId, 'rider_assigned', {
+    orderId: order.orderId,
+    status: 'Assigned',
+    delivery: {
+      partnerName: firstName,
+      vehicleType: partner?.vehicleType || null,
+      rating: partner?.rating ?? null,
+      revealed: false, // phone / contact opens at "Out For Delivery"
+      location: riderLoc,
+      locationUpdatedAt: partner?.locationUpdatedAt || null,
+    },
+    eta: order.estimatedDelivery,
+    at,
+  });
+  // Seed the live marker immediately instead of waiting up to one heartbeat.
+  if (riderLoc) {
+    emit(order.orderId, 'rider_location_update', {
+      orderId: order.orderId, lat: riderLoc.lat, lng: riderLoc.lng, riderName: firstName,
+    });
+  }
+
+  // --- Non-blocking cleanup: revoke the losing offers + ping ops fleet. The
+  // atomic Order update above is the real guard, so this need not block the
+  // accepting partner's response. ---
+  (async () => {
+    try {
+      if (partner) emit('admin_fleet', 'fleet_update', fleetPayload(partner, user.name));
+      const others = await Assignment.find({ orderId: a.orderId, status: 'offered', _id: { $ne: a._id } });
+      if (others.length) {
+        await Assignment.updateMany(
+          { _id: { $in: others.map((o) => o._id) } },
+          { $set: { status: 'cancelled', reason: 'order assigned to another partner' } }
+        );
+        for (const o of others) {
+          emit('partner:' + String(o.partnerUserId), 'delivery_offer_revoked', { assignmentId: String(o._id), orderId: a.orderId });
+        }
+      }
+    } catch (_) { /* best-effort */ }
+  })();
+
   return { ok: true, order, assignment: a };
 };
 
@@ -264,9 +299,12 @@ export const findCandidates = async ({ pickup, excludeUserIds = [], radiusKm = 6
 };
 
 /**
- * Try to auto-assign one order: offer to the single best candidate. Called when
- * an order becomes Ready and on every subsequent decline/expiry (re-offer).
- * Idempotent — bails if the order already has a partner or a live offer.
+ * Try to auto-dispatch one order. Finds the nearest non-empty ring of online,
+ * in-radius, under-capacity partners (radius grows from 100m outward) and
+ * broadcasts the offer to every partner in that ring at once. The first to
+ * accept wins; all other offers for the order are revoked. Called when an order
+ * becomes Ready and again once a whole batch has declined/expired (wider batch).
+ * Idempotent — bails if the order already has a partner or any live offer.
  */
 export const tryAssign = async (orderOrId) => {
   const order = typeof orderOrId === 'string' ? await Order.findOne({ orderId: orderOrId }) : orderOrId;
@@ -308,19 +346,20 @@ export const tryAssign = async (orderOrId) => {
     } catch (_) { /* zone lookup is best-effort */ }
   }
 
+  // Broadcast dispatch: cover the whole configured radius, growing outward on
+  // each re-offer batch. Attempt 1 = base radius (default 6 km); each later
+  // batch (after a whole batch declined/expired) widens by one base radius, up
+  // to 3×. `findCandidates` returns nearest-first, so the closest riders still
+  // rank first even though everyone in range is offered at once.
+  const radiusKm = baseRadius * Math.min(attempt, 3);
   let candidates = [];
-  // Progressive radius search starting from 100m, 200m, 300m...
-  const radiiKm = [0.1, 0.2, 0.3, 0.5, 1, 2, 3, baseRadius, baseRadius * 2];
   // Pass 1: zone-restricted (skipped when no zone applies). Pass 2: unrestricted.
   const passes = restrictUserIds ? [restrictUserIds, null] : [null];
   for (const list of passes) {
-    for (const rKm of radiiKm) {
-      candidates = await findCandidates({
-        pickup: order.pickup, excludeUserIds, radiusKm: rKm, restrictUserIds: list,
-        drop: order.deliveryLocation, batchRadiusKm,
-      });
-      if (candidates.length) break;
-    }
+    candidates = await findCandidates({
+      pickup: order.pickup, excludeUserIds, radiusKm, restrictUserIds: list,
+      drop: order.deliveryLocation, batchRadiusKm,
+    });
     if (candidates.length) break;
   }
   if (!candidates.length) {
@@ -328,16 +367,42 @@ export const tryAssign = async (orderOrId) => {
     return { ok: false, code: 'no_candidate' };
   }
 
-  const top = candidates[0];
-  const partnerDoc = await DeliveryPartner.findOne({ userId: top.user._id });
-  const assignment = await createOffer({
-    order, partnerUser: top.user, partner: partnerDoc, attempt, timeoutSec, source: 'auto',
-  });
+  // Offer to every eligible partner in range at once (not one-by-one).
+  // acceptOffer is atomic: the first partner to accept wins the order and every
+  // other live offer for it is revoked immediately, so it disappears from the
+  // other partners' apps. A partial set of declines does not re-broadcast — the
+  // next (wider) batch is only tried once all of this batch's offers are gone
+  // (see `onOfferDeclined` / `expireStaleOffers`).
+  const maxFanout = Math.max(1, s.maxFanout || CANDIDATE_LIMIT);
+  const targets = candidates.slice(0, maxFanout);
+  const created = [];
+  for (const c of targets) {
+    const partnerDoc = await DeliveryPartner.findOne({ userId: c.user._id });
+    const a = await createOffer({
+      order, partnerUser: c.user, partner: partnerDoc, attempt, timeoutSec, source: 'auto',
+    }).catch(() => null);
+    if (a) created.push({ assignmentId: String(a._id), partnerUserId: String(c.user._id), distanceMeters: c.distance });
+  }
+  if (!created.length) {
+    await markStalled(order.orderId, 'could not create offers');
+    return { ok: false, code: 'offer_failed' };
+  }
   await Order.updateOne({ orderId: order.orderId }, { $set: { assignmentStalled: false } });
   emit('admin_fleet', 'auto_offer', {
-    orderId: order.orderId, partnerUserId: String(top.user._id), attempt, distanceMeters: top.distance,
+    orderId: order.orderId, attempt, count: created.length,
+    partnerUserId: created[0].partnerUserId, // back-compat (nearest)
+    partnerUserIds: created.map((c) => c.partnerUserId),
+    distanceMeters: created[0].distanceMeters,
   });
-  return { ok: true, assignmentId: assignment._id, partnerUserId: String(top.user._id), attempt };
+  return {
+    ok: true,
+    offers: created,
+    count: created.length,
+    attempt,
+    // back-compat: the nearest candidate (offers are now sent to all at once)
+    assignmentId: created[0].assignmentId,
+    partnerUserId: created[0].partnerUserId,
+  };
 };
 
 /** Sweeper body — call on an interval from index.js. */
@@ -377,7 +442,31 @@ export const cancelForOrder = async (orderId, reason = 'order cancelled') => {
   }
 };
 
+// Releases the assigned partner when an order is force-finished from the
+// admin console (status set to Delivered/Failed/Returned directly) instead
+// of via the partner app's own completion flow — that flow already frees the
+// partner itself (deliveryController's freePartnerFromOrder), but an admin
+// override otherwise leaves the order stuck in the partner's activeOrderIds
+// forever, blocking them from ever going offline again.
+export const completeForOrder = async (orderId, status) => {
+  const live = await Assignment.findOne({ orderId, status: 'accepted' });
+  if (!live) return;
+  await Assignment.updateOne(
+    { _id: live._id },
+    { $set: { status: status === 'Delivered' ? 'completed' : 'failed', respondedAt: new Date() } }
+  );
+  const partner = await DeliveryPartner.findOne({ userId: live.partnerUserId });
+  if (!partner) return;
+  partner.activeOrderIds = (partner.activeOrderIds || []).filter((id) => id !== orderId);
+  partner.availability = availabilityFor(partner);
+  if (status === 'Delivered') partner.completedCount = (partner.completedCount || 0) + 1;
+  else partner.failedCount = (partner.failedCount || 0) + 1;
+  await partner.save();
+  const u = await User.findById(live.partnerUserId).select('name');
+  emit('admin_fleet', 'fleet_update', fleetPayload(partner, u?.name));
+};
+
 export const assignmentService = {
   setIo, geoDistanceMeters, createOffer, acceptOffer, rejectOffer, expireStaleOffers, cancelForOrder,
-  findCandidates, tryAssign,
+  completeForOrder, findCandidates, tryAssign,
 };

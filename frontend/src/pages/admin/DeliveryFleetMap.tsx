@@ -153,18 +153,18 @@ export const DeliveryFleetMap: React.FC = () => {
       <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-divider">
         <div>
           <h3 className="font-extrabold text-sm text-text-primary">Live fleet</h3>
-          <p className="text-[10px] text-text-secondary font-medium">
+          <p className="text-[11px] text-text-secondary font-medium">
             {fleet.length} online • {withLoc} with a live location
             {updatedAt && ` • updated ${updatedAt.toLocaleTimeString()}`}
           </p>
         </div>
-        <button onClick={fetchFleet} className="flex items-center gap-1 border border-divider text-text-secondary font-bold py-1.5 px-3 rounded-full text-[10px] hover:bg-background cursor-pointer">
+        <button onClick={fetchFleet} className="flex items-center gap-1 border border-divider text-text-secondary font-bold py-1.5 px-3 rounded-full text-[11px] hover:bg-background cursor-pointer">
           <RefreshCw size={12} /> Refresh
         </button>
       </div>
       <div ref={elRef} className="w-full h-[320px] sm:h-[420px] bg-background" />
       {fleet.length > 0 && withLoc === 0 && (
-        <div className="px-4 sm:px-6 py-2 text-[10px] text-text-secondary font-semibold border-t border-divider">
+        <div className="px-4 sm:px-6 py-2 text-[11px] text-text-secondary font-semibold border-t border-divider">
           Partners are online but haven't sent a GPS heartbeat yet.
         </div>
       )}

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:freshcart_delivery/core/config/app_config.dart';
 
@@ -38,7 +37,6 @@ class SocketService {
     final s = _socket!;
     s.connect();
     s.onConnect((_) {
-      if (kDebugMode) print('⚡ partner socket connected');
       _connection.add(true);
     });
     s.onDisconnect((_) => _connection.add(false));

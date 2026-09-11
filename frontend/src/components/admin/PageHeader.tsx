@@ -11,13 +11,11 @@ export const PageHeader: React.FC<PageHeaderProps> = ({ eyebrow, title, descript
   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
     <div>
       {eyebrow && (
-        <span className="font-admin-mono text-[10px] font-semibold tracking-[0.14em] uppercase text-admin-text-faint">
-          {eyebrow}
-        </span>
+        <span className="admin-label block">{eyebrow}</span>
       )}
-      <h1 className="font-admin-display text-2xl font-bold text-admin-text mt-0.5">{title}</h1>
+      <h1 className="admin-h1 mt-1">{title}</h1>
       {description && (
-        <p className="font-admin-body text-xs text-admin-text-muted font-medium mt-1 max-w-xl">{description}</p>
+        <p className="font-admin-body text-[13px] leading-relaxed text-admin-text-muted mt-1.5 max-w-[68ch]">{description}</p>
       )}
     </div>
     {actions && <div className="flex items-center gap-2.5 shrink-0">{actions}</div>}

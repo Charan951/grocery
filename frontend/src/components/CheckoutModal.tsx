@@ -17,6 +17,8 @@ interface SavedAddress {
   pincode: string;
   receiverName?: string;
   receiverPhone?: string;
+  lat?: number;
+  lng?: number;
 }
 
 interface CheckoutModalProps {
@@ -123,7 +125,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     paymentRef?: string;
     paymentId?: string;
   }): Promise<void> => {
-    await fetch('/api/orders', {
+    const res = await fetch('/api/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -149,8 +151,25 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         ...(opts.paymentRef ? { paymentRef: opts.paymentRef } : {}),
         ...(opts.paymentId ? { paymentId: opts.paymentId } : {}),
         deliveryAddress: addressString,
+        // Without these the order never gets a `deliveryLocation`, which is
+        // what the live tracking map keys off — the customer would place an
+        // order and never see a map until (if ever) a rider's live position
+        // happened to come through.
+        ...(Number.isFinite(selectedAddress?.lat) && Number.isFinite(selectedAddress?.lng)
+          ? { deliveryLat: selectedAddress!.lat, deliveryLng: selectedAddress!.lng }
+          : {}),
       }),
     });
+    // A payment can succeed while the order write fails (DB blip, validation
+    // error, offline-mode fallback) — never treat that as a placed order, or
+    // the customer sees a success screen for an order that never reaches the
+    // admin console. Surface it as a real failure so the caller's catch block
+    // shows an error instead of calling finish().
+    let data: any = null;
+    try { data = await res.json(); } catch { /* non-JSON error body */ }
+    if (!res.ok || !data?.success || !data?.order?.orderId) {
+      throw new Error(data?.message || 'Could not place your order. Please try again.');
+    }
   };
 
   const cacheOrderLocally = (orderId: string, paymentStatus: 'Paid' | 'Pending') => {

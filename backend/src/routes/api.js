@@ -59,6 +59,13 @@ router.use((req, res, next) => {
         });
       }
     }
+    // Orders are money-and-inventory critical — never fake a "saved" order
+    // while the DB is unreachable. A customer who paid (or committed to COD)
+    // must see a real error and retry, not a false success that never shows
+    // up in the admin console because nothing was actually written.
+    if (req.path.startsWith('/orders') && (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH')) {
+      return res.status(503).json({ success: false, message: 'We could not reach the server. Please try again.' });
+    }
     if (req.method === 'PUT' || req.method === 'POST' || req.method === 'DELETE' || req.method === 'PATCH') {
       if (
         req.path.startsWith('/super-categories') ||

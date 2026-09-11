@@ -1,10 +1,10 @@
-import React from 'react';
-import { Loader2 } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Loader2, ListFilter, Check } from 'lucide-react';
 
 /**
  * Shared presentational primitives for the delivery-partner console. They pin
- * the surface to the admin design system (`--admin-*` tokens, Space Grotesk /
- * IBM Plex) so the two staff consoles read as one product.
+ * the surface to the admin design system (`--admin-*` tokens, Rubik /
+ * Nunito Sans / IBM Plex Mono) so the two staff consoles read as one product.
  */
 
 export const PageHead: React.FC<{
@@ -178,6 +178,84 @@ export const CenterState: React.FC<{
       {children && (
         <div className="text-[12px] text-admin-text-muted max-w-[240px] leading-relaxed">
           {children}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/**
+ * A single "three lines" filter action (matches the mobile app's
+ * FilterAction): a compact icon button that opens a small menu to pick one
+ * option, instead of a permanently-visible tab/segmented row. Used the same
+ * way on every list screen (History, Earnings, ...) so filtering stays
+ * consistent across the console.
+ */
+export const FilterMenu = <T extends string>({
+  title,
+  options,
+  value,
+  onChange,
+}: {
+  title: string;
+  options: Array<{ value: T; label: string }>;
+  value: T;
+  onChange: (v: T) => void;
+}) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onEsc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onEsc);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onEsc);
+    };
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        title={title}
+        onClick={() => setOpen((o) => !o)}
+        className={`inline-flex items-center justify-center w-9 h-9 rounded-md border transition-colors cursor-pointer ${
+          open
+            ? 'bg-admin-green-soft border-admin-green text-admin-green'
+            : 'bg-admin-surface border-admin-ledger-line text-admin-text-muted hover:text-admin-text'
+        }`}
+      >
+        <ListFilter size={16} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-[calc(100%+6px)] z-20 w-48 bg-admin-surface border border-admin-ledger-line rounded-lg shadow-lg overflow-hidden">
+          <div className="font-admin-mono text-[10px] font-bold uppercase tracking-[0.1em] text-admin-text-faint px-3 pt-3 pb-1.5">
+            {title}
+          </div>
+          {options.map((o) => {
+            const sel = o.value === value;
+            return (
+              <button
+                key={o.value}
+                onClick={() => {
+                  onChange(o.value);
+                  setOpen(false);
+                }}
+                className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-[13px] text-left transition-colors cursor-pointer ${
+                  sel ? 'font-semibold text-admin-green bg-admin-green-soft' : 'text-admin-text hover:bg-admin-paper'
+                }`}
+              >
+                {o.label}
+                {sel && <Check size={14} />}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
