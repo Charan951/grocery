@@ -2,8 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Plus, Trash2, MapPin } from 'lucide-react';
-
-const API_URL = '/api';
+import { API_URL } from '../../config/api';
 const authHeader = (): Record<string, string> => {
   const t = localStorage.getItem('admin_token');
   return t ? { Authorization: `Bearer ${t}` } : {};

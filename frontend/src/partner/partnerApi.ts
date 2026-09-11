@@ -2,7 +2,9 @@
 // `deliveryapp/lib/core/services/api_client.dart` — every call hits
 // `/api/delivery/*` with the staff bearer token written at login.
 
-const API = '/api';
+import { API_URL } from '../config/api';
+
+const API = API_URL;
 
 export const partnerToken = () =>
   localStorage.getItem('admin_token') || localStorage.getItem('token') || '';

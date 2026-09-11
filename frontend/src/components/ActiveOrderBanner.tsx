@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Bike, ChevronRight } from 'lucide-react';
+import { apiUrl } from '../config/api';
 
 const TERMINAL = ['delivered', 'cancelled', 'canceled', 'returned', 'refunded'];
 
@@ -23,7 +24,7 @@ export const ActiveOrderBanner: React.FC = () => {
 
     const load = async () => {
       try {
-        const res = await fetch(`/api/orders/customer/${clean}`);
+        const res = await fetch(apiUrl(`/orders/customer/${clean}`));
         const data = await res.json();
         if (cancelled || !data?.success || !Array.isArray(data.orders)) return;
         const live = data.orders.find(

@@ -10,8 +10,8 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { ShelfTag } from '../../components/admin/ShelfTag';
+import { API_URL } from '../../config/api';
 
-const API_URL = '/api';
 const authHeader = (): Record<string, string> => {
   const t = localStorage.getItem('admin_token');
   return t ? { Authorization: `Bearer ${t}` } : {};

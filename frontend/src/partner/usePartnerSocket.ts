@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import { partnerToken, type DeliveryOffer } from './partnerApi';
+import { SOCKET_URL } from '../config/api';
 
 // One socket connection for the whole partner app. The backend joins this
 // socket to `partner:<userId>` from the JWT alone (see backend/app.js), so we
@@ -16,7 +17,7 @@ export function usePartnerSocket(onOrderStatus?: (p: any) => void) {
     const token = partnerToken();
     if (!token) return;
 
-    const socket = io(window.location.origin, {
+    const socket = io(SOCKET_URL, {
       path: '/socket.io',
       transports: ['websocket'],
       auth: { token },

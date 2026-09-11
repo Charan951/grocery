@@ -24,23 +24,56 @@ import { setIo as setAssignmentIo } from './src/services/assignmentService.js';
 const LAN_ORIGIN_RE = /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?$/;
 
 function buildCorsOptions() {
-  const configured = (process.env.CORS_ORIGINS || '')
-    .split(',')
-    .map((s) => s.trim())
+  const envSources = [
+    process.env.CORS_ORIGINS,
+    process.env.CORS_ORIGIN,
+    process.env.CLIENT_URL,
+    process.env.FRONTEND_URL,
+  ];
+
+  const configured = envSources
+    .filter(Boolean)
+    .flatMap((s) => s.split(','))
+    .map((s) => s.trim().replace(/\/+$/, ''))
     .filter(Boolean);
+
+  const allowAll = configured.includes('*');
 
   return {
     origin(origin, callback) {
-      // No Origin header at all → not a browser request (native app / curl /
-      // server-to-server). Always allow.
+      // No Origin header at all → not a browser request (native app / curl / server-to-server). Always allow.
       if (!origin) return callback(null, true);
-      if (LAN_ORIGIN_RE.test(origin)) return callback(null, true);
-      if (configured.includes(origin)) return callback(null, true);
-      callback(new Error(`CORS: origin "${origin}" is not allowed`));
+      if (allowAll) return callback(null, true);
+
+      const normalized = origin.replace(/\/+$/, '');
+      if (LAN_ORIGIN_RE.test(normalized)) return callback(null, true);
+      if (configured.includes(normalized)) return callback(null, true);
+
+      // Support wildcard subdomains e.g. *.vercel.app or *.netlify.app
+      const matchesWildcard = configured.some((c) => {
+        if (c.startsWith('*.')) {
+          const suffix = c.slice(2);
+          try {
+            const host = new URL(normalized).hostname;
+            return host.endsWith(suffix);
+          } catch (_) {
+            return false;
+          }
+        }
+        return false;
+      });
+      if (matchesWildcard) return callback(null, true);
+
+      // Disallow origin cleanly without crashing the request with a 500 error
+      callback(null, false);
     },
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
     credentials: true,
+    optionsSuccessStatus: 204,
   };
 }
+
 
 /**
  * Builds the Express app + HTTP server + Socket.IO instance without starting to

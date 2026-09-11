@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, User, Shield, Info, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { API_URL } from '../../config/api';
 
 interface LoginProps {
   onLoginSuccess: (user: { name: string; email: string; role: string; token: string }) => void;
@@ -16,8 +17,6 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [isOfflineSandbox, setIsOfflineSandbox] = useState(false);
-
-  const API_URL = '/api';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

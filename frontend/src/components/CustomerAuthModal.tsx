@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, CheckCircle2, ShieldAlert, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { apiUrl } from '../config/api';
 
 interface CustomerAuthModalProps {
   isOpen: boolean;
@@ -104,7 +105,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
 
     setLoading(true);
     try {
-      const res = await fetch('/api/customers/otp/send', {
+      const res = await fetch(apiUrl('/customers/otp/send'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: phoneDigits }),
@@ -131,7 +132,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
     setError('');
     setLoading(true);
     try {
-      const res = await fetch('/api/customers/otp/verify', {
+      const res = await fetch(apiUrl('/customers/otp/verify'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: phoneDigits, code: otp }),
@@ -161,7 +162,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
     setError('');
     setLoading(true);
     try {
-      const res = await fetch('/api/customers/login-email', {
+      const res = await fetch(apiUrl('/customers/login-email'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: identifier.trim().toLowerCase(), password }),
@@ -193,7 +194,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
     setError('');
     setLoading(true);
     try {
-      const res = await fetch('/api/customers/register', {
+      const res = await fetch(apiUrl('/customers/register'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email: identifier.trim().toLowerCase(), password, phone: regPhone }),

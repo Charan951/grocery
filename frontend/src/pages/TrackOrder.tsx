@@ -4,6 +4,7 @@ import { io } from 'socket.io-client';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Phone, MessageCircle, ArrowLeft, MapPin, RefreshCw } from 'lucide-react';
+import { apiUrl, SOCKET_URL } from '../config/api';
 
 interface DeliveryBlock {
   partnerName: string;
@@ -110,7 +111,7 @@ export const TrackOrder: React.FC = () => {
   const fetchOrder = async () => {
     try {
       const token = localStorage.getItem('customer_token');
-      const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, {
+      const res = await fetch(apiUrl(`/orders/${encodeURIComponent(orderId)}`), {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       const data = await res.json();
@@ -131,7 +132,7 @@ export const TrackOrder: React.FC = () => {
   // Real-time updates for this order (rider location + status changes).
   useEffect(() => {
     if (!orderId) return;
-    const socket = io(window.location.origin, { path: '/socket.io', transports: ['websocket'] });
+    const socket = io(SOCKET_URL, { path: '/socket.io', transports: ['websocket'] });
     const join = () => socket.emit('join_order_room', orderId);
     socket.on('connect', join);
 
@@ -277,7 +278,7 @@ export const TrackOrder: React.FC = () => {
     setRateBusy(true);
     setRateErr('');
     try {
-      const res = await fetch(`/api/orders/${encodeURIComponent(order.orderId)}/rate-partner`, {
+      const res = await fetch(apiUrl(`/orders/${encodeURIComponent(order.orderId)}/rate-partner`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ stars: rateStars, comment: rateComment.trim() || undefined, phone: customerPhone() }),

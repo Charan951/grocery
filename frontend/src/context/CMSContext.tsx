@@ -1,5 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { normalizeCategoryImageUrl } from '../components/SubcategoryCardImage';
+import { apiUrl } from '../config/api';
+
+const apiFetch = (url: string, init?: RequestInit) => fetch(apiUrl(url), init);
 
 // Interfaces for our CMS models
 export interface SubCategory {
@@ -1459,7 +1462,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       try {
         const fetchJson = async (url: string) => {
-          const res = await fetch(url, { signal: controller.signal });
+          const res = await apiFetch(url, { signal: controller.signal });
           return res.ok ? await res.json() : null;
         };
 
@@ -1548,7 +1551,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       banners: [...prev.banners, banner],
     }));
     try {
-      await fetch('/api/banners', {
+      await apiFetch('/api/banners', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(banner)
@@ -1564,7 +1567,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       banners: prev.banners.filter((b) => b.id !== id),
     }));
     try {
-      await fetch(`/api/banners/${id}`, {
+      await apiFetch(`/api/banners/${id}`, {
         method: 'DELETE'
       });
     } catch (e) {
@@ -1578,7 +1581,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       banners: prev.banners.map((b) => (b.id === id ? { ...b, ...updated } : b)),
     }));
     try {
-      await fetch(`/api/banners/${id}`, {
+      await apiFetch(`/api/banners/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updated)
@@ -1594,7 +1597,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       promoCards: [...(prev.promoCards || []), card],
     }));
     try {
-      await fetch('/api/promo-cards', {
+      await apiFetch('/api/promo-cards', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(card)
@@ -1610,7 +1613,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       promoCards: (prev.promoCards || []).map((c) => (c.id === id ? { ...c, ...updated } : c)),
     }));
     try {
-      await fetch(`/api/promo-cards/${id}`, {
+      await apiFetch(`/api/promo-cards/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updated)
@@ -1626,7 +1629,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       promoCards: (prev.promoCards || []).filter((c) => c.id !== id),
     }));
     try {
-      await fetch(`/api/promo-cards/${id}`, {
+      await apiFetch(`/api/promo-cards/${id}`, {
         method: 'DELETE'
       });
     } catch (e) {
@@ -1637,8 +1640,8 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const refreshFestivalCampaigns = async () => {
     try {
       const [listRes, activeRes] = await Promise.all([
-        fetch('/api/festival-campaigns'),
-        fetch('/api/festival-campaigns/active')
+        apiFetch('/api/festival-campaigns'),
+        apiFetch('/api/festival-campaigns/active')
       ]);
       const listData = listRes.ok ? await listRes.json() : null;
       const activeData = activeRes.ok ? await activeRes.json() : null;
@@ -1665,7 +1668,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addFestivalCampaign = async (campaignData: any) => {
     try {
-      const res = await fetch('/api/festival-campaigns', {
+      const res = await apiFetch('/api/festival-campaigns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(campaignData)
@@ -1684,7 +1687,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateFestivalCampaign = async (id: string, updatedData: any) => {
     try {
-      const res = await fetch(`/api/festival-campaigns/${id}`, {
+      const res = await apiFetch(`/api/festival-campaigns/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedData)
@@ -1703,7 +1706,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteFestivalCampaign = async (id: string) => {
     try {
-      const res = await fetch(`/api/festival-campaigns/${id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/festival-campaigns/${id}`, { method: 'DELETE' });
       const data = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(data.message || 'Failed to delete festival campaign');
@@ -1718,7 +1721,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const toggleFestivalCampaignStatus = async (id: string, isActive?: boolean) => {
     try {
-      const res = await fetch(`/api/festival-campaigns/${id}/status`, {
+      const res = await apiFetch(`/api/festival-campaigns/${id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isActive })
@@ -1749,7 +1752,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const res = await fetch(`/api/products/${id}`, {
+      const res = await apiFetch(`/api/products/${id}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify(payload)
@@ -1781,7 +1784,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const res = await fetch('/api/products', {
+      const res = await apiFetch('/api/products', {
         method: 'POST',
         headers,
         body: JSON.stringify(payload)
@@ -1810,7 +1813,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      await fetch(`/api/products/${id}`, {
+      await apiFetch(`/api/products/${id}`, {
         method: 'DELETE',
         headers
       });
@@ -1835,7 +1838,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }),
     }));
     try {
-      await fetch(`/api/categories/${id}`, {
+      await apiFetch(`/api/categories/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -1851,7 +1854,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       categories: [category, ...prev.categories],
     }));
     try {
-      await fetch('/api/categories', {
+      await apiFetch('/api/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(category)
@@ -1867,7 +1870,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       categories: prev.categories.filter((c) => c.id !== id && c.slug !== id && (c as any)._id !== id && (c.name && c.name.toLowerCase() !== id.toLowerCase())),
     }));
     try {
-      await fetch(`/api/categories/${id}`, {
+      await apiFetch(`/api/categories/${id}`, {
         method: 'DELETE'
       });
     } catch (e) {
@@ -1895,7 +1898,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Sync updated displayOrder to backend
       updatedCategories.forEach(async (cat) => {
         try {
-          await fetch(`/api/categories/${cat.id}`, {
+          await apiFetch(`/api/categories/${cat.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ displayOrder: cat.displayOrder })
@@ -1957,7 +1960,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     try {
-      await fetch(`/api/categories/${categoryId}/subcategories`, {
+      await apiFetch(`/api/categories/${categoryId}/subcategories`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newSub)
@@ -2008,7 +2011,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     try {
-      await fetch(`/api/categories/${categoryId}/subcategories/${encodeURIComponent(subCategoryNameOrId)}`, {
+      await apiFetch(`/api/categories/${categoryId}/subcategories/${encodeURIComponent(subCategoryNameOrId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(subPayload)
@@ -2033,7 +2036,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
 
     try {
-      await fetch(`/api/categories/${categoryId}/subcategories/${encodeURIComponent(subCategoryNameOrId)}`, {
+      await apiFetch(`/api/categories/${categoryId}/subcategories/${encodeURIComponent(subCategoryNameOrId)}`, {
         method: 'DELETE'
       });
     } catch (e) {
@@ -2052,7 +2055,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const res = await fetch('/api/special-groups', {
+      const res = await apiFetch('/api/special-groups', {
         method: 'POST',
         headers,
         body: JSON.stringify(group)
@@ -2082,7 +2085,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const res = await fetch(`/api/special-groups/${id}`, {
+      const res = await apiFetch(`/api/special-groups/${id}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify(updated)
@@ -2112,7 +2115,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      await fetch(`/api/special-groups/${id}`, {
+      await apiFetch(`/api/special-groups/${id}`, {
         method: 'DELETE',
         headers
       });
@@ -2127,7 +2130,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       coupons: prev.coupons.map((c) => (c.code === code ? { ...c, ...updated } : c)),
     }));
     try {
-      await fetch(`/api/coupons/${code}`, {
+      await apiFetch(`/api/coupons/${code}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updated)
@@ -2143,7 +2146,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       coupons: [coupon, ...prev.coupons],
     }));
     try {
-      await fetch('/api/coupons', {
+      await apiFetch('/api/coupons', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(coupon)
@@ -2159,7 +2162,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       coupons: prev.coupons.filter((c) => c.code !== code),
     }));
     try {
-      await fetch(`/api/coupons/${code}`, {
+      await apiFetch(`/api/coupons/${code}`, {
         method: 'DELETE'
       });
     } catch (e) {
@@ -2173,7 +2176,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       blogs: prev.blogs.map((b) => (b.id === id ? { ...b, ...updated } : b)),
     }));
     try {
-      await fetch(`/api/blogs/${id}`, {
+      await apiFetch(`/api/blogs/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updated)
@@ -2189,7 +2192,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       blogs: [blog, ...prev.blogs],
     }));
     try {
-      await fetch('/api/blogs', {
+      await apiFetch('/api/blogs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(blog)
@@ -2205,7 +2208,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       blogs: prev.blogs.filter((b) => b.id !== id),
     }));
     try {
-      await fetch(`/api/blogs/${id}`, {
+      await apiFetch(`/api/blogs/${id}`, {
         method: 'DELETE'
       });
     } catch (e) {
@@ -2322,7 +2325,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ),
     }));
     try {
-      await fetch(`/api/super-categories/${id}`, {
+      await apiFetch(`/api/super-categories/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updated),
@@ -2339,7 +2342,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
     superCats.forEach(async (sc, index) => {
       try {
-        await fetch(`/api/super-categories/${sc.id}`, {
+        await apiFetch(`/api/super-categories/${sc.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ displayOrder: index }),
@@ -2350,7 +2353,7 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const uploadImage = async (fileBase64OrUri: string, folder?: string): Promise<string> => {
     try {
-      const response = await fetch('/api/upload', {
+      const response = await apiFetch('/api/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: fileBase64OrUri, folder: folder || 'freshcart' }),

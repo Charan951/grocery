@@ -6,6 +6,7 @@ import { useCMS } from '../context/CMSContext';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useSmartBack } from '../hooks/useSmartBack';
 import { downloadInvoice } from '../utils/invoice';
+import { apiUrl } from '../config/api';
 import { 
   Package, 
   Clock, 
@@ -130,7 +131,7 @@ export const CustomerOrders: React.FC = () => {
   React.useEffect(() => {
     if (customerUser?.phone) {
       const cleanPhone = customerUser.phone.replace(/\D/g, '').slice(-10);
-      fetch(`/api/orders/customer/${cleanPhone}`)
+      fetch(apiUrl(`/orders/customer/${cleanPhone}`))
         .then((res) => res.json())
         .then((data) => {
           if (data && data.success && data.orders && data.orders.length > 0) {
@@ -195,7 +196,7 @@ export const CustomerOrders: React.FC = () => {
     setSwitchingPayment(true);
     setSwitchPaymentError(null);
     try {
-      const co = await fetch('/api/payment/create-order', {
+      const co = await fetch(apiUrl('/payment/create-order'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount: order.totalAmount, receipt: id }),
@@ -220,7 +221,7 @@ export const CustomerOrders: React.FC = () => {
 
       // Local-dev path: backend in test mode with no usable key — skip the sheet.
       if (testMode && !key) {
-        await fetch('/api/payment/verify', {
+        await fetch(apiUrl('/payment/verify'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -258,7 +259,7 @@ export const CustomerOrders: React.FC = () => {
         theme: { color: '#2E7D32' },
         handler: async (resp: any) => {
           try {
-            const v = await fetch('/api/payment/verify', {
+            const v = await fetch(apiUrl('/payment/verify'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -294,7 +295,7 @@ export const CustomerOrders: React.FC = () => {
     setCancelling(true);
     try {
       const phone = customerUser?.phone ? customerUser.phone.replace(/\D/g, '').slice(-10) : '';
-      const res = await fetch(`/api/orders/${encodeURIComponent(id)}/cancel`, {
+      const res = await fetch(apiUrl(`/orders/${encodeURIComponent(id)}/cancel`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, reason: 'Cancelled by customer' }),

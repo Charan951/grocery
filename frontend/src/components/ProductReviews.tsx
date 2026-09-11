@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Star } from 'lucide-react';
+import { apiUrl } from '../config/api';
 
 interface ReviewItem {
   _id?: string;
@@ -48,7 +49,7 @@ export const ProductReviews: React.FC<{ productId: string }> = ({ productId }) =
 
   const load = useCallback(() => {
     setLoading(true);
-    fetch(`/api/products/${encodeURIComponent(productId)}/reviews`)
+    fetch(apiUrl(`/products/${encodeURIComponent(productId)}/reviews`))
       .then((r) => r.json())
       .then((d) => {
         if (d?.success) {
@@ -73,7 +74,7 @@ export const ProductReviews: React.FC<{ productId: string }> = ({ productId }) =
     setFeedback(null);
     try {
       const phone = customerUser?.phone ? customerUser.phone.replace(/\D/g, '').slice(-10) : '';
-      const res = await fetch(`/api/products/${encodeURIComponent(productId)}/reviews`, {
+      const res = await fetch(apiUrl(`/products/${encodeURIComponent(productId)}/reviews`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, rating, comment }),

@@ -3,6 +3,7 @@ import { io } from 'socket.io-client';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { RefreshCw } from 'lucide-react';
+import { API_URL, SOCKET_URL } from '../../config/api';
 
 interface FleetPartner {
   userId: string;
@@ -14,7 +15,6 @@ interface FleetPartner {
   locationUpdatedAt: string | null;
 }
 
-const API_URL = '/api';
 const authHeader = (): Record<string, string> => {
   const t = localStorage.getItem('admin_token');
   return t ? { Authorization: `Bearer ${t}` } : {};
@@ -91,7 +91,7 @@ export const DeliveryFleetMap: React.FC = () => {
   useEffect(() => {
     const token = localStorage.getItem('admin_token');
     if (!token) return;
-    const socket = io(window.location.origin, {
+    const socket = io(SOCKET_URL, {
       path: '/socket.io',
       transports: ['websocket'],
       auth: { token },

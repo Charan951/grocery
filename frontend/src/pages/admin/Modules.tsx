@@ -10,6 +10,7 @@ import {
 import { useCMS, getCategoryImage, getSubCategoryImage } from '../../context/CMSContext';
 import { DeliveryFleetMap } from './DeliveryFleetMap';
 import { ZonesManager } from './ZonesManager';
+import { API_URL } from '../../config/api';
 
 // ==========================================
 // 1. CATEGORIES MODULE
@@ -32,7 +33,6 @@ export const CategoriesModule: React.FC = () => {
   const [newSubName, setNewSubName] = useState('');
   const [editingSub, setEditingSub] = useState<{ categoryId: string; subId: string; name: string } | null>(null);
 
-  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -488,7 +488,6 @@ export const SubCategoriesModule: React.FC = () => {
     if (cat) setSelectedCatFilter(cat);
   }, [searchParams]);
 
-  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -1371,7 +1370,6 @@ export const InventoryModule: React.FC = () => {
   const [stockFilter, setStockFilter] = useState<'all' | 'low' | 'out'>('all');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token') || localStorage.getItem('token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -1760,7 +1758,6 @@ export const CustomersModule: React.FC = () => {
   const [customers, setCustomers] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
 
-  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -1940,7 +1937,6 @@ export const DeliveryModule: React.FC = () => {
   const [adding, setAdding] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token') || localStorage.getItem('token') || 'mock_sandbox_token_123456789';
     return { 'Authorization': `Bearer ${token}` };
@@ -2575,7 +2571,6 @@ export const EmployeesModule: React.FC = () => {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('Employee');
 
-  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -2730,7 +2725,6 @@ export const CouponsModule: React.FC = () => {
   const [editingCoupon, setEditingCoupon] = useState<any | null>(null);
   const [showForm, setShowForm] = useState(false);
 
-  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -2892,7 +2886,6 @@ export const CMSModule: React.FC = () => {
   const [cover, setCover] = useState('https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=500&auto=format&fit=crop');
   const [category, setCategory] = useState('Nutrition');
 
-  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -3049,7 +3042,6 @@ export const CMSModule: React.FC = () => {
 export const FinanceModule: React.FC = () => {
   const [orders, setOrders] = useState<any[]>([]);
 
-  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -3165,7 +3157,6 @@ export const ReviewsModule: React.FC = () => {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
 
-  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -3341,7 +3332,6 @@ export const SupportModule: React.FC = () => {
   const [activeTicket, setActiveTicket] = useState<any | null>(null);
   const [replyText, setReplyText] = useState('');
 
-  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -3503,7 +3493,6 @@ export const SupportModule: React.FC = () => {
 export const AuditLogsModule: React.FC = () => {
   const [logs, setLogs] = useState<any[]>([]);
 
-  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -3615,7 +3604,6 @@ export const SettingsModule: React.FC = () => {
   const [dcfg, setDcfg] = useState<DeliveryCfg>(DEFAULT_DELIVERY_CFG);
   const [dSaving, setDSaving] = useState(false);
 
-  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};

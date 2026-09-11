@@ -17,6 +17,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useSmartBack } from '../hooks/useSmartBack';
 import { CustomerAuthModal } from '../components/CustomerAuthModal';
+import { apiUrl } from '../config/api';
 
 type MenuItem = {
   icon: React.ElementType;
@@ -82,7 +83,7 @@ export const CustomerProfile: React.FC = () => {
 
     try {
       const targetId = customerUser?.customerId || phone || 'customer';
-      const res = await fetch(`/api/customers/${encodeURIComponent(targetId)}/profile`, {
+      const res = await fetch(apiUrl(`/customers/${encodeURIComponent(targetId)}/profile`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email }),
@@ -107,7 +108,7 @@ export const CustomerProfile: React.FC = () => {
 
   const handleDeleteAccount = async () => {
     try {
-      await fetch(`/api/customers/me?phone=${encodeURIComponent(phone)}`, { method: 'DELETE' });
+      await fetch(apiUrl(`/customers/me?phone=${encodeURIComponent(phone)}`), { method: 'DELETE' });
     } catch (err) {
       console.warn('Account deletion API unavailable — cleared locally');
     }

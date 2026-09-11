@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useCartWishlist } from '../context/CartWishlistContext';
 import { OrderSuccessModal } from './OrderSuccessModal';
+import { apiUrl } from '../config/api';
 
 interface SavedAddress {
   id: string;
@@ -91,7 +92,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
     setPayError(null);
-    fetch('/api/settings')
+    fetch(apiUrl('/settings'))
       .then((r) => r.json())
       .then((d) => {
         const s = d?.settings;
@@ -125,7 +126,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     paymentRef?: string;
     paymentId?: string;
   }): Promise<void> => {
-    const res = await fetch('/api/orders', {
+    const res = await fetch(apiUrl('/orders'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -246,7 +247,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
     try {
       setStage('Creating payment order…');
-      const co = await fetch('/api/payment/create-order', {
+      const co = await fetch(apiUrl('/payment/create-order'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount: finalPayable, receipt: orderId }),
@@ -266,7 +267,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       // Local-dev path: backend in test mode with no usable key — skip the sheet.
       if (testMode && !key) {
         setStage('Confirming…');
-        await fetch('/api/payment/verify', {
+        await fetch(apiUrl('/payment/verify'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -306,7 +307,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         handler: async (resp: any) => {
           setStage('Verifying payment…');
           try {
-            const v = await fetch('/api/payment/verify', {
+            const v = await fetch(apiUrl('/payment/verify'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({

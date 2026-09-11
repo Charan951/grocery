@@ -7,6 +7,7 @@ import {
 import { useCMS } from '../../context/CMSContext';
 import { PageHeader } from '../../components/admin/PageHeader';
 import { ShelfTag } from '../../components/admin/ShelfTag';
+import { API_URL } from '../../config/api';
 
 export const Dashboard: React.FC = () => {
   const { products } = useCMS();
@@ -31,7 +32,6 @@ export const Dashboard: React.FC = () => {
   const [pendingOrders, setPendingOrders] = useState<any[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { apiUrl, SOCKET_URL } from '../../config/api';
 
 type LL = { lat: number; lng: number };
 
@@ -41,7 +42,7 @@ export const OrderRiderMap: React.FC<{ orderId: string; partnerUserId?: string }
   // Pickup / drop (and any already-revealed rider location) from the order.
   useEffect(() => {
     let live = true;
-    fetch(`/api/orders/${encodeURIComponent(orderId)}`, { headers: authHeader() })
+    fetch(apiUrl(`/orders/${encodeURIComponent(orderId)}`), { headers: authHeader() })
       .then((r) => r.json())
       .then((d) => {
         if (!live || !d?.order) return;
@@ -64,7 +65,7 @@ export const OrderRiderMap: React.FC<{ orderId: string; partnerUserId?: string }
   useEffect(() => {
     if (!partnerUserId) return;
     let live = true;
-    fetch('/api/admin/delivery/fleet', { headers: authHeader() })
+    fetch(apiUrl('/admin/delivery/fleet'), { headers: authHeader() })
       .then((r) => r.json())
       .then((d) => {
         if (!live || !Array.isArray(d?.fleet)) return;
@@ -83,7 +84,7 @@ export const OrderRiderMap: React.FC<{ orderId: string; partnerUserId?: string }
   // Live updates for this order.
   useEffect(() => {
     const token = localStorage.getItem('admin_token');
-    const socket = io(window.location.origin, {
+    const socket = io(SOCKET_URL, {
       path: '/socket.io',
       transports: ['websocket'],
       auth: token ? { token } : undefined,

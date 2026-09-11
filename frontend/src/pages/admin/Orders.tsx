@@ -7,6 +7,7 @@ import {
 import { PageHeader } from '../../components/admin/PageHeader';
 import { ShelfTag } from '../../components/admin/ShelfTag';
 import { OrderRiderMap } from './OrderRiderMap';
+import { API_URL } from '../../config/api';
 
 interface OrderItem {
   productId: string;
@@ -62,7 +63,6 @@ export const Orders: React.FC = () => {
   const [assignMsg, setAssignMsg] = useState('');
   
   // MERN API Connection
-  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token') || localStorage.getItem('token') || localStorage.getItem('freshcart_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};

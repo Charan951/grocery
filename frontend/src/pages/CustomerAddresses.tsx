@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useCMS } from '../context/CMSContext';
 import { useSmartBack } from '../hooks/useSmartBack';
+import { apiUrl } from '../config/api';
 
 interface SavedAddress {
   id: string;
@@ -344,7 +345,7 @@ export const CustomerAddresses: React.FC = () => {
     // Save Customer Profile & Address to Backend MongoDB Database
     try {
       const targetPhone = receiverPhone || customerUser?.phone || userPhoneKey;
-      await fetch(`/api/customers/${encodeURIComponent(targetPhone)}/addresses`, {
+      await fetch(apiUrl(`/customers/${encodeURIComponent(targetPhone)}/addresses`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newAddrObj),

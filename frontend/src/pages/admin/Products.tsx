@@ -7,6 +7,7 @@ import { useCMS, Product } from '../../context/CMSContext';
 import { PageHeader } from '../../components/admin/PageHeader';
 import { ShelfTag } from '../../components/admin/ShelfTag';
 import { getProductImage } from '../../utils/imageUtils';
+import { API_URL } from '../../config/api';
 
 export const Products: React.FC = () => {
   const { products: contextProducts, categories, addProduct: contextAdd, deleteProduct: contextDelete, updateProduct: contextUpdate, uploadImage } = useCMS();
@@ -42,7 +43,6 @@ export const Products: React.FC = () => {
   const { addSubCategory: contextAddSubCategory } = useCMS();
 
   // REST API connection helper
-  const API_URL = '/api';
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
