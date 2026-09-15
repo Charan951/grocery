@@ -379,7 +379,10 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
       {/* Checkout Modal */}
       <CheckoutModal
         isOpen={isCheckoutOpen}
-        onClose={() => setIsCheckoutOpen(false)}
+        onClose={() => {
+          setIsCheckoutOpen(false);
+          onClose();
+        }}
         selectedAddress={activeAddress}
         onOpenAddressSelector={() => {
           setIsCheckoutOpen(false);

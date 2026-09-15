@@ -68,6 +68,8 @@ class OrderModel {
   final String deliveryPartnerName;
   final int deliveryRatingStars; // 0 = not yet rated
   final String deliveryOtp; // 4-digit doorstep code, only present once out for delivery
+  final String customerName;
+  final String customerPhone;
 
   const OrderModel({
     required this.id,
@@ -89,7 +91,18 @@ class OrderModel {
     this.deliveryPartnerName = '',
     this.deliveryRatingStars = 0,
     this.deliveryOtp = '',
+    this.customerName = '',
+    this.customerPhone = '',
   });
+
+  /// The "Delivered" milestone's timestamp, if the order has reached it —
+  /// used for the "Order Arrived at" row on the details card.
+  DateTime? get arrivedAt {
+    for (final t in timeline) {
+      if (t.status.toLowerCase() == 'delivered') return t.at;
+    }
+    return null;
+  }
 
   String get statusText {
     if (statusRaw.isNotEmpty) {
@@ -162,6 +175,8 @@ class OrderModel {
       deliveryRatingStars: (j['deliveryRating'] is Map)
           ? asInt((j['deliveryRating'] as Map)['stars'])
           : 0,
+      customerName: asString(j['customerName']),
+      customerPhone: asString(j['customerPhone']),
       deliveryOtp: asString(j['deliveryOtp']),
     );
   }

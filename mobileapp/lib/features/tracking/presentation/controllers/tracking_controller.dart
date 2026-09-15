@@ -20,6 +20,10 @@ class TrackingState {
   final String riderPhoneMasked; // e.g. "98••••10" — always safe to show
   final bool canContact;         // reveal window (Out For Delivery / Arrived) + a real number
   final bool hasRider;
+  /// A partner is actually assigned and the order is still active — mirrors
+  /// the server's `order.delivery` block. Gates the map, partner card and
+  /// chat: nothing to show before assignment or after the order is done.
+  final bool assigned;
   final bool connected;
   final List<OrderTimelineEntry> timeline;
 
@@ -47,6 +51,7 @@ class TrackingState {
     this.riderPhoneMasked = '',
     this.canContact = false,
     this.hasRider = false,
+    this.assigned = false,
     this.connected = false,
     this.timeline = const [],
     this.destination,
@@ -67,6 +72,7 @@ class TrackingState {
     String? riderPhoneMasked,
     bool? canContact,
     bool? hasRider,
+    bool? assigned,
     bool? connected,
     List<OrderTimelineEntry>? timeline,
     LatLng? destination,
@@ -87,6 +93,7 @@ class TrackingState {
       riderPhoneMasked: riderPhoneMasked ?? this.riderPhoneMasked,
       canContact: canContact ?? this.canContact,
       hasRider: hasRider ?? this.hasRider,
+      assigned: assigned ?? this.assigned,
       connected: connected ?? this.connected,
       timeline: timeline ?? this.timeline,
       destination: destination ?? this.destination,
@@ -164,6 +171,7 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
         riderPhone: (d['riderPhone'] as String?) ?? state.riderPhone,
       );
       _maybeRefreshRoute();
+      _recomputeLiveEta();
     }));
 
     // A partner just accepted — show the rider + map immediately (no refetch wait).
@@ -185,6 +193,7 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
             : state.riderLocation,
       );
       _maybeRefreshRoute();
+      _recomputeLiveEta();
       _refreshFromApi(); // reconcile the rest of the record
     }));
 
@@ -217,6 +226,8 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
       );
 
       // Server-side rider block (masked until Out For Delivery / Arrived).
+      // Present only while a partner is assigned and the order is active —
+      // absent both before assignment and after completion.
       final d = raw['delivery'];
       if (d is Map) {
         final loc = d['location'];
@@ -224,6 +235,7 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
         final real = (d['phone'] as String?)?.trim() ?? '';
         final masked = (d['phoneMasked'] as String?)?.trim() ?? '';
         state = state.copyWith(
+          assigned: true,
           riderName: name.isNotEmpty ? name : state.riderName,
           riderPhone: real.isNotEmpty ? real : state.riderPhone,
           riderPhoneMasked: masked.isNotEmpty ? masked : state.riderPhoneMasked,
@@ -233,8 +245,11 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
               ? LatLng((loc['lat'] as num).toDouble(), (loc['lng'] as num).toDouble())
               : state.riderLocation,
         );
+      } else {
+        state = state.copyWith(assigned: false);
       }
       _maybeRefreshRoute();
+      _recomputeLiveEta();
     } catch (_) {
       // keep last-known state
     }
@@ -285,6 +300,17 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
     } catch (_) {/* keep straight line */}
     _routing = false;
     if (mounted) state = state.copyWith(routePoints: path);
+  }
+
+  /// Derives ETA from the rider's live distance to the drop point (matches
+  /// the web tracking page's formula: ~18 km/h city average, 2-min floor) so
+  /// the estimate actually moves as the rider does, instead of sitting on a
+  /// static server value between status pushes.
+  void _recomputeLiveEta() {
+    if (!state.hasRider || state.destination == null) return;
+    final km = _dist(state.riderLocation, state.destination!) / 1000;
+    final mins = (km / 18 * 60).round().clamp(2, 999);
+    if (mounted) state = state.copyWith(etaMinutes: mins);
   }
 
   int? _minsFrom(dynamic v) {

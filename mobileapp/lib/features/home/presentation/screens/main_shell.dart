@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:freshcart/core/widgets/bottom_nav.dart';
 import 'package:freshcart/core/widgets/floating_cart.dart';
+import 'package:freshcart/core/widgets/active_order_pill.dart';
 import 'package:freshcart/features/cart/presentation/controllers/cart_controller.dart';
+import 'package:freshcart/features/orders/presentation/controllers/orders_controller.dart';
 
 /// Hosts the four main tab branches ([StatefulNavigationShell]).
 /// The bottom navigation bar and floating cart are rendered persistent and static
@@ -51,6 +53,9 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
   @override
   Widget build(BuildContext context) {
     final cartCount = ref.watch(cartProvider.select((c) => c.totalItemsCount));
+    final hasActiveOrder = ref.watch(
+      ordersProvider.select((s) => s.asData?.value.any((o) => o.isActive) ?? false),
+    );
 
     return PopScope(
       canPop: false,
@@ -65,6 +70,18 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
         body: Stack(
           children: [
             widget.navigationShell,
+
+            // Active order pill: sits above the cart pill (when both are up)
+            // or directly above the bottom nav (when the cart is empty).
+            if (hasActiveOrder)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: cartCount > 0 ? 128.0 : 70.0,
+                child: ActiveOrderPill(
+                  onTap: (orderId) => context.push('/tracking/$orderId'),
+                ),
+              ),
 
             // Floating Cart: Visible ONLY on the 4 main tabs when cart has items
             if (cartCount > 0)

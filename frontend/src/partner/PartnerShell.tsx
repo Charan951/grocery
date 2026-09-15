@@ -11,6 +11,7 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  ArrowLeft,
   LogOut,
   Settings,
 } from 'lucide-react';
@@ -68,13 +69,19 @@ export const PartnerShell: React.FC<Props> = ({ children, onLogout }) => {
       (i) => location.pathname === i.path || location.pathname.startsWith(i.path + '/'),
     )?.name ||
     (location.pathname.startsWith('/partner/orders/') ? 'Delivery' : 'Console');
+  const isHome = location.pathname === '/partner/dashboard';
+  // Order Details is a pushed detail screen (has its own sticky action bar),
+  // same as the delivery app's order-detail route which sits outside the
+  // bottom-tab shell — so the tab bar doesn't double up with it here either.
+  const isOrderDetail = /^\/partner\/orders\/[^/]+$/.test(location.pathname);
 
   return (
     <div className="admin-shell min-h-screen bg-admin-paper flex font-admin-body text-admin-text">
-      {/* SIDEBAR */}
+      {/* SIDEBAR — desktop/tablet only; mobile uses the bottom nav bar instead,
+          matching the delivery app's own Home/Orders/Earnings/Profile tabs. */}
       <aside
-        className={`bg-admin-ink flex flex-col transition-all duration-300 z-30 fixed top-0 left-0 bottom-0 h-screen shrink-0 ${
-          collapsed ? 'w-[72px]' : 'w-[248px]'
+        className={`hidden lg:flex bg-admin-ink flex-col transition-all duration-300 z-50 fixed top-0 left-0 bottom-0 h-screen shrink-0 ${
+          collapsed ? 'lg:w-[72px]' : 'lg:w-[248px]'
         }`}
       >
         <div className="h-[72px] flex items-center justify-between px-4 border-b border-admin-ink-line">
@@ -89,13 +96,13 @@ export const PartnerShell: React.FC<Props> = ({ children, onLogout }) => {
             </motion.div>
           )}
           {collapsed && (
-            <span className="w-8 h-8 rounded-md bg-admin-accent text-admin-ink font-admin-display font-bold text-[13px] flex items-center justify-center mx-auto">
+            <span className="flex w-8 h-8 rounded-md bg-admin-accent text-admin-ink font-admin-display font-bold text-[13px] items-center justify-center mx-auto">
               F
             </span>
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="p-1.5 rounded text-white/40 hover:text-white bg-white/5 hover:bg-white/10 cursor-pointer hidden md:block transition-colors"
+            className="p-1.5 rounded text-white/40 hover:text-white bg-white/5 hover:bg-white/10 cursor-pointer transition-colors"
           >
             {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
           </button>
@@ -147,20 +154,43 @@ export const PartnerShell: React.FC<Props> = ({ children, onLogout }) => {
 
       {/* MAIN CONTAINER */}
       <div
-        className={`flex-1 flex flex-col overflow-x-hidden min-h-screen min-w-0 transition-all duration-300 ${
-          collapsed ? 'ml-[72px]' : 'ml-[248px]'
+        className={`flex-1 flex flex-col overflow-x-hidden min-h-screen min-w-0 transition-all duration-300 ml-0 ${
+          collapsed ? 'lg:ml-[72px]' : 'lg:ml-[248px]'
         }`}
       >
         {/* HEADER */}
-        <header className="h-[72px] sticky top-0 z-20 bg-admin-paper/95 backdrop-blur-sm border-b border-admin-ledger-line flex items-center justify-between px-6">
-          <div className="flex items-center gap-2 font-admin-mono">
-            <span className="text-xs font-medium text-admin-text-faint uppercase tracking-wide">
-              Delivery Partner
-            </span>
-            <span className="text-admin-text-faint">/</span>
-            <span className="text-xs font-semibold text-admin-text uppercase tracking-wide">
-              {activeName}
-            </span>
+        <header className="h-[72px] sticky top-0 z-20 bg-admin-paper/95 backdrop-blur-sm border-b border-admin-ledger-line flex items-center gap-3 justify-between px-4 sm:px-6">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="hidden sm:flex items-center gap-2 font-admin-mono min-w-0">
+              <span className="text-xs font-medium text-admin-text-faint uppercase tracking-wide">
+                Delivery Partner
+              </span>
+              <span className="text-admin-text-faint">/</span>
+              <span className="text-xs font-semibold text-admin-text uppercase tracking-wide truncate">
+                {activeName}
+              </span>
+            </div>
+            {/* Mobile: on Home, the FreshCart Delivery brand (matching the delivery
+                app's AppBar); on every other tab, a back arrow to Home — same as
+                the delivery app's own tab_back_button, since these tab roots have
+                no natural "previous screen" to fall back on otherwise. */}
+            {isHome ? (
+              <span className="sm:hidden font-admin-display text-[17px] tracking-tight truncate">
+                <span className="font-extrabold text-admin-green">FreshCart</span>
+                <span className="font-semibold text-admin-text"> Delivery</span>
+              </span>
+            ) : (
+              <button
+                onClick={() => navigate('/partner/dashboard')}
+                aria-label="Back to Home"
+                className="sm:hidden flex items-center gap-2 -ml-1 min-w-0"
+              >
+                <ArrowLeft size={19} className="text-admin-text shrink-0" />
+                <span className="font-admin-display font-bold text-[17px] text-admin-text truncate">
+                  {activeName}
+                </span>
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
@@ -173,6 +203,32 @@ export const PartnerShell: React.FC<Props> = ({ children, onLogout }) => {
               {online ? 'Online · accepting offers' : 'Offline'}
             </span>
 
+            {/* Mobile: inline Online/Offline switch, matching the delivery app's AppBar toggle */}
+            <button
+              type="button"
+              onClick={toggleOnline}
+              disabled={toggling || !partner}
+              role="switch"
+              aria-checked={online}
+              aria-label={online ? 'Go offline' : 'Go online'}
+              className="sm:hidden flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <span className={`text-xs font-bold ${online ? 'text-admin-green' : 'text-admin-text-faint'}`}>
+                {toggling ? '…' : online ? 'Online' : 'Offline'}
+              </span>
+              <span
+                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                  online ? 'bg-admin-green' : 'bg-admin-ledger-line'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+                    online ? 'translate-x-4' : 'translate-x-0.5'
+                  }`}
+                />
+              </span>
+            </button>
+
             <button
               onClick={() => navigate('/partner/notifications')}
               className="p-2 rounded-md border border-admin-ledger-line text-admin-text-muted hover:text-admin-text bg-admin-surface cursor-pointer relative transition-colors"
@@ -184,7 +240,7 @@ export const PartnerShell: React.FC<Props> = ({ children, onLogout }) => {
               )}
             </button>
 
-            <div className="relative">
+            <div className="relative hidden lg:block">
               <button
                 onClick={() => setProfileOpen((o) => !o)}
                 className="w-8 h-8 rounded-md bg-admin-accent text-admin-ink font-admin-display font-bold text-[12px] flex items-center justify-center cursor-pointer"
@@ -239,7 +295,7 @@ export const PartnerShell: React.FC<Props> = ({ children, onLogout }) => {
         </header>
 
         {/* VIEWPORT CONTENT */}
-        <main className="flex-1 p-6 md:p-8 max-w-[1400px] mx-auto w-full">
+        <main className={`flex-1 p-4 sm:p-6 md:p-8 ${isOrderDetail ? 'pb-4' : 'pb-24'} lg:pb-8 max-w-[1400px] mx-auto w-full`}>
           {loading ? (
             <div className="flex items-center justify-center py-24 text-admin-text-faint">
               <Loader2 className="animate-spin" size={22} />
@@ -253,6 +309,43 @@ export const PartnerShell: React.FC<Props> = ({ children, onLogout }) => {
           )}
         </main>
       </div>
+
+      {/* MOBILE BOTTOM NAV — same 4 tabs as the delivery app's own bottom nav
+          (Home / Orders / Earnings / Profile), desktop keeps the sidebar.
+          Hidden on Order Details (see isOrderDetail above). */}
+      {!isOrderDetail && (
+        <nav
+          className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-admin-surface border-t border-admin-ledger-line grid grid-cols-4"
+          style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 6px)' }}
+        >
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive =
+              location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+            return (
+              <Link
+                key={item.name}
+                to={item.path}
+                aria-current={isActive ? 'page' : undefined}
+                className="flex flex-col items-center justify-center gap-1 py-2.5"
+              >
+                <Icon
+                  size={20}
+                  strokeWidth={isActive ? 2.4 : 1.8}
+                  className={isActive ? 'text-admin-green' : 'text-admin-text-faint'}
+                />
+                <span
+                  className={`text-[11px] leading-none ${
+                    isActive ? 'font-extrabold text-admin-green' : 'font-medium text-admin-text-muted'
+                  }`}
+                >
+                  {item.name}
+                </span>
+              </Link>
+            );
+          })}
+        </nav>
+      )}
     </div>
   );
 };

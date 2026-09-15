@@ -533,6 +533,68 @@ export const orderController = {
     }
   },
 
+  // GET /api/orders/:id/chat  (attachCustomerOptional — owner only when token present)
+  getOrderChat: async (req, res) => {
+    try {
+      if (!req.customer) return res.status(401).json({ success: false, message: 'Sign in to view this chat' });
+
+      const order = await Order.findOne({ orderId: req.params.id }).select('customerId customerPhone chatMessages');
+      if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+      const phone10 = String(req.customer.phone || '').replace(/\D/g, '').slice(-10);
+      const isOwner = order.customerId === req.customer.customerId
+        || (!!phone10 && String(order.customerPhone || '').endsWith(phone10));
+      if (!isOwner) return res.status(403).json({ success: false, message: 'Not your order' });
+
+      res.json({ success: true, messages: order.chatMessages || [] });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // POST /api/orders/:id/chat  { text, phone? }  (attachCustomerOptional — token OR body {phone} for web)
+  // Customer -> assigned delivery partner. Only while a partner is actually
+  // assigned and the order hasn't finished — matches when the tracking map
+  // and partner contact card are shown.
+  sendOrderChat: async (req, res) => {
+    try {
+      const order = await Order.findOne({ orderId: req.params.id });
+      if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+      let cust = req.customer;
+      if (!cust) {
+        const raw = String(req.body.phone || '').replace(/\D/g, '').slice(-10);
+        if (raw) cust = await Customer.findOne({ phone: new RegExp(raw + '$') });
+      }
+      if (!cust) return res.status(401).json({ success: false, message: 'Sign in to send a message' });
+
+      const phone10 = String(cust.phone || '').replace(/\D/g, '').slice(-10);
+      const owns = order.customerId === cust.customerId
+        || (phone10 && String(order.customerPhone || '').endsWith(phone10));
+      if (!owns) return res.status(403).json({ success: false, message: 'Not your order' });
+
+      if (!order.deliveryPartnerUserId) {
+        return res.status(409).json({ success: false, message: 'No delivery partner assigned yet' });
+      }
+      if (['Delivered', 'Cancelled', 'Returned', 'Refunded', 'Failed'].includes(order.status)) {
+        return res.status(409).json({ success: false, message: 'This order is no longer active' });
+      }
+
+      const text = String(req.body.text || '').trim().slice(0, 1000);
+      if (!text) return res.status(400).json({ success: false, message: 'Message cannot be empty' });
+
+      const message = { from: 'customer', text, at: new Date() };
+      order.chatMessages.push(message);
+      await order.save();
+
+      req.app.get('io')?.to(order.orderId).emit('order_chat_message', { orderId: order.orderId, message });
+
+      res.status(201).json({ success: true, message });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
   // POST /api/orders/:id/rider-location  { lat, lng, etaMinutes }  (staff/delivery)
   // A rider/dispatch producer for the tracking map. Emits to the order room.
   updateRiderLocation: async (req, res) => {

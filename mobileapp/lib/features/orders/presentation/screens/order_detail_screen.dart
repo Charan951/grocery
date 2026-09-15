@@ -82,7 +82,10 @@ class OrderDetailScreen extends ConsumerWidget {
             physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
             children: [
-              _StatusHeader(order: order, isDark: isDark),
+              // Hidden once delivered — the "in progress" hero card has
+              // nothing left to say at that point.
+              if (order.status != OrderStatus.delivered)
+                _StatusHeader(order: order, isDark: isDark),
               if (order.timeline.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 _sectionTitle('Status', isDark),
@@ -94,7 +97,7 @@ class OrderDetailScreen extends ConsumerWidget {
                 _DeliveryOtpCard(otp: order.deliveryOtp, isDark: isDark),
               ],
               const SizedBox(height: 16),
-              _sectionTitle('Items in Order (${order.items.length})', isDark),
+              _sectionTitle('${order.items.length} item${order.items.length == 1 ? '' : 's'} in order', isDark),
               const SizedBox(height: 8),
               _ItemsCard(items: order.items, isDark: isDark),
               const SizedBox(height: 16),
@@ -102,7 +105,9 @@ class OrderDetailScreen extends ConsumerWidget {
               const SizedBox(height: 8),
               _BillCard(order: order, isDark: isDark),
               const SizedBox(height: 16),
-              _sectionTitle('Delivery & Payment', isDark),
+              _OrderDetailsCard(order: order, isDark: isDark),
+              const SizedBox(height: 16),
+              _sectionTitle('Payment Method', isDark),
               const SizedBox(height: 8),
               _DeliveryAndPaymentCard(
                 order: order,
@@ -137,13 +142,6 @@ class OrderDetailScreen extends ConsumerWidget {
                     },
                   ),
                 ),
-              if (OrderDetailScreen.canCancel(order.status)) ...[
-                const SizedBox(height: 8),
-                _CancelOrderButton(
-                  orderId: order.id,
-                  onCancelled: () => ref.invalidate(orderDetailProvider(orderId)),
-                ),
-              ],
             ],
           ),
         ),
@@ -654,17 +652,14 @@ class _ItemsCard extends StatelessWidget {
           width: 50,
           height: 50,
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF242426) : const Color(0xFFF9FAFB),
+            color: isDark ? const Color(0xFF242426) : const Color(0xFFF3F4F6),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isDark ? AppColors.dividerDark : const Color(0xFFE5E7EB),
-            ),
           ),
           clipBehavior: Clip.antiAlias,
           child: it.product.imageUrl.startsWith('http')
               ? CachedNetworkImage(
                   imageUrl: it.product.imageUrl,
-                  fit: BoxFit.contain,
+                  fit: BoxFit.cover,
                   errorWidget: (_, _, _) => const Icon(
                     Icons.shopping_bag_outlined,
                     size: 20,
@@ -694,33 +689,13 @@ class _ItemsCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 4),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF3F4F6),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      it.selectedWeight,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? AppColors.textSecondaryDark : const Color(0xFF6B7280),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    '× ${it.quantity}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? AppColors.textSecondaryDark : const Color(0xFF6B7280),
-                    ),
-                  ),
-                ],
+              Text(
+                '${it.quantity} pc${it.quantity == 1 ? '' : 's'} · ${it.selectedWeight}',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? AppColors.textSecondaryDark : const Color(0xFF6B7280),
+                ),
               ),
             ],
           ),
@@ -908,6 +883,113 @@ class _BillCard extends StatelessWidget {
   }
 }
 
+/// "07 Jun 2026, 4:46 PM" in IST (fixed +5:30 offset — India has no DST),
+/// regardless of the device's local timezone.
+String _formatOrderDateTime(DateTime utc) {
+  final ist = utc.toUtc().add(const Duration(hours: 5, minutes: 30));
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+  final hour12 = ist.hour % 12 == 0 ? 12 : ist.hour % 12;
+  final minute = ist.minute.toString().padLeft(2, '0');
+  final ampm = ist.hour >= 12 ? 'PM' : 'AM';
+  return '${ist.day.toString().padLeft(2, '0')} ${months[ist.month - 1]} ${ist.year}, $hour12:$minute $ampm';
+}
+
+class _DetailRow extends StatelessWidget {
+  final String label;
+  final Widget value;
+  const _DetailRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF9CA3AF)),
+        ),
+        const SizedBox(height: 3),
+        value,
+      ],
+    );
+  }
+}
+
+/// Blinkit-style "Order Details" card — order id (+ copy), receiver, delivery
+/// address, and placed/arrived timestamps, all in IST.
+class _OrderDetailsCard extends StatelessWidget {
+  final OrderModel order;
+  final bool isDark;
+  const _OrderDetailsCard({required this.order, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimary;
+    final valueStyle = TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: textColor);
+    final receiver = [order.customerName, order.customerPhone].where((s) => s.isNotEmpty).join(', ');
+    final arrivedAt = order.arrivedAt;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: isDark ? AppColors.dividerDark : const Color(0xFFE5E7EB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Order Details', style: AppTypography.titleLarge(textColor).copyWith(fontSize: 16, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 16),
+          _DetailRow(
+            label: 'Order ID',
+            value: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('#${order.id}', style: valueStyle),
+                const SizedBox(width: 4),
+                InkWell(
+                  borderRadius: BorderRadius.circular(6),
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: order.id));
+                    AppToast.success('Order ID copied: #${order.id}');
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(Icons.copy_rounded, size: 15, color: isDark ? AppColors.textSecondaryDark : const Color(0xFF9CA3AF)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (receiver.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _DetailRow(label: 'Receiver Details', value: Text(receiver, style: valueStyle)),
+          ],
+          const SizedBox(height: 12),
+          _DetailRow(label: 'Delivery Address', value: Text(order.deliveryAddress, style: valueStyle.copyWith(height: 1.3))),
+          const SizedBox(height: 12),
+          _DetailRow(label: 'Order Placed at', value: Text(_formatOrderDateTime(order.date), style: valueStyle)),
+          if (arrivedAt != null) ...[
+            const SizedBox(height: 12),
+            _DetailRow(label: 'Order Arrived at', value: Text(_formatOrderDateTime(arrivedAt), style: valueStyle)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _DeliveryAndPaymentCard extends StatelessWidget {
   final OrderModel order;
   final bool isDark;
@@ -940,57 +1022,7 @@ class _DeliveryAndPaymentCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Address section
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.location_on_rounded, color: AppColors.primaryText, size: 18),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Delivery Address',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: isDark ? AppColors.textSecondaryDark : const Color(0xFF6B7280),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      order.deliveryAddress,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Divider(
-              height: 1,
-              color: isDark ? AppColors.dividerDark : const Color(0xFFF3F4F6),
-            ),
-          ),
-          // Payment section
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 width: 32,
@@ -1001,70 +1033,60 @@ class _DeliveryAndPaymentCard extends StatelessWidget {
                 ),
                 child: const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFF8E24AA), size: 18),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Payment Method',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: isDark ? AppColors.textSecondaryDark : const Color(0xFF6B7280),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Wrap(
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: [
-                        Text(
-                          order.paymentMethod.isEmpty ? 'Payment' : order.paymentMethod,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: isPaid
-                                ? const Color(0xFFE8F5E9)
-                                : (isCod ? const Color(0xFFFFF3E0) : const Color(0xFFF3F4F6)),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            isPaid
-                                ? 'PAID'
-                                : (order.paymentStatus.isNotEmpty
-                                    ? order.paymentStatus.toUpperCase()
-                                    : 'PENDING'),
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: isPaid
-                                  ? AppColors.primaryText
-                                  : (isCod ? const Color(0xFFE65100) : const Color(0xFF6B7280)),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (OrderDetailScreen.canSwitchToPrepaid(order)) ...[
-                      const SizedBox(height: 8),
-                      _ChangePaymentMethodButton(
-                        order: order,
-                        onChanged: onPaymentMethodChanged,
-                      ),
-                    ],
-                  ],
+              const SizedBox(width: 10),
+              Text(
+                'Payment Method',
+                style: AppTypography.titleLarge(
+                  isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                ).copyWith(fontSize: 14, fontWeight: FontWeight.w900),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                order.paymentMethod.isEmpty ? 'Payment' : order.paymentMethod,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isPaid
+                      ? const Color(0xFFE8F5E9)
+                      : (isCod ? const Color(0xFFFFF3E0) : const Color(0xFFF3F4F6)),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  isPaid
+                      ? 'PAID'
+                      : (order.paymentStatus.isNotEmpty
+                          ? order.paymentStatus.toUpperCase()
+                          : 'PENDING'),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: isPaid
+                        ? AppColors.primaryText
+                        : (isCod ? const Color(0xFFE65100) : const Color(0xFF6B7280)),
+                  ),
                 ),
               ),
             ],
           ),
+          if (OrderDetailScreen.canSwitchToPrepaid(order)) ...[
+            const SizedBox(height: 12),
+            _ChangePaymentMethodButton(
+              order: order,
+              onChanged: onPaymentMethodChanged,
+              isDark: isDark,
+            ),
+          ],
         ],
       ),
     );
@@ -1091,7 +1113,8 @@ class _CopyOrderButton extends StatelessWidget {
 class _ChangePaymentMethodButton extends ConsumerStatefulWidget {
   final OrderModel order;
   final VoidCallback onChanged;
-  const _ChangePaymentMethodButton({required this.order, required this.onChanged});
+  final bool isDark;
+  const _ChangePaymentMethodButton({required this.order, required this.onChanged, required this.isDark});
 
   @override
   ConsumerState<_ChangePaymentMethodButton> createState() => _ChangePaymentMethodButtonState();
@@ -1157,20 +1180,59 @@ class _ChangePaymentMethodButtonState extends ConsumerState<_ChangePaymentMethod
 
   @override
   Widget build(BuildContext context) {
-    return TextButton.icon(
-      onPressed: _busy ? null : _pay,
-      icon: _busy
-          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-          : const Icon(Icons.sync_alt_rounded, size: 16),
-      label: Text(_busy ? 'Processing…' : 'Switch to UPI / Card'),
-      style: TextButton.styleFrom(
-        foregroundColor: AppColors.primaryText,
-        backgroundColor: AppColors.primary.withOpacity(0.10),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    final isDark = widget.isDark;
+    return Material(
+      color: AppColors.primary.withOpacity(0.06),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: _busy ? null : _pay,
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.primary.withOpacity(0.25)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                child: _busy
+                    ? const Padding(
+                        padding: EdgeInsets.all(7),
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.sync_alt_rounded, color: Colors.white, size: 14),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _busy ? 'Processing…' : 'Pay online instead',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      'Switch to UPI or Card',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark ? AppColors.textSecondaryDark : const Color(0xFF6B7280),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: AppColors.primary, size: 20),
+            ],
+          ),
+        ),
       ),
     );
   }

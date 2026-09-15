@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
 import 'package:freshcart/core/constants/app_radius.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
-import 'package:freshcart/core/utils/invoice.dart';
 import 'package:freshcart/core/widgets/app_toast.dart';
 import 'package:freshcart/core/widgets/feedback_states.dart';
 import 'package:freshcart/core/widgets/skeletons.dart';
@@ -13,21 +12,6 @@ import 'package:freshcart/core/widgets/tab_back_button.dart';
 import 'package:freshcart/features/cart/presentation/controllers/cart_controller.dart';
 import 'package:freshcart/features/orders/data/models/order_model.dart';
 import 'package:freshcart/features/orders/presentation/controllers/orders_controller.dart';
-
-Color statusColor(OrderStatus s) => switch (s) {
-      OrderStatus.delivered => AppColors.primary,
-      OrderStatus.cancelled => AppColors.error,
-      OrderStatus.dispatched => AppColors.primary,
-      _ => AppColors.warning,
-    };
-
-IconData statusIcon(OrderStatus s) => switch (s) {
-      OrderStatus.delivered => Icons.check_circle_rounded,
-      OrderStatus.cancelled => Icons.cancel_rounded,
-      OrderStatus.dispatched => Icons.delivery_dining_rounded,
-      OrderStatus.processing => Icons.inventory_2_rounded,
-      OrderStatus.placed => Icons.receipt_long_rounded,
-    };
 
 void reorder(WidgetRef ref, OrderModel order) {
   final cart = ref.read(cartProvider.notifier);
@@ -213,6 +197,9 @@ class _TabBar extends StatelessWidget {
   }
 }
 
+/// "Order delivered" (Blinkit-style) card: status icon + title, price +
+/// chevron, "Placed at …" line, item thumbnails, and (delivered orders
+/// only) a full-width "Order Again" footer link.
 class _OrderCard extends ConsumerWidget {
   final OrderModel order;
   final bool isDark;
@@ -220,7 +207,21 @@ class _OrderCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final c = statusColor(order.status);
+    final isDelivered = order.status == OrderStatus.delivered;
+    final title = order.isActive
+        ? 'Order ${(order.statusText.isEmpty ? 'in progress' : order.statusText).toLowerCase()}'
+        : isDelivered
+            ? 'Order delivered'
+            : 'Order cancelled';
+    final badgeColor = order.isActive ? AppColors.warning : (isDelivered ? AppColors.primary : AppColors.error);
+    final badgeIcon = order.isActive ? Icons.bolt_rounded : (isDelivered ? Icons.check_rounded : Icons.close_rounded);
+    final subColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondary;
+    // Fixed +5:30 offset (IST has no DST) so the placed-at time is always
+    // shown in IST, regardless of the viewer's device timezone.
+    final ist = order.date.toUtc().add(const Duration(hours: 5, minutes: 30));
+    final placedAt = '${_ordinal(ist.day)} ${_month(ist.month)} ${ist.year}, '
+        '${_hour12(ist.hour).toString().padLeft(2, '0')}:${ist.minute.toString().padLeft(2, '0')} ${ist.hour >= 12 ? 'pm' : 'am'}';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -228,122 +229,83 @@ class _OrderCard extends ConsumerWidget {
         borderRadius: AppRadius.brLg,
         border: Border.all(color: isDark ? AppColors.dividerDark : AppColors.divider),
       ),
+      clipBehavior: Clip.antiAlias,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: AppRadius.brLg,
           onTap: () => context.push('/order/${order.id}'),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (order.isActive) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.12),
-                          borderRadius: AppRadius.brPill,
-                          border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTypography.labelLarge(
+                                    isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                                  ).copyWith(fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                width: 20,
+                                height: 20,
+                                decoration: BoxDecoration(color: badgeColor, shape: BoxShape.circle),
+                                child: Icon(badgeIcon, size: 13, color: Colors.white),
+                              ),
+                            ],
+                          ),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.bolt_rounded, size: 14, color: AppColors.primary),
-                            const SizedBox(width: 4),
-                            Text(
-                              order.statusText.isEmpty ? 'In Progress' : order.statusText,
-                              style: AppTypography.labelSmall(AppColors.primaryText).copyWith(fontWeight: FontWeight.w800),
-                            ),
-                          ],
+                        const SizedBox(width: 8),
+                        Text(
+                          '₹${order.total.toStringAsFixed(0)}',
+                          style: AppTypography.labelLarge(
+                            isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                          ).copyWith(fontWeight: FontWeight.w800),
                         ),
-                      ),
-                    ] else ...[
-                      Icon(statusIcon(order.status), size: 16, color: c),
-                      const SizedBox(width: 6),
-                      Text(order.statusText, style: AppTypography.labelMedium(c)),
-                    ],
-                    const Spacer(),
-                    Text(
-                      '${order.date.day}/${order.date.month}/${order.date.year}',
-                      style: AppTypography.bodySmall(
-                        isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                      ),
+                        const SizedBox(width: 4),
+                        Icon(Icons.chevron_right_rounded, size: 18, color: subColor),
+                      ],
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
+                    const SizedBox(height: 4),
+                    Text('Placed at $placedAt', style: AppTypography.bodySmall(subColor)),
+                    const SizedBox(height: 12),
                     _Thumbs(order: order, isDark: isDark),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${order.items.length} item${order.items.length == 1 ? '' : 's'} · ₹${order.total.toStringAsFixed(0)}',
-                            style: AppTypography.labelLarge(
-                              isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            order.deliveryAddress,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTypography.bodySmall(
-                              isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    if (order.isActive)
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: () => context.push('/tracking/${order.id}'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            shape: RoundedRectangleBorder(borderRadius: AppRadius.brSm),
-                          ),
-                          child: const Text('Track order'),
-                        ),
-                      )
-                    else
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            reorder(ref, order);
-                            context.push('/cart');
-                          },
-                          style: OutlinedButton.styleFrom(
-                            shape: RoundedRectangleBorder(borderRadius: AppRadius.brSm),
-                          ),
-                          child: const Text('Reorder'),
-                        ),
-                      ),
-                    const SizedBox(width: 8),
-                    _OrderInvoiceButton(order: order),
-                    const SizedBox(width: 8),
-                    OutlinedButton(
-                      onPressed: () => context.push('/order/${order.id}'),
-                      style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(borderRadius: AppRadius.brSm),
-                      ),
-                      child: const Text('Details'),
+              ),
+              if (isDelivered)
+                InkWell(
+                  onTap: () {
+                    reorder(ref, order);
+                    context.push('/cart');
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    decoration: BoxDecoration(
+                      border: Border(top: BorderSide(color: isDark ? AppColors.dividerDark : AppColors.divider)),
                     ),
-                  ],
+                    child: const Center(
+                      child: Text(
+                        'Order Again',
+                        style: TextStyle(color: Color(0xFFEF4B6B), fontWeight: FontWeight.w800, fontSize: 14),
+                      ),
+                    ),
+                  ),
                 ),
-              ],
-            ),
+            ],
           ),
         ),
       ),
@@ -351,43 +313,18 @@ class _OrderCard extends ConsumerWidget {
   }
 }
 
-class _OrderInvoiceButton extends StatefulWidget {
-  final OrderModel order;
-  const _OrderInvoiceButton({required this.order});
+String _month(int m) => const [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ][m - 1];
 
-  @override
-  State<_OrderInvoiceButton> createState() => _OrderInvoiceButtonState();
-}
+int _hour12(int h) => h % 12 == 0 ? 12 : h % 12;
 
-class _OrderInvoiceButtonState extends State<_OrderInvoiceButton> {
-  bool _busy = false;
-
-  Future<void> _download() async {
-    if (_busy) return;
-    setState(() => _busy = true);
-    try {
-      await downloadInvoice(widget.order);
-    } catch (_) {
-      if (mounted) AppToast.error('Could not generate invoice. Please try again.');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: _busy ? null : _download,
-      icon: _busy
-          ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2))
-          : const Icon(Icons.download_rounded, size: 15),
-      label: const Text('Invoice'),
-      style: OutlinedButton.styleFrom(
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.brSm),
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-      ),
-    );
-  }
+String _ordinal(int n) {
+  if (n % 10 == 1 && n % 100 != 11) return '${n}st';
+  if (n % 10 == 2 && n % 100 != 12) return '${n}nd';
+  if (n % 10 == 3 && n % 100 != 13) return '${n}rd';
+  return '${n}th';
 }
 
 class _Thumbs extends StatelessWidget {
@@ -403,62 +340,56 @@ class _Thumbs extends StatelessWidget {
         .toList();
     if (validItems.isEmpty) {
       return Container(
-        width: 48,
-        height: 48,
+        width: 64,
+        height: 64,
         decoration: BoxDecoration(
           color: isDark ? Colors.white10 : AppColors.background,
-          borderRadius: AppRadius.brSm,
+          borderRadius: AppRadius.brMd,
         ),
-        child: const Icon(Icons.shopping_bag_outlined, size: 20),
+        child: const Icon(Icons.shopping_bag_outlined, size: 22),
       );
     }
-    return SizedBox(
-      width: 48 + (validItems.length - 1) * 16.0,
-      height: 48,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          for (var i = 0; i < validItems.length; i++)
-            Positioned(
-              left: i * 16.0,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
+    return Row(
+      children: [
+        for (var i = 0; i < validItems.length; i++) ...[
+          if (i != 0) const SizedBox(width: 8),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  borderRadius: AppRadius.brMd,
+                  color: isDark ? Colors.white10 : AppColors.background,
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: CachedNetworkImage(
+                  imageUrl: validItems[i].product.imageUrl,
+                  fit: BoxFit.cover,
+                  errorWidget: (_, _, _) => const Icon(Icons.shopping_bag_outlined, size: 18),
+                ),
+              ),
+              if (validItems[i].quantity > 1)
+                Positioned(
+                  top: -3,
+                  right: -3,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                     decoration: BoxDecoration(
-                      borderRadius: AppRadius.brSm,
-                      border: Border.all(color: isDark ? AppColors.surfaceDark : AppColors.surface, width: 2),
+                      color: isDark ? Colors.black87 : const Color(0xFF1E293B),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    clipBehavior: Clip.antiAlias,
-                    child: CachedNetworkImage(
-                      imageUrl: validItems[i].product.imageUrl,
-                      fit: BoxFit.cover,
-                      errorWidget: (_, _, _) => const Icon(Icons.shopping_bag_outlined, size: 16),
+                    child: Text(
+                      'x${validItems[i].quantity}',
+                      style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800),
                     ),
                   ),
-                  if (validItems[i].quantity > 1)
-                    Positioned(
-                      top: -3,
-                      right: -3,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: isDark ? Colors.black87 : const Color(0xFF1E293B),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          'x${validItems[i].quantity}',
-                          style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
+                ),
+            ],
+          ),
         ],
-      ),
+      ],
     );
   }
 }

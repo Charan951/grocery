@@ -9,6 +9,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:freshcart_delivery/core/error/api_exception.dart';
 import 'package:freshcart_delivery/core/theme.dart';
 import 'package:freshcart_delivery/core/widgets/delivery_map.dart';
+import 'package:freshcart_delivery/features/orders/order_chat_sheet.dart';
 import 'package:freshcart_delivery/features/orders/order_controller.dart';
 import 'package:freshcart_delivery/models/delivery_models.dart';
 
@@ -944,9 +945,33 @@ class _BodyState extends ConsumerState<_Body> {
 
           const SizedBox(height: 10),
 
-          // Call & WhatsApp Actions
+          // Chat, Call & WhatsApp Actions
           Row(
             children: [
+              Expanded(
+                child: SizedBox(
+                  height: 42,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: kText,
+                      side: const BorderSide(color: kLedgerLine),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () => showOrderChatSheet(
+                      context,
+                      ref: ref,
+                      orderId: o.orderId,
+                      customerName: o.customerName,
+                    ),
+                    icon: const Icon(Icons.forum_rounded, size: 17, color: kGreen),
+                    label: Text(
+                      'Chat',
+                      style: GoogleFonts.nunitoSans(fontWeight: FontWeight.w700, fontSize: 13),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
               Expanded(
                 child: SizedBox(
                   height: 42,

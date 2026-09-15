@@ -16,6 +16,7 @@ class SocketService {
   final _riderLocationController = StreamController<Map<String, dynamic>>.broadcast();
   final _riderAssignedController = StreamController<Map<String, dynamic>>.broadcast();
   final _supportMessageController = StreamController<Map<String, dynamic>>.broadcast();
+  final _orderChatController = StreamController<Map<String, dynamic>>.broadcast();
   final _connectionController = StreamController<bool>.broadcast();
 
   Stream<Map<String, dynamic>> get orderStatusStream => _orderStatusController.stream;
@@ -25,6 +26,10 @@ class SocketService {
   /// (`delivery`) and their current position so tracking starts immediately.
   Stream<Map<String, dynamic>> get riderAssignedStream => _riderAssignedController.stream;
   Stream<Map<String, dynamic>> get supportMessageStream => _supportMessageController.stream;
+
+  /// One in-order chat message (customer <-> assigned delivery partner),
+  /// pushed to everyone in the order room the moment either side sends one.
+  Stream<Map<String, dynamic>> get orderChatStream => _orderChatController.stream;
 
   /// Emits `true`/`false` as the socket connects / drops.
   Stream<bool> get connectionStream => _connectionController.stream;
@@ -73,6 +78,9 @@ class SocketService {
       });
       _socket!.on('support_message_received', (d) {
         if (d is Map) _supportMessageController.add(Map<String, dynamic>.from(d));
+      });
+      _socket!.on('order_chat_message', (d) {
+        if (d is Map) _orderChatController.add(Map<String, dynamic>.from(d));
       });
     } catch (_) {}
   }

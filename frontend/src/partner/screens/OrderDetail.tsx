@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import {
-  ArrowLeft, Phone, MessageCircle, MapPin, Camera, CheckCircle2, XCircle, PackageX,
+  ArrowLeft, Phone, MessageCircle, MessageSquare, MapPin, Camera, CheckCircle2, XCircle, PackageX,
   Copy, Check, Navigation, AlertTriangle, ShoppingBag, Store, Truck, Clock, Sparkles
 } from 'lucide-react';
 import { partnerApi } from '../partnerApi';
 import { usePartner } from '../PartnerContext';
 import { Btn, CenterState, money } from '../ui';
+import { useSmartBack } from '../../hooks/useSmartBack';
+import { OrderChat } from '../OrderChat';
 
 const NEXT: Record<string, { label: string; fn: keyof typeof partnerApi }> = {
   Assigned: { label: 'Arrived at Store', fn: 'pickupArrived' },
@@ -19,7 +21,7 @@ const STEPS = ['Assigned', 'Arrived At Store', 'Out For Delivery', 'Arrived', 'D
 
 export const OrderDetail: React.FC = () => {
   const { orderId = '' } = useParams();
-  const navigate = useNavigate();
+  const goBack = useSmartBack('/partner/orders');
   const { refreshMe } = usePartner();
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -32,6 +34,7 @@ export const OrderDetail: React.FC = () => {
   const [photo, setPhoto] = useState<string | null>(null);
   const [showFail, setShowFail] = useState(false);
   const [failReason, setFailReason] = useState('');
+  const [showChat, setShowChat] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -122,10 +125,10 @@ export const OrderDetail: React.FC = () => {
     return (
       <div className="max-w-xl mx-auto py-6">
         <button
-          onClick={() => navigate('/partner/dashboard')}
+          onClick={goBack}
           className="inline-flex items-center gap-1.5 font-admin-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-admin-green hover:underline"
         >
-          <ArrowLeft size={14} /> Back to dashboard
+          <ArrowLeft size={14} /> Back
         </button>
         <div className="mt-6">
           <CenterState kind="error">{err || 'Order not found'}</CenterState>
@@ -215,12 +218,12 @@ export const OrderDetail: React.FC = () => {
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`;
 
   return (
-    <div className="max-w-xl mx-auto w-full pb-20">
+    <div className="w-full pb-24">
       {/* Navigation & Header Bar */}
       <div className="flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2.5">
           <button
-            onClick={() => navigate('/partner/dashboard')}
+            onClick={goBack}
             aria-label="Back"
             className="p-2 -ml-2 rounded-lg text-admin-text-muted hover:bg-admin-surface hover:text-admin-text transition-colors"
           >
@@ -265,6 +268,7 @@ export const OrderDetail: React.FC = () => {
         </div>
       )}
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 lg:items-start gap-3.5 lg:gap-5">
       <div className="flex flex-col gap-3.5">
         {/* 1. Status Hero Banner - Normal Card */}
         <div className="bg-admin-surface border border-admin-ledger-line rounded-2xl p-4 sm:p-5 shadow-sm">
@@ -378,8 +382,15 @@ export const OrderDetail: React.FC = () => {
             <span>{isPickupLeg ? 'Navigate to Store (Google Maps)' : 'Navigate to Customer (Google Maps)'}</span>
           </a>
 
-          {/* Call & WhatsApp Quick Actions */}
-          <div className="grid grid-cols-2 gap-2.5">
+          {/* Chat, Call & WhatsApp Quick Actions */}
+          <div className="grid grid-cols-3 gap-2.5">
+            <button
+              type="button"
+              onClick={() => setShowChat(true)}
+              className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-admin-surface border border-admin-ledger-line text-admin-text hover:bg-admin-paper text-[13px] font-bold transition-colors cursor-pointer"
+            >
+              <MessageSquare size={15} className="text-admin-green" /> Chat
+            </button>
             {canContact ? (
               <>
                 <a
@@ -398,13 +409,23 @@ export const OrderDetail: React.FC = () => {
                 </a>
               </>
             ) : (
-              <div className="col-span-2 text-center py-2 px-3 rounded-lg bg-admin-paper border border-admin-ledger-line font-admin-mono text-[11px] text-admin-text-faint">
-                Customer phone will be unlocked when Out for Delivery
+              <div className="col-span-2 text-center py-2 px-3 rounded-lg bg-admin-paper border border-admin-ledger-line font-admin-mono text-[11px] text-admin-text-faint flex items-center justify-center">
+                Phone unlocks when Out for Delivery
               </div>
             )}
           </div>
         </div>
+      </div>
 
+      {showChat && (
+        <OrderChat
+          orderId={orderId}
+          customerName={order.customerName}
+          onClose={() => setShowChat(false)}
+        />
+      )}
+
+      <div className="flex flex-col gap-3.5">
         {/* 4. Items in Order Card */}
         <div className="bg-admin-surface border border-admin-ledger-line rounded-2xl p-4 sm:p-5 shadow-sm">
           <div className="flex items-center justify-between mb-3.5">
@@ -525,16 +546,17 @@ export const OrderDetail: React.FC = () => {
           </div>
         )}
       </div>
+      </div>
 
       {/* 6. Ergonomic Sticky Mobile Action Bar */}
       {!isTerminal && (
         <div className="fixed bottom-0 left-0 right-0 z-30 bg-admin-surface/95 backdrop-blur-md border-t border-admin-ledger-line py-3 px-4 shadow-xl">
-          <div className="max-w-xl mx-auto flex flex-col gap-2">
+          <div className="max-w-[1400px] mx-auto flex flex-col sm:flex-row sm:items-center gap-2">
             {step && (
               <button
                 onClick={onForward}
                 disabled={busy}
-                className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-admin-green hover:bg-emerald-700 text-white font-admin-display font-extrabold text-[15px] shadow-md transition-all disabled:opacity-50"
+                className="w-full sm:flex-1 flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-admin-green hover:bg-emerald-700 text-white font-admin-display font-extrabold text-[15px] shadow-md transition-all disabled:opacity-50"
               >
                 {busy ? (
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -551,7 +573,7 @@ export const OrderDetail: React.FC = () => {
               <button
                 onClick={() => runStep(() => partnerApi.markReturned(orderId))}
                 disabled={busy}
-                className="w-full py-2.5 rounded-xl bg-admin-ink text-white font-semibold text-[13px]"
+                className="w-full sm:w-auto sm:shrink-0 sm:px-6 py-2.5 rounded-xl bg-admin-ink text-white font-semibold text-[13px]"
               >
                 Mark Returned to Store
               </button>
@@ -559,7 +581,7 @@ export const OrderDetail: React.FC = () => {
               <button
                 onClick={() => setShowFail(true)}
                 disabled={busy}
-                className="w-full py-1 text-center font-semibold text-[12.5px] text-rose-600 hover:text-rose-700 hover:underline"
+                className="w-full sm:w-auto sm:shrink-0 py-1 sm:px-4 text-center font-semibold text-[12.5px] text-rose-600 hover:text-rose-700 hover:underline"
               >
                 Report a problem / Can't deliver
               </button>

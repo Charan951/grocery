@@ -161,6 +161,177 @@
 
 ## 5. Completed Major Work
 
+- **2026-09-15 — Customer order-tracking/order-detail redesign pass (web + mobile
+  parity throughout) + several real bug fixes.** Large, mostly UI-driven session
+  touching `CustomerOrders.tsx`/`order_detail_screen.dart` (order detail + list),
+  `TrackOrder.tsx`/`tracking_screen.dart` (live tracking), `OrderPlaced.tsx`/
+  `order_placed_screen.dart` (new full-page order-confirmation, replacing the old
+  in-drawer `OrderSuccessModal` which is now deleted), `ActiveOrderBanner.tsx`
+  (home floating "order ready" pill), and mobile `orders_list_screen.dart`.
+  - **Real bug: `CheckoutModal.tsx` had `if (!isOpen) return null;` before the
+    `OrderSuccessModal` JSX** — `finish()` called `onClose()` (→ `isOpen=false`)
+    in the same tick it set success-modal state, so the whole component bailed
+    out before ever reaching the success modal; a placed order silently showed
+    nothing. Fixed by replacing the modal-in-drawer pattern entirely with a
+    dedicated route, `/order-placed` (`OrderPlaced.tsx`), navigated to via
+    `finish()` — sidesteps the unmount-timing class of bug altogether. Mirrored
+    conceptually on mobile via the pre-existing `order_placed_screen.dart`,
+    redesigned to match (order-number card, 4-step tracker, "Go to Orders" /
+    "Track Your Order" buttons, friendly `#N` order number matching the list
+    instead of the raw id).
+  - **Real bug: `CartDrawer.tsx`'s cart-open state (`cartOpen`, owned by
+    `App.tsx`) never closed when `CheckoutModal`'s local `isCheckoutOpen`
+    closed** — after a successful order the right-docked cart drawer
+    (`fixed right-0 w-full max-w-[430px] z-[1060]`) stayed mounted and
+    overlapping the new page. Fixed: `CheckoutModal`'s `onClose` now also calls
+    the drawer's own `onClose`.
+  - **Real bug: `PartnerShell.tsx` had a `<main ...>` opening tag missing its
+    closing `>`** (line ~298), which broke Vite's parser for the *entire* app
+    (cascading "Internal server error" on every route, not just partner). Found
+    and fixed while debugging an unrelated console error the user pasted.
+  - **Real bug: `getCustomerOrders`/order list normalized objects referenced
+    `order.date`/`order.time` fields that don't exist on the API response** (the
+    backend sends `createdAt`/`orderPlacedAt`, not `date`/`time`) — "Placed at"
+    text was silently blank/broken on both the order-list card and order-detail
+    header. Fixed with a real `formatPlacedAt()`/`formatOrderDateTime()` using
+    `createdAt`, explicitly formatted in **IST** via `Intl.DateTimeFormat` with
+    `timeZone: 'Asia/Kolkata'` (mobile: fixed `+5:30` UTC offset, no DST in
+    India) — always correct regardless of viewer's local timezone. Applied to
+    the order list, order detail's new "Order Details" card, and
+    `TrackOrder.tsx`'s Status Updates timeline (same root cause, same fix).
+  - **"Order Details" card (new, both surfaces)** — Order ID (+copy), Receiver
+    Details (customer name/phone — `OrderModel` gained `customerName`/
+    `customerPhone` fields + parsing on mobile), Delivery Address, Order Placed
+    at, Order Arrived at (prefers the real `deliveredAt` Date field — already
+    being set server-side on both delivery-completion paths, just never read by
+    the frontend before — falls back to the trackingTimeline's "Delivered"
+    entry). Positioned directly above the Payment Method card (both surfaces,
+    per explicit user placement request) — not near the top.
+  - **Order-list cards redesigned (Blinkit-style, both surfaces)**: status
+    icon-circle + "Order delivered"/"Order in progress"/"Order cancelled" title
+    (badge now *after* the text, not before — explicit user ask), price +
+    chevron, "Placed at …" (IST), plain edge-to-edge `object-cover` item
+    thumbnails (was padded/bordered icon boxes), full-width "Order Again"
+    footer link (delivered orders only, replaces the old boxed "Repeat Order"
+    button — mobile: `_CopyOrderButton`/`statusColor`/`statusIcon` helpers
+    removed as dead code). Removed per explicit ask: order-number label,
+    item-count text, Invoice button, and the "Track live" button from cards
+    (web `CustomerOrders.tsx` + mobile `orders_list_screen.dart`).
+  - **Order-detail page**: "Cancel Order" button removed (bottom sticky bar,
+    web) and the mobile `_CancelOrderButton` usage removed too (dead class left
+    in place, unused). "Items in Order (N)" → "N item(s) in order" heading.
+    Item rows: plain `object-cover` thumbnail (was padded icon box), single
+    "{qty} pc(s) · {weight}" line (was a separate pill badge + "× qty"). Invoice
+    download moved into the header nav bar (icon button, always visible, was
+    desktop-only text button); "Get Help" moved out of the header down into the
+    Bill Summary section. Payment Method card redesigned: header row (icon +
+    title) separated from the method-name/status-pill row, and the floating
+    "Switch to UPI/Card" pill replaced with a proper tappable row (icon badge +
+    "Pay online instead"/"Switch to UPI or Card" + chevron) matching the
+    "Live tracking is active" pattern used elsewhere. The hero "IN PROGRESS /
+    Your order is in progress" status card + 4-step stepper is now **hidden
+    once the order is Delivered** (both surfaces) — reverted once (user said
+    "undo that" mid-change) then re-applied per a later, more specific request;
+    keep this distinction in mind if asked again.
+  - **`TrackOrder.tsx` (web) — substantial rebuild**, no Flutter mirror built
+    this session (explicitly deferred — user was asked, hasn't confirmed yet):
+    - Delivery-partner card: star-rating badge removed, "Delivery Partner
+      Details" heading added, WhatsApp button removed (kept Chat + Call), Call
+      button now **always shown** (was gated behind `canContact`) — same trim
+      applied to mobile `tracking_screen.dart`.
+    - Floating map status pill ("Rider is on the way to your doorstep")
+      removed from over the map, both surfaces.
+    - Delivery Address card gained a "Change" button (→ `/account/addresses`).
+    - Top header ("Track Order" title + "Help" button) removed entirely,
+      replaced by a full-bleed **promo banner carousel** (reused the existing
+      `BannerCarousel` + `useCMS().banners`, same one Home uses) occupying the
+      very top of the page (`h-50vh`, no header row above it); back nav is now
+      a floating circular button (`fixed`, overlays the banner, lower z-index
+      than the sticky bar below so it's naturally covered once that appears).
+    - Map + ETA card: side-by-side on **all** breakpoints (not just desktop),
+      ETA left / Map right (`grid-cols-[2fr_3fr]`), replacing the original
+      5-step "Market/Preparing/Out for Delivery/Near You/Delivered" stepper
+      concept entirely (dropped per explicit "no need market, preparing" ask).
+    - **Sticky ETA bar on scroll** (the most-iterated piece this session): once
+      the user scrolls past the ETA/Map row, a **full-width** (never 40%)
+      compact bar (`⚡ Estimated Arrival · Xmins · ● Live`) pins to
+      `position: fixed; top:0`, while the Map/Delivery Partner/Address/Status
+      Updates continue scrolling normally underneath — only the ETA info is
+      sticky, never the map or the rest. Went through 3 implementations before
+      landing on the reliable one: (1) `IntersectionObserver` on the ETA card
+      itself — unreliable, card height shifts as the map lazy-inits; (2)
+      `IntersectionObserver` + `requestAnimationFrame`-attach on a dedicated
+      1px sentinel — still reported not firing; (3) **current**: plain
+      `getBoundingClientRect().top < 0` check on the sentinel, driven by
+      `window`+`document` scroll/resize listeners **and** a 150ms
+      `setInterval` poll as a belt-and-braces fallback (DevTools' emulated
+      mobile-viewport scroll dispatch was suspected flaky) — plus the bar's
+      show/hide now uses **inline styles** for `transform`/`opacity`/
+      `pointerEvents` rather than Tailwind arbitrary classes (`-translate-y-full`
+      etc.), since this exact codebase has previously hit silent Tailwind
+      class-generation failures (see the `OrderPlaced.tsx` entry below). As of
+      the last message in this session the user had not yet confirmed the
+      final (3rd) version works — **verify on the next tracking-page task
+      before assuming it's fixed**.
+  - **`ActiveOrderBanner.tsx` (home floating "order ready" pill, web only —
+    no mobile equivalent, storefront web is a different surface than the
+    order-detail/tracking pages above)**: desktop keeps an inline strip;
+    mobile is a `fixed` floating pill above the bottom nav (mirrors
+    `FloatingCartBar.tsx`'s pattern/offset), auto-shifts down when the nav
+    hides on scroll. No avatar icon, no order number shown (status + ETA
+    only). Dismiss is swipe-left-to-reveal-then-tap-X (iOS-style), **not**
+    swipe-to-dismiss directly — user was explicit that a drag release alone
+    must never dismiss it, only an explicit X tap; the pill "stays put"
+    otherwise. Backend: `assignmentService` broadcast-dispatch (see the
+    2026-09-11 follow-up 3 entry) already covers "auto-dispatch on Ready" —
+    confirmed via code read that the admin console's manual
+    "Assign Partner Manually" button already coexists with the auto-broadcast
+    (button shows whenever `status==='Ready' && !deliveryPartnerUserId`, which
+    is true for the whole broadcast window since `deliveryPartnerUserId` is
+    only set on accept) — no code change was needed there, just confirmation.
+  - **`OrderPlaced.tsx` (web) — a real, in-session-observed Tailwind bug**:
+    the page intermittently rendered with every word of body text on its own
+    line (as if the container were ~60–90px wide) despite correct Tailwind
+    classes (`max-w-md`, `px-6`, flex-col stretch) — reproduced identically on
+    an *older, unrelated* component (`CheckoutModal`) before this page even
+    existed, ruling out a code bug in this file specifically. Root-caused to
+    Tailwind arbitrary/utility classes not generating in this dev session
+    (same class of issue independently re-surfaced in the `TrackOrder.tsx`
+    sticky-bar work above). **Fix that worked**: rewrote the page's
+    layout-critical CSS (widths, padding, font-size) as **inline styles**
+    instead of Tailwind utility classes — inline styles can't be purged or
+    fail to compile. **If a page renders with garbled/wrapped/invisible
+    content despite correct-looking Tailwind classes, suspect this exact
+    failure mode again and reach for inline styles on the load-bearing
+    layout properties before debugging further.**
+  - **Admin order-detail "Order progress timeline" (`admin/Orders.tsx`)** now
+    sorts entries by a canonical fulfillment-stage order (Pending → Accepted →
+    Packed → Ready → Assigned → Out For Delivery → Delivered, then
+    Cancelled/Returned/Refunded) instead of raw insertion order, so it always
+    renders left-to-right in the right sequence even if an admin set statuses
+    out of order while testing. Admin-console-only, no mobile equivalent.
+  - **Verified**: `frontend` `npx tsc --noEmit` clean after every change this
+    session, **and** `npm run build` (the stricter `tsc -b && vite build`) run
+    at session end — caught 2 real errors `--noEmit -p .` had missed (`X` icon
+    used-but-not-imported in `CustomerOrders.tsx`; `order.deliveryPartnerPhone`
+    referenced but not on `TrackedOrder` in `TrackOrder.tsx`), both fixed.
+    **Lesson: `tsc --noEmit -p .` is not equivalent to the actual `npm run
+    build` type-check in this repo — run the real build before considering a
+    frontend session done, not just the quick check.** `mobileapp`
+    `flutter analyze` clean on every touched file (not re-run as a full-repo
+    pass this session). `backend` — only file touched was a same-session
+    add-then-revert of an `orderArrivedAt` string field (net zero diff);
+    `npm test` still shows the **same 6 pre-existing failures** as baseline
+    (`catalog is public...`, `customer can cancel...wallet`, `legacy DELETE
+    /customers/:id`, `GET /admin/delivery/analytics`, `PUT /api/settings`,
+    `delivery zones: CRUD...`) — confirmed unrelated to this session (backend
+    diff is a no-op), not re-investigated.
+  - Multiple mid-session reverts happened (hero status card removal undone,
+    order-details-card position moved after initial placement) — always
+    re-read the user's most recent message as the authoritative spec when it
+    conflicts with an earlier ASCII-art spec they pasted; they iterate a lot on
+    this page.
+
 - **2026-09-11 (follow-up 5) — Order-lookup bug fix, delivery-code visibility, FCM
   Android permission fix, tracking-map zoom tightened (web+mobile), deliveryapp
   in-app route map, deliveryapp order history/profile/login fixes, orders-list
@@ -2212,6 +2383,16 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
   117/117, `flutter build apk --debug` succeeded.
 
 ## 13. Last Updated
+
+2026-09-15 — see §5 top entry: customer order-tracking/order-detail redesign
+pass (web + mobile parity), new `/order-placed` full page replacing the buggy
+`OrderSuccessModal`, several real bugs fixed (CheckoutModal early-return
+swallowing the success modal, CartDrawer not closing after checkout,
+PartnerShell JSX syntax error breaking the whole dev server, IST timezone
+formatting, missing "Order Details" card), `TrackOrder.tsx` sticky-ETA-bar
+scroll behavior (still unconfirmed working as of session end), and a
+recurring Tailwind-class-not-generating failure mode (fix: inline styles for
+load-bearing layout CSS) documented for future reference.
 
 2026-09-11 (follow-up 5) — see §5 top entry: order-lookup phone-match bug fix,
 delivery-code visibility (web+mobile), deliveryapp Android FCM permission fix,

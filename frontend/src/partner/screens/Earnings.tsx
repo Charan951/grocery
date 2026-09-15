@@ -26,7 +26,6 @@ export const Earnings: React.FC = () => {
     <div>
       <PageHead
         title="Earnings"
-        meta={s ? `${s.count} deliver${s.count === 1 ? 'y' : 'ies'} · ${range}` : 'Payout ledger'}
         actions={
           <FilterMenu
             title="Time range"

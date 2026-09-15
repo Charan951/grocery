@@ -25,6 +25,7 @@ import { CustomerProfile } from './pages/CustomerProfile';
 import { CustomerSupport } from './pages/CustomerSupport';
 import { CustomerAddresses } from './pages/CustomerAddresses';
 import { Search } from './pages/Search';
+import OrderPlaced from './pages/OrderPlaced';
 
 // Admin bundle (code-split — a storefront shopper never loads this)
 const AdminApp = lazy(() => import('./AdminApp'));
@@ -152,6 +153,7 @@ const AppContent: React.FC = () => {
   const isProfilePage = location.pathname === '/profile' || location.pathname.startsWith('/account/profile');
   const isOrdersPage = location.pathname === '/orders' || location.pathname.startsWith('/orders/') || location.pathname.startsWith('/account/orders');
   const isTrackOrderPage = location.pathname.startsWith('/track/');
+  const isOrderPlacedPage = location.pathname === '/order-placed';
   const isAddressesPage =
     location.pathname.startsWith('/locations') ||
     location.pathname.startsWith('/saved-addresses') ||
@@ -191,7 +193,7 @@ const AppContent: React.FC = () => {
       {/* Main Pages */}
       <main
         className="flex-grow"
-        style={{ paddingTop: isMobile && (isPDP || isProductsListingPage || isCategoriesPage || isSearchPage || isProfilePage || isOrdersPage || isAddressesPage || isTrackOrderPage) ? 0 : 'var(--sticky-header-h)' }}
+        style={{ paddingTop: isMobile && (isPDP || isProductsListingPage || isCategoriesPage || isSearchPage || isProfilePage || isOrdersPage || isAddressesPage || isTrackOrderPage || isOrderPlacedPage) ? 0 : 'var(--sticky-header-h)' }}
       >
         <Routes>
           <Route path="/" element={<Home onQuickView={setQuickViewProduct} />} />
@@ -216,6 +218,7 @@ const AppContent: React.FC = () => {
           <Route path="/account/addresses" element={<CustomerAddresses />} />
           <Route path="/stores" element={<Stores />} />
           <Route path="/legal" element={<Legal />} />
+          <Route path="/order-placed" element={<OrderPlaced />} />
           <Route path="/orders" element={<CustomerOrders />} />
           <Route path="/account/orders" element={<CustomerOrders />} />
           <Route path="/track/:orderId" element={<Suspense fallback={<div className="min-h-screen flex items-center justify-center text-gray-400 text-sm font-semibold">Loading tracker…</div>}><TrackOrder /></Suspense>} />
@@ -244,9 +247,10 @@ const AppContent: React.FC = () => {
         isOpen={cartOpen} 
         onClose={() => setCartOpen(false)} 
       />
-      {!isStandalonePage && (
-        <FloatingCartBar 
-          onCartOpen={() => setCartOpen(true)} 
+      {(!isStandalonePage || isPDP) && (
+        <FloatingCartBar
+          onCartOpen={() => setCartOpen(true)}
+          raiseBy={isPDP ? 56 : 0}
         />
       )}
       {quickViewProduct && (

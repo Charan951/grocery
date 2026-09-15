@@ -10,14 +10,29 @@ class SocketService {
   final _revoked = StreamController<Map<String, dynamic>>.broadcast();
   final _confirmed = StreamController<Map<String, dynamic>>.broadcast();
   final _cancelled = StreamController<Map<String, dynamic>>.broadcast();
+  final _orderChat = StreamController<Map<String, dynamic>>.broadcast();
   final _connection = StreamController<bool>.broadcast();
+  final _joinedOrderRooms = <String>{};
 
   Stream<Map<String, dynamic>> get offers => _offer.stream;
   Stream<Map<String, dynamic>> get revoked => _revoked.stream;
   Stream<Map<String, dynamic>> get confirmed => _confirmed.stream;
   Stream<Map<String, dynamic>> get cancelled => _cancelled.stream;
+  /// One in-order chat message (customer <-> this partner), pushed live.
+  Stream<Map<String, dynamic>> get orderChat => _orderChat.stream;
   Stream<bool> get connection => _connection.stream;
   bool get isConnected => _socket?.connected ?? false;
+
+  void joinOrderRoom(String orderId) {
+    if (orderId.isEmpty) return;
+    _joinedOrderRooms.add(orderId);
+    _socket?.emit('join_order_room', orderId);
+  }
+
+  void leaveOrderRoom(String orderId) {
+    _joinedOrderRooms.remove(orderId);
+    _socket?.emit('leave_order_room', orderId);
+  }
 
   void connect(String token) {
     if (_socket != null && _socket!.connected) return;
@@ -38,6 +53,10 @@ class SocketService {
     s.connect();
     s.onConnect((_) {
       _connection.add(true);
+      // Re-join every order room after a reconnect.
+      for (final r in _joinedOrderRooms) {
+        s.emit('join_order_room', r);
+      }
     });
     s.onDisconnect((_) => _connection.add(false));
     s.onConnectError((_) => _connection.add(false));
@@ -45,11 +64,13 @@ class SocketService {
     s.on('delivery_offer_revoked', (d) => d is Map ? _revoked.add(Map<String, dynamic>.from(d)) : null);
     s.on('assignment_confirmed', (d) => d is Map ? _confirmed.add(Map<String, dynamic>.from(d)) : null);
     s.on('order_cancelled', (d) => d is Map ? _cancelled.add(Map<String, dynamic>.from(d)) : null);
+    s.on('order_chat_message', (d) => d is Map ? _orderChat.add(Map<String, dynamic>.from(d)) : null);
   }
 
   void disconnect() {
     _socket?.disconnect();
     _socket?.dispose();
     _socket = null;
+    _joinedOrderRooms.clear();
   }
 }

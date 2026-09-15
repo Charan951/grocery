@@ -9,6 +9,18 @@ import { ShelfTag } from '../../components/admin/ShelfTag';
 import { OrderRiderMap } from './OrderRiderMap';
 import { API_URL } from '../../config/api';
 
+// Canonical fulfillment sequence — the progress timeline always renders in
+// this order regardless of the order the status updates actually landed in
+// (e.g. an admin jumping statuses around manually while testing).
+const STATUS_STAGE_ORDER = [
+  'Pending', 'Accepted', 'Packed', 'Ready', 'Assigned', 'Out For Delivery', 'Delivered',
+  'Cancelled', 'Returned', 'Refunded',
+];
+const stageRank = (status: string) => {
+  const i = STATUS_STAGE_ORDER.indexOf(status);
+  return i === -1 ? STATUS_STAGE_ORDER.length : i;
+};
+
 interface OrderItem {
   productId: string;
   name: string;
@@ -600,8 +612,10 @@ const OrderDetailView: React.FC<OrderDetailViewProps> = ({
           <div className="text-[11px] uppercase tracking-wide font-bold text-admin-text-faint font-admin-mono">Order progress timeline</div>
           <div className="overflow-x-auto">
             <ol className="flex items-start min-w-max gap-0">
-              {order.trackingTimeline.map((t, idx) => {
-                const isLast = idx === order.trackingTimeline.length - 1;
+              {[...order.trackingTimeline]
+                .sort((a, b) => stageRank(a.status) - stageRank(b.status) || (new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()))
+                .map((t, idx, sorted) => {
+                const isLast = idx === sorted.length - 1;
                 return (
                   <li key={idx} className="flex flex-col items-center relative px-4 first:pl-0 last:pr-0" style={{ minWidth: 132 }}>
                     <div className="flex items-center w-full">

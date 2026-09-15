@@ -70,8 +70,10 @@ export const Dashboard: React.FC = () => {
         Stay active, deliver more, earn more.
       </p>
 
-      {/* Quick stats */}
-      <div className="grid grid-cols-3 sm:max-w-[560px] gap-3 mt-5">
+      {/* Quick stats — hidden on mobile to match the delivery app's home
+          screen (greeting + Active Delivery only); shown on larger screens
+          where this console has room for extra at-a-glance detail. */}
+      <div className="hidden sm:grid grid-cols-3 sm:max-w-[560px] gap-3 mt-5">
         <Stat Icon={IndianRupee} label="Earned today" value={money(partner?.todayEarnings)} tone="green" />
         <Stat Icon={PackageCheck} label="Delivered" value={partner?.completedCount ?? 0} tone="neutral" />
         <Stat

@@ -81,6 +81,11 @@ export const partnerApi = {
   fail: (o: string, reason: string) => partnerApi.step(o, 'fail', { reason }),
   markReturned: (o: string) => partnerApi.step(o, 'returned'),
 
+  // Order chat (same thread the customer's TrackOrder page uses)
+  getChat: (orderId: string) => req(`/delivery/orders/${encodeURIComponent(orderId)}/chat`),
+  sendChat: (orderId: string, text: string) =>
+    req(`/delivery/orders/${encodeURIComponent(orderId)}/chat`, { method: 'POST', body: { text } }),
+
   // Earnings
   earnings: (range: 'today' | 'week' | 'month' | 'all' = 'week') =>
     req('/delivery/earnings', { query: { range } }),

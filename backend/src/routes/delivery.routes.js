@@ -46,6 +46,8 @@ router.post('/delivery/orders/:id/arrived', protectDelivery, deliveryController.
 router.post('/delivery/orders/:id/complete', protectDelivery, deliveryController.completeDelivery);
 router.post('/delivery/orders/:id/fail', protectDelivery, deliveryController.failDelivery);
 router.post('/delivery/orders/:id/returned', protectDelivery, deliveryController.markReturned);
+router.get('/delivery/orders/:id/chat', protectDelivery, deliveryController.getOrderChat);
+router.post('/delivery/orders/:id/chat', protectDelivery, deliveryController.sendOrderChat);
 
 // ==========================================
 // 19. ADMIN DELIVERY / DISPATCH  (/api/admin/delivery/*, /api/admin/orders/:id/*)

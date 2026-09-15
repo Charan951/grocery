@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ChevronRight,
-  RefreshCw,
   MapPin,
   CheckCircle2,
   XCircle,
@@ -10,14 +9,15 @@ import {
   ClipboardList,
 } from 'lucide-react';
 import { partnerApi } from '../partnerApi';
-import { CenterState, PageHead, Pill, money } from '../ui';
+import { CenterState, FilterMenu, PageHead, Pill, money } from '../ui';
+import { useDeliveryNumbering } from '../useDeliveryNumbering';
 
 const FILTERS = [
   { key: '', label: 'All' },
   { key: 'delivered', label: 'Delivered' },
   { key: 'failed', label: 'Failed' },
   { key: 'returned', label: 'Returned' },
-];
+] as const;
 
 const toneFor = (s: string): 'green' | 'red' | 'amber' | 'neutral' =>
   s === 'Delivered' ? 'green' : s === 'Failed' ? 'red' : s === 'Returned' ? 'amber' : 'neutral';
@@ -37,6 +37,7 @@ export const Orders: React.FC = () => {
   const [filter, setFilter] = useState('');
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const numberByOrderId = useDeliveryNumbering();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -74,7 +75,7 @@ export const Orders: React.FC = () => {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="font-admin-mono text-[12px] font-semibold text-admin-text truncate">
-            {o.orderId}
+            {numberByOrderId[o.orderId] ? `Delivery #${numberByOrderId[o.orderId]}` : o.orderId}
           </span>
           <Pill tone={toneFor(o.status)}>{o.status}</Pill>
         </div>
@@ -102,37 +103,15 @@ export const Orders: React.FC = () => {
     <div>
       <PageHead
         title="Orders"
-        meta={
-          loading
-            ? 'Delivery history'
-            : `${history.length} ${filter || 'record'}${history.length === 1 ? '' : 's'}`
-        }
         actions={
-          <button
-            onClick={load}
-            className="p-1.5 rounded-md text-admin-text-faint hover:text-admin-text hover:bg-admin-surface transition-colors"
-            aria-label="Refresh"
-          >
-            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
-          </button>
+          <FilterMenu
+            title="Status"
+            value={filter}
+            onChange={setFilter}
+            options={FILTERS.map((f) => ({ value: f.key, label: f.label }))}
+          />
         }
       />
-
-      <div className="grid grid-cols-4 gap-1 bg-admin-surface border border-admin-ledger-line rounded-md p-0.5 mb-3">
-        {FILTERS.map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setFilter(f.key)}
-            className={`font-admin-mono text-[10px] font-bold uppercase tracking-[0.06em] py-1.5 rounded transition-colors cursor-pointer ${
-              filter === f.key
-                ? 'bg-admin-ink text-white'
-                : 'text-admin-text-muted hover:text-admin-text'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
 
       {loading ? (
         <CenterState kind="loading" />

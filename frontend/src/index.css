@@ -436,11 +436,15 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 }
 
 /* Full-bleed (max-w-none) layouts must never let the page scroll sideways —
-   wide rows scroll inside their own overflow-x containers instead. Scoped to
-   body + #root so `position: sticky` keeps working. */
+   wide rows scroll inside their own overflow-x containers instead. `clip`
+   (not `hidden`) is required here: `overflow-x: hidden` alone makes the
+   browser auto-resolve `overflow-y: auto`, turning body/#root into their
+   own scroll container and silently breaking every `position: sticky`
+   descendant (e.g. SuperCategoryNav) — it scrolls away instead of sticking. */
 body, #root {
-  overflow-x: hidden;
+  overflow-x: clip;
   max-width: 100vw;
+  touch-action: manipulation; /* blocks double-tap-to-zoom on browsers that ignore user-scalable=no */
 }
 
 /* Browser surfaces themed from the palette, not left at UA defaults. */
@@ -460,6 +464,16 @@ body, #root {
 :where(input, select, textarea):focus-within {
   outline: none !important;
   box-shadow: none !important;
+}
+
+/* iOS/Android auto-zoom the page whenever a focused form field renders
+   below 16px — this is what makes mobile Safari/Chrome "jump" in and out
+   of zoom while typing. Force 16px on focus at mobile widths only, so
+   desktop/tablet keep their original (often smaller) input type scale. */
+@media (max-width: 767px) {
+  :where(input, select, textarea):focus {
+    font-size: 16px !important;
+  }
 }
 
 h1, h2, h3, h4, h5, h6 {

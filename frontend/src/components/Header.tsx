@@ -411,7 +411,9 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
   const isSearchPage =
     location.pathname === '/search' || location.pathname.startsWith('/search');
 
-  if (isMobile && (isProductListingPage || isProductDetailPage || isCategoriesPage || isOrdersPage || isAddressesPage || isSearchPage || isProfilePage || isTrackOrderPage)) {
+  const isOrderPlacedPage = location.pathname === '/order-placed';
+
+  if (isMobile && (isProductListingPage || isProductDetailPage || isCategoriesPage || isOrdersPage || isAddressesPage || isSearchPage || isProfilePage || isTrackOrderPage || isOrderPlacedPage)) {
     return null;
   }
 

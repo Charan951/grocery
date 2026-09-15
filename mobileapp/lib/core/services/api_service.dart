@@ -526,6 +526,35 @@ class ApiService {
     }
   }
 
+  /// `GET /api/orders/:id/chat` — the chat thread with the assigned partner.
+  Future<List<Map<String, dynamic>>> fetchOrderChat(String orderId) async {
+    try {
+      final res = await _dio.get('/orders/${Uri.encodeComponent(orderId)}/chat');
+      final data = res.data;
+      final list = (data is Map && data['messages'] is List) ? data['messages'] as List : const [];
+      return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  /// `POST /api/orders/:id/chat` — send a chat message to the assigned partner.
+  Future<Map<String, dynamic>> sendOrderChat(String orderId, String text) async {
+    try {
+      final res = await _dio.post(
+        '/orders/${Uri.encodeComponent(orderId)}/chat',
+        data: {'text': text},
+      );
+      final data = res.data;
+      if (data is Map && data['message'] is Map) {
+        return Map<String, dynamic>.from(data['message'] as Map);
+      }
+      throw ApiException('Could not send message');
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
   /// `POST /api/orders/:id/cancel` — customer self-service cancel. A prepaid
   /// order is refunded to the wallet server-side. Returns the updated order +
   /// `{ refunded, walletBalance }`. Throws 409 when the order is past the

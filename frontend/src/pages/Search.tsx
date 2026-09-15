@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCMS } from '../context/CMSContext';
 import { ProductCard } from '../components/ProductCard';
+import { useIncrementalReveal } from '../hooks/useIncrementalReveal';
 import { SEO } from '../components/SEO';
 import { QuickViewModal } from '../components/QuickViewModal';
 import { 
@@ -103,6 +104,9 @@ export const Search: React.FC = () => {
       return nameMatch || brandMatch || catMatch || subCatMatch || descMatch;
     });
   }, [debouncedQuery, products]);
+
+  const { visibleCount: visibleSearchResults, sentinelRef: searchResultsSentinelRef } =
+    useIncrementalReveal(searchResults.length, 16);
 
   // Dynamic trending terms derived from live catalog + defaults
   const trendingTerms = useMemo(() => {
@@ -249,15 +253,20 @@ export const Search: React.FC = () => {
             </div>
 
             {searchResults.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-8 gap-3">
-                {searchResults.map((product) => (
-                  <ProductCard
-                    key={product.id || product._id}
-                    product={product}
-                    onQuickView={setQuickViewProduct}
-                  />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-8 gap-3">
+                  {searchResults.slice(0, visibleSearchResults).map((product) => (
+                    <ProductCard
+                      key={product.id || product._id}
+                      product={product}
+                      onQuickView={setQuickViewProduct}
+                    />
+                  ))}
+                </div>
+                {visibleSearchResults < searchResults.length && (
+                  <div ref={searchResultsSentinelRef} aria-hidden style={{ height: 1 }} />
+                )}
+              </>
             ) : (
               /* EMPTY RESULTS STATE */
               <div className="bg-white rounded-3xl p-8 text-center border border-gray-100 shadow-xs my-8">

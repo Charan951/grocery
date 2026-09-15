@@ -14,6 +14,7 @@ import 'package:freshcart/core/utils/launch.dart';
 import 'package:freshcart/features/cart/data/models/cart_item_model.dart';
 import 'package:freshcart/features/orders/data/models/order_model.dart';
 import 'package:freshcart/features/tracking/presentation/controllers/tracking_controller.dart';
+import 'package:freshcart/features/tracking/presentation/widgets/order_chat_sheet.dart';
 
 String formatOrderNumber(String orderId) {
   final clean = orderId.replaceAll(RegExp(r'^[#A-Za-z\-_]+'), '');
@@ -35,7 +36,6 @@ class TrackingScreen extends ConsumerWidget {
 
     final t = ref.watch(trackingProvider(orderId));
     final bucket = t.statusBucket;
-    final stepIdx = _trackingStepIndex(bucket, t.status);
     final orderNum = formatOrderNumber(orderId);
 
     return AppScaffold(
@@ -157,37 +157,39 @@ class TrackingScreen extends ConsumerWidget {
         physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
-          // 1. LIVE INTERACTIVE MAP CARD
-          _MapSection(t: t, bucket: bucket, isDark: isDark),
-          const SizedBox(height: 14),
+          // 1. LIVE INTERACTIVE MAP CARD — only while a partner is assigned
+          // and the order is still active; hidden before assignment and
+          // after completion.
+          if (t.assigned) ...[
+            _MapSection(t: t, isDark: isDark),
+            const SizedBox(height: 14),
+          ],
 
           // 2. ETA & LIVE STATUS HERO CARD
           _EtaHeroCard(t: t, bucket: bucket, isDark: isDark),
           const SizedBox(height: 14),
 
-          // 3. 4-STEP MILESTONE TRACKER
-          _MilestoneCard(currentStep: stepIdx, isDark: isDark),
-          const SizedBox(height: 14),
-
-          // 4. DOORSTEP OTP CODE (when available)
+          // 3. DOORSTEP OTP CODE (when available)
           if (t.deliveryOtp.isNotEmpty) ...[
             _DeliveryOtpCard(otp: t.deliveryOtp, isDark: isDark),
             const SizedBox(height: 14),
           ],
 
-          // 5. DELIVERY PARTNER CARD
-          _DeliveryPartnerCard(t: t, isDark: isDark),
-          const SizedBox(height: 14),
-
-          // 6. ORDER ITEMS SUMMARY
-          if (t.items.isNotEmpty) ...[
-            _OrderItemsCard(items: t.items, total: t.total, isDark: isDark),
+          // 4. DELIVERY PARTNER CARD — only once actually assigned.
+          if (t.assigned) ...[
+            _DeliveryPartnerCard(t: t, isDark: isDark, orderId: orderId),
             const SizedBox(height: 14),
           ],
 
-          // 7. TRACKING TIMELINE
+          // 5. TRACKING TIMELINE
           if (t.timeline.isNotEmpty) ...[
             _TimelineCard(entries: t.timeline, isDark: isDark),
+            const SizedBox(height: 14),
+          ],
+
+          // 6. ORDER ITEMS SUMMARY — kept last per request
+          if (t.items.isNotEmpty) ...[
+            _OrderItemsCard(items: t.items, total: t.total, isDark: isDark),
           ],
         ],
       ),
@@ -195,29 +197,11 @@ class TrackingScreen extends ConsumerWidget {
   }
 }
 
-int _trackingStepIndex(OrderStatus bucket, String status) {
-  if (bucket == OrderStatus.delivered) return 3;
-  final s = status.toLowerCase();
-  if (bucket == OrderStatus.dispatched ||
-      s == 'in progress' ||
-      s == 'in transit' ||
-      s == 'out for delivery' ||
-      s == 'assigned' ||
-      s == 'arrived') {
-    return 2;
-  }
-  if (bucket == OrderStatus.processing || s == 'packed' || s == 'ready' || s == 'arrived at store') {
-    return 1;
-  }
-  return 0; // Placed / Pending
-}
-
 class _MapSection extends StatelessWidget {
   final TrackingState t;
-  final OrderStatus bucket;
   final bool isDark;
 
-  const _MapSection({required this.t, required this.bucket, required this.isDark});
+  const _MapSection({required this.t, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
@@ -238,72 +222,7 @@ class _MapSection extends StatelessWidget {
         ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: _LiveMap(t: t, isDark: isDark),
-          ),
-          // Floating status badge over map bottom
-          Positioned(
-            left: 12,
-            right: 12,
-            bottom: 12,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: (isDark ? const Color(0xFF1E1E20) : Colors.white).withOpacity(0.94),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: isDark ? AppColors.dividerDark : const Color(0xFFE5E7EB),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 26,
-                    height: 26,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.12),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      bucket == OrderStatus.delivered
-                          ? Icons.check_circle_rounded
-                          : (t.hasRider ? Icons.delivery_dining_rounded : Icons.storefront_rounded),
-                      size: 16,
-                      color: AppColors.primaryText,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      bucket == OrderStatus.delivered
-                          ? 'Order delivered safely'
-                          : (t.hasRider
-                              ? 'Rider is on the way to your doorstep'
-                              : 'Order being prepared at local dark store'),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
+      child: _LiveMap(t: t, isDark: isDark),
     );
   }
 }
@@ -391,181 +310,28 @@ class _EtaHeroCard extends StatelessWidget {
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE8F5E9),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Text(
-              '10 MINS',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-                color: AppColors.primaryText,
+          if (!isDelivered)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5E9),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '${t.etaMinutes} MINS',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.primaryText,
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
   }
 }
 
-class _MilestoneCard extends StatelessWidget {
-  final int currentStep;
-  final bool isDark;
-
-  const _MilestoneCard({required this.currentStep, required this.isDark});
-
-  static const _steps = ['Placed', 'Packed', 'In Progress', 'Delivered'];
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark ? AppColors.dividerDark : const Color(0xFFE5E7EB),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Delivery Milestones',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              for (var i = 0; i < _steps.length; i++) ...[
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Container(
-                              height: 2.5,
-                              color: i == 0
-                                  ? Colors.transparent
-                                  : (i <= currentStep
-                                      ? AppColors.primary
-                                      : (isDark ? AppColors.dividerDark : const Color(0xFFE5E7EB))),
-                            ),
-                          ),
-                          _node(i),
-                          Expanded(
-                            child: Container(
-                              height: 2.5,
-                              color: i == _steps.length - 1
-                                  ? Colors.transparent
-                                  : (i < currentStep
-                                      ? AppColors.primary
-                                      : (isDark ? AppColors.dividerDark : const Color(0xFFE5E7EB))),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        _steps[i],
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: i == currentStep
-                              ? FontWeight.w800
-                              : (i < currentStep ? FontWeight.w600 : FontWeight.w500),
-                          color: i == currentStep
-                              ? AppColors.primaryText
-                              : (i < currentStep
-                                  ? (isDark ? AppColors.textPrimaryDark : AppColors.textPrimary)
-                                  : (isDark ? AppColors.textSecondaryDark : const Color(0xFF9CA3AF))),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _node(int index) {
-    final isDone = index < currentStep;
-    final isCurrent = index == currentStep;
-    if (isDone) {
-      return Container(
-        width: 20,
-        height: 20,
-        decoration: const BoxDecoration(
-          color: AppColors.primary,
-          shape: BoxShape.circle,
-        ),
-        child: const Icon(Icons.check_rounded, color: Colors.white, size: 13),
-      );
-    }
-    if (isCurrent) {
-      return Container(
-        width: 22,
-        height: 22,
-        decoration: BoxDecoration(
-          color: AppColors.primary,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withOpacity(0.35),
-              blurRadius: 6,
-              spreadRadius: 2,
-            ),
-          ],
-        ),
-        child: Center(
-          child: Container(
-            width: 7,
-            height: 7,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-            ),
-          ),
-        ),
-      );
-    }
-    return Container(
-      width: 16,
-      height: 16,
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : const Color(0xFFF3F4F6),
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: isDark ? AppColors.dividerDark : const Color(0xFFD1D5DB),
-          width: 1.5,
-        ),
-      ),
-    );
-  }
-}
 
 class _DeliveryOtpCard extends StatelessWidget {
   final String otp;
@@ -645,12 +411,29 @@ class _DeliveryOtpCard extends StatelessWidget {
 class _DeliveryPartnerCard extends StatelessWidget {
   final TrackingState t;
   final bool isDark;
+  final String orderId;
 
-  const _DeliveryPartnerCard({required this.t, required this.isDark});
+  const _DeliveryPartnerCard({required this.t, required this.isDark, required this.orderId});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            'DELIVERY PARTNER DETAILS',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.4,
+              color: isDark ? AppColors.textSecondaryDark : const Color(0xFF6B7280),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
       decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDark : Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -682,91 +465,60 @@ class _DeliveryPartnerCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Text(
-                      t.riderName,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                      ),
-                    ),
-                    if (t.hasRider) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEF3C7),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.star_rounded, size: 12, color: Color(0xFFD97706)),
-                            SizedBox(width: 2),
-                            Text(
-                              '4.9',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF92400E),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 2),
                 Text(
-                  !t.hasRider
-                      ? 'Waiting for a delivery partner'
-                      : t.canContact
-                          ? t.riderPhone
-                          : (t.riderPhoneMasked.isNotEmpty
-                              ? '${t.riderPhoneMasked} • contact opens at doorstep'
-                              : 'Contact opens when out for delivery'),
+                  t.riderName,
                   style: TextStyle(
-                    fontSize: 11.5,
-                    color: isDark ? AppColors.textSecondaryDark : const Color(0xFF6B7280),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
                   ),
                 ),
+                if (!t.hasRider) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'Waiting for a delivery partner',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: isDark ? AppColors.textSecondaryDark : const Color(0xFF6B7280),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
-          if (t.canContact) ...[
-            GestureDetector(
-              onTap: () => dialPhone(t.riderPhone),
+          Builder(
+            builder: (context) => GestureDetector(
+              onTap: () => showOrderChatSheet(context, orderId: orderId, partnerName: t.riderName),
               child: Container(
                 padding: const EdgeInsets.all(9),
-                decoration: const BoxDecoration(
-                  color: AppColors.primary,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF2A2A2C) : const Color(0xFFF3F4F6),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.call_rounded, color: Colors.white, size: 18),
-              ),
-            ),
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: () {
-                final digits = t.riderPhone.replaceAll(RegExp(r'[^0-9]'), '');
-                final ten = digits.length > 10 ? digits.substring(digits.length - 10) : digits;
-                openUrl('https://wa.me/91$ten');
-              },
-              child: Container(
-                padding: const EdgeInsets.all(9),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF25D366),
-                  shape: BoxShape.circle,
+                child: Icon(
+                  Icons.forum_rounded,
+                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                  size: 18,
                 ),
-                child: const Icon(Icons.chat_bubble_rounded, color: Colors.white, size: 18),
               ),
             ),
-          ],
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () => dialPhone(t.riderPhone.isNotEmpty ? t.riderPhone : t.riderPhoneMasked),
+            child: Container(
+              padding: const EdgeInsets.all(9),
+              decoration: const BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.call_rounded, color: Colors.white, size: 18),
+            ),
+          ),
         ],
       ),
+    ),
+      ],
     );
   }
 }

@@ -116,27 +116,52 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
 
   const festivalTheme = React.useMemo(() => resolveFestivalTheme(activeFestivalCampaign), [activeFestivalCampaign]);
 
+  // Once the page is scrolled enough for this bar to actually be pinned
+  // (sticking under the collapsed header), force it back to a plain white/
+  // surface background — the festival tint is only for its resting spot
+  // right below the hero banner.
+  const [isPinned, setIsPinned] = React.useState(false);
+  React.useEffect(() => {
+    let raf = 0;
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        setIsPinned(window.scrollY > 24);
+      });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  const showFestivalTint = isFestivalActive && isMobile && !isPinned;
+
   const navBgColor = React.useMemo(() => {
-    if (isFestivalActive && isMobile) {
+    if (showFestivalTint) {
       return festivalTheme.gStart;
     }
     return undefined;
-  }, [isFestivalActive, isMobile, festivalTheme]);
+  }, [showFestivalTint, festivalTheme]);
 
   const underlineW = 8;
 
   return (
     <nav
       aria-label="Shop by department"
-      className={`w-full sticky z-30 transition-colors border-b shadow-2xs ${
-        isFestivalActive && isMobile
+      className={`w-full sticky z-30 border-b shadow-2xs ${
+        showFestivalTint
           ? 'border-cyan-200/40'
           : 'bg-surface border-divider'
       }`}
       style={{
         backgroundColor: navBgColor,
         top: 'calc(var(--sticky-header-h) - 1px)',
-        marginTop: '-1px'
+        marginTop: '-1px',
+        transition: 'top 300ms cubic-bezier(0.4, 0, 0.2, 1), background-color 250ms ease, border-color 250ms ease',
       }}
     >
       <div className="max-w-none mx-auto px-2 sm:px-4 lg:px-8 relative flex items-center group">
@@ -170,8 +195,8 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
             const IconComponent = getSuperCatIcon(cat.name, cat.icon);
 
             if (isMobile) {
-              const activeColorClass = isFestivalActive ? 'text-black' : 'text-primary-strong';
-              const activeBgClass = isFestivalActive ? 'bg-black' : 'bg-primary-strong';
+              const activeColorClass = showFestivalTint ? 'text-black' : 'text-primary-strong';
+              const activeBgClass = showFestivalTint ? 'bg-black' : 'bg-primary-strong';
 
               return (
                 <button

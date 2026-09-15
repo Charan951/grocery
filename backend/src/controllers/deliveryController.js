@@ -435,6 +435,37 @@ export const deliveryController = {
     res.json({ success: true, order: o });
   },
 
+  // GET /api/delivery/orders/:id/chat
+  getOrderChat: async (req, res) => {
+    const { order, err } = await loadMyOrder(req);
+    if (err) return res.status(err[0]).json({ success: false, message: err[1] });
+    res.json({ success: true, messages: order.chatMessages || [] });
+  },
+
+  // POST /api/delivery/orders/:id/chat  { text }
+  sendOrderChat: async (req, res) => {
+    try {
+      const { order, err } = await loadMyOrder(req);
+      if (err) return res.status(err[0]).json({ success: false, message: err[1] });
+      if (['Delivered', 'Cancelled', 'Returned', 'Refunded', 'Failed'].includes(order.status)) {
+        return res.status(409).json({ success: false, message: 'This order is no longer active' });
+      }
+
+      const text = String(req.body.text || '').trim().slice(0, 1000);
+      if (!text) return res.status(400).json({ success: false, message: 'Message cannot be empty' });
+
+      const message = { from: 'partner', text, at: new Date() };
+      order.chatMessages.push(message);
+      await order.save();
+
+      req.app.get('io')?.to(order.orderId).emit('order_chat_message', { orderId: order.orderId, message });
+
+      res.status(201).json({ success: true, message });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
   // POST /api/delivery/orders/:id/pickup-arrived
   pickupArrived: step(['Assigned', 'Ready'], 'Arrived At Store', 'Delivery partner arrived at the store'),
 

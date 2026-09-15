@@ -27,6 +27,8 @@ router.post('/orders/:id/cancel', attachCustomerOptional, orderController.cancel
 router.post('/orders/:id/rate-partner', attachCustomerOptional, orderController.ratePartner); // customer rates the delivery partner after Delivered (token OR body {phone})
 router.put('/orders/:id/status', protect, authorize('Admin', 'Manager', 'Delivery'), orderController.updateStatus);
 router.post('/orders/:id/rider-location', protect, authorize('Admin', 'Manager', 'Delivery'), orderController.updateRiderLocation);
+router.get('/orders/:id/chat', attachCustomerOptional, orderController.getOrderChat); // owner-only when a customer token is present
+router.post('/orders/:id/chat', attachCustomerOptional, orderController.sendOrderChat); // customer -> assigned partner (token OR body {phone})
 
 
 export default router;

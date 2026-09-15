@@ -5,6 +5,7 @@ import { ProductCard } from '../components/ProductCard';
 import { SEO } from '../components/SEO';
 import { BannerCarousel } from '../components/BannerCarousel';
 import { SubcategoryCardImage } from '../components/SubcategoryCardImage';
+import { useIncrementalReveal } from '../hooks/useIncrementalReveal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ArrowUpDown, ChevronRight, SearchX, PackageX } from 'lucide-react';
 
@@ -427,6 +428,11 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
     return filteredProducts.slice(startIdx, startIdx + itemsPerPage);
   }, [filteredProducts, currentPage]);
 
+  // Category view (no subcategory selected) renders the full filtered list
+  // instead of paginating — reveal it incrementally as the user scrolls.
+  const { visibleCount: visibleCategoryProducts, sentinelRef: categoryProductsSentinelRef } =
+    useIncrementalReveal(filteredProducts.length, 16);
+
   const handleClearAll = () => {
     setSelectedSubCategory('');
     setOnlyOrganic(false);
@@ -779,11 +785,16 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
                   <p className="text-xs text-text-secondary leading-normal text-center self-stretch mx-auto" style={{ maxWidth: '32rem' }}>We are actively restocking fresh items for this category. Please check back soon or browse other catalog categories.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-8 gap-2 sm:gap-3 md:gap-4">
-                  {filteredProducts.map((product, idx) => (
-                    <ProductCard key={product.id || product._id || `cat_prod_${idx}`} product={product} onQuickView={onQuickView} />
-                  ))}
-                </div>
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-8 gap-2 sm:gap-3 md:gap-4">
+                    {filteredProducts.slice(0, visibleCategoryProducts).map((product, idx) => (
+                      <ProductCard key={product.id || product._id || `cat_prod_${idx}`} product={product} onQuickView={onQuickView} />
+                    ))}
+                  </div>
+                  {visibleCategoryProducts < filteredProducts.length && (
+                    <div ref={categoryProductsSentinelRef} aria-hidden style={{ height: 1 }} />
+                  )}
+                </>
               )}
             </div>
 

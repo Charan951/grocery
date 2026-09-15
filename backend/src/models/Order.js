@@ -72,6 +72,14 @@ const orderSchema = new mongoose.Schema({
     note: { type: String },
     at: { type: Date, default: Date.now }
   }],
+  // In-order chat between the customer and the assigned delivery partner.
+  // One thread per order — small volume, so it's embedded rather than a
+  // separate collection.
+  chatMessages: [{
+    from: { type: String, enum: ['customer', 'partner'], required: true },
+    text: { type: String, required: true, maxlength: 1000 },
+    at: { type: Date, default: Date.now }
+  }],
   orderPlacedAt: { type: String, default: () => new Date().toLocaleString() },
   orderArrivedAt: { type: String },
   estimatedDelivery: { type: String, default: '8 minutes' }

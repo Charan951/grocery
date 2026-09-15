@@ -4,8 +4,8 @@ import {
   ArrowLeft, MapPin, Clock, ShieldCheck, Plus, Minus, CreditCard, Wallet,
   Loader2, AlertCircle, CheckCircle2,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useCartWishlist } from '../context/CartWishlistContext';
-import { OrderSuccessModal } from './OrderSuccessModal';
 import { apiUrl } from '../config/api';
 
 interface SavedAddress {
@@ -46,18 +46,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onOpenAddressSelector,
 }) => {
   const { cart, updateCartQuantity, cartSubtotal, clearCart } = useCartWishlist();
+  const navigate = useNavigate();
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [stage, setStage] = useState('');
   const [payMethod, setPayMethod] = useState<PayMethod>('razorpay');
   const [payError, setPayError] = useState<string | null>(null);
-  const [successModalData, setSuccessModalData] = useState({
-    isOpen: false,
-    orderNumber: '',
-    totalAmount: 0,
-    addressText: '',
-    itemCount: 0,
-  });
 
   const customerUser = (() => {
     try {
@@ -102,8 +96,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       })
       .catch(() => {});
   }, [isOpen]);
-
-  if (!isOpen) return null;
 
   const addressString = selectedAddress
     ? `${selectedAddress.label} - ${selectedAddress.houseNo ? selectedAddress.houseNo + ', ' : ''}${selectedAddress.fullAddress}`
@@ -214,12 +206,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setIsProcessing(false);
     setStage('');
     onClose();
-    setSuccessModalData({
-      isOpen: true,
-      orderNumber: orderId,
-      totalAmount: finalPayable,
-      addressText: addressFormatted,
-      itemCount,
+    navigate('/order-placed', {
+      state: {
+        orderId,
+        totalAmount: finalPayable,
+        addressText: addressFormatted,
+        itemCount,
+      },
     });
   };
 
@@ -368,10 +361,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     ? `Place order · ₹${finalPayable}`
     : `Pay ₹${finalPayable}`;
 
+  if (!isOpen) return null;
+
   return (
     <>
       <AnimatePresence>
-        <div className="fixed inset-0 z-[1100] flex justify-end bg-black/50 backdrop-blur-2xs">
+        <div key="checkout-sheet" className="fixed inset-0 z-[1100] flex justify-end bg-black/50 backdrop-blur-2xs">
           <motion.div
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
@@ -575,15 +570,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           </motion.div>
         </div>
       </AnimatePresence>
-
-      <OrderSuccessModal
-        isOpen={successModalData.isOpen}
-        onClose={() => setSuccessModalData((prev) => ({ ...prev, isOpen: false }))}
-        orderNumber={successModalData.orderNumber}
-        totalAmount={successModalData.totalAmount}
-        deliveryAddress={successModalData.addressText}
-        itemCount={successModalData.itemCount}
-      />
     </>
   );
 };

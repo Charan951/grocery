@@ -2,22 +2,22 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSmartBack } from '../hooks/useSmartBack';
 import { useHideBottomNav } from '../context/BottomNavContext';
-import { io } from 'socket.io-client';
+import { io, Socket } from 'socket.io-client';
+import { OrderChat } from '../components/OrderChat';
+import { BannerCarousel } from '../components/BannerCarousel';
+import { useCMS } from '../context/CMSContext';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
   Phone,
-  MessageCircle,
+  MessageSquareText,
   ArrowLeft,
   MapPin,
-  RefreshCw,
-  Check,
-  Copy,
   CheckCircle2,
   Zap,
   ShieldCheck,
-  Store,
   Clock,
+  Bike,
 } from 'lucide-react';
 import { apiUrl, SOCKET_URL } from '../config/api';
 
@@ -77,19 +77,15 @@ export function normalizeStatus(s: string): string {
   return s;
 }
 
-const STEPS = ['Placed', 'Packed', 'In Progress', 'Delivered'];
-
-const getStepIndex = (rawStatus: string): number => {
-  const norm = normalizeStatus(rawStatus).toLowerCase();
-  if (norm === 'delivered') return 3;
-  if (['in progress', 'dispatched', 'out for delivery', 'assigned', 'arrived'].includes(norm)) {
-    return 2;
-  }
-  if (['packed', 'processing', 'ready', 'arrived at store', 'accepted'].includes(norm)) {
-    return 1;
-  }
-  return 0; // Placed / Pending
-};
+/** Collapses the backend's wide status enum onto the 5 stages shown in the tracker. */
+function stageIndex(status: string): number {
+  const s = (status || '').toLowerCase();
+  if (s === 'delivered') return 4;
+  if (s === 'arrived') return 3;
+  if (s === 'out for delivery' || s === 'assigned') return 2;
+  if (s === 'packed' || s === 'ready' || s === 'arrived at store') return 1;
+  return 0;
+}
 
 const riderIcon = L.divIcon({
   className: '',
@@ -147,44 +143,24 @@ async function fetchRoute(
   ];
 }
 
-export function formatOrderNumber(orderId: string): string {
-  const clean = orderId.replace(/^[#A-Za-z\-_]+/, '');
-  return clean.length > 0 ? clean : orderId.replace('#', '');
-}
-
-/**
- * Stable per-customer order number (#1 = this customer's very first order),
- * read from the same cache CustomerOrders.tsx maintains
- * (`customer_orders_<phone>`, newest-first) — falls back to the raw id when
- * the cache doesn't have this order yet (e.g. tracked before ever opening
- * "Your Orders").
- */
-function customerOrderLabel(orderId: string): string {
-  try {
-    const phone = customerPhone();
-    const key = phone ? `customer_orders_${phone.replace(/\D/g, '')}` : '';
-    const cached = key ? JSON.parse(localStorage.getItem(key) || '[]') : [];
-    if (Array.isArray(cached) && cached.length > 0) {
-      const total = cached.length;
-      const idx = cached.findIndex((o: any) => (o.orderId || o.id) === orderId);
-      if (idx !== -1) return `Order #${total - idx}`;
-    }
-  } catch {
-    /* fall through */
-  }
-  return formatOrderNumber(orderId);
-}
-
 export const TrackOrder: React.FC = () => {
   const { orderId = '' } = useParams();
   const navigate = useNavigate();
   const goBack = useSmartBack('/account/orders');
   useHideBottomNav(true);
+  const { banners } = useCMS();
   const [order, setOrder] = useState<TrackedOrder | null>(null);
   const [err, setErr] = useState('');
   const [tick, setTick] = useState(0);
-  const [copied, setCopied] = useState(false);
   const [socketConnected, setSocketConnected] = useState(false);
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
+
+  // Sticky ETA bar: shown once the real ETA card has scrolled past the top
+  // of the viewport (not while it's still below the fold, nor before it's
+  // ever been rendered).
+  const [stickyEta, setStickyEta] = useState(false);
+  const etaSentinelRef = useRef<HTMLDivElement>(null);
 
   // Live rider position pushed over socket
   const [liveRider, setLiveRider] = useState<{ lat: number; lng: number } | null>(null);
@@ -247,6 +223,7 @@ export const TrackOrder: React.FC = () => {
   useEffect(() => {
     if (!orderId) return;
     const socket = io(SOCKET_URL, { path: '/socket.io', transports: ['websocket'] });
+    setSocket(socket);
     const join = () => socket.emit('join_order_room', orderId);
 
     socket.on('connect', () => {
@@ -297,6 +274,7 @@ export const TrackOrder: React.FC = () => {
       socket.emit('leave_order_room', orderId);
       socket.removeAllListeners();
       socket.close();
+      setSocket(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
@@ -304,6 +282,55 @@ export const TrackOrder: React.FC = () => {
   useEffect(() => {
     setLiveRider(null);
   }, [orderId]);
+
+  // Toggle the sticky compact ETA bar once the full-size ETA card scrolls
+  // above the viewport (down-scroll past it), and hide it again once it's
+  // back in view (scroll up) or before it's ever appeared below the fold.
+  // Plain scroll-position check (rAF-throttled) rather than
+  // IntersectionObserver — simpler to reason about and unaffected by root/
+  // threshold edge cases.
+  useEffect(() => {
+    if (!order) {
+      setStickyEta(false);
+      return;
+    }
+    let raf = 0;
+    let lastTop: number | null = null;
+    const check = () => {
+      raf = 0;
+      const el = etaSentinelRef.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top;
+      if (top !== lastTop) {
+        lastTop = top;
+        setStickyEta(top < 0);
+      }
+    };
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(check);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    document.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    // Belt-and-braces: some environments (e.g. Chrome DevTools' emulated
+    // touch/mobile scrolling) don't reliably dispatch 'scroll' on window,
+    // so also poll on an interval — cheap (one getBoundingClientRect call)
+    // and guarantees correctness regardless of event quirks.
+    const poll = setInterval(check, 150);
+    // Run once immediately (and again shortly after) in case the sentinel
+    // wasn't in the DOM yet on the very first paint.
+    check();
+    const t = setTimeout(check, 300);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      document.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      if (raf) cancelAnimationFrame(raf);
+      clearTimeout(t);
+      clearInterval(poll);
+    };
+  }, [!!order]);
 
   const rawStatus = order?.status || 'Placed';
   const normalizedStatus = normalizeStatus(rawStatus);
@@ -340,7 +367,10 @@ export const TrackOrder: React.FC = () => {
       riderMk.current = destMk.current = pickupMk.current = null;
       routeLine.current = null;
     };
-  }, []);
+    // The map is only rendered while a partner is assigned and the order is
+    // still active (before assignment / after completion it's hidden), so
+    // this must re-run whenever that flips, not just once on mount.
+  }, [!!order?.delivery]);
 
   // Markers and route line
   useEffect(() => {
@@ -435,19 +465,9 @@ export const TrackOrder: React.FC = () => {
     }
   }, [rider, dest, pickup]);
 
-  const curStep = order ? getStepIndex(order.status) : 0;
   const existingRating = order?.deliveryRating?.stars || 0;
   const canRate = !!order && isDelivered && !!order.deliveryPartnerName;
   const shownStars = rateStars || existingRating;
-
-  const handleCopyOrderId = () => {
-    const raw = order?.orderId || orderId;
-    if (!raw) return;
-    const num = formatOrderNumber(raw);
-    navigator.clipboard.writeText(num);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   const submitRating = async () => {
     if (!order || !rateStars) return;
@@ -483,41 +503,90 @@ export const TrackOrder: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] pb-28">
-      <div className="max-w-3xl mx-auto px-4 py-4 md:py-6 flex flex-col gap-4 font-sans text-gray-900">
-        {/* Top bar */}
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={goBack}
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-600 hover:text-gray-900 bg-white border border-gray-200/80 px-3 py-1.5 rounded-full shadow-xs transition-colors"
-          >
-            <ArrowLeft size={14} /> Orders
-          </button>
-          <div className="flex items-center gap-2">
+      {/* Compact sticky ETA bar — always mounted (so the slide/fade is a CSS
+          transition, not a mount/unmount pop), pinned to the very top of the
+          viewport once the full ETA card scrolls past. Fixed, not sticky:
+          it must keep floating over Delivery Partner / Address / Status
+          Updates, which a `position: sticky` element can't do once its own
+          row has scrolled out of its parent. */}
+      {order && (
+        <div
+          className="bg-white/95 backdrop-blur-md border-b border-gray-200/80"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 50,
+            boxShadow: '0 4px 16px -6px rgba(0,0,0,0.12)',
+            transition: 'transform 0.3s ease-out, opacity 0.3s ease-out',
+            transform: stickyEta ? 'translateY(0)' : 'translateY(-100%)',
+            opacity: stickyEta ? 1 : 0,
+            pointerEvents: stickyEta ? 'auto' : 'none',
+          }}
+        >
+          <div className="max-w-3xl mx-auto px-4 py-2.5 flex items-center gap-3">
+            <span className="w-8 h-8 shrink-0 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700">
+              {isDelivered ? <CheckCircle2 size={16} /> : <Zap size={16} />}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide shrink-0">
+                  Estimated Arrival
+                </span>
+                <span className="text-sm font-black text-gray-900 tabular-nums shrink-0">
+                  {isDelivered ? 'Delivered' : `${etaMins || 10} min${(etaMins || 10) === 1 ? '' : 's'}`}
+                </span>
+              </div>
+              <p className="hidden sm:block text-[11px] text-gray-500 font-medium truncate">
+                {isDelivered
+                  ? 'Groceries delivered with care'
+                  : rider
+                    ? 'Delivery partner is heading to your drop'
+                    : 'Items being packed at FreshCart Dark Store'}
+              </p>
+            </div>
             <div
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${
+              className={`shrink-0 inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold ${
                 socketConnected
                   ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                   : 'bg-amber-50 text-amber-800 border border-amber-200'
               }`}
             >
               <span
-                className={`w-2 h-2 rounded-full ${
+                className={`w-1.5 h-1.5 rounded-full ${
                   socketConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
                 }`}
               />
-              {socketConnected ? 'Live GPS' : 'Connecting'}
+              {socketConnected ? 'Live' : 'Connecting'}
             </div>
-            <button
-              onClick={fetchOrder}
-              aria-label="Refresh Order"
-              className="p-1.5 rounded-full bg-white border border-gray-200/80 text-gray-600 hover:text-gray-900 hover:bg-gray-50 shadow-xs transition-colors"
-            >
-              <RefreshCw size={14} />
-            </button>
           </div>
         </div>
+      )}
 
+      {/* Floating back button — overlays the banner at the very top of the
+          page; sits below the sticky ETA bar's z-index so it's naturally
+          covered once that bar slides in on scroll. */}
+      <button
+        type="button"
+        onClick={goBack}
+        aria-label="Back"
+        className="fixed top-3 left-3 z-40 w-9 h-9 rounded-full bg-white/90 backdrop-blur-sm hover:bg-white shadow-md flex items-center justify-center text-gray-700 transition-colors"
+      >
+        <ArrowLeft size={16} />
+      </button>
+
+      {/* Promo Banner Carousel — flush with the very top of the page (no
+          header/nav row above it, no top padding) and full-bleed width. */}
+      {order && (
+        <BannerCarousel
+          banners={banners}
+          aspectRatioClass="h-[50vh] w-full"
+          className="!mb-0"
+        />
+      )}
+
+      <div className="max-w-3xl mx-auto px-4 py-4 md:py-6 flex flex-col gap-4 font-sans text-gray-900">
         {err && (
           <div className="rounded-2xl bg-red-50 border border-red-200 text-red-700 text-sm font-semibold px-4 py-3">
             {err}
@@ -526,151 +595,73 @@ export const TrackOrder: React.FC = () => {
 
         {order && (
           <>
-            {/* Header with Order Number */}
-            <div className="flex items-center justify-between bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs">
-              <div>
-                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-                  Track Order
+            {/* 1 & 2. Live Map + ETA — side by side */}
+            <div className="grid grid-cols-[2fr_3fr] gap-2 sm:gap-3 items-stretch">
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3 sm:p-4 flex flex-col items-center text-center gap-1">
+                <span className="w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700">
+                  {isDelivered ? <CheckCircle2 size={20} /> : <Zap size={20} />}
                 </span>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <h1 className="text-base font-black text-gray-900 font-mono">
-                    {customerOrderLabel(order.orderId)}
-                  </h1>
-                  <button
-                    onClick={handleCopyOrderId}
-                    className="text-gray-400 hover:text-emerald-700 p-1 rounded-md transition-colors"
-                    title="Copy Order Number"
-                  >
-                    {copied ? (
-                      <Check size={14} className="text-emerald-600" />
-                    ) : (
-                      <Copy size={14} />
-                    )}
-                  </button>
-                </div>
-              </div>
-              <span className="text-xs font-black px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
-                {normalizedStatus}
-              </span>
-            </div>
+                <span className="text-[9px] sm:text-[10px] font-bold text-gray-500 uppercase tracking-wide mt-1">
+                  Estimated Arrival
+                </span>
+                <span className="text-xl sm:text-2xl font-black text-gray-900 tabular-nums">
+                  {isDelivered ? 'Delivered' : `${etaMins || 10} min${(etaMins || 10) === 1 ? '' : 's'}`}
+                </span>
+                <span className="text-[10px] sm:text-[11px] text-gray-500 font-medium leading-snug">
+                  {isDelivered
+                    ? 'Groceries delivered with care'
+                    : rider
+                      ? 'Delivery partner is heading to your drop'
+                      : 'Items being packed at FreshCart Dark Store'}
+                </span>
 
-            {/* 1. Live Interactive Map Card */}
-            <div className="relative rounded-2xl overflow-hidden border border-gray-200/90 shadow-sm bg-gray-100">
-              <div ref={elRef} className="w-full h-[260px] sm:h-[280px]" />
-
-              {/* Floating status pill over map */}
-              <div className="absolute bottom-3 left-3 right-3 z-[1000] pointer-events-none">
-                <div className="bg-white/95 backdrop-blur-md border border-gray-200/80 rounded-xl px-3 py-2.5 shadow-md flex items-center gap-2.5 pointer-events-auto">
-                  <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                    {isDelivered ? (
-                      <CheckCircle2 size={16} className="text-emerald-700" />
-                    ) : rider ? (
-                      <Zap size={16} className="text-emerald-700" />
-                    ) : (
-                      <Store size={15} className="text-emerald-700" />
-                    )}
-                  </div>
-                  <div className="text-xs font-bold text-gray-900 truncate">
-                    {isDelivered
-                      ? 'Order delivered safely'
-                      : rider
-                        ? 'Rider is on the way to your doorstep'
-                        : 'Order being prepared at local dark store'}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 2. ETA & Live Status Hero Card */}
-            <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-xs flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                  {isDelivered ? (
-                    <CheckCircle2 size={24} className="text-emerald-700" />
-                  ) : (
-                    <Zap size={24} className="text-emerald-700" />
-                  )}
-                </div>
-                <div>
-                  <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                    ESTIMATED ARRIVAL
-                  </div>
-                  <div className="text-xl font-black text-gray-900 tabular-nums">
-                    {isDelivered ? 'Delivered' : `${etaMins || 10} mins`}
-                  </div>
-                  <div className="text-xs text-gray-500 font-medium">
-                    {isDelivered
-                      ? 'Groceries delivered with care'
-                      : rider
-                        ? 'Delivery partner is heading to your drop'
-                        : 'Items being packed at FreshCart Dark Store'}
-                  </div>
-                </div>
-              </div>
-              <div className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-black shrink-0">
-                10 MINS
-              </div>
-            </div>
-
-            {/* 3. 4-Stage Milestone Stepper */}
-            <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-xs">
-              <h2 className="text-xs font-black text-gray-900 uppercase tracking-wider mb-3">
-                Delivery Milestones
-              </h2>
-              <div className="flex items-center justify-between relative px-2">
-                {STEPS.map((step, idx) => {
-                  const isDone = idx < curStep || isDelivered;
-                  const isCurrent = idx === curStep && !isDelivered;
-                  return (
-                    <div
-                      key={step}
-                      className="flex-1 flex flex-col items-center relative text-center"
-                    >
-                      {/* Connector Line */}
-                      {idx > 0 && (
-                        <div
-                          className={`absolute top-3 right-[50%] w-full h-1 -z-0 ${
-                            isDone || isCurrent ? 'bg-emerald-600' : 'bg-gray-200'
-                          }`}
-                        />
-                      )}
-
-                      {/* Node circle */}
+                {!isDelivered && (
+                  <div className="w-full mt-2.5">
+                    <div className="relative h-1.5 bg-emerald-200/70 rounded-full overflow-visible">
                       <div
-                        className={`relative z-10 w-6 h-6 rounded-full flex items-center justify-center transition-all ${
-                          isDone
-                            ? 'bg-emerald-600 text-white shadow-xs'
-                            : isCurrent
-                              ? 'bg-emerald-600 text-white ring-4 ring-emerald-100 shadow-xs'
-                              : 'bg-gray-100 text-gray-400 border border-gray-300'
-                        }`}
+                        className="absolute inset-y-0 left-0 bg-emerald-600 rounded-full transition-all duration-700"
+                        style={{ width: `${Math.min(100, (stageIndex(normalizedStatus) / 4) * 100)}%` }}
+                      />
+                      <div
+                        className="absolute -top-2 -translate-x-1/2 transition-all duration-700"
+                        style={{ left: `${Math.min(100, (stageIndex(normalizedStatus) / 4) * 100)}%` }}
                       >
-                        {isDone ? (
-                          <Check size={14} strokeWidth={3} />
-                        ) : isCurrent ? (
-                          <span className="w-2 h-2 bg-white rounded-full" />
-                        ) : (
-                          <span className="w-1.5 h-1.5 bg-gray-300 rounded-full" />
-                        )}
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white shadow-sm">
+                          <Bike size={11} />
+                        </span>
                       </div>
-
-                      {/* Step Label */}
-                      <span
-                        className={`text-[11px] mt-1.5 font-bold truncate max-w-[70px] ${
-                          isCurrent
-                            ? 'text-emerald-700 font-extrabold'
-                            : isDone
-                              ? 'text-gray-900'
-                              : 'text-gray-400'
-                        }`}
-                      >
-                        {step}
-                      </span>
                     </div>
-                  );
-                })}
+                    <div className="flex items-center justify-between mt-2 text-[10px] font-bold text-gray-500">
+                      <span>0 min</span>
+                      <span>{etaMins || 10} mins</span>
+                    </div>
+                  </div>
+                )}
               </div>
+
+              {order.delivery ? (
+                <div className="relative rounded-2xl overflow-hidden border border-gray-200/90 shadow-sm bg-gray-100">
+                  <div ref={elRef} className="w-full h-full min-h-[190px] sm:min-h-[220px]" />
+                  <div className="absolute top-2 left-2 z-[1000] inline-flex items-center gap-1.5 bg-white/95 backdrop-blur-sm px-2 py-1 rounded-full text-[10px] font-bold shadow-xs">
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        socketConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+                      }`}
+                    />
+                    {socketConnected ? 'Live GPS' : 'Connecting'}
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-gray-200/90 bg-gray-100 min-h-[190px] sm:min-h-[220px] flex items-center justify-center text-xs text-gray-400 font-semibold text-center px-3">
+                  Map opens once a partner is assigned
+                </div>
+              )}
             </div>
+            {/* Sentinel — a fixed 1px marker right after the Map+ETA row.
+                Observed instead of the ETA card itself so the toggle isn't
+                thrown off by the card's height changing (e.g. the map
+                lazy-initializing after mount). */}
+            <div ref={etaSentinelRef} className="h-px w-full -mt-2" aria-hidden="true" />
 
             {/* 4. Doorstep OTP Code */}
             {order.deliveryOtp && (
@@ -696,58 +687,63 @@ export const TrackOrder: React.FC = () => {
               </div>
             )}
 
-            {/* 5. Delivery Partner Card */}
-            <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-xs flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 shrink-0">
-                  <Zap size={22} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-extrabold text-gray-900">
-                      {order.delivery?.partnerName ||
-                        order.deliveryPartnerName ||
-                        'Delivery Partner'}
-                    </span>
-                    {(order.delivery?.rating || 4.9) && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black">
-                        ★ {order.delivery?.rating ? order.delivery.rating.toFixed(1) : '4.9'}
+            {/* 5. Delivery Partner Card — only shown once admin has actually
+                assigned a partner (and the order is still active). Before
+                that there's nothing real to show yet. */}
+            {order.delivery && (
+              <div className="flex flex-col gap-2">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wide px-1">
+                  Delivery Partner
+                </span>
+                <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-xs flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="relative shrink-0">
+                      <div className="w-11 h-11 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700">
+                        <Zap size={22} />
+                      </div>
+                      <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-sm font-extrabold text-gray-900 truncate block">
+                        {order.delivery.partnerName || order.deliveryPartnerName || 'Delivery Partner'}
                       </span>
-                    )}
+                      {order.delivery.rating != null && (
+                        <span className="text-[11px] text-amber-600 font-bold flex items-center gap-1 mt-0.5">
+                          ★ {order.delivery.rating.toFixed(1)}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-500 font-medium mt-0.5">
-                    {order.delivery
-                      ? order.delivery.canContact && order.delivery.phone
-                        ? order.delivery.phone
-                        : order.delivery.phoneMasked
-                          ? `${order.delivery.phoneMasked} • contact opens at doorstep`
-                          : 'Contact opens when out for delivery'
-                      : 'Assigned to your order'}
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => setChatOpen(true)}
+                      className="w-9 h-9 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center hover:bg-gray-200 transition-colors shadow-xs"
+                      aria-label="Chat with partner"
+                    >
+                      <MessageSquareText size={16} />
+                    </button>
+                    <a
+                      href={`tel:${order.delivery.phone || ''}`}
+                      className="w-9 h-9 rounded-full bg-emerald-600 text-white flex items-center justify-center hover:bg-emerald-700 transition-colors shadow-xs"
+                      aria-label="Call partner"
+                    >
+                      <Phone size={16} />
+                    </a>
                   </div>
                 </div>
               </div>
+            )}
 
-              {order.delivery?.canContact && order.delivery.phone && (
-                <div className="flex items-center gap-2 shrink-0">
-                  <a
-                    href={`tel:${order.delivery.phone}`}
-                    className="w-9 h-9 rounded-full bg-emerald-600 text-white flex items-center justify-center hover:bg-emerald-700 transition-colors shadow-xs"
-                    aria-label="Call partner"
-                  >
-                    <Phone size={16} />
-                  </a>
-                  <a
-                    href={`https://wa.me/91${order.delivery.phone.replace(/\D/g, '').slice(-10)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="w-9 h-9 rounded-full bg-[#25D366] text-white flex items-center justify-center hover:opacity-95 transition-opacity shadow-xs"
-                    aria-label="WhatsApp partner"
-                  >
-                    <MessageCircle size={16} />
-                  </a>
-                </div>
-              )}
-            </div>
+            {chatOpen && order.delivery && (
+              <OrderChat
+                orderId={order.orderId}
+                socket={socket}
+                customerPhone={customerPhone()}
+                partnerName={order.delivery.partnerName || order.deliveryPartnerName || 'Delivery Partner'}
+                onClose={() => setChatOpen(false)}
+              />
+            )}
 
             {/* 6. Partner Rating (when eligible) */}
             {canRate && (
@@ -817,7 +813,65 @@ export const TrackOrder: React.FC = () => {
               </div>
             )}
 
-            {/* 7. Order Items Breakdown */}
+            {/* 7. Delivery Address Card */}
+            {order.deliveryAddress && (
+              <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-xs flex items-start gap-3">
+                <MapPin size={18} className="text-gray-400 mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                      Delivery Address
+                    </span>
+                    {!isDelivered && (
+                      <button
+                        type="button"
+                        onClick={() => navigate('/account/addresses')}
+                        className="shrink-0 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-full transition-colors"
+                      >
+                        Change
+                      </button>
+                    )}
+                  </div>
+                  <div className="text-xs font-semibold text-gray-800 mt-0.5">
+                    {order.deliveryAddress}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 9. Order Status Updates Timeline */}
+            {order.trackingTimeline && order.trackingTimeline.length > 0 && (
+              <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-xs">
+                <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider mb-3">
+                  Status Updates
+                </h3>
+                <div className="relative pl-5 border-l-2 border-emerald-100 space-y-4">
+                  {[...order.trackingTimeline].reverse().map((t, idx) => (
+                    <div key={idx} className="relative text-xs">
+                      <span className="absolute -left-[27px] top-1 w-3 h-3 rounded-full bg-emerald-600 ring-4 ring-emerald-50" />
+                      <div className="font-bold text-gray-900">
+                        {normalizeStatus(t.status)}
+                      </div>
+                      {t.note && (
+                        <div className="text-gray-500 font-medium mt-0.5">{t.note}</div>
+                      )}
+                      {(t.at || t.timestamp) && (
+                        <div className="text-[10px] text-gray-400 font-medium mt-0.5">
+                          {new Date(t.at || t.timestamp!).toLocaleTimeString('en-IN', {
+                            timeZone: 'Asia/Kolkata',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: true,
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 9. Order Items Breakdown — kept last per request */}
             {order.items && order.items.length > 0 && (
               <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-xs">
                 <div className="flex items-center justify-between mb-3">
@@ -852,51 +906,6 @@ export const TrackOrder: React.FC = () => {
                         <span className="font-bold text-gray-900 tabular-nums shrink-0">
                           ₹{Math.round(item.price * (item.quantity || item.qty || 1))}
                         </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 8. Delivery Address Card */}
-            {order.deliveryAddress && (
-              <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-xs flex items-start gap-3">
-                <MapPin size={18} className="text-gray-400 mt-0.5 shrink-0" />
-                <div>
-                  <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-                    Delivery Address
-                  </div>
-                  <div className="text-xs font-semibold text-gray-800 mt-0.5">
-                    {order.deliveryAddress}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* 9. Order Status Updates Timeline */}
-            {order.trackingTimeline && order.trackingTimeline.length > 0 && (
-              <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-xs">
-                <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider mb-3">
-                  Status Updates
-                </h3>
-                <div className="relative pl-5 border-l-2 border-emerald-100 space-y-4">
-                  {[...order.trackingTimeline].reverse().map((t, idx) => (
-                    <div key={idx} className="relative text-xs">
-                      <span className="absolute -left-[27px] top-1 w-3 h-3 rounded-full bg-emerald-600 ring-4 ring-emerald-50" />
-                      <div className="font-bold text-gray-900">
-                        {normalizeStatus(t.status)}
-                      </div>
-                      {t.note && (
-                        <div className="text-gray-500 font-medium mt-0.5">{t.note}</div>
-                      )}
-                      {(t.at || t.timestamp) && (
-                        <div className="text-[10px] text-gray-400 font-medium mt-0.5">
-                          {new Date(t.at || t.timestamp!).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </div>
                       )}
                     </div>
                   ))}

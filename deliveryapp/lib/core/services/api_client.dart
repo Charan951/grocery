@@ -211,6 +211,27 @@ class ApiClient {
   Future<DeliveryOrder> fail(String o, String reason) => _step(o, 'fail', {'reason': reason});
   Future<DeliveryOrder> markReturned(String o) => _step(o, 'returned');
 
+  /// `GET /api/delivery/orders/:id/chat` — chat thread with the customer.
+  Future<List<Map<String, dynamic>>> orderChat(String orderId) async {
+    try {
+      final r = await _dio.get('/delivery/orders/${Uri.encodeComponent(orderId)}/chat');
+      final list = (r.data as Map)['messages'] as List? ?? const [];
+      return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } on DioException catch (e) {
+      _rethrow(e);
+    }
+  }
+
+  /// `POST /api/delivery/orders/:id/chat` — send a chat message to the customer.
+  Future<Map<String, dynamic>> sendOrderChat(String orderId, String text) async {
+    try {
+      final r = await _dio.post('/delivery/orders/${Uri.encodeComponent(orderId)}/chat', data: {'text': text});
+      return Map<String, dynamic>.from((r.data as Map)['message'] as Map);
+    } on DioException catch (e) {
+      _rethrow(e);
+    }
+  }
+
   Future<({int unread, List<AppNotification> items})> notifications({bool unreadOnly = false}) async {
     try {
       final r = await _dio.get('/delivery/notifications',
