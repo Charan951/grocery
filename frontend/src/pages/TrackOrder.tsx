@@ -463,8 +463,17 @@ export const TrackOrder: React.FC = () => {
       const barRect = appBarRef.current?.getBoundingClientRect();
       const barH = barRect?.height || appBarH;
       const cRect = contentRef.current?.getBoundingClientRect();
+      // The map doesn't stay pinned forever — it holds in place for
+      // HOLD_PX of additional scroll after fully pinning, then releases
+      // and slides up/away with the rest of the page (its `top` keeps
+      // decreasing with scroll instead of staying fixed at `barH`),
+      // matching how Swiggy/Zomato/Blinkit tracking screens behave.
+      // Staying pinned indefinitely for the entire rest of the page was
+      // reported as making it feel like scrolling wasn't working.
+      const HOLD_PX = 240;
+      const releaseScroll = Math.max(0, scrollY - TRANSITION_PX - HOLD_PX);
       const pinned = {
-        top: barH,
+        top: barH - releaseScroll,
         left: cRect ? cRect.left : 16,
         width: cRect ? cRect.width : 300,
         height: 290,
@@ -539,7 +548,12 @@ export const TrackOrder: React.FC = () => {
       } else {
         const spacerRect = spacerRef.current?.getBoundingClientRect();
         if (spacerRect) {
-          const desiredBottom = barH + nextMapBox.height;
+          // The map's real current bottom edge, not a fixed `barH +
+          // height` — once it starts releasing (see HOLD_PX above) its
+          // top keeps decreasing with scroll, so this naturally shrinks
+          // the reserved space in lockstep as the map slides away,
+          // eventually reaching 0 once it's fully scrolled past.
+          const desiredBottom = nextMapBox.top + nextMapBox.height;
           const delta = desiredBottom - spacerRect.bottom;
           if (Math.abs(delta) > 0.5) {
             setSpacerH((h) => Math.max(0, h + delta));
