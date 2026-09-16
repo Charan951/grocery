@@ -464,6 +464,15 @@ export const TrackOrder: React.FC = () => {
           opacity: 1 - Math.min(1, progress / 0.85),
         });
       }
+
+      // Leaflet caches its internal canvas/tile-layer size and only
+      // reflows it on invalidateSize() — it does NOT know the container
+      // div resized just because our inline styles changed its CSS
+      // width/height this frame. Without calling it here, the div visibly
+      // stretches every scroll frame while the map tiles/markers inside
+      // stay put until the next boundary flip — reading as "no proper
+      // movement" even though the box math above is correct.
+      if (mapRef.current) mapRef.current.invalidateSize({ pan: false });
     };
     const onScroll = () => {
       if (raf) return;
@@ -652,11 +661,18 @@ export const TrackOrder: React.FC = () => {
       fitted.current = false;
       setMapReady((n) => n + 1);
 
+      // Guarded against the map having already been removed by the time
+      // these fire (e.g. the ref re-runs with `null` then a fresh node
+      // during a remount) — calling invalidateSize()/any method on a
+      // removed Leaflet instance throws reading '_leaflet_pos' of
+      // undefined, since remove() tears down its internal DOM refs.
       setTimeout(() => {
+        if (mapRef.current !== map) return;
         map.invalidateSize();
         fitMap();
       }, 100);
       setTimeout(() => {
+        if (mapRef.current !== map) return;
         map.invalidateSize();
         fitMap();
       }, 350);
