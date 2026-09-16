@@ -272,24 +272,6 @@ export const TrackOrder: React.FC = () => {
   const spacerRef = useRef<HTMLDivElement>(null);
   const [spacerH, setSpacerH] = useState(0);
 
-  // prefers-reduced-motion: the whole ETA-card-travels/map-grows scroll
-  // choreography is continuous motion tied to scroll position. For users
-  // who've asked the OS for reduced motion, skip the travel/growth
-  // animation and snap straight between the two end states at the scroll
-  // midpoint instead — a ref (not state) since it's read inside the
-  // scroll effect's closure, which mounts once with an empty deps array.
-  const reducedMotionRef = useRef(false);
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return;
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const apply = () => {
-      reducedMotionRef.current = mq.matches;
-    };
-    apply();
-    mq.addEventListener('change', apply);
-    return () => mq.removeEventListener('change', apply);
-  }, []);
-
   // Anchor's natural (pre-scroll) height, breakpoint-aware — matchMedia
   // instead of a Tailwind min-h class, since the anchor's height must be
   // fully JS-controlled (min-height would otherwise always win over the
@@ -475,11 +457,6 @@ export const TrackOrder: React.FC = () => {
       const TRANSITION_PX = Math.max(160, bannerHeightRef.current);
       let progress = scrollY / TRANSITION_PX;
       progress = Math.min(1, Math.max(0, progress));
-      // Reduced motion: snap straight to the nearer end state instead of
-      // interpolating — every value derived from `progress` below (map/ETA
-      // box, App Bar cross-fade, grid columns) inherits this automatically.
-      if (reducedMotionRef.current) progress = progress >= 0.5 ? 1 : 0;
-
       setIsScrolledPastTracking(progress >= 1);
       setScrollProgress(progress);
 
