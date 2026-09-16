@@ -254,6 +254,10 @@ export const TrackOrder: React.FC = () => {
   // guess; the scroll effect's very first `checkScroll()` call corrects
   // them to the real anchor rect before the user can scroll.
   const [mapBox, setMapBox] = useState({ top: 0, left: 16, width: 320, height: 260 });
+  // Tracks the last size Leaflet was actually told about, so
+  // invalidateSize() (a forced-layout-reflow call) only fires when the
+  // box genuinely changed — not on every poll tick where nothing moved.
+  const lastMapSizeRef = useRef({ w: 320, h: 260 });
 
   // Anchor's natural (pre-scroll) height, breakpoint-aware — matchMedia
   // instead of a Tailwind min-h class, since the anchor's height must be
@@ -431,18 +435,20 @@ export const TrackOrder: React.FC = () => {
         height: 290,
       };
 
+      let nextMapBox;
       if (progress >= 1) {
-        setMapBox(pinned);
+        nextMapBox = pinned;
       } else {
         const aRect = mapAnchorRef.current?.getBoundingClientRect();
         const from = aRect && aRect.width > 0 ? aRect : pinned;
-        setMapBox({
+        nextMapBox = {
           top: lerp(from.top, pinned.top, progress),
           left: lerp(from.left, pinned.left, progress),
           width: lerp(from.width, pinned.width, progress),
           height: lerp(from.height, pinned.height, progress),
-        });
+        };
       }
+      setMapBox(nextMapBox);
 
       // ETA card: travels from its natural grid slot up into the App
       // Bar's headline area (right of the back button), shrinking to a
@@ -470,22 +476,34 @@ export const TrackOrder: React.FC = () => {
       // div resized just because our inline styles changed its CSS
       // width/height this frame. Without calling it here, the div visibly
       // stretches every scroll frame while the map tiles/markers inside
-      // stay put until the next boundary flip — reading as "no proper
-      // movement" even though the box math above is correct.
-      if (mapRef.current) mapRef.current.invalidateSize({ pan: false });
+      // stay put until the next boundary flip. But invalidateSize() forces
+      // a synchronous layout reflow, which is expensive — calling it on
+      // every single tick (including the 100ms poll firing with nothing
+      // having moved) was the actual cause of the stutter/jank ("not
+      // smooth"): only call it when the box actually changed by more
+      // than a fraction of a pixel.
+      const last = lastMapSizeRef.current;
+      const changed =
+        Math.abs(last.w - nextMapBox.width) > 0.5 || Math.abs(last.h - nextMapBox.height) > 0.5;
+      if (mapRef.current && changed) {
+        lastMapSizeRef.current = { w: nextMapBox.width, h: nextMapBox.height };
+        mapRef.current.invalidateSize({ pan: false });
+      }
     };
     const onScroll = () => {
       if (raf) return;
       raf = requestAnimationFrame(checkScroll);
     };
+    // A single window scroll listener is enough for page-level scroll —
+    // `document` was a redundant second listener firing for the same
+    // event in every browser this runs in, doubling the per-tick work
+    // (including the expensive invalidateSize() reflow above).
     window.addEventListener('scroll', onScroll, { passive: true });
-    document.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll);
     const poll = setInterval(checkScroll, 100);
     checkScroll();
     return () => {
       window.removeEventListener('scroll', onScroll);
-      document.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onScroll);
       if (raf) cancelAnimationFrame(raf);
       clearInterval(poll);
