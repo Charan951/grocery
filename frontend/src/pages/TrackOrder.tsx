@@ -938,30 +938,45 @@ export const TrackOrder: React.FC = () => {
                 gap: `${0.875 * (1 - scrollProgress)}rem`,
               }}
             >
-              {/* 1. Estimated Arrival Hero Card — always mounted so it can
-                  animate away instead of popping out of the layout.
-                  `opacity` alone was NOT enough to remove it from the grid
-                  row's reserved height: `items-stretch` sizes the row to
-                  the tallest column, and this card's real content height
-                  (icon + headline + subtitle, ~150–190px) stayed fully
-                  reserved even at opacity 0 — that invisible reserved
-                  block, sitting right below the sticky App Bar, was the
-                  visible "gap" the map/spacer numbers alone couldn't
-                  explain. `height` now collapses in lockstep with the
-                  anchor beside it (same `anchorNaturalH` source), same
-                  fix pattern as the anchor's own height collapse. */}
+              {/* 1. ETA anchor — an invisible spacer that reserves this
+                  card's place in the grid pre-scroll. The real, VISIBLE
+                  card below is a single `position: fixed` element driven
+                  by `etaBox`, following the exact same pattern as the map
+                  card — one element that travels, not a spacer plus a
+                  separate duplicate overlay (that duplication was the
+                  earlier "two 2 mins" bug: the flying chip and the
+                  original card were both visible over the map at once). */}
               <div
                 ref={etaAnchorRef}
-                className="rounded-2xl border border-emerald-100 bg-[#E8F8F0] shadow-xs overflow-hidden shrink-0"
+                aria-hidden="true"
+                className="shrink-0"
                 style={{
-                  // Driven directly by scrollProgress every frame (no CSS
-                  // transition) — see the scrollProgress state comment for
-                  // why this can't lag behind the map's own per-frame box.
-                  opacity: 1 - scrollProgress,
+                  visibility: 'hidden',
                   height: anchorNaturalH * (1 - scrollProgress),
                 }}
+              />
+
+              {/* 1b. The real ETA card — always `position: fixed`, box
+                  driven by `etaBox` (continuous scroll-progress
+                  interpolation, same as the map). Its content cross-fades
+                  between the full hero layout and a compact pill as it
+                  shrinks, instead of a second element being layered on
+                  top of it. */}
+              <div
+                className="fixed z-[650] rounded-2xl border border-emerald-100 bg-[#E8F8F0] shadow-xs overflow-hidden pointer-events-none"
+                style={{
+                  top: etaBox.top,
+                  left: etaBox.left,
+                  width: etaBox.width,
+                  height: etaBox.height,
+                  borderRadius: 16 - 4 * Math.min(1, scrollProgress / 0.6),
+                }}
               >
-                <div className="flex flex-col h-full p-3 sm:p-4 gap-2 sm:gap-2.5">
+                {/* Full hero content — fades out across the first 60% of the scroll */}
+                <div
+                  className="flex flex-col h-full p-3 sm:p-4 gap-2 sm:gap-2.5"
+                  style={{ opacity: Math.max(0, 1 - scrollProgress / 0.6) }}
+                >
                   <div className="flex items-center gap-2">
                     <span className="w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-emerald-200/70 text-emerald-800 flex items-center justify-center shrink-0">
                       <Zap size={18} className="fill-emerald-800" />
@@ -1017,32 +1032,21 @@ export const TrackOrder: React.FC = () => {
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* 1b. Flying ETA chip — a compact copy of the ETA that
-                  travels from the hero card's spot up into the App Bar
-                  as `etaBox` interpolates every frame, so the arrival
-                  genuinely reads as "left card moves to top bar" rather
-                  than "left card fades, unrelated bar text fades in".
-                  Fades out right as it lands, handing off to the bar's
-                  own (cross-fading) content. */}
-              <div
-                aria-hidden="true"
-                className="fixed z-[650] flex items-center gap-1.5 rounded-full bg-white pl-1.5 pr-3 py-1 shadow-md pointer-events-none"
-                style={{
-                  top: etaBox.top,
-                  left: etaBox.left,
-                  width: etaBox.width,
-                  height: etaBox.height,
-                  opacity: scrollProgress > 0.02 ? etaBox.opacity : 0,
-                }}
-              >
-                <span className="w-6 h-6 rounded-full bg-emerald-200/70 text-emerald-800 flex items-center justify-center shrink-0">
-                  <Zap size={12} className="fill-emerald-800" />
-                </span>
-                <span className="text-xs font-black text-gray-900 truncate">
-                  {isDelivered ? 'Delivered' : `${etaMins || 2} mins`}
-                </span>
+                {/* Compact pill content — cross-fades in over the last
+                    40% of the scroll as the box above shrinks to a
+                    sliver, so there's only ever one visible label. */}
+                <div
+                  className="absolute inset-0 flex items-center gap-1.5 px-2"
+                  style={{ opacity: Math.max(0, (scrollProgress - 0.6) / 0.4) }}
+                >
+                  <span className="w-5 h-5 rounded-full bg-emerald-200/70 text-emerald-800 flex items-center justify-center shrink-0">
+                    <Zap size={11} className="fill-emerald-800" />
+                  </span>
+                  <span className="text-xs font-black text-gray-900 truncate">
+                    {isDelivered ? 'Delivered' : `${etaMins || 2} mins`}
+                  </span>
+                </div>
               </div>
 
               {/* 2. Map anchor — invisible spacer that reserves the map's
