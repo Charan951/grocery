@@ -233,61 +233,119 @@
     once the order is Delivered** (both surfaces) — reverted once (user said
     "undo that" mid-change) then re-applied per a later, more specific request;
     keep this distinction in mind if asked again.
-  - **`TrackOrder.tsx` (web) — substantial rebuild.** Flutter mirror for the
-    app-bar/banner-overlay piece landed 2026-09-16 (`tracking_screen.dart`):
-    app bar moved out of the sliver list into a `Stack` overlay driven by
-    `AnimatedBuilder` on the `ScrollController` (no title/help/copy icon;
-    floating circular back button over the banner at rest → continuous,
-    not-snapped transition to solid `#0C8B4F` bar + headline + "Arriving in
-    X mins • Live" pill + refresh icon; every property is `progress =
-    clamp(offset/bannerHeight, 0, 1)`-driven, tied to the banner's real
-    height). Pinned map header now offsets by app-bar height so it sits
-    flush below it. Deliberate deviations from the web's literal DOM
-    position math: ETA hero card cross-fades into the bar via scroll-linked
-    opacity rather than FLIP-style position interpolation; map stays a
-    pinned full-width sliver header below the ETA/content column rather
-    than a fixed 2-column desktop-style layout (phone widths too narrow for
-    ETA+map side by side). `flutter analyze` clean; no tests cover this
-    screen. Below-header details (ETA card, side-by-side grid, sticky-bar
-    history) below are the **web's** iteration history, not yet all ported:
+  - **`TrackOrder.tsx` (web) — full scroll-choreography rebuild, 2026-09-16,
+    ~30 iterative commits.** Final, confirmed-working architecture (don't
+    re-litigate without new evidence):
+    - **Single continuous `scrollProgress` (0→1)** is the only source of
+      truth for every scroll-linked value (App Bar color/padding/text
+      opacity, ETA card box+opacity, map box, grid column widths, flow
+      spacer). Nothing has its own independent CSS transition — mixing
+      per-element transitions with per-frame values was the root cause of
+      several early "gap on fast/reverse scroll" bugs (values could
+      desync mid-transition).
+    - `TRANSITION_PX` (how much scroll it takes to reach the fully-scrolled
+      state) is **measured from the banner's real rendered height**
+      (`ResizeObserver` + `getBoundingClientRect()`), never a hardcoded
+      pixel constant — a fixed constant either finished the transition
+      before the banner actually scrolled away (leftover banner visible
+      under the "pinned" state) or created a dead zone with no visible
+      movement, depending which way it was wrong.
+    - App Bar: no title text, no help icon. At rest = a minimal floating
+      circular back button over the banner (banner rendered *behind* the
+      bar via `marginBottom: -appBarH` on the sticky bar, not pushed below
+      it). On scroll it cross-fades (not snaps) to a solid `#0C8B4F` bar +
+      headline + "Arriving in X mins • Live" pill + refresh icon. The
+      green fill is deliberately delayed to the back half of the scroll
+      (`barT`, not raw `scrollProgress`) — filling it from scroll-pixel 0
+      blended semi-transparent green directly over the vivid banner photo
+      and read as a muddy tint, not a clean bar.
+    - ETA card + Map: side-by-side grid at every width. Both are
+      `position: fixed` from first render (never toggled static↔fixed),
+      positioned via **`transform: translate3d(x,y,0)`, not `top`/`left`**
+      — an `/impeccable optimize` finding: updating `top`/`left` every
+      scroll frame forces synchronous layout reflow (the actual cause of
+      persistent scroll jank across many earlier fix attempts);
+      `transform` is GPU-composited. Width/height remain real properties
+      for both (Leaflet needs real pixel dimensions for tile rendering;
+      the ETA card's content needs to genuinely reflow/clip as it shrinks,
+      not visually distort via `scale`). The ETA card visually *travels*
+      from its grid slot up into the App Bar's headline area as one
+      element (not a duplicate "flying chip" layered over the original —
+      an earlier attempt at that showed two "2 mins" on screen at once)
+      and fades to opacity 0 by the time it lands, so it never visibly
+      overlaps the bar's own (cross-fading-in) pill.
+    - Flow-spacer after the pinned map (reserves space so Doorstep
+      Code/Delivery Partner/Address/Status Updates don't scroll up under
+      the fixed map): **self-correcting, not formula-derived**. Three
+      rounds of hand-computed offsets (accounting for `py-4`, `gap-3.5`,
+      `appBarH`) each landed slightly off. Final approach measures the
+      spacer's own real rendered bottom edge each scroll frame via a ref
+      and feeds the delta back into its height for the next frame —
+      converges to the exact right value regardless of any future
+      padding/gap changes, no constants to maintain.
+    - Leaflet map: `scrollWheelZoom: false` always (wheel-over-map should
+      never trap page scroll), and **`pointer-events: none` on the map's
+      tile container once pinned** — `map.dragging.disable()` alone was
+      *not* sufficient, Leaflet still attaches its own touch listeners for
+      tap/double-tap-zoom detection and can `preventDefault()` regardless
+      of dragging state, which kept trapping scroll gestures that started
+      over the (large, pinned) map. `pointer-events:none` removes it from
+      the event path entirely; the floating Recenter/Zoom/Layers buttons
+      are separate elements and stay clickable.
+    - `mapCallbackRef`'s delayed `setTimeout(() => map.invalidateSize())`
+      calls are guarded with `mapRef.current !== map` — firing on an
+      already-removed Leaflet instance throws `reading '_leaflet_pos' of
+      undefined` (not just a visual glitch — corrupts Leaflet's internal
+      state). `invalidateSize()` itself is a forced reflow, so it's only
+      called when the map's box actually changed by >0.5px, not on every
+      scroll tick/poll — was a real, measurable cause of jank.
+    - **Recurring root cause worth remembering**: Tailwind arbitrary-value
+      height classes *without* a responsive prefix (`h-[46vh]`, even
+      `h-[180px]`) were silently **not generating at all** in this
+      project's build — confirmed by grepping the actual built
+      `dist/assets/*.css` output, only the `sm:`-prefixed variants existed.
+      This produced two different-looking bugs from the same root cause
+      (banner collapsing to intrinsic content height below the `sm`
+      breakpoint, which threw off the scroll-transition-length
+      measurement above). Fix: compute such values in JS
+      (`matchMedia`/`window.innerHeight`) and set them via inline
+      `style`, never a bracket-value Tailwind class expected to survive
+      the mobile-width build. This is the same class of failure
+      documented under `OrderPlaced.tsx` below — treat any "correct
+      Tailwind classes, wrong/missing rendered size" report on this
+      codebase as this bug first, not a code logic bug.
     - Delivery-partner card: star-rating badge removed, "Delivery Partner
       Details" heading added, WhatsApp button removed (kept Chat + Call), Call
       button now **always shown** (was gated behind `canContact`) — same trim
       applied to mobile `tracking_screen.dart`.
+    - Touch targets: back button fixed 44px, map Recenter/Zoom buttons
+      44px, refresh button (inside the compact pill) 36px — a deliberate
+      tradeoff short of 44px to preserve the pill's proportions.
+    - **Do not re-add** a `prefers-reduced-motion` snap for this scroll
+      choreography — tried once, reverted: it made the animation snap
+      abruptly instead of continuously for any user with the OS "reduce
+      motion"/"show animations off" setting, which directly conflicted
+      with the explicit, repeated ask for smooth continuous scroll-tied
+      motion in both directions.
+    - **Flutter parity** (`tracking_screen.dart`) landed for the app-bar/
+      banner-overlay piece only: `Stack` overlay driven by
+      `AnimatedBuilder` on the `ScrollController`, same no-title/no-help
+      floating-button-at-rest → cross-fading-solid-bar behavior, progress
+      tied to the banner's real height. Deliberately **not** ported: the
+      ETA-card-travels-into-bar motion (cross-fades via opacity instead —
+      no clean Flutter equivalent of the web's transform-based FLIP
+      trick) and the fixed side-by-side ETA+map grid (map stays a pinned
+      full-width sliver header on phone widths instead). `flutter analyze`
+      clean; no tests cover this screen.
     - Floating map status pill ("Rider is on the way to your doorstep")
       removed from over the map, both surfaces.
     - Delivery Address card gained a "Change" button (→ `/account/addresses`).
-    - Top header ("Track Order" title + "Help" button) removed entirely,
-      replaced by a full-bleed **promo banner carousel** (reused the existing
-      `BannerCarousel` + `useCMS().banners`, same one Home uses) occupying the
-      very top of the page (`h-50vh`, no header row above it); back nav is now
-      a floating circular button (`fixed`, overlays the banner, lower z-index
-      than the sticky bar below so it's naturally covered once that appears).
-    - Map + ETA card: side-by-side on **all** breakpoints (not just desktop),
-      ETA left / Map right (`grid-cols-[2fr_3fr]`), replacing the original
-      5-step "Market/Preparing/Out for Delivery/Near You/Delivered" stepper
-      concept entirely (dropped per explicit "no need market, preparing" ask).
-    - **Sticky ETA bar on scroll** (the most-iterated piece this session): once
-      the user scrolls past the ETA/Map row, a **full-width** (never 40%)
-      compact bar (`⚡ Estimated Arrival · Xmins · ● Live`) pins to
-      `position: fixed; top:0`, while the Map/Delivery Partner/Address/Status
-      Updates continue scrolling normally underneath — only the ETA info is
-      sticky, never the map or the rest. Went through 3 implementations before
-      landing on the reliable one: (1) `IntersectionObserver` on the ETA card
-      itself — unreliable, card height shifts as the map lazy-inits; (2)
-      `IntersectionObserver` + `requestAnimationFrame`-attach on a dedicated
-      1px sentinel — still reported not firing; (3) **current**: plain
-      `getBoundingClientRect().top < 0` check on the sentinel, driven by
-      `window`+`document` scroll/resize listeners **and** a 150ms
-      `setInterval` poll as a belt-and-braces fallback (DevTools' emulated
-      mobile-viewport scroll dispatch was suspected flaky) — plus the bar's
-      show/hide now uses **inline styles** for `transform`/`opacity`/
-      `pointerEvents` rather than Tailwind arbitrary classes (`-translate-y-full`
-      etc.), since this exact codebase has previously hit silent Tailwind
-      class-generation failures (see the `OrderPlaced.tsx` entry below). As of
-      the last message in this session the user had not yet confirmed the
-      final (3rd) version works — **verify on the next tracking-page task
-      before assuming it's fixed**.
+  - **Account-deletion legal page**, 2026-09-16: new `/delete-account` and
+    `/s/delete-account` routes render `Legal.tsx`'s `defaultTab="delete"`,
+    linked from `Footer.tsx`. Mirrored on mobileapp's `legal_screen.dart`.
+    Alongside this, unrelated backend startup/error `console.log`/
+    `console.error` calls (app.js, index.js, several controllers/services)
+    were trimmed — not a functional change, just less log noise.
   - **`ActiveOrderBanner.tsx` (home floating "order ready" pill, web only —
     no mobile equivalent, storefront web is a different surface than the
     order-detail/tracking pages above)**: desktop keeps an inline strip;
@@ -2399,14 +2457,23 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
 
 ## 13. Last Updated
 
+2026-09-16 — see §5 top entry: `TrackOrder.tsx` full scroll-choreography
+rebuild confirmed working end-to-end (single `scrollProgress` source of
+truth, transform-based positioning for perf, self-correcting flow-spacer,
+Leaflet scroll-trapping fully fixed via `pointer-events:none`), Flutter
+app-bar parity landed, `/impeccable audit` fixes applied (touch targets,
+dead code), and account-deletion legal page + backend log cleanup. The
+Tailwind arbitrary-value-class-not-generating failure mode (§5, confirmed
+this session via the actual built CSS output) is a standing lesson — check
+that first for any "correct classes, wrong rendered size" report.
+
 2026-09-15 — see §5 top entry: customer order-tracking/order-detail redesign
 pass (web + mobile parity), new `/order-placed` full page replacing the buggy
 `OrderSuccessModal`, several real bugs fixed (CheckoutModal early-return
 swallowing the success modal, CartDrawer not closing after checkout,
 PartnerShell JSX syntax error breaking the whole dev server, IST timezone
-formatting, missing "Order Details" card), `TrackOrder.tsx` sticky-ETA-bar
-scroll behavior (still unconfirmed working as of session end), and a
-recurring Tailwind-class-not-generating failure mode (fix: inline styles for
+formatting, missing "Order Details" card), and a recurring
+Tailwind-class-not-generating failure mode (fix: inline styles for
 load-bearing layout CSS) documented for future reference.
 
 2026-09-11 (follow-up 5) — see §5 top entry: order-lookup phone-match bug fix,
