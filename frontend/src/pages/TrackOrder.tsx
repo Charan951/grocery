@@ -874,6 +874,17 @@ export const TrackOrder: React.FC = () => {
           boxShadow: barT > 0.5 ? '0 2px 12px rgba(0,0,0,0.08)' : 'none',
           paddingTop: 12 + 2 * barT,
           paddingBottom: 12 * barT,
+          // Being `sticky` (not `fixed`) means this bar normally still
+          // reserves its own height in document flow, pushing the banner
+          // below it down — leaving a plain white strip above the banner
+          // in the initial state instead of the banner filling edge-to-edge
+          // under a floating bar. Pulling the very next sibling (the
+          // banner) up by that same height with a negative margin removes
+          // that reserved space, so the banner starts flush at the true
+          // top of the page and the (transparent, at rest) bar simply
+          // floats over it — same effect as `position: fixed` for layout
+          // purposes, but keeps the simpler `sticky` positioning model.
+          marginBottom: -appBarH,
         }}
       >
         <div className="max-w-3xl mx-auto relative">
