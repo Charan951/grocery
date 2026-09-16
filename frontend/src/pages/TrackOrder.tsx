@@ -15,7 +15,6 @@ import {
   MapPin,
   Zap,
   ShieldCheck,
-  Headphones,
   RefreshCw,
   Crosshair,
   Layers,
@@ -217,7 +216,27 @@ export const TrackOrder: React.FC = () => {
   // every change smoothly — no FLIP-style before/after measuring needed.
   const mapAnchorRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const [mapBox, setMapBox] = useState({ top: 0, left: 0, width: 0, height: 260 });
+  // width/height must never be 0 on first paint — Leaflet initializes its
+  // internal pixel origin against the container's size at that instant, and
+  // a 0×0 container corrupts it permanently ("Cannot read '_leaflet_pos' of
+  // undefined"), not just render blank. These are just a sane starting
+  // guess; the scroll effect's very first `checkScroll()` call corrects
+  // them to the real anchor rect before the user can scroll.
+  const [mapBox, setMapBox] = useState({ top: 0, left: 16, width: 320, height: 260 });
+
+  // Anchor's natural (pre-scroll) height, breakpoint-aware — matchMedia
+  // instead of a Tailwind min-h class, since the anchor's height must be
+  // fully JS-controlled (min-height would otherwise always win over the
+  // collapse-to-0 transition when scrolled).
+  const [anchorNaturalH, setAnchorNaturalH] = useState(220);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(min-width: 640px)');
+    const apply = () => setAnchorNaturalH(mq.matches ? 290 : 220);
+    apply();
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, []);
 
   // Live rider position pushed over socket
   const [liveRider, setLiveRider] = useState<{ lat: number; lng: number } | null>(null);
@@ -713,88 +732,67 @@ export const TrackOrder: React.FC = () => {
           a small pill squeezed into an otherwise-white header. */}
       <div
         ref={appBarRef}
-        className={`sticky top-0 z-[600] shadow-2xs transition-colors duration-300 ${
+        className={`sticky top-0 z-[600] transition-[background-color,box-shadow,padding] duration-300 ${
           isScrolledPastTracking
-            ? 'bg-[#0C8B4F] px-3 sm:px-4 pt-2.5 pb-3'
-            : 'bg-white/95 backdrop-blur-md border-b border-gray-200/80 px-3 sm:px-4 py-2.5'
+            ? 'bg-[#0C8B4F] shadow-2xs px-3 sm:px-4 pt-2.5 pb-3'
+            : 'bg-transparent px-3 sm:px-4 pt-3 pb-0'
         }`}
       >
         <div className="max-w-3xl mx-auto">
-          <div className="flex items-center justify-between gap-2 h-10">
-            {/* Left: Back button + Title */}
-            <div className="flex items-center gap-2.5 min-w-0">
+          {!isScrolledPastTracking ? (
+            /* INITIAL STATE: just a back button, floating over the banner —
+               no title text, no help icon (per explicit brief). The
+               "earned shadow" rule applies: this button is genuinely
+               floating over imagery, so a shadow is warranted here. */
+            <button
+              type="button"
+              onClick={goBack}
+              aria-label="Back"
+              className="w-10 h-10 rounded-full bg-white/95 hover:bg-white shadow-md flex items-center justify-center text-gray-800 transition-colors"
+            >
+              <ArrowLeft size={18} />
+            </button>
+          ) : (
+            /* SCROLLED STATE: full green status bar — back button, order
+               headline, and an "Arriving in X mins • Live" pill. */
+            <>
               <button
                 type="button"
                 onClick={goBack}
                 aria-label="Back"
-                className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors shrink-0 ${
-                  isScrolledPastTracking
-                    ? 'bg-white/15 hover:bg-white/25 text-white'
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                }`}
+                className="w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors"
               >
                 <ArrowLeft size={18} />
               </button>
-              <div className="min-w-0">
-                <h1
-                  className={`text-sm sm:text-base font-black leading-tight truncate ${
-                    isScrolledPastTracking ? 'text-white' : 'text-gray-900'
-                  }`}
-                >
-                  Track Order
-                </h1>
-                {!isScrolledPastTracking && (
-                  <p className="text-[11px] font-semibold text-gray-500 truncate">
-                    Order #{order?.orderId || orderId}
-                  </p>
-                )}
-              </div>
-            </div>
 
-            <button
-              type="button"
-              onClick={() => navigate('/support')}
-              className={`shrink-0 flex items-center gap-1.5 rounded-full transition-colors ${
-                isScrolledPastTracking
-                  ? 'w-9 h-9 justify-center bg-white/15 hover:bg-white/25 text-white'
-                  : 'px-3 py-1.5 bg-gray-100 hover:bg-gray-200 shadow-2xs text-xs font-bold text-gray-800'
-              }`}
-              aria-label="Help"
-            >
-              <Headphones size={isScrolledPastTracking ? 16 : 14} />
-              {!isScrolledPastTracking && <span>Help</span>}
-            </button>
-          </div>
-
-          {/* Status headline + ETA pill — scrolled state only */}
-          {isScrolledPastTracking && (
-            <div className="mt-1.5">
-              <p className="text-base sm:text-lg font-black text-white leading-snug truncate">
-                {isDelivered
-                  ? 'Order delivered'
-                  : rider
-                    ? 'Delivery partner is heading to your drop'
-                    : 'Order is being prepared'}
-              </p>
-              <div className="mt-2 inline-flex items-center gap-2 bg-white/15 rounded-full pl-3 pr-1 py-1">
-                <span className="text-xs font-extrabold text-white">
-                  {isDelivered ? 'Delivered' : `Arriving in ${etaMins || 2} min${(etaMins || 2) === 1 ? '' : 's'}`}
-                </span>
-                <span className="w-1 h-1 rounded-full bg-white/60" />
-                <span className="inline-flex items-center gap-1 text-xs font-bold text-white/90">
-                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                  Live
-                </span>
-                <button
-                  type="button"
-                  onClick={fetchOrder}
-                  aria-label="Refresh"
-                  className="w-6 h-6 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition-colors"
-                >
-                  <RefreshCw size={12} />
-                </button>
+              <div className="mt-1.5">
+                <p className="text-base sm:text-lg font-black text-white leading-snug truncate">
+                  {isDelivered
+                    ? 'Order delivered'
+                    : rider
+                      ? 'Delivery partner is heading to your drop'
+                      : 'Order is being prepared'}
+                </p>
+                <div className="mt-2 inline-flex items-center gap-2 bg-white/15 rounded-full pl-3 pr-1 py-1">
+                  <span className="text-xs font-extrabold text-white">
+                    {isDelivered ? 'Delivered' : `Arriving in ${etaMins || 2} min${(etaMins || 2) === 1 ? '' : 's'}`}
+                  </span>
+                  <span className="w-1 h-1 rounded-full bg-white/60" />
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-white/90">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                    Live
+                  </span>
+                  <button
+                    type="button"
+                    onClick={fetchOrder}
+                    aria-label="Refresh"
+                    className="w-6 h-6 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition-colors"
+                  >
+                    <RefreshCw size={12} />
+                  </button>
+                </div>
               </div>
-            </div>
+            </>
           )}
         </div>
       </div>
@@ -902,13 +900,26 @@ export const TrackOrder: React.FC = () => {
               </div>
 
               {/* 2. Map anchor — invisible spacer that reserves the map's
-                  grid space; the real map (below, always-fixed) shadows
-                  this element's live position pre-scroll. */}
+                  grid space pre-scroll only; the real map (below, always-
+                  fixed) shadows this element's live position while it's
+                  active. Collapses to 0 once scrolled — the dedicated flow
+                  spacer after the grid takes over reserving space from
+                  there, so the two never double-reserve height at once
+                  (that double-reservation was the visible "gap" bug). */}
               <div
                 ref={mapAnchorRef}
                 aria-hidden="true"
-                className="rounded-2xl sm:rounded-3xl min-h-[220px] sm:min-h-[290px]"
-                style={{ visibility: 'hidden', transition: 'min-height 400ms ease' }}
+                className="rounded-2xl sm:rounded-3xl overflow-hidden"
+                style={{
+                  visibility: 'hidden',
+                  // No Tailwind min-h here on purpose — a CSS min-height
+                  // would clamp this collapse (min-height always wins over
+                  // a competing height shrink). Collapses to 0 in lockstep
+                  // with the flow spacer below growing to take over
+                  // reserving that same space — no double-reservation.
+                  height: isScrolledPastTracking ? 0 : anchorNaturalH,
+                  transition: 'height 350ms cubic-bezier(0.4,0,0.2,1)',
+                }}
               />
             </div>
 
@@ -923,8 +934,8 @@ export const TrackOrder: React.FC = () => {
                 position: 'fixed',
                 top: mapBox.top,
                 left: mapBox.left,
-                width: mapBox.width,
-                height: mapBox.height,
+                width: Math.max(mapBox.width, 200), // never 0 — see mapBox init comment
+                height: Math.max(mapBox.height, 160),
                 zIndex: isScrolledPastTracking ? 490 : 10,
                 transition:
                   'top 350ms cubic-bezier(0.4,0,0.2,1), left 350ms cubic-bezier(0.4,0,0.2,1), width 350ms cubic-bezier(0.4,0,0.2,1), height 350ms cubic-bezier(0.4,0,0.2,1)',
