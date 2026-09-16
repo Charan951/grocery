@@ -435,19 +435,22 @@ export const TrackOrder: React.FC = () => {
         height: 290,
       };
 
-      let nextMapBox;
-      if (progress >= 1) {
-        nextMapBox = pinned;
-      } else {
-        const aRect = mapAnchorRef.current?.getBoundingClientRect();
-        const from = aRect && aRect.width > 0 ? aRect : pinned;
-        nextMapBox = {
-          top: lerp(from.top, pinned.top, progress),
-          left: lerp(from.left, pinned.left, progress),
-          width: lerp(from.width, pinned.width, progress),
-          height: lerp(from.height, pinned.height, progress),
-        };
-      }
+      // The map's own anchor spacer already moves smoothly on its own —
+      // its height and the grid's column widths are both driven directly
+      // by scrollProgress every frame (see the JSX), so the anchor's real
+      // getBoundingClientRect() already reflects the exact right position
+      // at every point in the scroll. Lerping it AGAIN toward a separate
+      // hardcoded `pinned` target was applying motion twice from two
+      // different sources that could drift out of sync on fast/reversed
+      // scrolls — that desync was the map/gap-alignment bugs. The anchor
+      // naturally arrives at the same coordinates `pinned` describes by
+      // the time progress reaches 1 (banner fully scrolled, grid column
+      // collapsed to single-column), so just shadow it directly — no lerp.
+      const aRect = mapAnchorRef.current?.getBoundingClientRect();
+      const nextMapBox =
+        aRect && aRect.width > 0
+          ? { top: aRect.top, left: aRect.left, width: aRect.width, height: aRect.height }
+          : pinned;
       setMapBox(nextMapBox);
 
       // ETA card: travels from its natural grid slot up into the App
