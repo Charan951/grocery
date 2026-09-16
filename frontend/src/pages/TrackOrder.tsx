@@ -1162,8 +1162,15 @@ export const TrackOrder: React.FC = () => {
                 Doorstep/Partner/Address/Status starting right where the map
                 visually ends instead of being covered by it. Zero height
                 pre-scroll since the map is still shadowing the anchor above
-                (which already reserves the space). */}
-            <div style={{ height: (mapBox.height + 14) * scrollProgress }} />
+                (which already reserves the space).
+                Height is `mapBox.height - 16`, not `+ 14`: the pinned map's
+                `top` is flush against the App Bar (barH, no offset) so it
+                hugs the bar with no gap, but this spacer sits 16px lower —
+                after contentRef's own `py-4` top padding. The old `+ 14`
+                double-counted breathing room the flex container's own
+                `gap-3.5` already adds before and after this element,
+                over-reserving space and showing as the gap below the map. */}
+            <div style={{ height: Math.max(0, mapBox.height - 16) * scrollProgress }} />
 
             {/* 3. Doorstep OTP Code (if available) */}
             {order.deliveryOtp && (
