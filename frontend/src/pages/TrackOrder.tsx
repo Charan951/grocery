@@ -722,6 +722,12 @@ export const TrackOrder: React.FC = () => {
         attributionControl: false,
         minZoom: 12,
         maxZoom: 19,
+        // Mouse-wheel-over-map zooming traps the page's own scroll —
+        // the user's wheel/trackpad gesture zooms the map instead of
+        // scrolling the page, with no way to scroll past it. The
+        // floating zoom buttons already cover zoom; page scroll always
+        // wins here.
+        scrollWheelZoom: false,
       }).setView([17.4485, 78.3815], 15);
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -771,6 +777,23 @@ export const TrackOrder: React.FC = () => {
       }, 250);
     }
   }, [isScrolledPastTracking, fitMap]);
+
+  // Once pinned, the map covers most of the viewport — a touch-drag or
+  // mouse-drag starting on it pans the map instead of scrolling the
+  // page, leaving no way to reach Delivery Partner/Address/Status
+  // Updates below it. Disabling map dragging once pinned makes every
+  // gesture over it scroll the page instead; the Recenter button still
+  // re-centers on the rider if the view has drifted from earlier
+  // (pre-pinned) interaction.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (isScrolledPastTracking) {
+      map.dragging.disable();
+    } else {
+      map.dragging.enable();
+    }
+  }, [isScrolledPastTracking, mapReady]);
 
   // Markers and route line
   useEffect(() => {
