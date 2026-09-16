@@ -235,7 +235,7 @@ export const TrackOrder: React.FC = () => {
   // makes it visually *travel* from the left column up into the bar,
   // instead of shrinking/fading in place while the bar's own text pops in.
   const etaAnchorRef = useRef<HTMLDivElement>(null);
-  const [etaBox, setEtaBox] = useState({ top: 70, left: 16, width: 160, height: 220, opacity: 1 });
+  const [etaBox, setEtaBox] = useState({ top: 70, left: 16, width: 160, height: 220 });
 
   // The banner (~46vh, so ~350-450px depending on viewport) is what's
   // actually above the ETA/Map row in document flow. A fixed transition
@@ -271,6 +271,24 @@ export const TrackOrder: React.FC = () => {
   // right value regardless of what padding/gap values surround it.
   const spacerRef = useRef<HTMLDivElement>(null);
   const [spacerH, setSpacerH] = useState(0);
+
+  // prefers-reduced-motion: the whole ETA-card-travels/map-grows scroll
+  // choreography is continuous motion tied to scroll position. For users
+  // who've asked the OS for reduced motion, skip the travel/growth
+  // animation and snap straight between the two end states at the scroll
+  // midpoint instead — a ref (not state) since it's read inside the
+  // scroll effect's closure, which mounts once with an empty deps array.
+  const reducedMotionRef = useRef(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const apply = () => {
+      reducedMotionRef.current = mq.matches;
+    };
+    apply();
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, []);
 
   // Anchor's natural (pre-scroll) height, breakpoint-aware — matchMedia
   // instead of a Tailwind min-h class, since the anchor's height must be
@@ -457,6 +475,10 @@ export const TrackOrder: React.FC = () => {
       const TRANSITION_PX = Math.max(160, bannerHeightRef.current);
       let progress = scrollY / TRANSITION_PX;
       progress = Math.min(1, Math.max(0, progress));
+      // Reduced motion: snap straight to the nearer end state instead of
+      // interpolating — every value derived from `progress` below (map/ETA
+      // box, App Bar cross-fade, grid columns) inherits this automatically.
+      if (reducedMotionRef.current) progress = progress >= 0.5 ? 1 : 0;
 
       setIsScrolledPastTracking(progress >= 1);
       setScrollProgress(progress);
@@ -503,7 +525,6 @@ export const TrackOrder: React.FC = () => {
           left: lerp(etaFrom.left, etaPinned.left, progress),
           width: lerp(etaFrom.width, etaPinned.width, progress),
           height: lerp(etaFrom.height, etaPinned.height, progress),
-          opacity: 1 - Math.min(1, progress / 0.85),
         });
       }
 
@@ -979,8 +1000,11 @@ export const TrackOrder: React.FC = () => {
             aria-label="Back"
             className="relative z-10 rounded-full flex items-center justify-center transition-colors"
             style={{
-              width: 40 - 4 * barT,
-              height: 40 - 4 * barT,
+              // Fixed at the 44px touch-target minimum (was 36-40px,
+              // shrinking further with scroll — an /impeccable audit
+              // finding). Only color/shadow cross-fade now, not size.
+              width: 44,
+              height: 44,
               backgroundColor: `rgba(255,255,255,${0.95 - 0.8 * barT})`,
               color: barT > 0.5 ? '#fff' : '#1f2937',
               boxShadow: barT < 0.5 ? '0 1px 6px rgba(0,0,0,0.15)' : 'none',
@@ -1015,13 +1039,17 @@ export const TrackOrder: React.FC = () => {
                 <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                 Live
               </span>
+              {/* 36px, not the 44px ideal (an /impeccable audit finding) —
+                  full 44px would overwhelm this compact pill's proportions;
+                  36px is a meaningful improvement over the original 24px
+                  while keeping the pill's scale, a deliberate tradeoff. */}
               <button
                 type="button"
                 onClick={fetchOrder}
                 aria-label="Refresh"
-                className="w-6 h-6 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition-colors"
+                className="w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition-colors"
               >
-                <RefreshCw size={12} />
+                <RefreshCw size={14} />
               </button>
             </div>
           </div>
@@ -1266,13 +1294,15 @@ export const TrackOrder: React.FC = () => {
                 <span>{socketConnected ? 'Live GPS' : 'Connecting'}</span>
               </div>
 
-              {/* Bottom-Right Floating Controls */}
+              {/* Bottom-Right Floating Controls — 44px, the touch-target
+                  minimum (was 36px, an /impeccable audit finding); no
+                  layout constraint here, so no tradeoff needed. */}
               <div className="absolute bottom-3 right-3 z-[500] flex flex-col gap-2">
                 <button
                   type="button"
                   onClick={recenterMap}
                   aria-label="Recenter Map"
-                  className="w-9 h-9 rounded-full bg-white/95 hover:bg-white shadow-md flex items-center justify-center text-gray-700 transition-transform active:scale-95 border border-gray-200/60"
+                  className="w-11 h-11 rounded-full bg-white/95 hover:bg-white shadow-md flex items-center justify-center text-gray-700 transition-transform active:scale-95 border border-gray-200/60"
                 >
                   <Crosshair size={18} />
                 </button>
@@ -1280,7 +1310,7 @@ export const TrackOrder: React.FC = () => {
                   type="button"
                   onClick={toggleZoom}
                   aria-label="Toggle Zoom"
-                  className="w-9 h-9 rounded-full bg-white/95 hover:bg-white shadow-md flex items-center justify-center text-gray-700 transition-transform active:scale-95 border border-gray-200/60"
+                  className="w-11 h-11 rounded-full bg-white/95 hover:bg-white shadow-md flex items-center justify-center text-gray-700 transition-transform active:scale-95 border border-gray-200/60"
                 >
                   <Layers size={18} />
                 </button>
