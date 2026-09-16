@@ -1,5 +1,5 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -7,11 +7,12 @@ import 'package:latlong2/latlong.dart';
 import 'package:freshcart/core/widgets/freshcart_map.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
 import 'package:freshcart/core/constants/app_radius.dart';
-import 'package:freshcart/core/widgets/app_scaffold.dart';
 import 'package:freshcart/core/widgets/app_toast.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
 import 'package:freshcart/core/utils/launch.dart';
+import 'package:freshcart/core/utils/web_link.dart';
 import 'package:freshcart/features/cart/data/models/cart_item_model.dart';
+import 'package:freshcart/features/home/presentation/controllers/catalog_providers.dart' show bannersProvider;
 import 'package:freshcart/features/orders/data/models/order_model.dart';
 import 'package:freshcart/features/tracking/presentation/controllers/tracking_controller.dart';
 import 'package:freshcart/features/tracking/presentation/widgets/order_chat_sheet.dart';
@@ -21,7 +22,7 @@ String formatOrderNumber(String orderId) {
   return clean.isNotEmpty ? clean : orderId.replaceAll('#', '');
 }
 
-class TrackingScreen extends ConsumerWidget {
+class TrackingScreen extends ConsumerStatefulWidget {
   final String orderId;
 
   const TrackingScreen({
@@ -30,72 +31,45 @@ class TrackingScreen extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TrackingScreen> createState() => _TrackingScreenState();
+}
+
+class _TrackingScreenState extends ConsumerState<TrackingScreen> {
+  final _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  /// Scroll-linked source of truth for the App Bar's transition, mirroring
+  /// the web tracker's `scrollProgress`: 0 at the very top (banner fully
+  /// visible, bar transparent) to 1 once the banner has fully scrolled
+  /// past (bar solid green). Tied to the banner's actual rendered height
+  /// (not a hardcoded constant) so the transition always finishes exactly
+  /// as the banner leaves the viewport, at any screen size.
+  double _progress(bool hasBanner) {
+    if (!_scrollController.hasClients) return 0;
+    final bannerHeight =
+        hasBanner ? MediaQuery.of(context).size.height * 0.46 : 160.0;
+    final offset = _scrollController.offset;
+    return (offset / bannerHeight).clamp(0.0, 1.0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final t = ref.watch(trackingProvider(orderId));
+    final t = ref.watch(trackingProvider(widget.orderId));
     final bucket = t.statusBucket;
-    final orderNum = formatOrderNumber(orderId);
+    final orderId = widget.orderId;
+    final banners = ref.watch(bannersProvider).valueOrNull ?? const [];
+    final hasBanner = banners.isNotEmpty;
 
-    return AppScaffold(
-      titleWidget: FittedBox(
-        fit: BoxFit.scaleDown,
-        alignment: Alignment.centerLeft,
-        child: Text(
-          'Track Order $orderNum',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-          ),
-        ),
-      ),
-      onBack: () => context.canPop() ? context.pop() : context.go('/orders'),
-      actions: [
-        Padding(
-          padding: const EdgeInsets.only(right: 4),
-          child: IconButton(
-            tooltip: 'Copy Order Number',
-            icon: const Icon(Icons.copy_rounded, size: 18),
-            onPressed: () {
-              Clipboard.setData(ClipboardData(text: orderNum));
-              AppToast.success('Order number copied: $orderNum');
-            },
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(right: 12),
-          child: Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: (t.connected ? AppColors.primary : AppColors.warning).withOpacity(0.12),
-                borderRadius: BorderRadius.circular(100),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    t.connected ? Icons.circle : Icons.sync_rounded,
-                    size: 8,
-                    color: t.connected ? AppColors.primaryText : AppColors.warningText,
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    t.connected ? 'Live GPS' : 'Connecting',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: t.connected ? AppColors.primaryText : AppColors.warningText,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
+    return Scaffold(
+      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
       bottomNavigationBar: Container(
         padding: EdgeInsets.fromLTRB(16, 10, 16, 10 + MediaQuery.of(context).padding.bottom),
         decoration: BoxDecoration(
@@ -153,77 +127,427 @@ class TrackingScreen extends ConsumerWidget {
           ],
         ),
       ),
-      body: ListView(
-        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      body: Stack(
         children: [
-          // 1. LIVE INTERACTIVE MAP CARD — only while a partner is assigned
-          // and the order is still active; hidden before assignment and
-          // after completion.
-          if (t.assigned) ...[
-            _MapSection(t: t, isDark: isDark),
-            const SizedBox(height: 14),
-          ],
+          CustomScrollView(
+            controller: _scrollController,
+            physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+            slivers: [
+              // 1. Large banner carousel — fills edge-to-edge from the very
+              // top of the page (the App Bar floats transparently over it,
+              // as a Stack overlay below, instead of reserving its own
+              // height above the banner). Scrolls away completely, same as
+              // the web tracker.
+              if (banners.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.46,
+                    width: double.infinity,
+                    child: _TrackingBannerCarousel(banners: banners),
+                  ),
+                ),
 
-          // 2. ETA & LIVE STATUS HERO CARD
-          _EtaHeroCard(t: t, bucket: bucket, isDark: isDark),
-          const SizedBox(height: 14),
+              // 2. LIVE INTERACTIVE MAP CARD — pinned just below the app bar
+              // while everything else scrolls underneath it, mirroring the
+              // web tracker's pinned-map behavior. Only shown while a
+              // partner is assigned and the order is still active.
+              if (t.assigned)
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _MapHeaderDelegate(
+                    t: t,
+                    isDark: isDark,
+                    topInset: MediaQuery.of(context).padding.top + 56,
+                  ),
+                ),
 
-          // 3. DOORSTEP OTP CODE (when available)
-          if (t.deliveryOtp.isNotEmpty) ...[
-            _DeliveryOtpCard(otp: t.deliveryOtp, isDark: isDark),
-            const SizedBox(height: 14),
-          ],
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    if (t.assigned) const SizedBox(height: 2),
 
-          // 4. DELIVERY PARTNER CARD — only once actually assigned.
-          if (t.assigned) ...[
-            _DeliveryPartnerCard(t: t, isDark: isDark, orderId: orderId),
-            const SizedBox(height: 14),
-          ],
+                    // ETA & LIVE STATUS HERO CARD — its content is what the
+                    // App Bar's headline + pill visually take over from as
+                    // the bar solidifies on scroll (a continuous opacity
+                    // cross-fade, driven by the same scroll offset, rather
+                    // than a literal FLIP-style position animation — the
+                    // idiomatic Flutter equivalent of the web's "travels
+                    // into the bar" effect for a pinned-header layout).
+                    _EtaHeroCard(t: t, bucket: bucket, isDark: isDark),
+                    const SizedBox(height: 14),
 
-          // 5. TRACKING TIMELINE
-          if (t.timeline.isNotEmpty) ...[
-            _TimelineCard(entries: t.timeline, isDark: isDark),
-            const SizedBox(height: 14),
-          ],
+                    // DOORSTEP OTP CODE (when available)
+                    if (t.deliveryOtp.isNotEmpty) ...[
+                      _DeliveryOtpCard(otp: t.deliveryOtp, isDark: isDark),
+                      const SizedBox(height: 14),
+                    ],
 
-          // 6. ORDER ITEMS SUMMARY — kept last per request
-          if (t.items.isNotEmpty) ...[
-            _OrderItemsCard(items: t.items, total: t.total, isDark: isDark),
-          ],
+                    // DELIVERY PARTNER CARD — only once actually assigned.
+                    if (t.assigned) ...[
+                      _DeliveryPartnerCard(t: t, isDark: isDark, orderId: orderId),
+                      const SizedBox(height: 14),
+                    ],
+
+                    // TRACKING TIMELINE
+                    if (t.timeline.isNotEmpty) ...[
+                      _TimelineCard(entries: t.timeline, isDark: isDark),
+                      const SizedBox(height: 14),
+                    ],
+
+                    // ORDER ITEMS SUMMARY — kept last per request
+                    if (t.items.isNotEmpty) ...[
+                      _OrderItemsCard(items: t.items, total: t.total, isDark: isDark),
+                    ],
+                  ]),
+                ),
+              ),
+            ],
+          ),
+
+          // 0. Floating App Bar overlay — NOT a sliver, so it never reserves
+          // layout height above the banner (mirrors the web tracker's
+          // `sticky` + negative-margin trick for an edge-to-edge banner
+          // under a transparent bar). Rebuilds every scroll frame via
+          // AnimatedBuilder listening directly to the ScrollController
+          // (no setState needed), so every visual — background, back
+          // button style, headline/pill opacity — interpolates
+          // continuously with scroll progress instead of snapping at a
+          // threshold.
+          AnimatedBuilder(
+            animation: _scrollController,
+            builder: (context, _) {
+              return _TrackingAppBar(
+                progress: _progress(hasBanner),
+                isDark: isDark,
+                t: t,
+                onBack: () => context.canPop() ? context.pop() : context.go('/orders'),
+                onRefresh: () => ref.invalidate(trackingProvider(orderId)),
+              );
+            },
+          ),
         ],
       ),
     );
   }
 }
 
-class _MapSection extends StatelessWidget {
-  final TrackingState t;
+/// Redesigned App Bar. Initial state (top of page, banner visible) = a
+/// minimal floating circular back button over the banner — no title, no
+/// help icon. Scrolled state = a solid green (#0C8B4F) full-width bar with
+/// back button + order-status headline + an "Arriving in X mins • Live"
+/// pill with a refresh icon. Every property (background alpha, padding,
+/// back-button size/tint/shadow, headline+pill opacity) is a direct
+/// function of `progress` — continuous, not a hard snap — mirroring the
+/// web tracker's `barT` easing.
+class _TrackingAppBar extends StatelessWidget {
+  final double progress;
   final bool isDark;
+  final TrackingState t;
+  final VoidCallback onBack;
+  final VoidCallback onRefresh;
 
-  const _MapSection({required this.t, required this.isDark});
+  const _TrackingAppBar({
+    required this.progress,
+    required this.isDark,
+    required this.t,
+    required this.onBack,
+    required this.onRefresh,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 270,
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF242426) : const Color(0xFFF3F4F6),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark ? AppColors.dividerDark : const Color(0xFFE5E7EB),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+    final topPad = MediaQuery.of(context).padding.top;
+    final isDelivered = t.statusBucket == OrderStatus.delivered;
+
+    // Bar-only easing: stays fully transparent while the banner is still
+    // mostly on screen, then ramps to solid over the back half of the
+    // scroll — matches the web tracker's `barT` so the green fill never
+    // reads as a muddy tint over the banner photo.
+    final barT = ((progress - 0.5) / 0.5).clamp(0.0, 1.0);
+
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: IgnorePointer(
+        ignoring: false,
+        child: Container(
+          padding: EdgeInsets.only(
+            top: topPad + 10 + 2 * barT,
+            left: 12,
+            right: 12,
+            bottom: 10 + 8 * barT,
           ),
-        ],
+          decoration: BoxDecoration(
+            color: Color.lerp(Colors.transparent, const Color(0xFF0C8B4F), barT),
+            boxShadow: barT > 0.5
+                ? [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 2))]
+                : null,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                height: 40 - 4 * barT,
+                child: _CircleIconButton(
+                  icon: Icons.arrow_back_rounded,
+                  onTap: onBack,
+                  filled: Color.lerp(Colors.white.withOpacity(0.95), Colors.white.withOpacity(0.15), barT)!,
+                  iconColor: Color.lerp(const Color(0xFF1F2937), Colors.white, barT)!,
+                  size: 40 - 4 * barT,
+                  shadow: barT < 0.5,
+                ),
+              ),
+
+              // SCROLLED content: order headline + "Arriving in X mins •
+              // Live" pill. Always laid out, cross-fading in via opacity
+              // so it never hard-pops the instant progress crosses a
+              // threshold. Collapsed to zero height pre-scroll via
+              // ClipRect + AnimatedSize-free interpolation (SizedBox with
+              // a height tied to barT) so it never reserves space over
+              // the banner while transparent.
+              ClipRect(
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  heightFactor: barT,
+                  child: Opacity(
+                    opacity: barT,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            isDelivered
+                                ? 'Order delivered'
+                                : (t.hasRider
+                                    ? 'Delivery partner is heading to your drop'
+                                    : 'Order is being prepared'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.white),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(100),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      isDelivered
+                                          ? 'Delivered'
+                                          : 'Arriving in ${t.etaMinutes} min${t.etaMinutes == 1 ? '' : 's'}',
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      width: 3,
+                                      height: 3,
+                                      decoration: const BoxDecoration(color: Colors.white54, shape: BoxShape.circle),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    const Icon(Icons.circle, size: 6, color: Colors.white),
+                                    const SizedBox(width: 3),
+                                    const Text('Live', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white)),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              _CircleIconButton(
+                                icon: Icons.refresh_rounded,
+                                onTap: onRefresh,
+                                filled: Colors.white.withOpacity(0.15),
+                                iconColor: Colors.white,
+                                size: 26,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: _LiveMap(t: t, isDark: isDark),
     );
+  }
+}
+
+class _CircleIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final Color filled;
+  final Color iconColor;
+  final double size;
+  final bool shadow;
+
+  const _CircleIconButton({
+    required this.icon,
+    required this.onTap,
+    required this.filled,
+    required this.iconColor,
+    this.size = 34,
+    this.shadow = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: filled,
+          shape: BoxShape.circle,
+          boxShadow: shadow
+              ? [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 1))]
+              : null,
+        ),
+        child: Icon(icon, size: size * 0.5, color: iconColor),
+      ),
+    );
+  }
+}
+
+/// Promotional CMS banner carousel shown at the top of the tracking screen,
+/// mirroring the web tracker's large hero banner that scrolls away.
+class _TrackingBannerCarousel extends StatefulWidget {
+  final List<dynamic> banners;
+  const _TrackingBannerCarousel({required this.banners});
+
+  @override
+  State<_TrackingBannerCarousel> createState() => _TrackingBannerCarouselState();
+}
+
+class _TrackingBannerCarouselState extends State<_TrackingBannerCarousel> {
+  final _controller = PageController();
+  int _page = 0;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final activeBanners = widget.banners.where((item) {
+      if (item is! Map) return false;
+      final b = Map<String, dynamic>.from(item);
+      final active = b['active'] ?? b['isActive'];
+      if (active == false || active == 0) return false;
+      final img = (b['imageUrl'] ?? b['image'] ?? '').toString().trim();
+      return img.isNotEmpty && img.startsWith('http');
+    }).toList();
+
+    if (activeBanners.isEmpty) return const SizedBox.shrink();
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        PageView.builder(
+          controller: _controller,
+          onPageChanged: (i) => setState(() => _page = i),
+          itemCount: activeBanners.length,
+          itemBuilder: (context, i) {
+            final b = Map<String, dynamic>.from(activeBanners[i] as Map);
+            final img = (b['imageUrl'] ?? b['image'] ?? '') as String;
+            final route = resolveAppRoute((b['linkUrl'] ?? '') as String);
+            return GestureDetector(
+              onTap: route == null ? null : () => context.push(route),
+              child: CachedNetworkImage(imageUrl: img, fit: BoxFit.cover, width: double.infinity),
+            );
+          },
+        ),
+        if (activeBanners.length > 1)
+          Positioned(
+            bottom: 12,
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(activeBanners.length, (i) {
+                final active = i == _page;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: active ? 16 : 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: active ? Colors.white : Colors.white38,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                );
+              }),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Pinned map header: keeps the live map flush below the app bar while the
+/// rest of the tracking content (ETA, OTP, partner, timeline) scrolls
+/// underneath it — mirrors the web tracker's fixed-map-on-scroll behavior.
+class _MapHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final TrackingState t;
+  final bool isDark;
+  // Height of the app bar the map must sit flush below once pinned —
+  // matches the web tracker's `appBarH`-driven map top offset.
+  final double topInset;
+  static const double _mapH = 258;
+
+  _MapHeaderDelegate({required this.t, required this.isDark, required this.topInset});
+
+  @override
+  double get minExtent => topInset + _mapH + 12;
+
+  @override
+  double get maxExtent => topInset + _mapH + 12;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, topInset + 12, 16, 0),
+      child: Container(
+        height: _mapH,
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF242426) : const Color(0xFFF3F4F6),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isDark ? AppColors.dividerDark : const Color(0xFFE5E7EB),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: _LiveMap(t: t, isDark: isDark),
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _MapHeaderDelegate oldDelegate) {
+    return oldDelegate.t != t || oldDelegate.isDark != isDark || oldDelegate.topInset != topInset;
   }
 }
 
