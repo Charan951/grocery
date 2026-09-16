@@ -259,6 +259,19 @@ export const TrackOrder: React.FC = () => {
   // box genuinely changed — not on every poll tick where nothing moved.
   const lastMapSizeRef = useRef({ w: 320, h: 260 });
 
+  // The spacer that reserves flow space for the pinned map (so Doorstep
+  // Code/Delivery Partner/Address/Status Updates don't scroll up under
+  // it) went through several rounds of hand-derived magic-number offsets
+  // (py-4, two gap-3.5's, appBarH...) that each landed slightly off —
+  // fragile by nature since any future spacing tweak elsewhere would
+  // throw them off again. Replaced with direct measurement: every frame,
+  // compare the spacer's own real rendered bottom edge against where the
+  // map's real bottom edge actually is, and feed the difference back into
+  // the spacer's height for the next frame. Self-corrects to the exact
+  // right value regardless of what padding/gap values surround it.
+  const spacerRef = useRef<HTMLDivElement>(null);
+  const [spacerH, setSpacerH] = useState(0);
+
   // Anchor's natural (pre-scroll) height, breakpoint-aware — matchMedia
   // instead of a Tailwind min-h class, since the anchor's height must be
   // fully JS-controlled (min-height would otherwise always win over the
@@ -511,6 +524,25 @@ export const TrackOrder: React.FC = () => {
       if (mapRef.current && changed) {
         lastMapSizeRef.current = { w: nextMapBox.width, h: nextMapBox.height };
         mapRef.current.invalidateSize({ pan: false });
+      }
+
+      // Self-correcting flow-spacer height: compare the spacer's own
+      // current rendered bottom edge against where the map's real bottom
+      // edge is, and feed the difference into its height for the next
+      // frame. Converges to the exact right value within a frame or two
+      // and stays correct regardless of any padding/gap changes around it
+      // — no more hand-derived magic-number offsets.
+      if (progress <= 0.02) {
+        setSpacerH((h) => (h === 0 ? h : 0));
+      } else {
+        const spacerRect = spacerRef.current?.getBoundingClientRect();
+        if (spacerRect) {
+          const desiredBottom = barH + nextMapBox.height;
+          const delta = desiredBottom - spacerRect.bottom;
+          if (Math.abs(delta) > 0.5) {
+            setSpacerH((h) => Math.max(0, h + delta));
+          }
+        }
       }
     };
     const onScroll = () => {
@@ -1198,26 +1230,14 @@ export const TrackOrder: React.FC = () => {
 
             {/* Flow spacer for the fixed map once it's pinned — keeps
                 Doorstep/Partner/Address/Status starting right where the map
-                visually ends instead of being covered by it. Zero height
-                pre-scroll since the map is still shadowing the anchor above
-                (which already reserves the space).
-                Height includes `appBarH`: the App Bar is `sticky`, not
-                `fixed`, and (since the "banner behind App Bar" fix) no
-                longer reserves its own height in document flow — it just
-                floats over whatever content is currently at the top of the
-                viewport, the normal sticky behavior. The pinned map starts
-                BELOW the bar (`top: barH`), so the flow must reserve
-                `barH + map height` for content beneath it to clear both,
-                not just the map's own height.
-                The `- 44` is the exact offset this spacer sits at versus
-                the banner's own bottom edge: contentRef's `py-4` top
-                padding (16px) plus the two `gap-3.5` (14px each) the flex
-                container inserts automatically — one before this spacer,
-                one after it, before Doorstep Code. Precisely matching that
-                (not a rounder guess) is what makes the spacer's bottom
-                land exactly on the map's real bottom edge, with neither an
-                overlap nor a leftover white gap before Doorstep Code. */}
-            <div style={{ height: Math.max(0, mapBox.height + appBarH - 44) * scrollProgress }} />
+                visually ends instead of being covered by it. Height is
+                measured/self-corrected every frame (see the scroll effect)
+                by comparing this element's own real bottom edge against
+                the map's real bottom edge — not computed from padding/gap
+                constants, which went through several rounds of landing
+                slightly off. Zero pre-scroll since the map is still
+                shadowing the anchor above (which already reserves space). */}
+            <div ref={spacerRef} style={{ height: spacerH }} />
 
             {/* 3. Doorstep OTP Code (if available) */}
             {order.deliveryOtp && (
