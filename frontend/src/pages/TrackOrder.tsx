@@ -1208,11 +1208,16 @@ export const TrackOrder: React.FC = () => {
                 viewport, the normal sticky behavior. The pinned map starts
                 BELOW the bar (`top: barH`), so the flow must reserve
                 `barH + map height` for content beneath it to clear both,
-                not just the map's own height — omitting `appBarH` here was
-                a real regression that let Delivery Partner/Doorstep Code
-                scroll up underneath the bar's own height worth of the map,
-                covering them. */}
-            <div style={{ height: Math.max(0, mapBox.height + appBarH - 16) * scrollProgress }} />
+                not just the map's own height.
+                The `- 44` is the exact offset this spacer sits at versus
+                the banner's own bottom edge: contentRef's `py-4` top
+                padding (16px) plus the two `gap-3.5` (14px each) the flex
+                container inserts automatically — one before this spacer,
+                one after it, before Doorstep Code. Precisely matching that
+                (not a rounder guess) is what makes the spacer's bottom
+                land exactly on the map's real bottom edge, with neither an
+                overlap nor a leftover white gap before Doorstep Code. */}
+            <div style={{ height: Math.max(0, mapBox.height + appBarH - 44) * scrollProgress }} />
 
             {/* 3. Doorstep OTP Code (if available) */}
             {order.deliveryOtp && (
