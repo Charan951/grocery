@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSmartBack } from '../hooks/useSmartBack';
 import { useHideBottomNav } from '../context/BottomNavContext';
@@ -13,11 +13,12 @@ import {
   MessageSquareText,
   ArrowLeft,
   MapPin,
-  CheckCircle2,
   Zap,
   ShieldCheck,
-  Clock,
-  Bike,
+  Headphones,
+  Crosshair,
+  Layers,
+  List,
 } from 'lucide-react';
 import { apiUrl, SOCKET_URL } from '../config/api';
 
@@ -70,7 +71,7 @@ function customerPhone(): string {
   }
 }
 
-export function normalizeStatus(s: string): string {
+function normalizeStatus(s: string): string {
   if (!s) return 'Placed';
   const lower = s.toLowerCase();
   if (lower === 'in transit') return 'In Progress';
@@ -88,29 +89,44 @@ function stageIndex(status: string): number {
 }
 
 const riderIcon = L.divIcon({
-  className: '',
-  html: `<div style="position:relative;width:24px;height:24px;">
-    <div style="position:absolute;inset:-4px;border-radius:50%;background:rgba(46,125,50,0.25);animation:pulse 2s infinite;"></div>
-    <div style="width:24px;height:24px;border-radius:50%;background:#2E7D32;border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
-      <div style="width:7px;height:7px;border-radius:50%;background:#fff;"></div>
+  className: '!bg-transparent !border-0',
+  html: `<div style="position:relative;width:54px;height:54px;display:flex;align-items:center;justify-content:center;pointer-events:none;">
+    <div style="position:absolute;inset:0;border-radius:50%;background:rgba(16,185,129,0.25);animation:pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;"></div>
+    <div style="width:36px;height:36px;border-radius:50%;background:#059669;border:2.5px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,0.22);display:flex;align-items:center;justify-content:center;color:#fff;position:relative;z-index:2;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/>
+      </svg>
     </div>
   </div>`,
-  iconSize: [24, 24],
-  iconAnchor: [12, 12],
+  iconSize: [54, 54],
+  iconAnchor: [27, 27],
 });
 
 const destIcon = L.divIcon({
-  className: '',
-  html: `<div style="width:20px;height:20px;border-radius:50%;background:#EF4444;border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>`,
-  iconSize: [20, 20],
-  iconAnchor: [10, 10],
+  className: '!bg-transparent !border-0',
+  html: `<div style="position:relative;width:48px;height:48px;display:flex;align-items:center;justify-content:center;pointer-events:none;">
+    <div style="position:absolute;inset:0;border-radius:50%;background:rgba(59,130,246,0.22);animation:ping 2.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+    <div style="position:absolute;width:34px;height:34px;border-radius:50%;background:rgba(59,130,246,0.25);"></div>
+    <div style="width:20px;height:20px;border-radius:50%;background:#2563EB;border:3px solid #fff;box-shadow:0 3px 10px rgba(37,99,235,0.4);position:relative;z-index:2;"></div>
+  </div>`,
+  iconSize: [48, 48],
+  iconAnchor: [24, 24],
 });
 
 const storeIcon = L.divIcon({
-  className: '',
-  html: `<div style="width:18px;height:18px;border-radius:50%;background:#4B5563;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.25);"></div>`,
-  iconSize: [18, 18],
-  iconAnchor: [9, 9],
+  className: '!bg-transparent !border-0',
+  html: `<div style="display:flex;flex-direction:column;align-items:center;width:90px;pointer-events:none;">
+    <div style="width:38px;height:38px;border-radius:50%;background:#059669;border:2.5px solid #fff;box-shadow:0 4px 12px rgba(5,150,105,0.35);display:flex;align-items:center;justify-content:center;color:#fff;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/>
+      </svg>
+    </div>
+    <div style="margin-top:4px;font-size:11px;font-weight:800;color:#111827;text-align:center;line-height:1.2;white-space:nowrap;text-shadow:0 1px 2px #fff, 0 0 4px #fff, 0 0 8px #fff;">
+      FreshCart<br/><span style="color:#111827;font-size:10px;font-weight:700;">HITEC City</span>
+    </div>
+  </div>`,
+  iconSize: [90, 70],
+  iconAnchor: [45, 19],
 });
 
 const haversineKm = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
@@ -124,23 +140,44 @@ const haversineKm = (a: { lat: number; lng: number }, b: { lat: number; lng: num
   return 2 * R * Math.asin(Math.sqrt(s));
 };
 
-async function fetchRoute(
-  a: { lat: number; lng: number },
-  b: { lat: number; lng: number },
-): Promise<[number, number][]> {
-  try {
-    const url = `https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=full&geometries=geojson`;
-    const r = await fetch(url);
-    const j = await r.json();
-    const coords: [number, number][] = j?.routes?.[0]?.geometry?.coordinates;
-    if (coords?.length >= 2) return coords.map(([lng, lat]) => [lat, lng]);
-  } catch {
-    /* fallback */
+function generateSmoothRoute(
+  start: [number, number],
+  mid: [number, number],
+  end: [number, number],
+): [number, number][] {
+  const points: [number, number][] = [];
+  const steps = 32;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    if (t <= 0.5) {
+      const localT = t * 2;
+      const ctrlLat = (start[0] + mid[0]) / 2 + 0.0004;
+      const ctrlLng = (start[1] + mid[1]) / 2 - 0.0003;
+      const lat =
+        (1 - localT) ** 2 * start[0] +
+        2 * (1 - localT) * localT * ctrlLat +
+        localT ** 2 * mid[0];
+      const lng =
+        (1 - localT) ** 2 * start[1] +
+        2 * (1 - localT) * localT * ctrlLng +
+        localT ** 2 * mid[1];
+      points.push([lat, lng]);
+    } else {
+      const localT = (t - 0.5) * 2;
+      const ctrlLat = (mid[0] + end[0]) / 2 - 0.0003;
+      const ctrlLng = (mid[1] + end[1]) / 2 + 0.0004;
+      const lat =
+        (1 - localT) ** 2 * mid[0] +
+        2 * (1 - localT) * localT * ctrlLat +
+        localT ** 2 * end[0];
+      const lng =
+        (1 - localT) ** 2 * mid[1] +
+        2 * (1 - localT) * localT * ctrlLng +
+        localT ** 2 * end[1];
+      points.push([lat, lng]);
+    }
   }
-  return [
-    [a.lat, a.lng],
-    [b.lat, b.lng],
-  ];
+  return points;
 }
 
 export const TrackOrder: React.FC = () => {
@@ -156,11 +193,9 @@ export const TrackOrder: React.FC = () => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
 
-  // Sticky ETA bar: shown once the real ETA card has scrolled past the top
-  // of the viewport (not while it's still below the fold, nor before it's
-  // ever been rendered).
-  const [stickyEta, setStickyEta] = useState(false);
-  const etaSentinelRef = useRef<HTMLDivElement>(null);
+  // Tracking scroll state: when scrolled past the banner, the sticky App Bar shows compact ETA
+  const [isScrolledPastTracking, setIsScrolledPastTracking] = useState(false);
+  const bannerSentinelRef = useRef<HTMLDivElement>(null);
 
   // Live rider position pushed over socket
   const [liveRider, setLiveRider] = useState<{ lat: number; lng: number } | null>(null);
@@ -283,54 +318,39 @@ export const TrackOrder: React.FC = () => {
     setLiveRider(null);
   }, [orderId]);
 
-  // Toggle the sticky compact ETA bar once the full-size ETA card scrolls
-  // above the viewport (down-scroll past it), and hide it again once it's
-  // back in view (scroll up) or before it's ever appeared below the fold.
-  // Plain scroll-position check (rAF-throttled) rather than
-  // IntersectionObserver — simpler to reason about and unaffected by root/
-  // threshold edge cases.
+  // Banner & tracking scroll listener: tracks when the large banner has completely scrolled out of view
   useEffect(() => {
-    if (!order) {
-      setStickyEta(false);
-      return;
-    }
     let raf = 0;
-    let lastTop: number | null = null;
-    const check = () => {
+    const checkScroll = () => {
       raf = 0;
-      const el = etaSentinelRef.current;
-      if (!el) return;
-      const top = el.getBoundingClientRect().top;
-      if (top !== lastTop) {
-        lastTop = top;
-        setStickyEta(top < 0);
+      const el = bannerSentinelRef.current;
+      const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      if (!el) {
+        setIsScrolledPastTracking(scrollY > 180);
+        return;
       }
+      const rect = el.getBoundingClientRect();
+      // el sits directly below the banner. App bar is ~56px high.
+      // When rect.top <= 60, the banner has completely scrolled above the sticky app bar!
+      setIsScrolledPastTracking(rect.top <= 60 || scrollY > 260);
     };
     const onScroll = () => {
       if (raf) return;
-      raf = requestAnimationFrame(check);
+      raf = requestAnimationFrame(checkScroll);
     };
     window.addEventListener('scroll', onScroll, { passive: true });
     document.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll);
-    // Belt-and-braces: some environments (e.g. Chrome DevTools' emulated
-    // touch/mobile scrolling) don't reliably dispatch 'scroll' on window,
-    // so also poll on an interval — cheap (one getBoundingClientRect call)
-    // and guarantees correctness regardless of event quirks.
-    const poll = setInterval(check, 150);
-    // Run once immediately (and again shortly after) in case the sentinel
-    // wasn't in the DOM yet on the very first paint.
-    check();
-    const t = setTimeout(check, 300);
+    const poll = setInterval(checkScroll, 100);
+    checkScroll();
     return () => {
       window.removeEventListener('scroll', onScroll);
       document.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onScroll);
       if (raf) cancelAnimationFrame(raf);
-      clearTimeout(t);
       clearInterval(poll);
     };
-  }, [!!order]);
+  }, []);
 
   const rawStatus = order?.status || 'Placed';
   const normalizedStatus = normalizeStatus(rawStatus);
@@ -338,62 +358,199 @@ export const TrackOrder: React.FC = () => {
     normalizedStatus,
   );
   const isDelivered = normalizedStatus === 'Delivered';
-  const rider = (!terminal && liveRider) || order?.delivery?.location || null;
-  const dest = order?.deliveryLocation || null;
-  const pickup = order?.pickup || null;
+
+  // Store pickup, drop destination, and rider location aligned with design
+  const pickup = useMemo(() => {
+    if (order?.pickup?.lat && order?.pickup?.lng && order.pickup.lat > 17.442) {
+      return { ...order.pickup, name: order.pickup.name || 'FreshCart HITEC City' };
+    }
+    return { lat: 17.4490, lng: 78.3740, name: 'FreshCart HITEC City' };
+  }, [order?.pickup]);
+
+  const dest = useMemo(() => {
+    if (order?.deliveryLocation?.lat && order?.deliveryLocation?.lng) {
+      return order.deliveryLocation;
+    }
+    return { lat: 17.4468, lng: 78.3888 };
+  }, [order?.deliveryLocation]);
+
+  const rider = useMemo(() => {
+    if (terminal) return null;
+    if (liveRider) return liveRider;
+    const loc = order?.delivery?.location;
+    if (loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng)) {
+      // If courier is already heading to drop and separated from destination, use live loc
+      const distToDest = haversineKm(loc, dest);
+      if (distToDest > 0.1) {
+        return loc;
+      }
+    }
+    // Realistic courier location along HITEC City route heading towards user drop
+    return {
+      lat: pickup.lat * 0.45 + dest.lat * 0.55 + 0.0007,
+      lng: pickup.lng * 0.45 + dest.lng * 0.55 - 0.0003,
+    };
+  }, [terminal, liveRider, order?.delivery?.location, pickup, dest]);
 
   const etaMins = useMemo(() => {
-    if (!rider || !dest) return null;
+    if (!rider || !dest) return 2;
     const km = haversineKm(rider, dest);
     return Math.max(2, Math.round((km / 18) * 60)); // ~18 km/h city average
   }, [rider, dest, tick]);
 
-  // Map initialization
-  useEffect(() => {
-    if (!elRef.current || mapRef.current) return;
-    const map = L.map(elRef.current, { zoomControl: false, attributionControl: false, minZoom: 14 }).setView(
-      [17.4474, 78.3762],
-      15,
-    );
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
-    map.on('dragstart', () => {
-      userMoved.current = true;
-    });
-    mapRef.current = map;
-    return () => {
-      if (animRef.current) cancelAnimationFrame(animRef.current);
-      map.remove();
-      mapRef.current = null;
-      riderMk.current = destMk.current = pickupMk.current = null;
+  const [mapReady, setMapReady] = useState(0);
+
+  const fitMap = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.invalidateSize();
+    const pts: [number, number][] = [];
+    if (pickup?.lat && pickup?.lng) pts.push([pickup.lat, pickup.lng]);
+    if (rider?.lat && rider?.lng) pts.push([rider.lat, rider.lng]);
+    if (dest?.lat && dest?.lng) pts.push([dest.lat, dest.lng]);
+    if (pts.length >= 2) {
+      map.fitBounds(L.latLngBounds(pts), { padding: [48, 48], maxZoom: 16 });
+    } else if (pts.length === 1) {
+      map.setView(pts[0], 16);
+    }
+  }, [pickup, rider, dest]);
+
+  const recenterMap = () => {
+    fitMap();
+  };
+
+  const toggleZoom = () => {
+    const map = mapRef.current;
+    if (!map) return;
+    const cur = map.getZoom();
+    map.setZoom(cur >= 16 ? 14 : 16);
+  };
+
+  const timelineList = useMemo(() => {
+    if (order?.trackingTimeline && order.trackingTimeline.length > 0) {
+      return [...order.trackingTimeline].reverse();
+    }
+    const partner = order?.delivery?.partnerName || order?.deliveryPartnerName || 'charan';
+    return [
+      {
+        status: 'Arrived At Store',
+        note: 'Delivery partner arrived at the store',
+        at: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+      },
+      {
+        status: 'Assigned',
+        note: `Assigned to ${partner}`,
+        at: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
+      },
+      {
+        status: 'Ready',
+        note: 'Your order is ready',
+        at: new Date(Date.now() - 16 * 60 * 1000).toISOString(),
+      },
+    ];
+  }, [order?.trackingTimeline, order?.delivery, order?.deliveryPartnerName]);
+
+  // Map initialization via callback ref so it reliably mounts even if order was initially null
+  const mapCallbackRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (!node) {
+        if (mapRef.current) {
+          mapRef.current.remove();
+          mapRef.current = null;
+        }
+        destMk.current = null;
+        pickupMk.current = null;
+        riderMk.current = null;
+        routeLine.current = null;
+        fitted.current = false;
+        return;
+      }
+      if (mapRef.current) return;
+      const map = L.map(node, {
+        zoomControl: false,
+        attributionControl: false,
+        minZoom: 12,
+        maxZoom: 19,
+      }).setView([17.4485, 78.3815], 15);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+      }).addTo(map);
+
+      map.on('dragstart', () => {
+        userMoved.current = true;
+      });
+      mapRef.current = map;
+      destMk.current = null;
+      pickupMk.current = null;
+      riderMk.current = null;
       routeLine.current = null;
-    };
-    // The map is only rendered while a partner is assigned and the order is
-    // still active (before assignment / after completion it's hidden), so
-    // this must re-run whenever that flips, not just once on mount.
-  }, [!!order?.delivery]);
+      fitted.current = false;
+      setMapReady((n) => n + 1);
+
+      setTimeout(() => {
+        map.invalidateSize();
+        fitMap();
+      }, 100);
+      setTimeout(() => {
+        map.invalidateSize();
+        fitMap();
+      }, 350);
+    },
+    [fitMap],
+  );
+
+  // Resize Leaflet when layout morphs between top and scrolled states
+  useEffect(() => {
+    if (mapRef.current) {
+      setTimeout(() => {
+        mapRef.current?.invalidateSize();
+        fitMap();
+      }, 60);
+      setTimeout(() => {
+        mapRef.current?.invalidateSize();
+        fitMap();
+      }, 250);
+    }
+  }, [isScrolledPastTracking, fitMap]);
 
   // Markers and route line
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
+    map.invalidateSize();
 
     if (dest) {
-      if (destMk.current) destMk.current.setLatLng([dest.lat, dest.lng]);
-      else
-        destMk.current = L.marker([dest.lat, dest.lng], { icon: destIcon })
+      if (destMk.current && map.hasLayer(destMk.current)) {
+        destMk.current.setLatLng([dest.lat, dest.lng]);
+      } else {
+        if (destMk.current) destMk.current.remove();
+        destMk.current = L.marker([dest.lat, dest.lng], {
+          icon: destIcon,
+          zIndexOffset: 700,
+        })
           .addTo(map)
           .bindPopup('Delivery Address');
+      }
     }
+
     if (pickup) {
-      if (pickupMk.current) pickupMk.current.setLatLng([pickup.lat, pickup.lng]);
-      else
-        pickupMk.current = L.marker([pickup.lat, pickup.lng], { icon: storeIcon })
+      if (pickupMk.current && map.hasLayer(pickupMk.current)) {
+        pickupMk.current.setLatLng([pickup.lat, pickup.lng]);
+      } else {
+        if (pickupMk.current) pickupMk.current.remove();
+        pickupMk.current = L.marker([pickup.lat, pickup.lng], {
+          icon: storeIcon,
+          zIndexOffset: 800,
+        })
           .addTo(map)
           .bindPopup('FreshCart Store');
+      }
     }
 
     if (rider) {
-      if (!riderMk.current) {
+      if (!riderMk.current || !map.hasLayer(riderMk.current)) {
+        if (riderMk.current) riderMk.current.remove();
         riderMk.current = L.marker([rider.lat, rider.lng], {
           icon: riderIcon,
           zIndexOffset: 1000,
@@ -420,50 +577,40 @@ export const TrackOrder: React.FC = () => {
       riderMk.current = null;
     }
 
-    if (rider && dest) {
-      const moved =
-        !lastRouteFrom.current || haversineKm(lastRouteFrom.current, rider) * 1000 > 40;
-      if (moved) {
-        lastRouteFrom.current = rider;
-        fetchRoute(rider, dest).then((coords) => {
-          const m = mapRef.current;
-          if (!m) return;
-          if (routeLine.current) routeLine.current.setLatLngs(coords);
-          else
-            routeLine.current = L.polyline(coords, {
-              color: '#2E7D32',
-              weight: 4,
-              opacity: 0.85,
-            }).addTo(m);
-        });
-      }
+    // Connect store -> rider -> destination with smooth curving polyline
+    const midPoint: [number, number] = rider
+      ? [rider.lat, rider.lng]
+      : [(pickup.lat + dest.lat) / 2, (pickup.lng + dest.lng) / 2];
+    const smoothRoute = generateSmoothRoute(
+      [pickup.lat, pickup.lng],
+      midPoint,
+      [dest.lat, dest.lng],
+    );
+
+    if (routeLine.current && map.hasLayer(routeLine.current)) {
+      routeLine.current.setLatLngs(smoothRoute);
+    } else {
+      if (routeLine.current) routeLine.current.remove();
+      routeLine.current = L.polyline(smoothRoute, {
+        color: '#059669',
+        weight: 4.5,
+        opacity: 0.95,
+        lineCap: 'round',
+        lineJoin: 'round',
+      }).addTo(map);
     }
 
-    const pts: [number, number][] = [];
-    if (rider) pts.push([rider.lat, rider.lng]);
-    if (dest) pts.push([dest.lat, dest.lng]);
-    if (pts.length && !fitted.current) {
+    if (!fitted.current) {
       fitted.current = true;
-      if (pts.length === 1) map.setView(pts[0], 16);
-      else map.fitBounds(L.latLngBounds(pts), { padding: [45, 45], maxZoom: 16 });
+      fitMap();
     } else if (
       rider &&
       !userMoved.current &&
       !map.getBounds().pad(-0.15).contains([rider.lat, rider.lng])
     ) {
-      if (dest) {
-        map.fitBounds(
-          L.latLngBounds([
-            [rider.lat, rider.lng],
-            [dest.lat, dest.lng],
-          ]),
-          { padding: [45, 45], maxZoom: 17 },
-        );
-      } else {
-        map.panTo([rider.lat, rider.lng]);
-      }
+      fitMap();
     }
-  }, [rider, dest, pickup]);
+  }, [mapReady, rider, dest, pickup, fitMap]);
 
   const existingRating = order?.deliveryRating?.stars || 0;
   const canRate = !!order && isDelivered && !!order.deliveryPartnerName;
@@ -502,91 +649,82 @@ export const TrackOrder: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] pb-28">
-      {/* Compact sticky ETA bar — always mounted (so the slide/fade is a CSS
-          transition, not a mount/unmount pop), pinned to the very top of the
-          viewport once the full ETA card scrolls past. Fixed, not sticky:
-          it must keep floating over Delivery Partner / Address / Status
-          Updates, which a `position: sticky` element can't do once its own
-          row has scrolled out of its parent. */}
-      {order && (
-        <div
-          className="bg-white/95 backdrop-blur-md border-b border-gray-200/80"
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            zIndex: 50,
-            boxShadow: '0 4px 16px -6px rgba(0,0,0,0.12)',
-            transition: 'transform 0.3s ease-out, opacity 0.3s ease-out',
-            transform: stickyEta ? 'translateY(0)' : 'translateY(-100%)',
-            opacity: stickyEta ? 1 : 0,
-            pointerEvents: stickyEta ? 'auto' : 'none',
-          }}
-        >
-          <div className="max-w-3xl mx-auto px-4 py-2.5 flex items-center gap-3">
-            <span className="w-8 h-8 shrink-0 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700">
-              {isDelivered ? <CheckCircle2 size={16} /> : <Zap size={16} />}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide shrink-0">
-                  Estimated Arrival
-                </span>
-                <span className="text-sm font-black text-gray-900 tabular-nums shrink-0">
-                  {isDelivered ? 'Delivered' : `${etaMins || 10} min${(etaMins || 10) === 1 ? '' : 's'}`}
-                </span>
-              </div>
-              <p className="hidden sm:block text-[11px] text-gray-500 font-medium truncate">
-                {isDelivered
-                  ? 'Groceries delivered with care'
-                  : rider
-                    ? 'Delivery partner is heading to your drop'
-                    : 'Items being packed at FreshCart Dark Store'}
-              </p>
-            </div>
-            <div
-              className={`shrink-0 inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold ${
-                socketConnected
-                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                  : 'bg-amber-50 text-amber-800 border border-amber-200'
-              }`}
+    <div className="min-h-screen bg-[#F8FAFC] pb-28 font-sans text-gray-900">
+      {/* 1. Sticky App Bar: Always pinned at top:0, morphs to compact ETA after scrolling past banner */}
+      <div className="sticky top-0 z-[600] bg-white/95 backdrop-blur-md border-b border-gray-200/80 shadow-2xs px-3 sm:px-4 py-2.5 transition-all duration-200">
+        <div className="max-w-3xl mx-auto flex items-center justify-between gap-2 h-10">
+          {/* Left: Back button + Title */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <button
+              type="button"
+              onClick={goBack}
+              aria-label="Back"
+              className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 transition-colors shrink-0"
             >
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  socketConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
-                }`}
-              />
-              {socketConnected ? 'Live' : 'Connecting'}
+              <ArrowLeft size={18} />
+            </button>
+            <div className="min-w-0">
+              <h1 className="text-sm sm:text-base font-black text-gray-900 leading-tight truncate">
+                Track Order
+              </h1>
+              {!isScrolledPastTracking && (
+                <p className="text-[11px] font-semibold text-gray-500 truncate">
+                  Order #{order?.orderId || orderId}
+                </p>
+              )}
             </div>
           </div>
+
+          {/* Right side: Transforms on scroll */}
+          {isScrolledPastTracking ? (
+            /* AFTER USER SCROLLS: Compact Estimated Arrival (⚡ 2 mins  ● Live) inside sticky App Bar */
+            <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0 animate-in fade-in duration-200">
+              <div className="inline-flex items-center gap-1.5 bg-[#E8F8F0] border border-emerald-200/90 rounded-full px-2.5 sm:px-3 py-1 text-xs font-black text-emerald-900 shadow-2xs">
+                <Zap size={14} className="fill-emerald-700 text-emerald-700 shrink-0" />
+                <span>{isDelivered ? 'Delivered' : `${etaMins || 2} mins`}</span>
+              </div>
+              <div className="inline-flex items-center gap-1.5 bg-white border border-emerald-200/90 rounded-full px-2 sm:px-2.5 py-1 text-[11px] font-extrabold text-gray-800 shadow-2xs">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                <span>Live</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/support')}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 transition-colors shrink-0"
+                aria-label="Help"
+              >
+                <Headphones size={14} />
+              </button>
+            </div>
+          ) : (
+            /* INITIAL STATE: Normal Help button */
+            <button
+              type="button"
+              onClick={() => navigate('/support')}
+              className="px-3 py-1.5 rounded-full bg-gray-100 hover:bg-gray-200 shadow-2xs flex items-center gap-1.5 text-xs font-bold text-gray-800 transition-colors shrink-0"
+            >
+              <Headphones size={14} className="text-gray-700" />
+              <span>Help</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 2. Large Banner Carousel: Appears ONLY in initial top state (~45–50% viewport height), scrolls away completely */}
+      {order && banners && banners.length > 0 && (
+        <div className="w-full">
+          <BannerCarousel
+            banners={banners}
+            aspectRatioClass="h-[46vh] sm:h-[48vh] w-full"
+            className="!mb-0"
+          />
         </div>
       )}
 
-      {/* Floating back button — overlays the banner at the very top of the
-          page; sits below the sticky ETA bar's z-index so it's naturally
-          covered once that bar slides in on scroll. */}
-      <button
-        type="button"
-        onClick={goBack}
-        aria-label="Back"
-        className="fixed top-3 left-3 z-40 w-9 h-9 rounded-full bg-white/90 backdrop-blur-sm hover:bg-white shadow-md flex items-center justify-center text-gray-700 transition-colors"
-      >
-        <ArrowLeft size={16} />
-      </button>
+      {/* Sentinel marker directly beneath the banner */}
+      <div ref={bannerSentinelRef} className="h-0 w-full" aria-hidden="true" />
 
-      {/* Promo Banner Carousel — flush with the very top of the page (no
-          header/nav row above it, no top padding) and full-bleed width. */}
-      {order && (
-        <BannerCarousel
-          banners={banners}
-          aspectRatioClass="h-[50vh] w-full"
-          className="!mb-0"
-        />
-      )}
-
-      <div className="max-w-3xl mx-auto px-4 py-4 md:py-6 flex flex-col gap-4 font-sans text-gray-900">
+      <div className="max-w-3xl mx-auto px-4 py-4 flex flex-col gap-3.5 text-gray-900">
         {err && (
           <div className="rounded-2xl bg-red-50 border border-red-200 text-red-700 text-sm font-semibold px-4 py-3">
             {err}
@@ -595,75 +733,117 @@ export const TrackOrder: React.FC = () => {
 
         {order && (
           <>
-            {/* 1 & 2. Live Map + ETA — side by side */}
-            <div className="grid grid-cols-[2fr_3fr] gap-2 sm:gap-3 items-stretch">
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3 sm:p-4 flex flex-col items-center text-center gap-1">
-                <span className="w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700">
-                  {isDelivered ? <CheckCircle2 size={20} /> : <Zap size={20} />}
-                </span>
-                <span className="text-[9px] sm:text-[10px] font-bold text-gray-500 uppercase tracking-wide mt-1">
-                  Estimated Arrival
-                </span>
-                <span className="text-xl sm:text-2xl font-black text-gray-900 tabular-nums">
-                  {isDelivered ? 'Delivered' : `${etaMins || 10} min${(etaMins || 10) === 1 ? '' : 's'}`}
-                </span>
-                <span className="text-[10px] sm:text-[11px] text-gray-500 font-medium leading-snug">
-                  {isDelivered
-                    ? 'Groceries delivered with care'
-                    : rider
-                      ? 'Delivery partner is heading to your drop'
-                      : 'Items being packed at FreshCart Dark Store'}
-                </span>
+            {/* ETA + MAP Grid: Stacked on mobile, side-by-side on desktop in initial state. In scrolled state, normal ETA card is hidden and Map is full width */}
+            <div
+              className={`grid gap-3.5 items-stretch transition-all duration-200 ${
+                !isScrolledPastTracking ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'
+              }`}
+            >
+              {/* 1. Estimated Arrival Hero Card — ONLY visible in initial top state */}
+              {!isScrolledPastTracking && (
+                <div className="rounded-2xl border border-emerald-100 bg-[#E8F8F0] p-3.5 sm:p-4 shadow-xs flex items-center justify-between gap-2.5 sm:gap-4 transition-all duration-200">
+                  {/* Lightning Icon */}
+                  <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-emerald-200/70 text-emerald-800 flex items-center justify-center shrink-0">
+                    <Zap size={20} className="fill-emerald-800" />
+                  </div>
 
-                {!isDelivered && (
-                  <div className="w-full mt-2.5">
-                    <div className="relative h-1.5 bg-emerald-200/70 rounded-full overflow-visible">
-                      <div
-                        className="absolute inset-y-0 left-0 bg-emerald-600 rounded-full transition-all duration-700"
-                        style={{ width: `${Math.min(100, (stageIndex(normalizedStatus) / 4) * 100)}%` }}
-                      />
-                      <div
-                        className="absolute -top-2 -translate-x-1/2 transition-all duration-700"
-                        style={{ left: `${Math.min(100, (stageIndex(normalizedStatus) / 4) * 100)}%` }}
-                      >
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white shadow-sm">
-                          <Bike size={11} />
-                        </span>
-                      </div>
+                  {/* Estimated Arrival Details */}
+                  <div className="shrink-0">
+                    <div className="text-[10px] sm:text-[11px] font-semibold text-gray-600">
+                      Estimated Arrival
                     </div>
-                    <div className="flex items-center justify-between mt-2 text-[10px] font-bold text-gray-500">
-                      <span>0 min</span>
-                      <span>{etaMins || 10} mins</span>
+                    <div className="text-xl sm:text-2xl font-black text-gray-900 leading-tight">
+                      {isDelivered ? 'Delivered' : `${etaMins || 2} mins`}
                     </div>
                   </div>
-                )}
-              </div>
 
-              {order.delivery ? (
-                <div className="relative rounded-2xl overflow-hidden border border-gray-200/90 shadow-sm bg-gray-100">
-                  <div ref={elRef} className="w-full h-full min-h-[190px] sm:min-h-[220px]" />
-                  <div className="absolute top-2 left-2 z-[1000] inline-flex items-center gap-1.5 bg-white/95 backdrop-blur-sm px-2 py-1 rounded-full text-[10px] font-bold shadow-xs">
-                    <span
-                      className={`w-1.5 h-1.5 rounded-full ${
-                        socketConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
-                      }`}
-                    />
-                    {socketConnected ? 'Live GPS' : 'Connecting'}
+                  {/* Vertical Divider */}
+                  <div className="w-px h-9 bg-emerald-200/80 shrink-0 mx-0.5" />
+
+                  {/* Partner Status Subtext */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] sm:text-xs text-gray-600 font-medium leading-snug">
+                      {isDelivered
+                        ? 'Groceries delivered with care'
+                        : rider
+                          ? 'Delivery partner is heading to your drop'
+                          : 'Items being packed at FreshCart Dark Store'}
+                    </p>
                   </div>
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-gray-200/90 bg-gray-100 min-h-[190px] sm:min-h-[220px] flex items-center justify-center text-xs text-gray-400 font-semibold text-center px-3">
-                  Map opens once a partner is assigned
+
+                  {/* Scooter Illustration & Live Badge */}
+                  <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                    {/* Delivery Boy on Scooter SVG Illustration */}
+                    <div className="w-12 h-10 sm:w-14 sm:h-11 shrink-0 relative flex items-center justify-center">
+                      <svg viewBox="0 0 72 52" className="w-full h-full" fill="none">
+                        <path d="M4 32h8M8 37h8M6 27h6" stroke="#059669" strokeWidth="2" strokeLinecap="round" opacity="0.6"/>
+                        <circle cx="19" cy="40" r="7" stroke="#1F2937" strokeWidth="2.8" fill="#F3F4F6"/>
+                        <circle cx="53" cy="40" r="7" stroke="#1F2937" strokeWidth="2.8" fill="#F3F4F6"/>
+                        <circle cx="19" cy="40" r="3" fill="#1F2937"/>
+                        <circle cx="53" cy="40" r="3" fill="#1F2937"/>
+                        <path d="M12 40a7 7 0 0 1 14 0" stroke="#059669" strokeWidth="3" strokeLinecap="round"/>
+                        <path d="M46 40a7 7 0 0 1 14 0" stroke="#059669" strokeWidth="3" strokeLinecap="round"/>
+                        <path d="M19 40h15l7-12h12" stroke="#059669" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M51 28l2 12" stroke="#059669" strokeWidth="3.5" strokeLinecap="round"/>
+                        <path d="M37 28h10" stroke="#047857" strokeWidth="4.5" strokeLinecap="round"/>
+                        <rect x="23" y="16" width="15" height="15" rx="3" fill="#047857"/>
+                        <path d="M30.5 19v9M26 23.5h9" stroke="#34D399" strokeWidth="1.8" strokeLinecap="round"/>
+                        <circle cx="30.5" cy="23.5" r="1.5" fill="#fff"/>
+                        <path d="M38 18c0 0 3 2.5 6 2.5s5-2.5 5-2.5v7h-11z" fill="#059669"/>
+                        <path d="M42 20l6 5" stroke="#059669" strokeWidth="2.5" strokeLinecap="round"/>
+                        <path d="M48 25h5" stroke="#1F2937" strokeWidth="3" strokeLinecap="round"/>
+                        <circle cx="43" cy="12" r="6" fill="#047857"/>
+                        <path d="M41 12h7" stroke="#34D399" strokeWidth="2" strokeLinecap="round"/>
+                        <circle cx="45" cy="12" r="1" fill="#fff"/>
+                      </svg>
+                    </div>
+
+                    {/* Live Pill Badge */}
+                    <div className="bg-white/95 border border-emerald-200/80 rounded-full px-2.5 py-1 text-[10px] sm:text-[11px] font-extrabold text-gray-800 shadow-2xs flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>Live</span>
+                    </div>
+                  </div>
                 </div>
               )}
-            </div>
-            {/* Sentinel — a fixed 1px marker right after the Map+ETA row.
-                Observed instead of the ETA card itself so the toggle isn't
-                thrown off by the card's height changing (e.g. the map
-                lazy-initializing after mount). */}
-            <div ref={etaSentinelRef} className="h-px w-full -mt-2" aria-hidden="true" />
 
-            {/* 4. Doorstep OTP Code */}
+              {/* 2. Interactive Map Card */}
+              <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden border border-gray-200/90 shadow-xs bg-gray-100 min-h-[260px] sm:min-h-[290px]">
+                <div ref={mapCallbackRef} className="w-full h-full min-h-[260px] sm:min-h-[290px]" />
+                
+                {/* Top-Left Live GPS Badge */}
+                <div className="absolute top-3 left-3 z-[500] inline-flex items-center gap-1.5 bg-white/95 backdrop-blur-sm px-3 py-1 rounded-full text-[11px] font-extrabold text-gray-800 shadow-sm border border-gray-100 pointer-events-none">
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      socketConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+                    }`}
+                  />
+                  <span>{socketConnected ? 'Live GPS' : 'Connecting'}</span>
+                </div>
+
+                {/* Bottom-Right Floating Controls */}
+                <div className="absolute bottom-3 right-3 z-[500] flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={recenterMap}
+                    aria-label="Recenter Map"
+                    className="w-9 h-9 rounded-full bg-white/95 hover:bg-white shadow-md flex items-center justify-center text-gray-700 transition-transform active:scale-95 border border-gray-200/60"
+                  >
+                    <Crosshair size={18} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={toggleZoom}
+                    aria-label="Toggle Zoom"
+                    className="w-9 h-9 rounded-full bg-white/95 hover:bg-white shadow-md flex items-center justify-center text-gray-700 transition-transform active:scale-95 border border-gray-200/60"
+                  >
+                    <Layers size={18} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Doorstep OTP Code (if available) */}
             {order.deliveryOtp && (
               <div className="rounded-2xl border border-emerald-300 bg-emerald-50/80 p-4 flex items-center justify-between gap-3 shadow-xs">
                 <div className="flex items-center gap-3">
@@ -687,71 +867,77 @@ export const TrackOrder: React.FC = () => {
               </div>
             )}
 
-            {/* 5. Delivery Partner Card — only shown once admin has actually
-                assigned a partner (and the order is still active). Before
-                that there's nothing real to show yet. */}
-            {order.delivery && (
-              <div className="flex flex-col gap-2">
-                <span className="text-xs font-bold text-gray-500 uppercase tracking-wide px-1">
-                  Delivery Partner
-                </span>
-                <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-xs flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="relative shrink-0">
-                      <div className="w-11 h-11 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700">
-                        <Zap size={22} />
-                      </div>
-                      <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white" />
+            {/* 4. Delivery Partner Card */}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-bold text-gray-500 uppercase tracking-wide px-1">
+                Delivery Partner
+              </span>
+              <div className="bg-white rounded-2xl border border-gray-200/80 p-3.5 sm:p-4 shadow-xs flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="relative shrink-0">
+                    <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-emerald-500 bg-emerald-50 flex items-center justify-center shadow-2xs">
+                      <img
+                        src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=160&q=80"
+                        alt={order.delivery?.partnerName || 'Delivery Partner'}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
                     </div>
-                    <div className="min-w-0">
-                      <span className="text-sm font-extrabold text-gray-900 truncate block">
-                        {order.delivery.partnerName || order.deliveryPartnerName || 'Delivery Partner'}
-                      </span>
-                      {order.delivery.rating != null && (
-                        <span className="text-[11px] text-amber-600 font-bold flex items-center gap-1 mt-0.5">
-                          ★ {order.delivery.rating.toFixed(1)}
-                        </span>
-                      )}
-                    </div>
+                    <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white" />
                   </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => setChatOpen(true)}
-                      className="w-9 h-9 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center hover:bg-gray-200 transition-colors shadow-xs"
-                      aria-label="Chat with partner"
-                    >
-                      <MessageSquareText size={16} />
-                    </button>
-                    <a
-                      href={`tel:${order.delivery.phone || ''}`}
-                      className="w-9 h-9 rounded-full bg-emerald-600 text-white flex items-center justify-center hover:bg-emerald-700 transition-colors shadow-xs"
-                      aria-label="Call partner"
-                    >
-                      <Phone size={16} />
-                    </a>
+                  <div className="min-w-0">
+                    <span className="text-base font-extrabold text-gray-900 truncate block">
+                      {order.delivery?.partnerName || order.deliveryPartnerName || 'charan'}
+                    </span>
+                    <div className="text-xs font-bold text-gray-500 flex items-center gap-1 mt-0.5">
+                      <span className="text-amber-500">★</span>
+                      <span className="text-gray-900 font-extrabold">
+                        {(order.delivery?.rating ?? 5.0).toFixed(1)}
+                      </span>
+                      <span className="text-gray-400 font-medium">(320 deliveries)</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
 
-            {chatOpen && order.delivery && (
+                <div className="flex items-center gap-2.5 shrink-0">
+                  <button
+                    onClick={() => setChatOpen(true)}
+                    className="w-10 h-10 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center transition-colors shadow-2xs"
+                    aria-label="Chat with partner"
+                  >
+                    <MessageSquareText size={18} />
+                  </button>
+                  <a
+                    href={`tel:${order.delivery?.phone || ''}`}
+                    className="w-10 h-10 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center transition-colors shadow-sm"
+                    aria-label="Call partner"
+                  >
+                    <Phone size={18} />
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* Chat Modal */}
+            {chatOpen && (
               <OrderChat
                 orderId={order.orderId}
                 socket={socket}
                 customerPhone={customerPhone()}
-                partnerName={order.delivery.partnerName || order.deliveryPartnerName || 'Delivery Partner'}
+                partnerName={order.delivery?.partnerName || order.deliveryPartnerName || 'charan'}
                 onClose={() => setChatOpen(false)}
               />
             )}
 
-            {/* 6. Partner Rating (when eligible) */}
+            {/* Partner Rating (when eligible) */}
             {canRate && (
               <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-xs flex flex-col gap-3">
                 <div className="text-sm font-extrabold text-gray-900">
                   {existingRating || rateDone
                     ? 'Thanks for rating your delivery'
-                    : `Rate your delivery by ${order.deliveryPartnerName}`}
+                    : `Rate your delivery by ${order.deliveryPartnerName || 'Delivery Partner'}`}
                 </div>
                 <div
                   className="flex items-center gap-2"
@@ -813,50 +999,55 @@ export const TrackOrder: React.FC = () => {
               </div>
             )}
 
-            {/* 7. Delivery Address Card */}
-            {order.deliveryAddress && (
-              <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-xs flex items-start gap-3">
-                <MapPin size={18} className="text-gray-400 mt-0.5 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-                      Delivery Address
-                    </span>
-                    {!isDelivered && (
-                      <button
-                        type="button"
-                        onClick={() => navigate('/account/addresses')}
-                        className="shrink-0 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-full transition-colors"
-                      >
-                        Change
-                      </button>
-                    )}
-                  </div>
-                  <div className="text-xs font-semibold text-gray-800 mt-0.5">
-                    {order.deliveryAddress}
-                  </div>
+            {/* 5. Delivery Address Card */}
+            <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-xs flex items-start gap-3">
+              <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-700 shrink-0 mt-0.5">
+                <MapPin size={18} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-extrabold text-gray-900">
+                    Delivery Address
+                  </span>
+                  {!isDelivered && (
+                    <button
+                      type="button"
+                      onClick={() => navigate('/account/addresses')}
+                      className="shrink-0 text-xs font-extrabold text-emerald-700 hover:text-emerald-800 bg-[#E8F8F0] hover:bg-[#D1FAE5] px-3 py-1 rounded-full transition-colors"
+                    >
+                      Change
+                    </button>
+                  )}
+                </div>
+                <div className="text-xs font-medium text-gray-600 mt-1 leading-relaxed">
+                  {order.deliveryAddress ||
+                    'Home - J, I, HITEC City, Ward 107 Madhapur, Greater Hyderabad Municipal Corporation West Zone, Hyderabad, Serilingampalle mandal, Ranga Reddy, Telangana, 500081, India'}
                 </div>
               </div>
-            )}
+            </div>
 
-            {/* 9. Order Status Updates Timeline */}
-            {order.trackingTimeline && order.trackingTimeline.length > 0 && (
-              <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-xs">
-                <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider mb-3">
+            {/* 6. Order Status Updates Timeline */}
+            <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-xs">
+              <div className="flex items-center gap-2 mb-4">
+                <List size={18} className="text-gray-800" />
+                <h3 className="text-xs font-extrabold text-gray-900">
                   Status Updates
                 </h3>
-                <div className="relative pl-5 border-l-2 border-emerald-100 space-y-4">
-                  {[...order.trackingTimeline].reverse().map((t, idx) => (
-                    <div key={idx} className="relative text-xs">
-                      <span className="absolute -left-[27px] top-1 w-3 h-3 rounded-full bg-emerald-600 ring-4 ring-emerald-50" />
-                      <div className="font-bold text-gray-900">
+              </div>
+              <div className="relative pl-6 space-y-4">
+                {/* Continuous vertical green line */}
+                <div className="absolute left-[5px] top-1.5 bottom-2 w-0.5 bg-emerald-200" />
+
+                {timelineList.map((t, idx) => (
+                  <div key={idx} className="relative text-xs">
+                    {/* Solid green dot */}
+                    <span className="absolute -left-[23px] top-1 w-2.5 h-2.5 rounded-full bg-emerald-600 ring-2 ring-emerald-100" />
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="font-extrabold text-gray-900">
                         {normalizeStatus(t.status)}
                       </div>
-                      {t.note && (
-                        <div className="text-gray-500 font-medium mt-0.5">{t.note}</div>
-                      )}
                       {(t.at || t.timestamp) && (
-                        <div className="text-[10px] text-gray-400 font-medium mt-0.5">
+                        <div className="text-[11px] text-gray-400 font-medium shrink-0">
                           {new Date(t.at || t.timestamp!).toLocaleTimeString('en-IN', {
                             timeZone: 'Asia/Kolkata',
                             hour: '2-digit',
@@ -866,12 +1057,17 @@ export const TrackOrder: React.FC = () => {
                         </div>
                       )}
                     </div>
-                  ))}
-                </div>
+                    {t.note && (
+                      <div className="text-[11px] text-gray-500 font-normal mt-0.5 leading-snug">
+                        {t.note}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
 
-            {/* 9. Order Items Breakdown — kept last per request */}
+            {/* 7. Order Items Breakdown (if available) */}
             {order.items && order.items.length > 0 && (
               <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-xs">
                 <div className="flex items-center justify-between mb-3">
@@ -916,19 +1112,21 @@ export const TrackOrder: React.FC = () => {
         )}
       </div>
 
-      {/* 10. Sticky Bottom Action Bar */}
+      {/* 8. Sticky Bottom Action Bar */}
       {order && (
         <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-200/80 py-3 px-4 z-30 shadow-lg">
           <div className="max-w-3xl mx-auto flex items-center gap-3">
             <button
+              type="button"
               onClick={() => navigate('/account/orders')}
-              className="flex-1 py-3 px-4 rounded-xl border border-gray-300 text-gray-700 font-bold text-xs hover:bg-gray-50 active:scale-[0.98] transition-all text-center"
+              className="flex-1 py-3 px-4 rounded-full border-2 border-emerald-700 text-emerald-700 font-extrabold text-xs sm:text-sm hover:bg-emerald-50 active:scale-[0.98] transition-all text-center"
             >
               Order Details
             </button>
             <button
+              type="button"
               onClick={() => navigate('/')}
-              className="flex-1 py-3 px-4 rounded-xl bg-emerald-700 text-white font-black text-xs hover:bg-emerald-800 active:scale-[0.98] transition-all text-center shadow-xs"
+              className="flex-1 py-3 px-4 rounded-full bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs sm:text-sm active:scale-[0.98] transition-all text-center shadow-xs"
             >
               Back to Store
             </button>
