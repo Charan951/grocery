@@ -233,8 +233,23 @@
     once the order is Delivered** (both surfaces) — reverted once (user said
     "undo that" mid-change) then re-applied per a later, more specific request;
     keep this distinction in mind if asked again.
-  - **`TrackOrder.tsx` (web) — substantial rebuild**, no Flutter mirror built
-    this session (explicitly deferred — user was asked, hasn't confirmed yet):
+  - **`TrackOrder.tsx` (web) — substantial rebuild.** Flutter mirror for the
+    app-bar/banner-overlay piece landed 2026-09-16 (`tracking_screen.dart`):
+    app bar moved out of the sliver list into a `Stack` overlay driven by
+    `AnimatedBuilder` on the `ScrollController` (no title/help/copy icon;
+    floating circular back button over the banner at rest → continuous,
+    not-snapped transition to solid `#0C8B4F` bar + headline + "Arriving in
+    X mins • Live" pill + refresh icon; every property is `progress =
+    clamp(offset/bannerHeight, 0, 1)`-driven, tied to the banner's real
+    height). Pinned map header now offsets by app-bar height so it sits
+    flush below it. Deliberate deviations from the web's literal DOM
+    position math: ETA hero card cross-fades into the bar via scroll-linked
+    opacity rather than FLIP-style position interpolation; map stays a
+    pinned full-width sliver header below the ETA/content column rather
+    than a fixed 2-column desktop-style layout (phone widths too narrow for
+    ETA+map side by side). `flutter analyze` clean; no tests cover this
+    screen. Below-header details (ETA card, side-by-side grid, sticky-bar
+    history) below are the **web's** iteration history, not yet all ported:
     - Delivery-partner card: star-rating badge removed, "Delivery Partner
       Details" heading added, WhatsApp button removed (kept Chat + Call), Call
       button now **always shown** (was gated behind `canContact`) — same trim
