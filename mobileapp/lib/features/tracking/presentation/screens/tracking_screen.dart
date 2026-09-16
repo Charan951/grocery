@@ -290,13 +290,17 @@ class _TrackingAppBar extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(
-                height: 40 - 4 * barT,
+                // Fixed at the 44px touch-target minimum (was 36-40px,
+                // shrinking further with scroll — matches the web
+                // tracker's /impeccable audit fix). Only color/shadow
+                // cross-fade now, not size.
+                height: 44,
                 child: _CircleIconButton(
                   icon: Icons.arrow_back_rounded,
                   onTap: onBack,
                   filled: Color.lerp(Colors.white.withOpacity(0.95), Colors.white.withOpacity(0.15), barT)!,
                   iconColor: Color.lerp(const Color(0xFF1F2937), Colors.white, barT)!,
-                  size: 40 - 4 * barT,
+                  size: 44,
                   shadow: barT < 0.5,
                 ),
               ),
@@ -363,12 +367,17 @@ class _TrackingAppBar extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(width: 8),
+                              // 36px, not the 44px ideal (matches the web
+                              // tracker's /impeccable audit tradeoff) — a
+                              // full 44px would overwhelm this compact
+                              // pill's proportions; 36px is a meaningful
+                              // step up from the original 26px.
                               _CircleIconButton(
                                 icon: Icons.refresh_rounded,
                                 onTap: onRefresh,
                                 filled: Colors.white.withOpacity(0.15),
                                 iconColor: Colors.white,
-                                size: 26,
+                                size: 36,
                               ),
                             ],
                           ),

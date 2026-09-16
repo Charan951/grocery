@@ -333,9 +333,12 @@ class _MapControlButton extends StatelessWidget {
         onTap: onTap,
         child: Tooltip(
           message: tooltip,
+          // 44px touch-target minimum (was 32px) — matches the web
+          // tracker's /impeccable audit fix for its Recenter/Zoom buttons;
+          // no layout constraint here, so no tradeoff needed.
           child: Container(
-            width: 32,
-            height: 32,
+            width: 44,
+            height: 44,
             alignment: Alignment.center,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),
@@ -345,7 +348,7 @@ class _MapControlButton extends StatelessWidget {
             ),
             child: Icon(
               icon,
-              size: 18,
+              size: 20,
               color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
             ),
           ),
