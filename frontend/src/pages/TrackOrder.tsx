@@ -16,6 +16,7 @@ import {
   Zap,
   ShieldCheck,
   Headphones,
+  RefreshCw,
   Crosshair,
   Layers,
   List,
@@ -197,6 +198,27 @@ export const TrackOrder: React.FC = () => {
   const [isScrolledPastTracking, setIsScrolledPastTracking] = useState(false);
   const bannerSentinelRef = useRef<HTMLDivElement>(null);
 
+  // Once scrolled, the map pins below the (now green, taller) App Bar
+  // (fixed) while the rest of the page (Doorstep code, Delivery Partner,
+  // Address, Status Updates) keeps scrolling normally underneath it.
+  // `appBarH` is measured so the fixed map sits exactly below the bar.
+  const appBarRef = useRef<HTMLDivElement>(null);
+  const [appBarH, setAppBarH] = useState(56);
+
+  // The map is *always* `position: fixed`, driven entirely by `mapBox`:
+  // before scroll it continuously tracks `mapAnchorRef` (an invisible
+  // spacer sitting in the ETA/Map grid, so it visually reads as "in the
+  // grid" while animating smoothly with the grid's own column transition);
+  // after scroll it snaps to pinned coordinates under the App Bar and stays
+  // there while Doorstep/Delivery Partner/Address/Status Updates scroll
+  // underneath. Being fixed from the very first render (never toggled
+  // static↔fixed) means its top/left/width/height are always comparable
+  // across renders, so a plain CSS transition on those properties animates
+  // every change smoothly — no FLIP-style before/after measuring needed.
+  const mapAnchorRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [mapBox, setMapBox] = useState({ top: 0, left: 0, width: 0, height: 260 });
+
   // Live rider position pushed over socket
   const [liveRider, setLiveRider] = useState<{ lat: number; lng: number } | null>(null);
 
@@ -325,14 +347,36 @@ export const TrackOrder: React.FC = () => {
       raf = 0;
       const el = bannerSentinelRef.current;
       const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      let scrolledPast: boolean;
       if (!el) {
-        setIsScrolledPastTracking(scrollY > 180);
-        return;
+        scrolledPast = scrollY > 180;
+      } else {
+        const rect = el.getBoundingClientRect();
+        // el sits directly below the banner. App bar is ~56px high.
+        // When rect.top <= 60, the banner has completely scrolled above the sticky app bar!
+        scrolledPast = rect.top <= 60 || scrollY > 260;
       }
-      const rect = el.getBoundingClientRect();
-      // el sits directly below the banner. App bar is ~56px high.
-      // When rect.top <= 60, the banner has completely scrolled above the sticky app bar!
-      setIsScrolledPastTracking(rect.top <= 60 || scrollY > 260);
+      setIsScrolledPastTracking(scrolledPast);
+
+      // Drive the always-fixed map's box: pre-scroll it shadows the
+      // in-grid anchor's live position (so it reads as "in the grid" and
+      // animates smoothly with the grid's own column transition);
+      // post-scroll it snaps to pinned coordinates under the App Bar.
+      const barH = appBarRef.current?.getBoundingClientRect().height || appBarH;
+      if (scrolledPast) {
+        const cRect = contentRef.current?.getBoundingClientRect();
+        setMapBox((prev) => ({
+          top: barH,
+          left: cRect ? cRect.left : prev.left,
+          width: cRect ? cRect.width : prev.width,
+          height: 290,
+        }));
+      } else {
+        const aRect = mapAnchorRef.current?.getBoundingClientRect();
+        if (aRect && aRect.width > 0) {
+          setMapBox({ top: aRect.top, left: aRect.left, width: aRect.width, height: aRect.height });
+        }
+      }
     };
     const onScroll = () => {
       if (raf) return;
@@ -351,6 +395,19 @@ export const TrackOrder: React.FC = () => {
       clearInterval(poll);
     };
   }, []);
+
+  // Keep the app-bar height current (it grows in the scrolled/green state,
+  // which now spans 2 lines) so the fixed map always sits flush below it.
+  useEffect(() => {
+    const measure = () => {
+      if (appBarRef.current) setAppBarH(appBarRef.current.getBoundingClientRect().height);
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    if (appBarRef.current) ro.observe(appBarRef.current);
+    return () => ro.disconnect();
+  }, [isScrolledPastTracking]);
 
   const rawStatus = order?.status || 'Placed';
   const normalizedStatus = normalizeStatus(rawStatus);
@@ -650,62 +707,94 @@ export const TrackOrder: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-28 font-sans text-gray-900">
-      {/* 1. Sticky App Bar: Always pinned at top:0, morphs to compact ETA after scrolling past banner */}
-      <div className="sticky top-0 z-[600] bg-white/95 backdrop-blur-md border-b border-gray-200/80 shadow-2xs px-3 sm:px-4 py-2.5 transition-all duration-200">
-        <div className="max-w-3xl mx-auto flex items-center justify-between gap-2 h-10">
-          {/* Left: Back button + Title */}
-          <div className="flex items-center gap-2.5 min-w-0">
-            <button
-              type="button"
-              onClick={goBack}
-              aria-label="Back"
-              className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 transition-colors shrink-0"
-            >
-              <ArrowLeft size={18} />
-            </button>
-            <div className="min-w-0">
-              <h1 className="text-sm sm:text-base font-black text-gray-900 leading-tight truncate">
-                Track Order
-              </h1>
-              {!isScrolledPastTracking && (
-                <p className="text-[11px] font-semibold text-gray-500 truncate">
-                  Order #{order?.orderId || orderId}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Right side: Transforms on scroll */}
-          {isScrolledPastTracking ? (
-            /* AFTER USER SCROLLS: Compact Estimated Arrival (⚡ 2 mins  ● Live) inside sticky App Bar */
-            <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0 animate-in fade-in duration-200">
-              <div className="inline-flex items-center gap-1.5 bg-[#E8F8F0] border border-emerald-200/90 rounded-full px-2.5 sm:px-3 py-1 text-xs font-black text-emerald-900 shadow-2xs">
-                <Zap size={14} className="fill-emerald-700 text-emerald-700 shrink-0" />
-                <span>{isDelivered ? 'Delivered' : `${etaMins || 2} mins`}</span>
-              </div>
-              <div className="inline-flex items-center gap-1.5 bg-white border border-emerald-200/90 rounded-full px-2 sm:px-2.5 py-1 text-[11px] font-extrabold text-gray-800 shadow-2xs">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                <span>Live</span>
-              </div>
+      {/* 1. Sticky App Bar: Always pinned at top:0. Initial = slim white bar.
+          After scrolling past the banner it becomes a full green status bar
+          (back + Help row, order headline, "X mins • Live" pill) instead of
+          a small pill squeezed into an otherwise-white header. */}
+      <div
+        ref={appBarRef}
+        className={`sticky top-0 z-[600] shadow-2xs transition-colors duration-300 ${
+          isScrolledPastTracking
+            ? 'bg-[#0C8B4F] px-3 sm:px-4 pt-2.5 pb-3'
+            : 'bg-white/95 backdrop-blur-md border-b border-gray-200/80 px-3 sm:px-4 py-2.5'
+        }`}
+      >
+        <div className="max-w-3xl mx-auto">
+          <div className="flex items-center justify-between gap-2 h-10">
+            {/* Left: Back button + Title */}
+            <div className="flex items-center gap-2.5 min-w-0">
               <button
                 type="button"
-                onClick={() => navigate('/support')}
-                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 transition-colors shrink-0"
-                aria-label="Help"
+                onClick={goBack}
+                aria-label="Back"
+                className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors shrink-0 ${
+                  isScrolledPastTracking
+                    ? 'bg-white/15 hover:bg-white/25 text-white'
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                }`}
               >
-                <Headphones size={14} />
+                <ArrowLeft size={18} />
               </button>
+              <div className="min-w-0">
+                <h1
+                  className={`text-sm sm:text-base font-black leading-tight truncate ${
+                    isScrolledPastTracking ? 'text-white' : 'text-gray-900'
+                  }`}
+                >
+                  Track Order
+                </h1>
+                {!isScrolledPastTracking && (
+                  <p className="text-[11px] font-semibold text-gray-500 truncate">
+                    Order #{order?.orderId || orderId}
+                  </p>
+                )}
+              </div>
             </div>
-          ) : (
-            /* INITIAL STATE: Normal Help button */
+
             <button
               type="button"
               onClick={() => navigate('/support')}
-              className="px-3 py-1.5 rounded-full bg-gray-100 hover:bg-gray-200 shadow-2xs flex items-center gap-1.5 text-xs font-bold text-gray-800 transition-colors shrink-0"
+              className={`shrink-0 flex items-center gap-1.5 rounded-full transition-colors ${
+                isScrolledPastTracking
+                  ? 'w-9 h-9 justify-center bg-white/15 hover:bg-white/25 text-white'
+                  : 'px-3 py-1.5 bg-gray-100 hover:bg-gray-200 shadow-2xs text-xs font-bold text-gray-800'
+              }`}
+              aria-label="Help"
             >
-              <Headphones size={14} className="text-gray-700" />
-              <span>Help</span>
+              <Headphones size={isScrolledPastTracking ? 16 : 14} />
+              {!isScrolledPastTracking && <span>Help</span>}
             </button>
+          </div>
+
+          {/* Status headline + ETA pill — scrolled state only */}
+          {isScrolledPastTracking && (
+            <div className="mt-1.5">
+              <p className="text-base sm:text-lg font-black text-white leading-snug truncate">
+                {isDelivered
+                  ? 'Order delivered'
+                  : rider
+                    ? 'Delivery partner is heading to your drop'
+                    : 'Order is being prepared'}
+              </p>
+              <div className="mt-2 inline-flex items-center gap-2 bg-white/15 rounded-full pl-3 pr-1 py-1">
+                <span className="text-xs font-extrabold text-white">
+                  {isDelivered ? 'Delivered' : `Arriving in ${etaMins || 2} min${(etaMins || 2) === 1 ? '' : 's'}`}
+                </span>
+                <span className="w-1 h-1 rounded-full bg-white/60" />
+                <span className="inline-flex items-center gap-1 text-xs font-bold text-white/90">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                  Live
+                </span>
+                <button
+                  type="button"
+                  onClick={fetchOrder}
+                  aria-label="Refresh"
+                  className="w-6 h-6 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition-colors"
+                >
+                  <RefreshCw size={12} />
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -724,7 +813,7 @@ export const TrackOrder: React.FC = () => {
       {/* Sentinel marker directly beneath the banner */}
       <div ref={bannerSentinelRef} className="h-0 w-full" aria-hidden="true" />
 
-      <div className="max-w-3xl mx-auto px-4 py-4 flex flex-col gap-3.5 text-gray-900">
+      <div ref={contentRef} className="max-w-3xl mx-auto px-4 py-4 flex flex-col gap-3.5 text-gray-900">
         {err && (
           <div className="rounded-2xl bg-red-50 border border-red-200 text-red-700 text-sm font-semibold px-4 py-3">
             {err}
@@ -812,44 +901,74 @@ export const TrackOrder: React.FC = () => {
                 </div>
               </div>
 
-              {/* 2. Interactive Map Card — grows to fill the freed column on scroll */}
+              {/* 2. Map anchor — invisible spacer that reserves the map's
+                  grid space; the real map (below, always-fixed) shadows
+                  this element's live position pre-scroll. */}
               <div
-                className="relative rounded-2xl sm:rounded-3xl overflow-hidden border border-gray-200/90 shadow-xs bg-gray-100 min-h-[220px] sm:min-h-[290px]"
-                style={{ transition: 'min-height 400ms ease' }}
-              >
-                <div ref={mapCallbackRef} className="w-full h-full min-h-[220px] sm:min-h-[290px]" />
-                
-                {/* Top-Left Live GPS Badge */}
-                <div className="absolute top-3 left-3 z-[500] inline-flex items-center gap-1.5 bg-white/95 backdrop-blur-sm px-3 py-1 rounded-full text-[11px] font-extrabold text-gray-800 shadow-sm border border-gray-100 pointer-events-none">
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      socketConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
-                    }`}
-                  />
-                  <span>{socketConnected ? 'Live GPS' : 'Connecting'}</span>
-                </div>
+                ref={mapAnchorRef}
+                aria-hidden="true"
+                className="rounded-2xl sm:rounded-3xl min-h-[220px] sm:min-h-[290px]"
+                style={{ visibility: 'hidden', transition: 'min-height 400ms ease' }}
+              />
+            </div>
 
-                {/* Bottom-Right Floating Controls */}
-                <div className="absolute bottom-3 right-3 z-[500] flex flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={recenterMap}
-                    aria-label="Recenter Map"
-                    className="w-9 h-9 rounded-full bg-white/95 hover:bg-white shadow-md flex items-center justify-center text-gray-700 transition-transform active:scale-95 border border-gray-200/60"
-                  >
-                    <Crosshair size={18} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={toggleZoom}
-                    aria-label="Toggle Zoom"
-                    className="w-9 h-9 rounded-full bg-white/95 hover:bg-white shadow-md flex items-center justify-center text-gray-700 transition-transform active:scale-95 border border-gray-200/60"
-                  >
-                    <Layers size={18} />
-                  </button>
-                </div>
+            {/* 2b. Interactive Map Card — always `position: fixed`, box
+                driven by `mapBox` (see the scroll effect). Pre-scroll it
+                shadows the anchor above; once scrolled it pins under the
+                App Bar and stays there while Doorstep/Delivery Partner/
+                Address/Status Updates scroll underneath. */}
+            <div
+              className="rounded-2xl sm:rounded-3xl overflow-hidden border border-gray-200/90 shadow-xs bg-gray-100"
+              style={{
+                position: 'fixed',
+                top: mapBox.top,
+                left: mapBox.left,
+                width: mapBox.width,
+                height: mapBox.height,
+                zIndex: isScrolledPastTracking ? 490 : 10,
+                transition:
+                  'top 350ms cubic-bezier(0.4,0,0.2,1), left 350ms cubic-bezier(0.4,0,0.2,1), width 350ms cubic-bezier(0.4,0,0.2,1), height 350ms cubic-bezier(0.4,0,0.2,1)',
+              }}
+            >
+              <div ref={mapCallbackRef} className="w-full h-full" />
+
+              {/* Top-Left Live GPS Badge */}
+              <div className="absolute top-3 left-3 z-[500] inline-flex items-center gap-1.5 bg-white/95 backdrop-blur-sm px-3 py-1 rounded-full text-[11px] font-extrabold text-gray-800 shadow-sm border border-gray-100 pointer-events-none">
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    socketConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+                  }`}
+                />
+                <span>{socketConnected ? 'Live GPS' : 'Connecting'}</span>
+              </div>
+
+              {/* Bottom-Right Floating Controls */}
+              <div className="absolute bottom-3 right-3 z-[500] flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={recenterMap}
+                  aria-label="Recenter Map"
+                  className="w-9 h-9 rounded-full bg-white/95 hover:bg-white shadow-md flex items-center justify-center text-gray-700 transition-transform active:scale-95 border border-gray-200/60"
+                >
+                  <Crosshair size={18} />
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleZoom}
+                  aria-label="Toggle Zoom"
+                  className="w-9 h-9 rounded-full bg-white/95 hover:bg-white shadow-md flex items-center justify-center text-gray-700 transition-transform active:scale-95 border border-gray-200/60"
+                >
+                  <Layers size={18} />
+                </button>
               </div>
             </div>
+
+            {/* Flow spacer for the fixed map once it's pinned — keeps
+                Doorstep/Partner/Address/Status starting right where the map
+                visually ends instead of being covered by it. Zero height
+                pre-scroll since the map is still shadowing the anchor above
+                (which already reserves the space). */}
+            <div style={{ height: isScrolledPastTracking ? mapBox.height + 14 : 0, transition: 'height 350ms ease' }} />
 
             {/* 3. Doorstep OTP Code (if available) */}
             {order.deliveryOtp && (
