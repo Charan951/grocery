@@ -1092,8 +1092,14 @@ export const TrackOrder: React.FC = () => {
               <div
                 className="fixed z-[650] rounded-2xl border border-emerald-100 bg-[#E8F8F0] shadow-xs overflow-hidden pointer-events-none"
                 style={{
-                  top: etaBox.top,
-                  left: etaBox.left,
+                  // Position via `transform`, not top/left — see the map
+                  // card's identical comment. width/height stay real
+                  // properties (not scale) since the card's content
+                  // (icon/text/illustration) needs to actually reflow/
+                  // clip as it shrinks, not visually distort.
+                  top: 0,
+                  left: 0,
+                  transform: `translate3d(${etaBox.left}px, ${etaBox.top}px, 0)`,
                   width: etaBox.width,
                   height: etaBox.height,
                   borderRadius: 16 - 4 * Math.min(1, scrollProgress / 0.6),
@@ -1216,8 +1222,19 @@ export const TrackOrder: React.FC = () => {
               className="rounded-2xl sm:rounded-3xl overflow-hidden border border-gray-200/90 shadow-xs bg-gray-100"
               style={{
                 position: 'fixed',
-                top: mapBox.top,
-                left: mapBox.left,
+                // Position via `transform` (GPU-composited), not top/left —
+                // updating top/left every scroll frame forces the browser
+                // to recompute layout each time, the actual cause of the
+                // scroll jank flagged by /impeccable optimize. transform
+                // moves the already-painted layer without a reflow.
+                // width/height still change directly (not transform:scale)
+                // because Leaflet renders real tiles sized to the
+                // container's actual pixel dimensions — scaling it would
+                // blur/misalign tiles instead of loading correctly-sized
+                // ones.
+                top: 0,
+                left: 0,
+                transform: `translate3d(${mapBox.left}px, ${mapBox.top}px, 0)`,
                 width: Math.max(mapBox.width, 200), // never 0 — see mapBox init comment
                 height: Math.max(mapBox.height, 160),
                 zIndex: isScrolledPastTracking ? 490 : 10,
