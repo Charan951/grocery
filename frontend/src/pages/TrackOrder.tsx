@@ -555,7 +555,12 @@ export const TrackOrder: React.FC = () => {
     // (including the expensive invalidateSize() reflow above).
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll);
-    const poll = setInterval(checkScroll, 100);
+    // Fallback safety net only (catches layout shifts the scroll/resize
+    // listeners wouldn't fire for, e.g. images finishing loading) — the
+    // real-time path is the scroll listener. Was 100ms, adding constant
+    // background reflow work on top of every real scroll tick; 300ms is
+    // still plenty responsive as a fallback and cuts that overhead 3x.
+    const poll = setInterval(checkScroll, 300);
     checkScroll();
     return () => {
       window.removeEventListener('scroll', onScroll);
