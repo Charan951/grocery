@@ -56,7 +56,6 @@ const init = () => {
     return _app;
   } catch (err) {
     if (!_warned) {
-      console.warn('[push] FCM disabled — bad FIREBASE_SERVICE_ACCOUNT:', err.message);
       _warned = true;
     }
     _app = false;
@@ -110,7 +109,6 @@ export const sendToOwner = async (ownerId, { title, body, data = {} }) => {
     if (dead.length) await DeviceToken.deleteMany({ token: { $in: dead } });
     return { skipped: false, sent: res.successCount, pruned: dead.length };
   } catch (err) {
-    console.warn('[push] send failed:', err.message);
     return { skipped: false, sent: 0, error: err.message };
   }
 };

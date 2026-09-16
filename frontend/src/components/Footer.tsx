@@ -151,6 +151,7 @@ export const Footer: React.FC = () => {
             <Link to="/legal?tab=terms" className="transition-colors duration-200 hover:text-primary">Terms of Service</Link>
             <Link to="/legal?tab=refund" className="transition-colors duration-200 hover:text-primary">Refund Policy</Link>
             <Link to="/legal?tab=cookie" className="transition-colors duration-200 hover:text-primary">Cookie Settings</Link>
+            <Link to="/delete-account" className="transition-colors duration-200 hover:text-primary">Delete Account</Link>
           </div>
         </div>
       </div>

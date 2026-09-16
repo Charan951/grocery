@@ -37,6 +37,5 @@ export const logAudit = async (userId, userName, action, details) => {
   try {
     await AuditLog.create({ userId, userName, action, details });
   } catch (err) {
-    console.error('Audit logging failed:', err.message);
   }
 };

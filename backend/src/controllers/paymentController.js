@@ -37,7 +37,6 @@ export const paymentController = {
         key: keyId,
       });
     } catch (err) {
-      console.warn('Razorpay order creation fallback:', err.message);
       // Only fall back to a fake order id when we're intentionally in test mode.
       if (isPaymentsTestMode()) {
         return res.json({
@@ -161,7 +160,6 @@ export const paymentController = {
       }
       res.json({ success: true });
     } catch (err) {
-      console.warn('Razorpay webhook error:', err.message);
       res.status(200).json({ success: false }); // 200 so Razorpay doesn't spam retries on parse errors
     }
   },

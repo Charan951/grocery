@@ -52,7 +52,6 @@ export const seedDatabase = async () => {
           });
         }
       }
-      console.log('✅ Seeded users for all roles successfully!');
     }
 
     // Every Delivery-role user needs a DeliveryPartner profile (idempotent, self-heals).
@@ -61,7 +60,6 @@ export const seedDatabase = async () => {
       const exists = await DeliveryPartner.findOne({ userId: du._id });
       if (!exists) {
         await DeliveryPartner.create({ userId: du._id, phone: du.phone || '' });
-        console.log(`✅ Created DeliveryPartner profile for user ${du._id}`);
       }
     }
 
@@ -70,7 +68,6 @@ export const seedDatabase = async () => {
     const settingsCount = await Settings.countDocuments();
     if (settingsCount === 0) {
       await Settings.create({});
-      console.log('seeded default application settings.');
     }
 
     // 4. Seed Categories & Subcategories
@@ -193,7 +190,6 @@ export const seedDatabase = async () => {
       ];
 
       await Category.insertMany(initialCategories);
-      console.log('✅ Seeded 7 Zepto Categories with subcategories!');
     }
 
     // Auto-heal existing MongoDB categories that lack valid HTTP image URLs
@@ -502,7 +498,6 @@ export const seedDatabase = async () => {
       ];
 
       await Product.insertMany(seedProductsList);
-      console.log(`✅ Seeded ${seedProductsList.length} rich product records!`);
     }
 
     // 6. Seed Predefined Super Categories
@@ -614,10 +609,8 @@ export const seedDatabase = async () => {
       ];
 
       await SuperCategory.insertMany(initialSuperCategories);
-      console.log('✅ Seeded predefined Super Categories!');
     }
 
   } catch (error) {
-    console.error('database seeding failed:', error.message);
   }
 };

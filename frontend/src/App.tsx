@@ -228,6 +228,8 @@ const AppContent: React.FC = () => {
           <Route path="/s/privacy-policy" element={<Legal defaultTab="privacy" />} />
           <Route path="/terms-of-service" element={<Legal defaultTab="terms" />} />
           <Route path="/privacy-policy" element={<Legal defaultTab="privacy" />} />
+          <Route path="/delete-account" element={<Legal defaultTab="delete" />} />
+          <Route path="/s/delete-account" element={<Legal defaultTab="delete" />} />
         </Routes>
       </main>
 

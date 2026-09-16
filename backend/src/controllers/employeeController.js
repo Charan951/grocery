@@ -44,7 +44,7 @@ export const employeeController = {
           { userId: employee._id },
           { userId: employee._id, phone: employee.phone || '' },
           { upsert: true, new: true }
-        ).catch((e) => console.warn('[DeliveryPartner] create note:', e?.message || e));
+        ).catch(() => {});
 
         if (email) {
           sendDeliveryCredentials({
@@ -53,7 +53,7 @@ export const employeeController = {
             email,
             password: plainPassword,
             mode: 'created',
-          }).catch((e) => console.error('[mail] createEmployee credentials:', e?.message || e));
+          }).catch(() => {});
         }
       }
 

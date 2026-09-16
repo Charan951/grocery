@@ -25,7 +25,6 @@ export const festivalCampaignController = {
         campaign
       });
     } catch (err) {
-      console.error('Error creating festival campaign:', err);
       res.status(500).json({ success: false, message: err.message });
     }
   },
@@ -39,7 +38,6 @@ export const festivalCampaignController = {
         campaigns
       });
     } catch (err) {
-      console.error('Error fetching festival campaigns:', err);
       res.status(500).json({ success: false, message: err.message });
     }
   },
@@ -93,7 +91,6 @@ export const festivalCampaignController = {
         activeCampaigns: validList
       });
     } catch (err) {
-      console.error('Error fetching active festival campaign:', err);
       res.json({ success: true, campaign: null, activeCampaigns: [] });
     }
   },
@@ -108,7 +105,6 @@ export const festivalCampaignController = {
       }
       res.json({ success: true, campaign });
     } catch (err) {
-      console.error('Error fetching festival campaign by ID:', err);
       res.status(500).json({ success: false, message: err.message });
     }
   },
@@ -133,7 +129,6 @@ export const festivalCampaignController = {
         campaign
       });
     } catch (err) {
-      console.error('Error updating festival campaign:', err);
       res.status(500).json({ success: false, message: err.message });
     }
   },
@@ -158,7 +153,6 @@ export const festivalCampaignController = {
         campaign
       });
     } catch (err) {
-      console.error('Error toggling campaign status:', err);
       res.status(500).json({ success: false, message: err.message });
     }
   },
@@ -173,7 +167,6 @@ export const festivalCampaignController = {
         message: 'Festival campaign deleted successfully'
       });
     } catch (err) {
-      console.error('Error deleting festival campaign:', err);
       res.status(500).json({ success: false, message: err.message });
     }
   }

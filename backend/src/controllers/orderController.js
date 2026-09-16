@@ -298,7 +298,6 @@ export const orderController = {
 
       res.status(201).json({ success: true, order });
     } catch (err) {
-      console.error('createOrder failed — order NOT saved:', err.message);
       res.status(500).json({ success: false, message: 'Could not place your order. Please try again.' });
     }
   },

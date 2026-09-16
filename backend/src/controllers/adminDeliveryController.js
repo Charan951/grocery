@@ -226,7 +226,7 @@ export const adminDeliveryController = {
           email: user.email,
           password,
           mode: 'reset',
-        }).catch((e) => console.error('[mail] resetPartnerPassword:', e?.message || e));
+        }).catch(() => {});
       }
 
       res.json({ success: true, message: 'Password reset' });

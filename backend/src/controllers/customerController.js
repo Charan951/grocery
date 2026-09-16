@@ -71,7 +71,6 @@ export const customerController = {
 
       res.json({ success: true, customer });
     } catch (err) {
-      console.warn('authCustomer DB error, returning phone fallback object:', err.message);
       const cleanPhone = (req.body.phone || '9876543210').replace(/\D/g, '').slice(-10);
       res.json({
         success: true,
@@ -185,7 +184,6 @@ export const customerController = {
 
       res.json({ success: true, addresses: customer.addresses, newAddress });
     } catch (err) {
-      console.warn('addAddress DB fallback note:', err.message);
       const newAddress = {
         id: 'addr_' + Date.now(),
         name: req.body.name || 'Customer',

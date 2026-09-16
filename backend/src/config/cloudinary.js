@@ -29,7 +29,6 @@ export const uploadToCloudinary = async (fileInput, folder = 'freshcart') => {
       height: result.height,
     };
   } catch (error) {
-    console.error('Cloudinary upload error:', error);
     throw new Error(error.message || 'Cloudinary upload failed');
   }
 };

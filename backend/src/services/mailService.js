@@ -48,7 +48,6 @@ export const sendMail = async ({ to, subject, html, text }) => {
   const transport = getTransport();
   if (transport === false) {
     if (!_warned) {
-      console.warn('[mail] disabled — set EMAIL_USER + EMAIL_APP_PASSWORD to enable');
       _warned = true;
     }
     return { skipped: true, reason: 'not configured' };
@@ -58,7 +57,6 @@ export const sendMail = async ({ to, subject, html, text }) => {
     const info = await transport.sendMail({ from: fromAddress(), to, subject, html, text });
     return { ok: true, messageId: info.messageId };
   } catch (err) {
-    console.error('[mail] send failed:', err.message);
     return { error: err.message };
   }
 };

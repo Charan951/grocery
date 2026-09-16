@@ -8,29 +8,18 @@ import { expireStaleOffers } from './src/services/assignmentService.js';
 // Load config variables
 dotenv.config();
 
-// Fail loud (but don't crash the demo) if critical secrets are missing — there
-// are no hardcoded fallbacks in source any more.
-const REQUIRED_ENV = ['JWT_SECRET', 'MONGO_URI'];
-const missingEnv = REQUIRED_ENV.filter((k) => !process.env[k]);
-if (missingEnv.length) {
-  console.error(`⚠️  Missing required environment variables: ${missingEnv.join(', ')}. ` +
-    `Auth and/or the database will not work until these are set (see backend/.env.example).`);
-}
-
 const { httpServer } = createApp();
 
 // Connect database and seed initial configurations
 connectDB().then((conn) => {
   if (conn) {
     seedDatabase();
-  } else {
-    console.log('ℹ️ Server proceeding without active DB connection.');
   }
 });
 
 // Dispatch: expire stale delivery offers and re-flag / re-offer.
 const sweeper = setInterval(() => {
-  expireStaleOffers().catch((e) => console.warn('offer sweeper:', e.message));
+  expireStaleOffers().catch(() => {});
 }, 15000);
 sweeper.unref?.();
 

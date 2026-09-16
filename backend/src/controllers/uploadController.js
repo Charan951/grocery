@@ -31,7 +31,6 @@ export const uploadController = {
           public_id: result.public_id
         });
       } catch (cloudErr) {
-        console.warn('Cloudinary upload warning, returning local data URI fallback:', cloudErr.message);
         return res.json({
           success: true,
           url: image,
@@ -40,7 +39,6 @@ export const uploadController = {
         });
       }
     } catch (err) {
-      console.error('Upload controller error:', err);
       res.status(500).json({ success: false, message: err.message || 'Image upload failed' });
     }
   }

@@ -13,7 +13,6 @@ export const OTP_TEST_MODE =
 
 export const sendSms = async (phone, message) => {
   if (OTP_TEST_MODE) {
-    console.log(`📩 [SMS test-mode] to ${phone}: ${message}`);
     return { testMode: true };
   }
 

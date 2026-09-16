@@ -134,7 +134,6 @@ export function createApp({ logRequests = true } = {}) {
   });
 
   app.use((err, req, res, next) => {
-    console.error('Unhandled Error:', err.message);
     res.status(err.status || 500).json({
       success: false,
       message: err.message || 'Internal Server Error'

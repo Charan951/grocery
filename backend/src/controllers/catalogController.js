@@ -201,7 +201,6 @@ export const productController = {
       );
       res.json({ success: true, product: prod });
     } catch (err) {
-      console.error('Error in updateProduct:', err);
       res.status(500).json({ success: false, message: err.message });
     }
   },
@@ -538,7 +537,6 @@ export const specialGroupController = {
       }
       res.json({ success: true, group });
     } catch (err) {
-      console.error('updateSpecialGroup error:', err);
       res.status(500).json({ success: false, message: err.message });
     }
   },
