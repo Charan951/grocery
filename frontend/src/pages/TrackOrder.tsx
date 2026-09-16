@@ -849,15 +849,26 @@ export const TrackOrder: React.FC = () => {
               }}
             >
               {/* 1. Estimated Arrival Hero Card — always mounted so it can
-                  animate away instead of popping out of the layout. */}
+                  animate away instead of popping out of the layout.
+                  `opacity` alone was NOT enough to remove it from the grid
+                  row's reserved height: `items-stretch` sizes the row to
+                  the tallest column, and this card's real content height
+                  (icon + headline + subtitle, ~150–190px) stayed fully
+                  reserved even at opacity 0 — that invisible reserved
+                  block, sitting right below the sticky App Bar, was the
+                  visible "gap" the map/spacer numbers alone couldn't
+                  explain. `height` now collapses in lockstep with the
+                  anchor beside it (same `anchorNaturalH` source), same
+                  fix pattern as the anchor's own height collapse. */}
               <div
                 className="rounded-2xl border border-emerald-100 bg-[#E8F8F0] shadow-xs overflow-hidden shrink-0"
                 style={{
                   opacity: isScrolledPastTracking ? 0 : 1,
-                  transition: 'opacity 300ms ease',
+                  height: isScrolledPastTracking ? 0 : anchorNaturalH,
+                  transition: 'opacity 300ms ease, height 350ms cubic-bezier(0.4,0,0.2,1)',
                 }}
               >
-                <div className="flex flex-col h-full p-3 sm:p-4 gap-2 sm:gap-2.5 min-w-[150px]">
+                <div className="flex flex-col h-full p-3 sm:p-4 gap-2 sm:gap-2.5">
                   <div className="flex items-center gap-2">
                     <span className="w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-emerald-200/70 text-emerald-800 flex items-center justify-center shrink-0">
                       <Zap size={18} className="fill-emerald-800" />
