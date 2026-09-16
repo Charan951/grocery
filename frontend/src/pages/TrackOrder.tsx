@@ -193,9 +193,8 @@ export const TrackOrder: React.FC = () => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
 
-  // Tracking scroll state: when scrolled past the banner, the sticky App Bar shows compact ETA
+  // Tracking scroll state: past TRANSITION_PX of scroll, the sticky App Bar shows compact ETA
   const [isScrolledPastTracking, setIsScrolledPastTracking] = useState(false);
-  const bannerSentinelRef = useRef<HTMLDivElement>(null);
 
   // Once scrolled, the map pins below the (now green, taller) App Bar
   // (fixed) while the rest of the page (Doorstep code, Delivery Partner,
@@ -370,23 +369,18 @@ export const TrackOrder: React.FC = () => {
   // where the smooth part left off instead of fighting it.
   useEffect(() => {
     let raf = 0;
-    const TRANSITION_PX = 160;
+    // Tied directly to raw scroll distance from the very top — not to the
+    // banner sentinel's position — so the map starts growing on the very
+    // first pixel of scroll instead of waiting for the (tall, ~46vh) banner
+    // to scroll away first. That wait was a dead zone with "no movement"
+    // for a few hundred px, which is what was being reported.
+    const TRANSITION_PX = 220;
     const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
     const checkScroll = () => {
       raf = 0;
-      const el = bannerSentinelRef.current;
       const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
-
-      let progress: number;
-      if (el) {
-        // el sits directly below the banner; the app bar is ~56px high.
-        // Progress reaches 1 exactly when the banner has fully scrolled
-        // above the sticky app bar (rect.top <= 60).
-        progress = (60 - el.getBoundingClientRect().top + TRANSITION_PX) / TRANSITION_PX;
-      } else {
-        progress = (scrollY - 120 + TRANSITION_PX) / TRANSITION_PX;
-      }
+      let progress = scrollY / TRANSITION_PX;
       progress = Math.min(1, Math.max(0, progress));
 
       setIsScrolledPastTracking(progress >= 1);
@@ -825,7 +819,6 @@ export const TrackOrder: React.FC = () => {
       )}
 
       {/* Sentinel marker directly beneath the banner */}
-      <div ref={bannerSentinelRef} className="h-0 w-full" aria-hidden="true" />
 
       <div ref={contentRef} className="max-w-3xl mx-auto px-4 py-4 flex flex-col gap-3.5 text-gray-900">
         {err && (
