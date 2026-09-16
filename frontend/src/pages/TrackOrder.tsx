@@ -359,42 +359,58 @@ export const TrackOrder: React.FC = () => {
     setLiveRider(null);
   }, [orderId]);
 
-  // Banner & tracking scroll listener: tracks when the large banner has completely scrolled out of view
+  // Banner & tracking scroll listener. Drives the map's box as a genuine
+  // scroll-progress interpolation (not a boolean snap + CSS transition) —
+  // "slowly increase [as you scroll]" was explicit: the map's size/position
+  // must track the scroll gesture 1:1 across TRANSITION_PX of scrolling,
+  // not jump once a threshold is crossed. `isScrolledPastTracking` (used by
+  // the app bar colour swap, ETA card fade, anchor collapse, flow spacer)
+  // only flips true once progress reaches 1 — i.e. exactly when the map's
+  // own continuous growth finishes, so that snap-driven UI picks up right
+  // where the smooth part left off instead of fighting it.
   useEffect(() => {
     let raf = 0;
+    const TRANSITION_PX = 160;
+    const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
     const checkScroll = () => {
       raf = 0;
       const el = bannerSentinelRef.current;
       const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
-      let scrolledPast: boolean;
-      if (!el) {
-        scrolledPast = scrollY > 180;
-      } else {
-        const rect = el.getBoundingClientRect();
-        // el sits directly below the banner. App bar is ~56px high.
-        // When rect.top <= 60, the banner has completely scrolled above the sticky app bar!
-        scrolledPast = rect.top <= 60 || scrollY > 260;
-      }
-      setIsScrolledPastTracking(scrolledPast);
 
-      // Drive the always-fixed map's box: pre-scroll it shadows the
-      // in-grid anchor's live position (so it reads as "in the grid" and
-      // animates smoothly with the grid's own column transition);
-      // post-scroll it snaps to pinned coordinates under the App Bar.
+      let progress: number;
+      if (el) {
+        // el sits directly below the banner; the app bar is ~56px high.
+        // Progress reaches 1 exactly when the banner has fully scrolled
+        // above the sticky app bar (rect.top <= 60).
+        progress = (60 - el.getBoundingClientRect().top + TRANSITION_PX) / TRANSITION_PX;
+      } else {
+        progress = (scrollY - 120 + TRANSITION_PX) / TRANSITION_PX;
+      }
+      progress = Math.min(1, Math.max(0, progress));
+
+      setIsScrolledPastTracking(progress >= 1);
+
       const barH = appBarRef.current?.getBoundingClientRect().height || appBarH;
-      if (scrolledPast) {
-        const cRect = contentRef.current?.getBoundingClientRect();
-        setMapBox((prev) => ({
-          top: barH,
-          left: cRect ? cRect.left : prev.left,
-          width: cRect ? cRect.width : prev.width,
-          height: 290,
-        }));
+      const cRect = contentRef.current?.getBoundingClientRect();
+      const pinned = {
+        top: barH,
+        left: cRect ? cRect.left : 16,
+        width: cRect ? cRect.width : 300,
+        height: 290,
+      };
+
+      if (progress >= 1) {
+        setMapBox(pinned);
       } else {
         const aRect = mapAnchorRef.current?.getBoundingClientRect();
-        if (aRect && aRect.width > 0) {
-          setMapBox({ top: aRect.top, left: aRect.left, width: aRect.width, height: aRect.height });
-        }
+        const from = aRect && aRect.width > 0 ? aRect : pinned;
+        setMapBox({
+          top: lerp(from.top, pinned.top, progress),
+          left: lerp(from.left, pinned.left, progress),
+          width: lerp(from.width, pinned.width, progress),
+          height: lerp(from.height, pinned.height, progress),
+        });
       }
     };
     const onScroll = () => {
@@ -924,10 +940,11 @@ export const TrackOrder: React.FC = () => {
             </div>
 
             {/* 2b. Interactive Map Card — always `position: fixed`, box
-                driven by `mapBox` (see the scroll effect). Pre-scroll it
-                shadows the anchor above; once scrolled it pins under the
-                App Bar and stays there while Doorstep/Delivery Partner/
-                Address/Status Updates scroll underneath. */}
+                driven by `mapBox`, a direct scroll-progress interpolation
+                (see the scroll effect) — grows continuously in step with
+                the scroll gesture rather than snapping via a CSS
+                transition, which is why there's deliberately no
+                `transition` on top/left/width/height here. */}
             <div
               className="rounded-2xl sm:rounded-3xl overflow-hidden border border-gray-200/90 shadow-xs bg-gray-100"
               style={{
@@ -937,8 +954,6 @@ export const TrackOrder: React.FC = () => {
                 width: Math.max(mapBox.width, 200), // never 0 — see mapBox init comment
                 height: Math.max(mapBox.height, 160),
                 zIndex: isScrolledPastTracking ? 490 : 10,
-                transition:
-                  'top 350ms cubic-bezier(0.4,0,0.2,1), left 350ms cubic-bezier(0.4,0,0.2,1), width 350ms cubic-bezier(0.4,0,0.2,1), height 350ms cubic-bezier(0.4,0,0.2,1)',
               }}
             >
               <div ref={mapCallbackRef} className="w-full h-full" />
