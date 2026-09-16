@@ -273,6 +273,29 @@ export const TrackOrder: React.FC = () => {
     return () => mq.removeEventListener('change', apply);
   }, []);
 
+  // Banner height, viewport-relative, computed in JS from window.innerHeight
+  // instead of a Tailwind `h-[46vh]` arbitrary-value class. Confirmed via
+  // the actual built CSS that the base (non-`sm:`-prefixed) bracket-height
+  // classes weren't generating at all in this project — only their `sm:`
+  // variants happened to (a known, previously-documented Tailwind JIT
+  // reliability issue in this codebase) — so below the `sm` breakpoint the
+  // banner had NO height at all, collapsing to its intrinsic (much
+  // shorter) content height. That silently shrank the real transition
+  // length (which is measured FROM this element), causing the App Bar/map
+  // to finish pinning while a chunk of banner was still genuinely on
+  // screen — the same "gap"/early-pin bug reported multiple times.
+  const [bannerVH, setBannerVH] = useState(400);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const apply = () => {
+      const isSm = window.matchMedia('(min-width: 640px)').matches;
+      setBannerVH(Math.round(window.innerHeight * (isSm ? 0.48 : 0.46)));
+    };
+    apply();
+    window.addEventListener('resize', apply);
+    return () => window.removeEventListener('resize', apply);
+  }, []);
+
   // Live rider position pushed over socket
   const [liveRider, setLiveRider] = useState<{ lat: number; lng: number } | null>(null);
 
@@ -947,12 +970,8 @@ export const TrackOrder: React.FC = () => {
 
       {/* 2. Large Banner Carousel: Appears ONLY in initial top state (~45–50% viewport height), scrolls away completely */}
       {order && banners && banners.length > 0 && (
-        <div ref={bannerRef} className="w-full">
-          <BannerCarousel
-            banners={banners}
-            aspectRatioClass="h-[46vh] sm:h-[48vh] w-full"
-            className="!mb-0"
-          />
+        <div ref={bannerRef} className="w-full" style={{ height: bannerVH }}>
+          <BannerCarousel banners={banners} aspectRatioClass="h-full w-full" className="!mb-0" />
         </div>
       )}
 
