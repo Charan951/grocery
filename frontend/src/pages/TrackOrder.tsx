@@ -227,6 +227,15 @@ export const TrackOrder: React.FC = () => {
   // every change smoothly — no FLIP-style before/after measuring needed.
   const mapAnchorRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  // The ETA hero card follows the exact same "always-fixed, box driven by
+  // scroll progress" pattern as the map: an invisible spacer (`etaAnchorRef`)
+  // holds its place in the grid pre-scroll, while the real card is
+  // `position: fixed` and its box is interpolated every frame from the
+  // spacer's rect to a pinned target inside the App Bar. This is what
+  // makes it visually *travel* from the left column up into the bar,
+  // instead of shrinking/fading in place while the bar's own text pops in.
+  const etaAnchorRef = useRef<HTMLDivElement>(null);
+  const [etaBox, setEtaBox] = useState({ top: 70, left: 16, width: 160, height: 220, opacity: 1 });
   // width/height must never be 0 on first paint — Leaflet initializes its
   // internal pixel origin against the container's size at that instant, and
   // a 0×0 container corrupts it permanently ("Cannot read '_leaflet_pos' of
@@ -398,7 +407,8 @@ export const TrackOrder: React.FC = () => {
       setIsScrolledPastTracking(progress >= 1);
       setScrollProgress(progress);
 
-      const barH = appBarRef.current?.getBoundingClientRect().height || appBarH;
+      const barRect = appBarRef.current?.getBoundingClientRect();
+      const barH = barRect?.height || appBarH;
       const cRect = contentRef.current?.getBoundingClientRect();
       const pinned = {
         top: barH,
@@ -417,6 +427,27 @@ export const TrackOrder: React.FC = () => {
           left: lerp(from.left, pinned.left, progress),
           width: lerp(from.width, pinned.width, progress),
           height: lerp(from.height, pinned.height, progress),
+        });
+      }
+
+      // ETA card: travels from its natural grid slot up into the App
+      // Bar's headline area (right of the back button), shrinking to a
+      // sliver as it arrives — then the bar's own text cross-fades over
+      // it (see the App Bar's opacity: scrollProgress content layer).
+      const etaFrom = etaAnchorRef.current?.getBoundingClientRect();
+      const etaPinned = {
+        top: (barRect ? barRect.top : 0) + barH * 0.28,
+        left: (barRect ? barRect.left : 0) + 56,
+        width: 140,
+        height: 28,
+      };
+      if (etaFrom && etaFrom.width > 0) {
+        setEtaBox({
+          top: lerp(etaFrom.top, etaPinned.top, progress),
+          left: lerp(etaFrom.left, etaPinned.left, progress),
+          width: lerp(etaFrom.width, etaPinned.width, progress),
+          height: lerp(etaFrom.height, etaPinned.height, progress),
+          opacity: 1 - Math.min(1, progress / 0.85),
         });
       }
     };
@@ -755,68 +786,72 @@ export const TrackOrder: React.FC = () => {
           a small pill squeezed into an otherwise-white header. */}
       <div
         ref={appBarRef}
-        className={`sticky top-0 z-[600] transition-[background-color,box-shadow,padding] duration-300 ${
-          isScrolledPastTracking
-            ? 'bg-[#0C8B4F] shadow-2xs px-3 sm:px-4 pt-2.5 pb-3'
-            : 'bg-transparent px-3 sm:px-4 pt-3 pb-0'
-        }`}
+        className="sticky top-0 z-[600] px-3 sm:px-4"
+        style={{
+          // Cross-fades continuously with scrollProgress (no boolean snap)
+          // so its arrival is in lockstep with the flying ETA chip above —
+          // the chip lands right as this green fill and text finish fading in.
+          backgroundColor: `rgba(12,139,79,${scrollProgress})`,
+          boxShadow: scrollProgress > 0.5 ? '0 2px 12px rgba(0,0,0,0.08)' : 'none',
+          paddingTop: 12 + 2 * scrollProgress,
+          paddingBottom: 12 * scrollProgress,
+        }}
       >
-        <div className="max-w-3xl mx-auto">
-          {!isScrolledPastTracking ? (
-            /* INITIAL STATE: just a back button, floating over the banner —
-               no title text, no help icon (per explicit brief). The
-               "earned shadow" rule applies: this button is genuinely
-               floating over imagery, so a shadow is warranted here. */
-            <button
-              type="button"
-              onClick={goBack}
-              aria-label="Back"
-              className="w-10 h-10 rounded-full bg-white/95 hover:bg-white shadow-md flex items-center justify-center text-gray-800 transition-colors"
-            >
-              <ArrowLeft size={18} />
-            </button>
-          ) : (
-            /* SCROLLED STATE: full green status bar — back button, order
-               headline, and an "Arriving in X mins • Live" pill. */
-            <>
+        <div className="max-w-3xl mx-auto relative">
+          {/* Back button: one control, colour cross-fades between the
+              floating white-on-banner look and the green bar's tinted look. */}
+          <button
+            type="button"
+            onClick={goBack}
+            aria-label="Back"
+            className="relative z-10 rounded-full flex items-center justify-center transition-colors"
+            style={{
+              width: 40 - 4 * scrollProgress,
+              height: 40 - 4 * scrollProgress,
+              backgroundColor: `rgba(255,255,255,${0.95 - 0.8 * scrollProgress})`,
+              color: scrollProgress > 0.5 ? '#fff' : '#1f2937',
+              boxShadow: scrollProgress < 0.5 ? '0 1px 6px rgba(0,0,0,0.15)' : 'none',
+            }}
+          >
+            <ArrowLeft size={18} />
+          </button>
+
+          {/* SCROLLED content: order headline + "Arriving in X mins • Live"
+              pill. Always mounted, cross-fading in via opacity so it never
+              hard-pops the instant progress crosses a threshold. */}
+          <div
+            className="mt-1.5"
+            style={{
+              opacity: scrollProgress,
+              pointerEvents: scrollProgress > 0.6 ? 'auto' : 'none',
+            }}
+          >
+            <p className="text-base sm:text-lg font-black text-white leading-snug truncate">
+              {isDelivered
+                ? 'Order delivered'
+                : rider
+                  ? 'Delivery partner is heading to your drop'
+                  : 'Order is being prepared'}
+            </p>
+            <div className="mt-2 inline-flex items-center gap-2 bg-white/15 rounded-full pl-3 pr-1 py-1">
+              <span className="text-xs font-extrabold text-white">
+                {isDelivered ? 'Delivered' : `Arriving in ${etaMins || 2} min${(etaMins || 2) === 1 ? '' : 's'}`}
+              </span>
+              <span className="w-1 h-1 rounded-full bg-white/60" />
+              <span className="inline-flex items-center gap-1 text-xs font-bold text-white/90">
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                Live
+              </span>
               <button
                 type="button"
-                onClick={goBack}
-                aria-label="Back"
-                className="w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors"
+                onClick={fetchOrder}
+                aria-label="Refresh"
+                className="w-6 h-6 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition-colors"
               >
-                <ArrowLeft size={18} />
+                <RefreshCw size={12} />
               </button>
-
-              <div className="mt-1.5">
-                <p className="text-base sm:text-lg font-black text-white leading-snug truncate">
-                  {isDelivered
-                    ? 'Order delivered'
-                    : rider
-                      ? 'Delivery partner is heading to your drop'
-                      : 'Order is being prepared'}
-                </p>
-                <div className="mt-2 inline-flex items-center gap-2 bg-white/15 rounded-full pl-3 pr-1 py-1">
-                  <span className="text-xs font-extrabold text-white">
-                    {isDelivered ? 'Delivered' : `Arriving in ${etaMins || 2} min${(etaMins || 2) === 1 ? '' : 's'}`}
-                  </span>
-                  <span className="w-1 h-1 rounded-full bg-white/60" />
-                  <span className="inline-flex items-center gap-1 text-xs font-bold text-white/90">
-                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                    Live
-                  </span>
-                  <button
-                    type="button"
-                    onClick={fetchOrder}
-                    aria-label="Refresh"
-                    className="w-6 h-6 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition-colors"
-                  >
-                    <RefreshCw size={12} />
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -849,9 +884,8 @@ export const TrackOrder: React.FC = () => {
             <div
               className="grid items-stretch"
               style={{
-                gridTemplateColumns: isScrolledPastTracking ? '0fr 1fr' : '0.85fr 1.15fr',
-                gap: isScrolledPastTracking ? 0 : '0.875rem',
-                transition: 'grid-template-columns 400ms cubic-bezier(0.4,0,0.2,1), gap 400ms ease',
+                gridTemplateColumns: `${0.85 * (1 - scrollProgress)}fr ${1.15 + 0.85 * scrollProgress}fr`,
+                gap: `${0.875 * (1 - scrollProgress)}rem`,
               }}
             >
               {/* 1. Estimated Arrival Hero Card — always mounted so it can
@@ -867,6 +901,7 @@ export const TrackOrder: React.FC = () => {
                   anchor beside it (same `anchorNaturalH` source), same
                   fix pattern as the anchor's own height collapse. */}
               <div
+                ref={etaAnchorRef}
                 className="rounded-2xl border border-emerald-100 bg-[#E8F8F0] shadow-xs overflow-hidden shrink-0"
                 style={{
                   // Driven directly by scrollProgress every frame (no CSS
@@ -932,6 +967,32 @@ export const TrackOrder: React.FC = () => {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* 1b. Flying ETA chip — a compact copy of the ETA that
+                  travels from the hero card's spot up into the App Bar
+                  as `etaBox` interpolates every frame, so the arrival
+                  genuinely reads as "left card moves to top bar" rather
+                  than "left card fades, unrelated bar text fades in".
+                  Fades out right as it lands, handing off to the bar's
+                  own (cross-fading) content. */}
+              <div
+                aria-hidden="true"
+                className="fixed z-[650] flex items-center gap-1.5 rounded-full bg-white pl-1.5 pr-3 py-1 shadow-md pointer-events-none"
+                style={{
+                  top: etaBox.top,
+                  left: etaBox.left,
+                  width: etaBox.width,
+                  height: etaBox.height,
+                  opacity: scrollProgress > 0.02 ? etaBox.opacity : 0,
+                }}
+              >
+                <span className="w-6 h-6 rounded-full bg-emerald-200/70 text-emerald-800 flex items-center justify-center shrink-0">
+                  <Zap size={12} className="fill-emerald-800" />
+                </span>
+                <span className="text-xs font-black text-gray-900 truncate">
+                  {isDelivered ? 'Delivered' : `${etaMins || 2} mins`}
+                </span>
               </div>
 
               {/* 2. Map anchor — invisible spacer that reserves the map's
