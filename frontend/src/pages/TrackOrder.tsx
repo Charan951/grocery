@@ -1240,7 +1240,21 @@ export const TrackOrder: React.FC = () => {
                 zIndex: isScrolledPastTracking ? 490 : 10,
               }}
             >
-              <div ref={mapCallbackRef} className="w-full h-full" />
+              {/* `pointer-events: none` once pinned — the definitive fix
+                  for scroll being trapped over the map. Leaflet's own
+                  dragging.disable() stops panning, but it can still call
+                  preventDefault() on touch gestures internally for its
+                  tap/double-tap-zoom detection, which was still blocking
+                  page scroll for any gesture starting on the map. Cutting
+                  pointer events off entirely here guarantees every touch/
+                  scroll passes straight through to the page; the floating
+                  Recenter/Zoom/Layers buttons below are separate elements
+                  with their own pointer-events and stay clickable. */}
+              <div
+                ref={mapCallbackRef}
+                className="w-full h-full"
+                style={{ pointerEvents: isScrolledPastTracking ? 'none' : 'auto' }}
+              />
 
               {/* Top-Left Live GPS Badge */}
               <div className="absolute top-3 left-3 z-[500] inline-flex items-center gap-1.5 bg-white/95 backdrop-blur-sm px-3 py-1 rounded-full text-[11px] font-extrabold text-gray-800 shadow-sm border border-gray-100 pointer-events-none">
