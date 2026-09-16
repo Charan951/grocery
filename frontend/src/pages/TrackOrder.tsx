@@ -828,6 +828,12 @@ export const TrackOrder: React.FC = () => {
     }
   };
 
+  // Bar-only easing: stays fully transparent while the banner is still
+  // mostly on screen, then ramps to solid over the back half of the
+  // scroll — see the App Bar's style comment for why this differs from
+  // the raw scrollProgress the ETA card's travel/position uses.
+  const barT = Math.max(0, Math.min(1, (scrollProgress - 0.5) / 0.5));
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-28 font-sans text-gray-900">
       {/* 1. Sticky App Bar: Always pinned at top:0. Initial = slim white bar.
@@ -838,13 +844,18 @@ export const TrackOrder: React.FC = () => {
         ref={appBarRef}
         className="sticky top-0 z-[600] px-3 sm:px-4"
         style={{
-          // Cross-fades continuously with scrollProgress (no boolean snap)
-          // so its arrival is in lockstep with the flying ETA chip above —
-          // the chip lands right as this green fill and text finish fading in.
-          backgroundColor: `rgba(12,139,79,${scrollProgress})`,
-          boxShadow: scrollProgress > 0.5 ? '0 2px 12px rgba(0,0,0,0.08)' : 'none',
-          paddingTop: 12 + 2 * scrollProgress,
-          paddingBottom: 12 * scrollProgress,
+          // `barT` (not raw scrollProgress) drives every visual on the bar
+          // itself. A semi-transparent green blended straight over the
+          // vivid banner photo for the first half of the scroll read as a
+          // muddy tint, not a clean bar — so the green fill (and the text
+          // that sits on it) stays off until the banner is mostly scrolled
+          // away, then ramps to fully solid by the time pinning completes.
+          // The ETA card's travel/position still uses raw scrollProgress
+          // (unrelated to this bar-coloring concern).
+          backgroundColor: `rgba(12,139,79,${barT})`,
+          boxShadow: barT > 0.5 ? '0 2px 12px rgba(0,0,0,0.08)' : 'none',
+          paddingTop: 12 + 2 * barT,
+          paddingBottom: 12 * barT,
         }}
       >
         <div className="max-w-3xl mx-auto relative">
@@ -856,11 +867,11 @@ export const TrackOrder: React.FC = () => {
             aria-label="Back"
             className="relative z-10 rounded-full flex items-center justify-center transition-colors"
             style={{
-              width: 40 - 4 * scrollProgress,
-              height: 40 - 4 * scrollProgress,
-              backgroundColor: `rgba(255,255,255,${0.95 - 0.8 * scrollProgress})`,
-              color: scrollProgress > 0.5 ? '#fff' : '#1f2937',
-              boxShadow: scrollProgress < 0.5 ? '0 1px 6px rgba(0,0,0,0.15)' : 'none',
+              width: 40 - 4 * barT,
+              height: 40 - 4 * barT,
+              backgroundColor: `rgba(255,255,255,${0.95 - 0.8 * barT})`,
+              color: barT > 0.5 ? '#fff' : '#1f2937',
+              boxShadow: barT < 0.5 ? '0 1px 6px rgba(0,0,0,0.15)' : 'none',
             }}
           >
             <ArrowLeft size={18} />
@@ -872,8 +883,8 @@ export const TrackOrder: React.FC = () => {
           <div
             className="mt-1.5"
             style={{
-              opacity: scrollProgress,
-              pointerEvents: scrollProgress > 0.6 ? 'auto' : 'none',
+              opacity: barT,
+              pointerEvents: barT > 0.6 ? 'auto' : 'none',
             }}
           >
             <p className="text-base sm:text-lg font-black text-white leading-snug truncate">
