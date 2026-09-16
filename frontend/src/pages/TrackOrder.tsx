@@ -193,7 +193,19 @@ export const TrackOrder: React.FC = () => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
 
-  // Tracking scroll state: past TRANSITION_PX of scroll, the sticky App Bar shows compact ETA
+  // Tracking scroll state: past TRANSITION_PX of scroll, the sticky App Bar shows compact ETA.
+  // `scrollProgress` (0→1) is the single source of truth every scroll-linked
+  // value derives from every frame — the ETA card's height/opacity, the
+  // anchor's height, and the flow spacer's height all read it directly
+  // (no CSS transitions of their own). Mixing that with the map's
+  // continuous box previously caused a visible gap when scrolling back up
+  // quickly: those pieces had their own 350ms transitions racing to catch
+  // up to a boolean flip, while the map recalculated every frame — on a
+  // fast reverse scroll the map would already be small again while the
+  // anchor/spacer were still mid-transition, momentarily double- or
+  // under-reserving space. Deriving everything from the same number each
+  // frame makes that mismatch structurally impossible.
+  const [scrollProgress, setScrollProgress] = useState(0);
   const [isScrolledPastTracking, setIsScrolledPastTracking] = useState(false);
 
   // Once scrolled, the map pins below the (now green, taller) App Bar
@@ -384,6 +396,7 @@ export const TrackOrder: React.FC = () => {
       progress = Math.min(1, Math.max(0, progress));
 
       setIsScrolledPastTracking(progress >= 1);
+      setScrollProgress(progress);
 
       const barH = appBarRef.current?.getBoundingClientRect().height || appBarH;
       const cRect = contentRef.current?.getBoundingClientRect();
@@ -856,9 +869,11 @@ export const TrackOrder: React.FC = () => {
               <div
                 className="rounded-2xl border border-emerald-100 bg-[#E8F8F0] shadow-xs overflow-hidden shrink-0"
                 style={{
-                  opacity: isScrolledPastTracking ? 0 : 1,
-                  height: isScrolledPastTracking ? 0 : anchorNaturalH,
-                  transition: 'opacity 300ms ease, height 350ms cubic-bezier(0.4,0,0.2,1)',
+                  // Driven directly by scrollProgress every frame (no CSS
+                  // transition) — see the scrollProgress state comment for
+                  // why this can't lag behind the map's own per-frame box.
+                  opacity: 1 - scrollProgress,
+                  height: anchorNaturalH * (1 - scrollProgress),
                 }}
               >
                 <div className="flex flex-col h-full p-3 sm:p-4 gap-2 sm:gap-2.5">
@@ -937,8 +952,7 @@ export const TrackOrder: React.FC = () => {
                   // a competing height shrink). Collapses to 0 in lockstep
                   // with the flow spacer below growing to take over
                   // reserving that same space — no double-reservation.
-                  height: isScrolledPastTracking ? 0 : anchorNaturalH,
-                  transition: 'height 350ms cubic-bezier(0.4,0,0.2,1)',
+                  height: anchorNaturalH * (1 - scrollProgress),
                 }}
               />
             </div>
@@ -998,7 +1012,7 @@ export const TrackOrder: React.FC = () => {
                 visually ends instead of being covered by it. Zero height
                 pre-scroll since the map is still shadowing the anchor above
                 (which already reserves the space). */}
-            <div style={{ height: isScrolledPastTracking ? mapBox.height + 14 : 0, transition: 'height 350ms ease' }} />
+            <div style={{ height: (mapBox.height + 14) * scrollProgress }} />
 
             {/* 3. Doorstep OTP Code (if available) */}
             {order.deliveryOtp && (
