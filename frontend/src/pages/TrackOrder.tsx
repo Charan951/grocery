@@ -236,6 +236,17 @@ export const TrackOrder: React.FC = () => {
   // instead of shrinking/fading in place while the bar's own text pops in.
   const etaAnchorRef = useRef<HTMLDivElement>(null);
   const [etaBox, setEtaBox] = useState({ top: 70, left: 16, width: 160, height: 220, opacity: 1 });
+
+  // The banner (~46vh, so ~350-450px depending on viewport) is what's
+  // actually above the ETA/Map row in document flow. A fixed transition
+  // length (e.g. 220px) shorter than the banner's real height finishes
+  // pinning the map/App Bar BEFORE the banner has scrolled fully out of
+  // view — the leftover banner then shows as a visible gap between the
+  // now-solid green bar and the now-pinned map. Measuring the banner's
+  // real height and using it as the transition length keeps pinning in
+  // lockstep with the banner actually leaving the viewport.
+  const bannerRef = useRef<HTMLDivElement>(null);
+  const bannerHeightRef = useRef(360);
   // width/height must never be 0 on first paint — Leaflet initializes its
   // internal pixel origin against the container's size at that instant, and
   // a 0×0 container corrupts it permanently ("Cannot read '_leaflet_pos' of
@@ -390,17 +401,20 @@ export const TrackOrder: React.FC = () => {
   // where the smooth part left off instead of fighting it.
   useEffect(() => {
     let raf = 0;
-    // Tied directly to raw scroll distance from the very top — not to the
-    // banner sentinel's position — so the map starts growing on the very
-    // first pixel of scroll instead of waiting for the (tall, ~46vh) banner
-    // to scroll away first. That wait was a dead zone with "no movement"
-    // for a few hundred px, which is what was being reported.
-    const TRANSITION_PX = 220;
+    // Tied directly to raw scroll distance from the very top — not to a
+    // fixed pixel constant. It must equal the banner's real height: any
+    // shorter and the map/App Bar finish pinning while the banner is
+    // still partly on screen (leftover banner shows as a gap); any
+    // longer reintroduces a dead zone with no visible movement. Matching
+    // the banner's own scroll-out distance is what keeps the whole
+    // transition — map growth, bar cross-fade, ETA chip flight — in
+    // lockstep with the banner actually leaving the viewport.
     const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
     const checkScroll = () => {
       raf = 0;
       const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      const TRANSITION_PX = Math.max(160, bannerHeightRef.current);
       let progress = scrollY / TRANSITION_PX;
       progress = Math.min(1, Math.max(0, progress));
 
@@ -468,6 +482,26 @@ export const TrackOrder: React.FC = () => {
       clearInterval(poll);
     };
   }, []);
+
+  // Keep the measured banner height current — it changes with viewport
+  // width (`h-[46vh] sm:h-[48vh]`) and once real banner images load.
+  useEffect(() => {
+    const measure = () => {
+      const h = bannerRef.current?.getBoundingClientRect().height;
+      if (h && h > 0) bannerHeightRef.current = h;
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    if (typeof ResizeObserver !== 'undefined' && bannerRef.current) {
+      const ro = new ResizeObserver(measure);
+      ro.observe(bannerRef.current);
+      return () => {
+        window.removeEventListener('resize', measure);
+        ro.disconnect();
+      };
+    }
+    return () => window.removeEventListener('resize', measure);
+  }, [order, banners]);
 
   // Keep the app-bar height current (it grows in the scrolled/green state,
   // which now spans 2 lines) so the fixed map always sits flush below it.
@@ -857,7 +891,7 @@ export const TrackOrder: React.FC = () => {
 
       {/* 2. Large Banner Carousel: Appears ONLY in initial top state (~45–50% viewport height), scrolls away completely */}
       {order && banners && banners.length > 0 && (
-        <div className="w-full">
+        <div ref={bannerRef} className="w-full">
           <BannerCarousel
             banners={banners}
             aspectRatioClass="h-[46vh] sm:h-[48vh] w-full"
