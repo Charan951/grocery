@@ -521,7 +521,11 @@ export const TrackOrder: React.FC = () => {
         Math.abs(last.w - nextMapBox.width) > 0.5 || Math.abs(last.h - nextMapBox.height) > 0.5;
       if (mapRef.current && changed) {
         lastMapSizeRef.current = { w: nextMapBox.width, h: nextMapBox.height };
-        mapRef.current.invalidateSize({ pan: false });
+        try {
+          mapRef.current.invalidateSize({ pan: false });
+        } catch {
+          // Defensive — see fitMap's identical comment.
+        }
       }
 
       // Self-correcting flow-spacer height: compare the spacer's own
@@ -652,15 +656,25 @@ export const TrackOrder: React.FC = () => {
   const fitMap = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
-    map.invalidateSize();
-    const pts: [number, number][] = [];
-    if (pickup?.lat && pickup?.lng) pts.push([pickup.lat, pickup.lng]);
-    if (rider?.lat && rider?.lng) pts.push([rider.lat, rider.lng]);
-    if (dest?.lat && dest?.lng) pts.push([dest.lat, dest.lng]);
-    if (pts.length >= 2) {
-      map.fitBounds(L.latLngBounds(pts), { padding: [48, 48], maxZoom: 16 });
-    } else if (pts.length === 1) {
-      map.setView(pts[0], 16);
+    // Defensive: Leaflet can throw reading '_leaflet_pos' of undefined if
+    // called at an awkward moment relative to its own internal DOM
+    // teardown/setup (e.g. mid unmount during a fast remount) despite the
+    // mapRef-identity guards elsewhere — never let that crash cascade into
+    // anything else on the page (like the scroll listeners set up in a
+    // separate effect).
+    try {
+      map.invalidateSize();
+      const pts: [number, number][] = [];
+      if (pickup?.lat && pickup?.lng) pts.push([pickup.lat, pickup.lng]);
+      if (rider?.lat && rider?.lng) pts.push([rider.lat, rider.lng]);
+      if (dest?.lat && dest?.lng) pts.push([dest.lat, dest.lng]);
+      if (pts.length >= 2) {
+        map.fitBounds(L.latLngBounds(pts), { padding: [48, 48], maxZoom: 16 });
+      } else if (pts.length === 1) {
+        map.setView(pts[0], 16);
+      }
+    } catch {
+      // Swallow — see comment above.
     }
   }, [pickup, rider, dest]);
 
@@ -1258,7 +1272,14 @@ export const TrackOrder: React.FC = () => {
               <div
                 ref={mapCallbackRef}
                 className="w-full h-full"
-                style={{ pointerEvents: isScrolledPastTracking ? 'none' : 'auto' }}
+                // Was gated on `isScrolledPastTracking` (only true at
+                // progress===1, fully pinned) — but the map is already
+                // large well before that, since it grows continuously
+                // with scroll. Gesture-trapping was still reproducible
+                // mid-transition. Gating on scrollProgress > 0.5 instead
+                // turns off map interaction, and hands gestures to page
+                // scroll, well before the map is large enough to matter.
+                style={{ pointerEvents: scrollProgress > 0.5 ? 'none' : 'auto' }}
               />
 
               {/* Top-Left Live GPS Badge */}
