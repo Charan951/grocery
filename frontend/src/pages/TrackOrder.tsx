@@ -970,6 +970,13 @@ export const TrackOrder: React.FC = () => {
                   width: etaBox.width,
                   height: etaBox.height,
                   borderRadius: 16 - 4 * Math.min(1, scrollProgress / 0.6),
+                  // Fades out over the full scroll so it has fully
+                  // disappeared by the time it reaches the App Bar —
+                  // the App Bar's own headline + "Arriving in X mins"
+                  // pill (which cross-fades in over the same range) is
+                  // the single final resting state, not a second visible
+                  // copy layered on top of it.
+                  opacity: 1 - scrollProgress,
                 }}
               >
                 {/* Full hero content — fades out across the first 60% of the scroll */}
