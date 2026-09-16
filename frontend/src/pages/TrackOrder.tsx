@@ -971,7 +971,15 @@ export const TrackOrder: React.FC = () => {
       {/* 2. Large Banner Carousel: Appears ONLY in initial top state (~45–50% viewport height), scrolls away completely */}
       {order && banners && banners.length > 0 && (
         <div ref={bannerRef} className="w-full" style={{ height: bannerVH }}>
-          <BannerCarousel banners={banners} aspectRatioClass="h-full w-full" className="!mb-0" />
+          {/* `h-full` on aspectRatioClass targets the inner image slide,
+              but a percentage height only resolves against a parent that
+              itself has a real height — BannerCarousel's own returned
+              wrapper (the element `className` lands on) has none by
+              default. Passing `h-full` here too gives that wrapper the
+              same bannerVH height as this outer div, completing the
+              chain so the inner slide's h-full actually resolves instead
+              of collapsing to intrinsic content size. */}
+          <BannerCarousel banners={banners} aspectRatioClass="h-full w-full" className="!mb-0 h-full" />
         </div>
       )}
 
