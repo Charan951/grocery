@@ -1193,14 +1193,18 @@ export const TrackOrder: React.FC = () => {
                 visually ends instead of being covered by it. Zero height
                 pre-scroll since the map is still shadowing the anchor above
                 (which already reserves the space).
-                Height is `mapBox.height - 16`, not `+ 14`: the pinned map's
-                `top` is flush against the App Bar (barH, no offset) so it
-                hugs the bar with no gap, but this spacer sits 16px lower —
-                after contentRef's own `py-4` top padding. The old `+ 14`
-                double-counted breathing room the flex container's own
-                `gap-3.5` already adds before and after this element,
-                over-reserving space and showing as the gap below the map. */}
-            <div style={{ height: Math.max(0, mapBox.height - 16) * scrollProgress }} />
+                Height includes `appBarH`: the App Bar is `sticky`, not
+                `fixed`, and (since the "banner behind App Bar" fix) no
+                longer reserves its own height in document flow — it just
+                floats over whatever content is currently at the top of the
+                viewport, the normal sticky behavior. The pinned map starts
+                BELOW the bar (`top: barH`), so the flow must reserve
+                `barH + map height` for content beneath it to clear both,
+                not just the map's own height — omitting `appBarH` here was
+                a real regression that let Delivery Partner/Doorstep Code
+                scroll up underneath the bar's own height worth of the map,
+                covering them. */}
+            <div style={{ height: Math.max(0, mapBox.height + appBarH - 16) * scrollProgress }} />
 
             {/* 3. Doorstep OTP Code (if available) */}
             {order.deliveryOtp && (
