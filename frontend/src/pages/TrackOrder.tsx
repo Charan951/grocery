@@ -733,48 +733,53 @@ export const TrackOrder: React.FC = () => {
 
         {order && (
           <>
-            {/* ETA + MAP Grid: Stacked on mobile, side-by-side on desktop in initial state. In scrolled state, normal ETA card is hidden and Map is full width */}
+            {/* ETA + MAP: side by side at every width. On scroll, the ETA
+                column smoothly collapses to 0 (not unmounted — animated via
+                width/opacity, no snap) and the map grows to fill the freed
+                space via an animated `grid-template-columns`. */}
             <div
-              className={`grid gap-3.5 items-stretch transition-all duration-200 ${
-                !isScrolledPastTracking ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'
-              }`}
+              className="grid items-stretch"
+              style={{
+                gridTemplateColumns: isScrolledPastTracking ? '0fr 1fr' : '0.85fr 1.15fr',
+                gap: isScrolledPastTracking ? 0 : '0.875rem',
+                transition: 'grid-template-columns 400ms cubic-bezier(0.4,0,0.2,1), gap 400ms ease',
+              }}
             >
-              {/* 1. Estimated Arrival Hero Card — ONLY visible in initial top state */}
-              {!isScrolledPastTracking && (
-                <div className="rounded-2xl border border-emerald-100 bg-[#E8F8F0] p-3.5 sm:p-4 shadow-xs flex items-center justify-between gap-2.5 sm:gap-4 transition-all duration-200">
-                  {/* Lightning Icon */}
-                  <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-emerald-200/70 text-emerald-800 flex items-center justify-center shrink-0">
-                    <Zap size={20} className="fill-emerald-800" />
-                  </div>
-
-                  {/* Estimated Arrival Details */}
-                  <div className="shrink-0">
-                    <div className="text-[10px] sm:text-[11px] font-semibold text-gray-600">
-                      Estimated Arrival
+              {/* 1. Estimated Arrival Hero Card — always mounted so it can
+                  animate away instead of popping out of the layout. */}
+              <div
+                className="rounded-2xl border border-emerald-100 bg-[#E8F8F0] shadow-xs overflow-hidden shrink-0"
+                style={{
+                  opacity: isScrolledPastTracking ? 0 : 1,
+                  transition: 'opacity 300ms ease',
+                }}
+              >
+                <div className="flex flex-col h-full p-3 sm:p-4 gap-2 sm:gap-2.5 min-w-[150px]">
+                  <div className="flex items-center gap-2">
+                    <span className="w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-emerald-200/70 text-emerald-800 flex items-center justify-center shrink-0">
+                      <Zap size={18} className="fill-emerald-800" />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-[10px] sm:text-[11px] font-semibold text-gray-600 truncate">
+                        Estimated Arrival
+                      </div>
+                      <div className="text-lg sm:text-2xl font-black text-gray-900 leading-tight">
+                        {isDelivered ? 'Delivered' : `${etaMins || 2} mins`}
+                      </div>
                     </div>
-                    <div className="text-xl sm:text-2xl font-black text-gray-900 leading-tight">
-                      {isDelivered ? 'Delivered' : `${etaMins || 2} mins`}
-                    </div>
                   </div>
 
-                  {/* Vertical Divider */}
-                  <div className="w-px h-9 bg-emerald-200/80 shrink-0 mx-0.5" />
+                  <p className="text-[11px] sm:text-xs text-gray-600 font-medium leading-snug">
+                    {isDelivered
+                      ? 'Groceries delivered with care'
+                      : rider
+                        ? 'Delivery partner is heading to your drop'
+                        : 'Items being packed at FreshCart Dark Store'}
+                  </p>
 
-                  {/* Partner Status Subtext */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[11px] sm:text-xs text-gray-600 font-medium leading-snug">
-                      {isDelivered
-                        ? 'Groceries delivered with care'
-                        : rider
-                          ? 'Delivery partner is heading to your drop'
-                          : 'Items being packed at FreshCart Dark Store'}
-                    </p>
-                  </div>
-
-                  {/* Scooter Illustration & Live Badge */}
-                  <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                    {/* Delivery Boy on Scooter SVG Illustration */}
-                    <div className="w-12 h-10 sm:w-14 sm:h-11 shrink-0 relative flex items-center justify-center">
+                  <div className="mt-auto flex items-center gap-1.5 sm:gap-2">
+                    {/* Delivery Boy on Scooter SVG Illustration — hidden on the narrowest phones */}
+                    <div className="hidden xs:flex w-11 h-9 sm:w-14 sm:h-11 shrink-0 relative items-center justify-center">
                       <svg viewBox="0 0 72 52" className="w-full h-full" fill="none">
                         <path d="M4 32h8M8 37h8M6 27h6" stroke="#059669" strokeWidth="2" strokeLinecap="round" opacity="0.6"/>
                         <circle cx="19" cy="40" r="7" stroke="#1F2937" strokeWidth="2.8" fill="#F3F4F6"/>
@@ -799,17 +804,20 @@ export const TrackOrder: React.FC = () => {
                     </div>
 
                     {/* Live Pill Badge */}
-                    <div className="bg-white/95 border border-emerald-200/80 rounded-full px-2.5 py-1 text-[10px] sm:text-[11px] font-extrabold text-gray-800 shadow-2xs flex items-center gap-1.5">
+                    <div className="bg-white/95 border border-emerald-200/80 rounded-full px-2 sm:px-2.5 py-1 text-[10px] sm:text-[11px] font-extrabold text-gray-800 shadow-2xs flex items-center gap-1.5 shrink-0">
                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                       <span>Live</span>
                     </div>
                   </div>
                 </div>
-              )}
+              </div>
 
-              {/* 2. Interactive Map Card */}
-              <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden border border-gray-200/90 shadow-xs bg-gray-100 min-h-[260px] sm:min-h-[290px]">
-                <div ref={mapCallbackRef} className="w-full h-full min-h-[260px] sm:min-h-[290px]" />
+              {/* 2. Interactive Map Card — grows to fill the freed column on scroll */}
+              <div
+                className="relative rounded-2xl sm:rounded-3xl overflow-hidden border border-gray-200/90 shadow-xs bg-gray-100 min-h-[220px] sm:min-h-[290px]"
+                style={{ transition: 'min-height 400ms ease' }}
+              >
+                <div ref={mapCallbackRef} className="w-full h-full min-h-[220px] sm:min-h-[290px]" />
                 
                 {/* Top-Left Live GPS Badge */}
                 <div className="absolute top-3 left-3 z-[500] inline-flex items-center gap-1.5 bg-white/95 backdrop-blur-sm px-3 py-1 rounded-full text-[11px] font-extrabold text-gray-800 shadow-sm border border-gray-100 pointer-events-none">
