@@ -102,6 +102,10 @@ class CartNotifier extends StateNotifier<CartState> {
     state = state.copyWith(items: loaded);
   }
 
+  void reloadCart() {
+    _loadCart();
+  }
+
   void _persistCart() {
     _storage.saveCartItems(state.items.map((i) => i.toJson()).toList());
   }

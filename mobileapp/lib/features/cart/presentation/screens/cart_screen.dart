@@ -1,4 +1,4 @@
-﻿// ignore_for_file: unnecessary_underscores
+// ignore_for_file: unnecessary_underscores
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -117,13 +117,49 @@ class CartScreen extends ConsumerWidget {
             ),
           const SizedBox(height: 14),
 
-          // 3. "You might also like" Shelf
+          // 3. "You might also like" Shelf (Same Category Products)
           popularProductsAsync.when(
             data: (products) {
-              final recommendations = products
+              final notInCart = products
                   .where((p) => !cart.items.any((ci) => ci.product.id == p.id))
-                  .take(6)
                   .toList();
+
+              final cartCategoryIds = cart.items
+                  .map((i) => i.product.categoryId.toLowerCase())
+                  .where((c) => c.isNotEmpty)
+                  .toSet();
+
+              final cartSubCategories = cart.items
+                  .map((i) => i.product.subCategory?.toLowerCase() ?? '')
+                  .where((c) => c.isNotEmpty)
+                  .toSet();
+
+              final sameSubCatProducts = <ProductModel>[];
+              final sameCategoryProducts = <ProductModel>[];
+              final otherProducts = <ProductModel>[];
+
+              for (final p in notInCart) {
+                final pCat = p.categoryId.toLowerCase();
+                final pSub = p.subCategory?.toLowerCase() ?? '';
+
+                final isSameSub = pSub.isNotEmpty && cartSubCategories.contains(pSub);
+                final isSameCat = pCat.isNotEmpty && cartCategoryIds.contains(pCat);
+
+                if (isSameSub && isSameCat) {
+                  sameSubCatProducts.add(p);
+                } else if (isSameCat) {
+                  sameCategoryProducts.add(p);
+                } else {
+                  otherProducts.add(p);
+                }
+              }
+
+              final recommendations = [
+                ...sameSubCatProducts,
+                ...sameCategoryProducts,
+                ...otherProducts,
+              ].take(10).toList();
+
               if (recommendations.isEmpty) return const SizedBox.shrink();
               return _YouMightAlsoLikeShelf(
                 products: recommendations,

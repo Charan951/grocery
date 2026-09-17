@@ -149,31 +149,23 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
 
               // 2. LIVE INTERACTIVE MAP CARD — pinned just below the app bar
               // while everything else scrolls underneath it, mirroring the
-              // web tracker's pinned-map behavior. Only shown while a
-              // partner is assigned and the order is still active.
-              if (t.assigned)
-                SliverPersistentHeader(
-                  pinned: true,
-                  delegate: _MapHeaderDelegate(
-                    t: t,
-                    isDark: isDark,
-                    topInset: MediaQuery.of(context).padding.top + 56,
-                  ),
+              // web tracker's pinned-map behavior.
+              SliverPersistentHeader(
+                pinned: true,
+                delegate: _MapHeaderDelegate(
+                  t: t,
+                  isDark: isDark,
+                  topInset: MediaQuery.of(context).padding.top + 56,
                 ),
+              ),
 
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
-                    if (t.assigned) const SizedBox(height: 2),
+                    const SizedBox(height: 2),
 
-                    // ETA & LIVE STATUS HERO CARD — its content is what the
-                    // App Bar's headline + pill visually take over from as
-                    // the bar solidifies on scroll (a continuous opacity
-                    // cross-fade, driven by the same scroll offset, rather
-                    // than a literal FLIP-style position animation — the
-                    // idiomatic Flutter equivalent of the web's "travels
-                    // into the bar" effect for a pinned-header layout).
+                    // ETA & LIVE STATUS HERO CARD
                     _EtaHeroCard(t: t, bucket: bucket, isDark: isDark),
                     const SizedBox(height: 14),
 
@@ -183,11 +175,25 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                       const SizedBox(height: 14),
                     ],
 
-                    // DELIVERY PARTNER CARD — only once actually assigned.
-                    if (t.assigned) ...[
+                    // DELIVERY PARTNER CARD — shown when assigned or partner name exists
+                    if (t.assigned || t.riderName.isNotEmpty) ...[
                       _DeliveryPartnerCard(t: t, isDark: isDark, orderId: orderId),
                       const SizedBox(height: 14),
                     ],
+
+                    // DELIVERY PARTNER RATING CARD — shown when delivered
+                    if (bucket == OrderStatus.delivered && t.riderName.isNotEmpty) ...[
+                      _DeliveryRatingCard(t: t, orderId: orderId, isDark: isDark),
+                      const SizedBox(height: 14),
+                    ],
+
+                    // DELIVERY ADDRESS CARD
+                    _DeliveryAddressCard(
+                      address: t.deliveryAddress,
+                      isDark: isDark,
+                      isDelivered: bucket == OrderStatus.delivered,
+                    ),
+                    const SizedBox(height: 14),
 
                     // TRACKING TIMELINE
                     if (t.timeline.isNotEmpty) ...[
@@ -195,7 +201,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                       const SizedBox(height: 14),
                     ],
 
-                    // ORDER ITEMS SUMMARY — kept last per request
+                    // ORDER ITEMS SUMMARY
                     if (t.items.isNotEmpty) ...[
                       _OrderItemsCard(items: t.items, total: t.total, isDark: isDark),
                     ],
@@ -1085,8 +1091,280 @@ class _TimelineCard extends StatelessWidget {
   }
 }
 
-/// Real map: OSM tiles + rider marker + drop marker + rider→drop route (OSRM,
-/// straight-line fallback). Recenters as the rider moves.
+class _DeliveryAddressCard extends StatelessWidget {
+  final String address;
+  final bool isDark;
+  final bool isDelivered;
+
+  const _DeliveryAddressCard({
+    required this.address,
+    required this.isDark,
+    required this.isDelivered,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark ? AppColors.dividerDark : const Color(0xFFE5E7EB),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF2A2A2C) : const Color(0xFFF3F4F6),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.location_on_rounded,
+              color: isDark ? AppColors.textPrimaryDark : const Color(0xFF374151),
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Delivery Address',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                      ),
+                    ),
+                    if (!isDelivered)
+                      GestureDetector(
+                        onTap: () => context.push('/addresses'),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8F8F0),
+                            borderRadius: BorderRadius.circular(100),
+                          ),
+                          child: const Text(
+                            'Change',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF047857),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  address,
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.4,
+                    color: isDark ? AppColors.textSecondaryDark : const Color(0xFF4B5563),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DeliveryRatingCard extends ConsumerStatefulWidget {
+  final TrackingState t;
+  final String orderId;
+  final bool isDark;
+
+  const _DeliveryRatingCard({
+    required this.t,
+    required this.orderId,
+    required this.isDark,
+  });
+
+  @override
+  ConsumerState<_DeliveryRatingCard> createState() => _DeliveryRatingCardState();
+}
+
+class _DeliveryRatingCardState extends ConsumerState<_DeliveryRatingCard> {
+  int _stars = 0;
+  final _commentController = TextEditingController();
+  bool _busy = false;
+  bool _editing = false;
+  bool _submitted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.t.deliveryRating != null) {
+      _stars = (widget.t.deliveryRating!['stars'] as num?)?.toInt() ?? 0;
+      _commentController.text = (widget.t.deliveryRating!['comment'] as String?) ?? '';
+      _submitted = _stars > 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_stars == 0 || _busy) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(trackingProvider(widget.orderId).notifier).submitRating(
+        _stars,
+        _commentController.text,
+      );
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _editing = false;
+          _submitted = true;
+        });
+        AppToast.success('Rating submitted! Thank you.');
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _busy = false);
+        AppToast.error('Could not save rating');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final existingRating = (widget.t.deliveryRating?['stars'] as num?)?.toInt() ?? 0;
+    final partnerName = widget.t.riderName.isNotEmpty ? widget.t.riderName : 'Delivery Partner';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: widget.isDark ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: widget.isDark ? AppColors.dividerDark : const Color(0xFFE5E7EB),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(widget.isDark ? 0.2 : 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            (existingRating > 0 || _submitted)
+                ? 'Thanks for rating your delivery'
+                : 'Rate your delivery by $partnerName',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: widget.isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: List.generate(5, (index) {
+              final starNum = index + 1;
+              final isFilled = starNum <= (_stars > 0 ? _stars : existingRating);
+              return GestureDetector(
+                onTap: _busy ? null : () => setState(() {
+                  _stars = starNum;
+                  _submitted = false;
+                }),
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Icon(
+                    isFilled ? Icons.star_rounded : Icons.star_border_rounded,
+                    color: isFilled ? const Color(0xFFF59E0B) : const Color(0xFFD1D5DB),
+                    size: 32,
+                  ),
+                ),
+              );
+            }),
+          ),
+          if (_editing || (existingRating == 0 && !_submitted)) ...[
+            const SizedBox(height: 10),
+            TextField(
+              controller: _commentController,
+              maxLength: 300,
+              maxLines: 2,
+              style: TextStyle(fontSize: 12, color: widget.isDark ? AppColors.textPrimaryDark : AppColors.textPrimary),
+              decoration: InputDecoration(
+                hintText: 'Add a note (optional)',
+                counterText: '',
+                filled: true,
+                fillColor: widget.isDark ? const Color(0xFF2A2A2C) : const Color(0xFFF9FAFB),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: widget.isDark ? AppColors.dividerDark : const Color(0xFFE5E7EB)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: widget.isDark ? AppColors.dividerDark : const Color(0xFFE5E7EB)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: (_stars > 0 && !_busy) ? _submit : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+              ),
+              child: Text(
+                _busy ? 'Saving…' : 'Submit rating',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white),
+              ),
+            ),
+          ] else if (existingRating > 0 || _submitted) ...[
+            const SizedBox(height: 6),
+            GestureDetector(
+              onTap: () => setState(() => _editing = true),
+              child: const Text(
+                'Change rating',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF047857),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Real map: OSM tiles + Store marker + Rider marker + Drop marker + route curve (OSRM / fallback).
 class _LiveMap extends ConsumerStatefulWidget {
   final TrackingState t;
   final bool isDark;
@@ -1098,22 +1376,25 @@ class _LiveMap extends ConsumerStatefulWidget {
 
 class _LiveMapState extends ConsumerState<_LiveMap> with TickerProviderStateMixin {
   late final FreshCartMapController _map = FreshCartMapController(vsync: this);
+  late final AnimationController _pulseController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2000),
+  )..repeat();
 
-  LatLng get _dest => widget.t.destination ?? const LatLng(17.4474, 78.3762);
-  LatLng get _store =>
-      widget.t.storeLocation ?? LatLng(_dest.latitude - 0.0085, _dest.longitude + 0.0075);
-  LatLng get _origin => widget.t.hasRider ? widget.t.riderLocation : _store;
+  LatLng get _dest => widget.t.destination ?? const LatLng(17.4468, 78.3888);
+  LatLng get _store => widget.t.storeLocation ?? const LatLng(17.4490, 78.3740);
+  LatLng get _origin => widget.t.riderLocation;
 
   List<LatLng> get _effectiveRoutePoints {
     if (widget.t.routePoints.length >= 2) {
       return widget.t.routePoints;
     }
-    return <LatLng>[_origin, _dest];
+    return <LatLng>[_store, _origin, _dest];
   }
 
   void _recenter() {
     _map.fitCoordinates(
-      _effectiveRoutePoints,
+      <LatLng>[_store, _origin, _dest],
       padding: const EdgeInsets.fromLTRB(36, 32, 36, 56),
       maxZoom: 17.5,
       minZoom: 14.5,
@@ -1131,7 +1412,7 @@ class _LiveMapState extends ConsumerState<_LiveMap> with TickerProviderStateMixi
     super.didUpdateWidget(old);
     if (old.t.riderLocation != widget.t.riderLocation ||
         old.t.destination != widget.t.destination ||
-        old.t.hasRider != widget.t.hasRider ||
+        old.t.storeLocation != widget.t.storeLocation ||
         old.t.routePoints != widget.t.routePoints) {
       _recenter();
     }
@@ -1139,181 +1420,140 @@ class _LiveMapState extends ConsumerState<_LiveMap> with TickerProviderStateMixi
 
   @override
   void dispose() {
+    _pulseController.dispose();
     _map.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final t = widget.t;
     final routePts = _effectiveRoutePoints;
 
     final markers = <Marker>[
-      // 1. Origin marker: Rider bike (if assigned) or FreshCart Dark Store
-      if (t.hasRider)
-        Marker(
-          point: t.riderLocation,
-          width: 50,
-          height: 56,
-          alignment: Alignment.topCenter,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(6),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.18),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: const Text(
-                  'Rider',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 2),
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withOpacity(0.4),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.delivery_dining_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-            ],
-          ),
-        )
-      else
-        Marker(
-          point: _store,
-          width: 64,
-          height: 56,
-          alignment: Alignment.topCenter,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1B5E20),
-                  borderRadius: BorderRadius.circular(6),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.18),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: const Text(
-                  'Dark Store',
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 2),
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2E7D32),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.storefront_rounded,
-                  color: Colors.white,
-                  size: 18,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-      // 2. Destination marker (Customer Home / Delivery Drop)
+      // 1. Store Marker ("FreshCart HITEC City")
       Marker(
-        point: _dest,
-        width: 48,
-        height: 56,
+        point: _store,
+        width: 90,
+        height: 62,
         alignment: Alignment.topCenter,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(6),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.18),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
-              ),
-              child: const Text(
-                'Drop',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFFD32F2F),
-                ),
-              ),
-            ),
-            const SizedBox(height: 2),
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE53935),
+                color: const Color(0xFF059669),
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
+                border: Border.all(color: Colors.white, width: 2.5),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 6,
+                    color: const Color(0xFF059669).withOpacity(0.35),
+                    blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
                 ],
               ),
+              child: const Icon(Icons.storefront_rounded, color: Colors.white, size: 18),
+            ),
+            const SizedBox(height: 2),
+            const Text(
+              'FreshCart\nHITEC City',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 9.5,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF111827),
+                height: 1.1,
+              ),
+            ),
+          ],
+        ),
+      ),
+
+      // 2. Rider Marker (Delivery Partner with animated pulse ring)
+      Marker(
+        point: _origin,
+        width: 54,
+        height: 54,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            AnimatedBuilder(
+              animation: _pulseController,
+              builder: (context, child) {
+                final v = _pulseController.value;
+                return Container(
+                  width: 24 + (30 * v),
+                  height: 24 + (30 * v),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF10B981).withOpacity(0.35 * (1 - v)),
+                  ),
+                );
+              },
+            ),
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: const Color(0xFF059669),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.22),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
               child: const Icon(
-                Icons.home_rounded,
+                Icons.delivery_dining_rounded,
                 color: Colors.white,
-                size: 18,
+                size: 20,
+              ),
+            ),
+          ],
+        ),
+      ),
+
+      // 3. Destination Drop Marker ("Delivery Address")
+      Marker(
+        point: _dest,
+        width: 48,
+        height: 48,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            AnimatedBuilder(
+              animation: _pulseController,
+              builder: (context, child) {
+                final v = _pulseController.value;
+                return Container(
+                  width: 20 + (28 * v),
+                  height: 20 + (28 * v),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF3B82F6).withOpacity(0.3 * (1 - v)),
+                  ),
+                );
+              },
+            ),
+            Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                color: const Color(0xFF2563EB),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 3),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF2563EB).withOpacity(0.4),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
             ),
           ],

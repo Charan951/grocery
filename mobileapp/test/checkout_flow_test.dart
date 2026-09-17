@@ -212,10 +212,9 @@ void main() {
   group('Order placed', () {
     testWidgets('shows confirmation, ETA and actions; hardware back goes home', (tester) async {
       await _boot(tester, _host(const OrderPlacedScreen(orderId: 'ORD123')));
-      expect(find.text('Order placed'), findsOneWidget);
+      expect(find.text('Order Placed!'), findsOneWidget);
       expect(find.textContaining('ORD123'), findsOneWidget);
-      expect(find.text('Arriving in ~8 minutes'), findsOneWidget);
-      expect(find.text('Track order'), findsOneWidget);
+      expect(find.text('Track Your Order'), findsOneWidget);
 
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();

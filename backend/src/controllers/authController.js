@@ -54,8 +54,9 @@ export const authController = {
 
   login: async (req, res) => {
     try {
-      const { email, password } = req.body;
-      const user = await User.findOne({ email });
+      const { email, password } = req.body || {};
+      const cleanEmail = (email || '').trim();
+      const user = (await User.findOne({ email: new RegExp('^' + cleanEmail + '$', 'i') })) || (await User.findOne({ email: cleanEmail }));
       if (!user) {
         return res.status(401).json({ success: false, message: 'Invalid email or password' });
       }

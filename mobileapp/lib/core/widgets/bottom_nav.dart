@@ -13,10 +13,10 @@ class BottomNavDestination {
 /// storefront's bottom nav. Search is NOT a tab — it's reached from the home
 /// search bar and pushed full-screen (`/search`).
 const kBottomNavDestinations = <BottomNavDestination>[
-  BottomNavDestination(Icons.grid_view_outlined, Icons.grid_view_rounded, 'Categories'),
+  BottomNavDestination(Icons.grid_3x3_rounded, Icons.grid_3x3_rounded, 'Categories'),
   BottomNavDestination(Icons.home_outlined, Icons.home_rounded, 'Home'),
-  BottomNavDestination(Icons.receipt_long_outlined, Icons.receipt_long_rounded, 'Orders'),
-  BottomNavDestination(Icons.person_outline_rounded, Icons.person_rounded, 'Account'),
+  BottomNavDestination(Icons.shopping_bag_outlined, Icons.shopping_bag_rounded, 'Orders'),
+  BottomNavDestination(Icons.account_circle_outlined, Icons.account_circle_rounded, 'Account'),
 ];
 
 /// Index of the Home tab in [kBottomNavDestinations]. Home is centre, not
@@ -24,7 +24,7 @@ const kBottomNavDestinations = <BottomNavDestination>[
 const kHomeNavIndex = 1;
 
 /// Flat, full-width bottom navigation. Every tab shows its label at all times
-/// (discoverability + a11y). Active = brand green; ≥ 56 dp tap targets; a
+/// (discoverability + a11y). Active = dark charcoal matching web; ≥ 56 dp tap targets; a
 /// hairline top border instead of a floating pill + shadow.
 class CustomBottomNavBar extends StatelessWidget {
   final int currentIndex;
@@ -83,7 +83,7 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final active = AppColors.primaryText;
+    final active = isDark ? AppColors.textPrimaryDark : AppColors.textPrimary;
     final inactive = isDark ? AppColors.textSecondaryDark : AppColors.textSecondary;
     final color = selected ? active : inactive;
 

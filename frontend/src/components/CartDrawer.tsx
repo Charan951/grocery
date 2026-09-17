@@ -96,10 +96,60 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
     setIsCheckoutOpen(true);
   };
 
-  // Recommendations for "You might also like" shelf
-  const recommendations = (products || [])
-    .filter((p) => !cart.some((ci) => ci.product.id === p.id))
-    .slice(0, 6);
+  // Recommendations for "You might also like" shelf (Same Category Products)
+  const recommendations = React.useMemo(() => {
+    if (!products || products.length === 0) return [];
+    
+    // Products not already in cart
+    const notInCart = products.filter((p) => !cart.some((ci) => ci.product.id === p.id));
+    if (notInCart.length === 0) return [];
+
+    // Extract category & subCategory sets from items in cart
+    const cartCategoryIds = new Set<string>();
+    const cartCategories = new Set<string>();
+    const cartSubCategories = new Set<string>();
+
+    cart.forEach((ci) => {
+      const p = ci.product as any;
+      if (p.categoryId) cartCategoryIds.add(String(p.categoryId).toLowerCase());
+      if (p.category) cartCategories.add(String(p.category).toLowerCase());
+      if (p.subCategory) cartSubCategories.add(String(p.subCategory).toLowerCase());
+    });
+
+    if (cartCategoryIds.size === 0 && cartCategories.size === 0) {
+      return notInCart.slice(0, 10);
+    }
+
+    // Level 1: Same subCategory & category
+    const sameSubCatProds: typeof products = [];
+    // Level 2: Same category
+    const sameCatProds: typeof products = [];
+    // Level 3: Other categories
+    const otherProds: typeof products = [];
+
+    notInCart.forEach((p) => {
+      const pCatId = p.categoryId ? String(p.categoryId).toLowerCase() : '';
+      const pCat = p.category ? String(p.category).toLowerCase() : '';
+      const pSubCat = p.subCategory ? String(p.subCategory).toLowerCase() : '';
+
+      const isSameSubCat = pSubCat && cartSubCategories.has(pSubCat);
+      const isSameCat = (pCatId && cartCategoryIds.has(pCatId)) || (pCat && cartCategories.has(pCat));
+
+      if (isSameSubCat && isSameCat) {
+        sameSubCatProds.push(p);
+      } else if (isSameCat) {
+        sameCatProds.push(p);
+      } else {
+        otherProds.push(p);
+      }
+    });
+
+    // Combine in order of relevance: same subcategory -> same category -> other products fallback
+    const combined = [...sameSubCatProds, ...sameCatProds, ...otherProds];
+    
+    // Slice nearly 5-10 items (up to 10 items)
+    return combined.slice(0, 10);
+  }, [products, cart]);
 
   return (
     <AnimatePresence>

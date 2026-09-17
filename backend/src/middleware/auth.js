@@ -133,7 +133,7 @@ export const protectDelivery = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'This area is for delivery partners' });
     }
     const user = await User.findById(decoded.id).select('-password');
-    if (!user || user.role !== 'Delivery') {
+    if (!user || user.role?.toLowerCase() !== 'delivery') {
       return res.status(403).json({ success: false, message: 'Delivery partner access required' });
     }
     if (user.status !== 'Active') {

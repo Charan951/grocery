@@ -36,9 +36,6 @@ class _OfferSheetState extends ConsumerState<OfferSheet> {
         ref.read(offerProvider.notifier).dismiss();
       }
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && !_busy) _accept();
-    });
   }
 
   @override

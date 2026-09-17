@@ -115,35 +115,38 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with WidgetsB
 
     return Scaffold(
       appBar: AppBar(
-        titleSpacing: 18,
-        title: RichText(
-          text: const TextSpan(
-            children: [
-              TextSpan(
-                text: 'FreshCart ',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 20,
-                  color: kGreen,
-                  letterSpacing: -0.4,
+        titleSpacing: 12,
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: RichText(
+            text: const TextSpan(
+              children: [
+                TextSpan(
+                  text: 'FreshCart ',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 19,
+                    color: kGreen,
+                    letterSpacing: -0.4,
+                  ),
                 ),
-              ),
-              TextSpan(
-                text: 'Delivery',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 20,
-                  color: kText,
-                  letterSpacing: -0.4,
+                TextSpan(
+                  text: 'Delivery',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 19,
+                    color: kText,
+                    letterSpacing: -0.4,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         actions: [
           if (_toggling)
             const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
+              padding: EdgeInsets.symmetric(horizontal: 12),
               child: SizedBox(
                 width: 20,
                 height: 20,
@@ -158,17 +161,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with WidgetsB
             )
           else
             Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   online ? 'Online' : 'Offline',
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
-                    fontSize: 12.5,
+                    fontSize: 12,
                     color: online ? kGreen : kTextMuted,
                   ),
                 ),
                 Transform.scale(
-                  scale: 0.85,
+                  scale: 0.8,
                   child: Switch(
                     value: online,
                     onChanged: _toggle,

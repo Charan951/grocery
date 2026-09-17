@@ -109,13 +109,14 @@ class SearchBarHeader extends StatefulWidget {
 
 class _SearchBarHeaderState extends State<SearchBarHeader> {
   static const List<String> _placeholders = [
-    'Search "atta, dal, coke and more"',
-    'Search "fresh milk, bread & eggs"',
-    'Search "chips, snacks & cold drinks"',
-    'Search "fresh fruits & vegetables"',
-    'Search "rice, cooking oil & spices"',
-    'Search "chocolates, biscuits & ice cream"',
-    'Search "soaps, shampoo & personal care"',
+    'Search "ice cream"',
+    'Search "bread & buns"',
+    'Search "chocolate box"',
+    'Search "fresh milk"',
+    'Search "kurkure & snacks"',
+    'Search "mangoes & fruits"',
+    'Search "organic ghee"',
+    'Search "paneer & cream"',
   ];
 
   Timer? _timer;

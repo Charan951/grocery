@@ -77,8 +77,15 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
 
   const phoneDigits = identifier.replace(/\D/g, '').slice(-10);
 
-  const finishLogin = (customerData: any) => {
+  const finishLogin = (customerData: any, isNewRegistration = false) => {
+    const userKey = String(customerData?.customerId || customerData?.phone || customerData?.email || 'guest').replace(/\s+/g, '_');
+    if (isNewRegistration) {
+      localStorage.setItem(`freshcart_cart_${userKey}`, JSON.stringify([]));
+      localStorage.setItem(`freshcart_wishlist_${userKey}`, JSON.stringify([]));
+    }
     localStorage.setItem('customer_user', JSON.stringify(customerData));
+    window.dispatchEvent(new Event('customer_auth_changed'));
+    window.dispatchEvent(new Event('storage'));
     onLoginSuccess(customerData);
     setStep('success');
     setTimeout(() => {
@@ -143,7 +150,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
         return;
       }
       localStorage.setItem('customer_token', data.token);
-      finishLogin(data.customer);
+      finishLogin(data.customer, false);
     } catch {
       setError('Network error. Please try again.');
     } finally {
@@ -178,7 +185,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
         return;
       }
       localStorage.setItem('customer_token', data.token);
-      finishLogin(data.customer);
+      finishLogin(data.customer, false);
     } catch {
       setError('Network error. Please try again.');
     } finally {
@@ -205,7 +212,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
         return;
       }
       localStorage.setItem('customer_token', data.token);
-      finishLogin(data.customer);
+      finishLogin(data.customer, true);
     } catch {
       setError('Network error. Please try again.');
     } finally {

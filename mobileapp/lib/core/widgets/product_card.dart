@@ -118,6 +118,26 @@ class ProductCard extends ConsumerWidget {
                         ),
                       ),
                     ),
+                  Positioned(
+                    bottom: 8,
+                    left: 8,
+                    child: Container(
+                      width: 14,
+                      height: 14,
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(3),
+                        border: Border.all(color: const Color(0xFF059669), width: 1),
+                      ),
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF059669),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                  ),
                   if (showWishlistButton)
                     Positioned(
                       top: 6,
@@ -374,7 +394,7 @@ class _QtyStepper extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.primaryText,
+        color: const Color(0xFF059669),
         borderRadius: BorderRadius.circular(10),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 4, offset: const Offset(0, 1))],
       ),

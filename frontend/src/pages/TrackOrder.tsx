@@ -271,6 +271,7 @@ export const TrackOrder: React.FC = () => {
   // right value regardless of what padding/gap values surround it.
   const spacerRef = useRef<HTMLDivElement>(null);
   const [spacerH, setSpacerH] = useState(0);
+  const spacerHRef = useRef(0);
 
   // Anchor's natural (pre-scroll) height, breakpoint-aware — matchMedia
   // instead of a Tailwind min-h class, since the anchor's height must be
@@ -505,46 +506,27 @@ export const TrackOrder: React.FC = () => {
         });
       }
 
-      // Leaflet caches its internal canvas/tile-layer size and only
-      // reflows it on invalidateSize() — it does NOT know the container
-      // div resized just because our inline styles changed its CSS
-      // width/height this frame. Without calling it here, the div visibly
-      // stretches every scroll frame while the map tiles/markers inside
-      // stay put until the next boundary flip. But invalidateSize() forces
-      // a synchronous layout reflow, which is expensive — calling it on
-      // every single tick (including the 100ms poll firing with nothing
-      // having moved) was the actual cause of the stutter/jank ("not
-      // smooth"): only call it when the box actually changed by more
-      // than a fraction of a pixel.
+      // Guarded invalidateSize call
       const last = lastMapSizeRef.current;
       const changed =
         Math.abs(last.w - nextMapBox.width) > 0.5 || Math.abs(last.h - nextMapBox.height) > 0.5;
       if (mapRef.current && changed) {
         lastMapSizeRef.current = { w: nextMapBox.width, h: nextMapBox.height };
         try {
-          mapRef.current.invalidateSize({ pan: false });
+          const m = mapRef.current as any;
+          if (m && m._container && m._container._leaflet_pos !== undefined) {
+            mapRef.current.invalidateSize({ pan: false });
+          }
         } catch {
-          // Defensive — see fitMap's identical comment.
+          // Defensive
         }
       }
 
-      // Self-correcting flow-spacer height: compare the spacer's own
-      // current rendered bottom edge against where the map's real bottom
-      // edge is, and feed the difference into its height for the next
-      // frame. Converges to the exact right value within a frame or two
-      // and stays correct regardless of any padding/gap changes around it
-      // — no more hand-derived magic-number offsets.
-      if (progress <= 0.02) {
-        setSpacerH((h) => (h === 0 ? h : 0));
-      } else {
-        const spacerRect = spacerRef.current?.getBoundingClientRect();
-        if (spacerRect) {
-          const desiredBottom = barH + nextMapBox.height;
-          const delta = desiredBottom - spacerRect.bottom;
-          if (Math.abs(delta) > 0.5) {
-            setSpacerH((h) => Math.max(0, h + delta));
-          }
-        }
+      // Deterministic flow-spacer height matching anchor collapse
+      const targetSpacerH = Math.round(progress * nextMapBox.height);
+      if (Math.abs(spacerHRef.current - targetSpacerH) > 1) {
+        spacerHRef.current = targetSpacerH;
+        setSpacerH(targetSpacerH);
       }
     };
     const onScroll = () => {
@@ -656,14 +638,11 @@ export const TrackOrder: React.FC = () => {
   const fitMap = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
-    // Defensive: Leaflet can throw reading '_leaflet_pos' of undefined if
-    // called at an awkward moment relative to its own internal DOM
-    // teardown/setup (e.g. mid unmount during a fast remount) despite the
-    // mapRef-identity guards elsewhere — never let that crash cascade into
-    // anything else on the page (like the scroll listeners set up in a
-    // separate effect).
     try {
-      map.invalidateSize();
+      const m = map as any;
+      if (m && m._container && m._container._leaflet_pos !== undefined) {
+        map.invalidateSize();
+      }
       const pts: [number, number][] = [];
       if (pickup?.lat && pickup?.lng) pts.push([pickup.lat, pickup.lng]);
       if (rider?.lat && rider?.lng) pts.push([rider.lat, rider.lng]);
@@ -693,7 +672,7 @@ export const TrackOrder: React.FC = () => {
     if (order?.trackingTimeline && order.trackingTimeline.length > 0) {
       return [...order.trackingTimeline].reverse();
     }
-    const partner = order?.delivery?.partnerName || order?.deliveryPartnerName || 'charan';
+    const partner = order?.delivery?.partnerName || order?.deliveryPartnerName || 'Delivery partner';
     return [
       {
         status: 'Arrived At Store',
@@ -734,11 +713,6 @@ export const TrackOrder: React.FC = () => {
         attributionControl: false,
         minZoom: 12,
         maxZoom: 19,
-        // Mouse-wheel-over-map zooming traps the page's own scroll —
-        // the user's wheel/trackpad gesture zooms the map instead of
-        // scrolling the page, with no way to scroll past it. The
-        // floating zoom buttons already cover zoom; page scroll always
-        // wins here.
         scrollWheelZoom: false,
       }).setView([17.4485, 78.3815], 15);
 
@@ -757,19 +731,20 @@ export const TrackOrder: React.FC = () => {
       fitted.current = false;
       setMapReady((n) => n + 1);
 
-      // Guarded against the map having already been removed by the time
-      // these fire (e.g. the ref re-runs with `null` then a fresh node
-      // during a remount) — calling invalidateSize()/any method on a
-      // removed Leaflet instance throws reading '_leaflet_pos' of
-      // undefined, since remove() tears down its internal DOM refs.
       setTimeout(() => {
         if (mapRef.current !== map) return;
-        map.invalidateSize();
+        const m = map as any;
+        if (m && m._container && m._container._leaflet_pos !== undefined) {
+          map.invalidateSize();
+        }
         fitMap();
       }, 100);
       setTimeout(() => {
         if (mapRef.current !== map) return;
-        map.invalidateSize();
+        const m = map as any;
+        if (m && m._container && m._container._leaflet_pos !== undefined) {
+          map.invalidateSize();
+        }
         fitMap();
       }, 350);
     },
@@ -780,38 +755,36 @@ export const TrackOrder: React.FC = () => {
   useEffect(() => {
     if (mapRef.current) {
       setTimeout(() => {
-        mapRef.current?.invalidateSize();
+        const m = mapRef.current as any;
+        if (m && m._container && m._container._leaflet_pos !== undefined) {
+          m.invalidateSize();
+        }
         fitMap();
       }, 60);
       setTimeout(() => {
-        mapRef.current?.invalidateSize();
+        const m = mapRef.current as any;
+        if (m && m._container && m._container._leaflet_pos !== undefined) {
+          m.invalidateSize();
+        }
         fitMap();
       }, 250);
     }
   }, [isScrolledPastTracking, fitMap]);
 
-  // Once pinned, the map covers most of the viewport — a touch-drag or
-  // mouse-drag starting on it pans the map instead of scrolling the
-  // page, leaving no way to reach Delivery Partner/Address/Status
-  // Updates below it. Disabling map dragging once pinned makes every
-  // gesture over it scroll the page instead; the Recenter button still
-  // re-centers on the rider if the view has drifted from earlier
-  // (pre-pinned) interaction.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    if (isScrolledPastTracking) {
-      map.dragging.disable();
-    } else {
-      map.dragging.enable();
-    }
-  }, [isScrolledPastTracking, mapReady]);
+    map.dragging.disable();
+  }, [mapReady]);
 
   // Markers and route line
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    map.invalidateSize();
+    const m = map as any;
+    if (m && m._container && m._container._leaflet_pos !== undefined) {
+      map.invalidateSize();
+    }
 
     if (dest) {
       if (destMk.current && map.hasLayer(destMk.current)) {
@@ -1271,15 +1244,7 @@ export const TrackOrder: React.FC = () => {
                   with their own pointer-events and stay clickable. */}
               <div
                 ref={mapCallbackRef}
-                className="w-full h-full"
-                // Was gated on `isScrolledPastTracking` (only true at
-                // progress===1, fully pinned) — but the map is already
-                // large well before that, since it grows continuously
-                // with scroll. Gesture-trapping was still reproducible
-                // mid-transition. Gating on scrollProgress > 0.5 instead
-                // turns off map interaction, and hands gestures to page
-                // scroll, well before the map is large enough to matter.
-                style={{ pointerEvents: scrollProgress > 0.5 ? 'none' : 'auto' }}
+                className="w-full h-full pointer-events-none [&_.leaflet-container]:!pointer-events-none [&_.leaflet-control-container]:!pointer-events-none"
               />
 
               {/* Top-Left Live GPS Badge */}
@@ -1293,9 +1258,8 @@ export const TrackOrder: React.FC = () => {
               </div>
 
               {/* Bottom-Right Floating Controls — 44px, the touch-target
-                  minimum (was 36px, an /impeccable audit finding); no
-                  layout constraint here, so no tradeoff needed. */}
-              <div className="absolute bottom-3 right-3 z-[500] flex flex-col gap-2">
+                  minimum; pointer-events-auto ensures buttons remain clickable. */}
+              <div className="absolute bottom-3 right-3 z-[500] flex flex-col gap-2 pointer-events-auto">
                 <button
                   type="button"
                   onClick={recenterMap}
@@ -1372,7 +1336,7 @@ export const TrackOrder: React.FC = () => {
                   </div>
                   <div className="min-w-0">
                     <span className="text-base font-extrabold text-gray-900 truncate block">
-                      {order.delivery?.partnerName || order.deliveryPartnerName || 'charan'}
+                      {order.delivery?.partnerName || order.deliveryPartnerName || (order.delivery ? 'Delivery Partner' : 'Waiting for assignment')}
                     </span>
                     <div className="text-xs font-bold text-gray-500 flex items-center gap-1 mt-0.5">
                       <span className="text-amber-500">★</span>
@@ -1409,7 +1373,7 @@ export const TrackOrder: React.FC = () => {
                 orderId={order.orderId}
                 socket={socket}
                 customerPhone={customerPhone()}
-                partnerName={order.delivery?.partnerName || order.deliveryPartnerName || 'charan'}
+                partnerName={order.delivery?.partnerName || order.deliveryPartnerName || 'Delivery Partner'}
                 onClose={() => setChatOpen(false)}
               />
             )}

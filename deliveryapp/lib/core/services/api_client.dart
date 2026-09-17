@@ -36,10 +36,10 @@ class ApiClient {
   // ---- auth ----
   Future<String> login(String email, String password) async {
     try {
-      final r = await _dio.post('/auth/login', data: {'email': email, 'password': password});
+      final r = await _dio.post('/auth/login', data: {'email': email.trim(), 'password': password});
       final data = Map<String, dynamic>.from(r.data as Map);
       final role = (data['user']?['role'] ?? '').toString();
-      if (role != 'Delivery') {
+      if (role.toLowerCase() != 'delivery') {
         throw ApiException('This app is for delivery partners only.', statusCode: 403);
       }
       return data['token'] as String;

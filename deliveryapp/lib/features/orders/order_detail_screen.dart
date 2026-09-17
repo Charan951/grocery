@@ -549,23 +549,26 @@ class _BodyState extends ConsumerState<_Body> {
                   children: [
                     Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                          decoration: BoxDecoration(
-                            color: meta.fg.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            o.status.toUpperCase(),
-                            style: GoogleFonts.rubik(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w800,
-                              color: meta.fg,
-                              letterSpacing: 0.5,
+                        Flexible(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                            decoration: BoxDecoration(
+                              color: meta.fg.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              o.status.toUpperCase(),
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.rubik(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                                color: meta.fg,
+                                letterSpacing: 0.5,
+                              ),
                             ),
                           ),
                         ),
-                        const Spacer(),
+                        const SizedBox(width: 6),
                         InkWell(
                           onTap: () {
                             Clipboard.setData(ClipboardData(text: o.orderId));
@@ -905,15 +908,28 @@ class _BodyState extends ConsumerState<_Body> {
           const SizedBox(height: 14),
 
           if (_latLngFrom(o.pickup) != null && _latLngFrom(o.deliveryLocation) != null) ...[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: SizedBox(
-                height: 160,
-                child: DeliveryMap(
-                  origin: _latLngFrom(o.pickup)!,
-                  destination: _latLngFrom(o.deliveryLocation)!,
-                  originLabel: 'Store',
-                  destinationLabel: 'Drop',
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: kLedgerLine),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(13),
+                child: SizedBox(
+                  height: 200,
+                  child: DeliveryMap(
+                    origin: _latLngFrom(o.pickup)!,
+                    destination: _latLngFrom(o.deliveryLocation)!,
+                    originLabel: 'Store',
+                    destinationLabel: 'Drop',
+                  ),
                 ),
               ),
             ),
@@ -948,71 +964,95 @@ class _BodyState extends ConsumerState<_Body> {
           // Chat, Call & WhatsApp Actions
           Row(
             children: [
-              Expanded(
-                child: SizedBox(
-                  height: 42,
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: kText,
-                      side: const BorderSide(color: kLedgerLine),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: () => showOrderChatSheet(
-                      context,
-                      ref: ref,
-                      orderId: o.orderId,
-                      customerName: o.customerName,
-                    ),
-                    icon: const Icon(Icons.forum_rounded, size: 17, color: kGreen),
-                    label: Text(
-                      'Chat',
-                      style: GoogleFonts.nunitoSans(fontWeight: FontWeight.w700, fontSize: 13),
-                    ),
-                  ),
+              _actionButton(
+                onTap: () => showOrderChatSheet(
+                  context,
+                  ref: ref,
+                  orderId: o.orderId,
+                  customerName: o.customerName,
                 ),
+                icon: Icons.forum_rounded,
+                iconColor: kGreen,
+                label: 'Chat',
+                textColor: kText,
+                borderColor: kLedgerLine,
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: SizedBox(
-                  height: 42,
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: canContact ? kText : kTextFaint,
-                      side: BorderSide(color: canContact ? kLedgerLine : kLedgerLine.withValues(alpha: 0.5)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: canContact ? _call : null,
-                    icon: Icon(Icons.call_rounded, size: 17, color: canContact ? kGreen : kTextFaint),
-                    label: Text(
-                      'Call',
-                      style: GoogleFonts.nunitoSans(fontWeight: FontWeight.w700, fontSize: 13),
-                    ),
-                  ),
-                ),
+              const SizedBox(width: 8),
+              _actionButton(
+                onTap: canContact ? _call : null,
+                icon: Icons.call_rounded,
+                iconColor: canContact ? kGreen : kTextFaint,
+                label: 'Call',
+                textColor: canContact ? kText : kTextFaint,
+                borderColor: canContact ? kLedgerLine : kLedgerLine.withValues(alpha: 0.5),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: SizedBox(
-                  height: 42,
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: canContact ? const Color(0xFF075E54) : kTextFaint,
-                      backgroundColor: canContact ? const Color(0xFFE8F5E9) : Colors.transparent,
-                      side: BorderSide(color: canContact ? const Color(0xFF25D366).withValues(alpha: 0.4) : kLedgerLine),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: canContact ? _whatsapp : null,
-                    icon: Icon(Icons.chat_bubble_rounded, size: 16, color: canContact ? const Color(0xFF25D366) : kTextFaint),
-                    label: Text(
-                      'WhatsApp',
-                      style: GoogleFonts.nunitoSans(fontWeight: FontWeight.w700, fontSize: 13),
-                    ),
-                  ),
-                ),
+              const SizedBox(width: 8),
+              _actionButton(
+                onTap: canContact ? _whatsapp : null,
+                icon: Icons.chat_bubble_rounded,
+                iconColor: canContact ? const Color(0xFF25D366) : kTextFaint,
+                label: 'WhatsApp',
+                textColor: canContact ? const Color(0xFF075E54) : kTextFaint,
+                borderColor: canContact ? const Color(0xFF25D366).withValues(alpha: 0.4) : kLedgerLine,
+                backgroundColor: canContact ? const Color(0xFFE8F5E9) : Colors.transparent,
               ),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _actionButton({
+    required VoidCallback? onTap,
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required Color textColor,
+    required Color borderColor,
+    Color? backgroundColor,
+  }) {
+    return Expanded(
+      child: SizedBox(
+        height: 42,
+        child: Material(
+          color: backgroundColor ?? Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: borderColor),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 16, color: iconColor),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        softWrap: false,
+                        style: GoogleFonts.nunitoSans(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12.5,
+                          color: textColor,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

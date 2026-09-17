@@ -27,9 +27,9 @@ class DeliveryMap extends StatefulWidget {
 class _DeliveryMapState extends State<DeliveryMap> {
   late final MapController _map = MapController();
 
-  static const _fitPadding = EdgeInsets.fromLTRB(32, 28, 32, 40);
-  static const _fitMinZoom = 14.5;
-  static const _fitMaxZoom = 17.5;
+  static const _fitPadding = EdgeInsets.fromLTRB(24, 24, 24, 24);
+  static const _fitMinZoom = 3.0;
+  static const _fitMaxZoom = 16.5;
 
   void _fit() {
     final points = [widget.origin, widget.destination];
@@ -38,7 +38,7 @@ class _DeliveryMapState extends State<DeliveryMap> {
       (p) => (p.latitude - first.latitude).abs() < 0.0001 && (p.longitude - first.longitude).abs() < 0.0001,
     );
     if (allSame) {
-      _map.move(first, _fitMaxZoom);
+      _map.move(first, 15.0);
       return;
     }
     _map.fitCamera(CameraFit.coordinates(
@@ -59,56 +59,85 @@ class _DeliveryMapState extends State<DeliveryMap> {
 
   @override
   Widget build(BuildContext context) {
-    return FlutterMap(
-      mapController: _map,
-      options: MapOptions(
-        initialCenter: widget.origin,
-        initialZoom: _fitMaxZoom,
-        minZoom: 4,
-        maxZoom: 19,
-        backgroundColor: const Color(0xFFF3F4F6),
-        onMapReady: _fit,
-        interactionOptions: const InteractionOptions(
-          flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag | InteractiveFlag.doubleTapZoom,
-        ),
-      ),
+    return Stack(
       children: [
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.freshcart.delivery',
-          maxZoom: 19,
+        FlutterMap(
+          mapController: _map,
+          options: MapOptions(
+            initialCenter: widget.origin,
+            initialZoom: 14.0,
+            minZoom: 3,
+            maxZoom: 19,
+            backgroundColor: const Color(0xFFF3F4F6),
+            onMapReady: _fit,
+            interactionOptions: const InteractionOptions(
+              flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag | InteractiveFlag.doubleTapZoom,
+            ),
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+              userAgentPackageName: 'com.freshcart.delivery',
+              maxZoom: 19,
+            ),
+            PolylineLayer(polylines: [
+              // Shadow outline for polyline
+              Polyline(
+                points: [widget.origin, widget.destination],
+                color: Colors.white.withValues(alpha: 0.9),
+                strokeWidth: 7,
+                strokeCap: StrokeCap.round,
+              ),
+              // Core polyline
+              Polyline(
+                points: [widget.origin, widget.destination],
+                color: kGreen,
+                strokeWidth: 4.5,
+                strokeCap: StrokeCap.round,
+              ),
+            ]),
+            MarkerLayer(markers: [
+              Marker(
+                point: widget.origin,
+                width: 64,
+                height: 54,
+                alignment: Alignment.topCenter,
+                child: _Pin(label: widget.originLabel, color: const Color(0xFF1B5E20), icon: Icons.storefront_rounded),
+              ),
+              Marker(
+                point: widget.destination,
+                width: 56,
+                height: 54,
+                alignment: Alignment.topCenter,
+                child: _Pin(label: widget.destinationLabel, color: kRed, icon: Icons.home_rounded),
+              ),
+            ]),
+            Align(
+              alignment: Alignment.bottomRight,
+              child: Container(
+                margin: const EdgeInsets.all(6),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.85), borderRadius: BorderRadius.circular(4)),
+                child: const Text('© OpenStreetMap © CARTO', style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w600, color: Colors.black87)),
+              ),
+            ),
+          ],
         ),
-        PolylineLayer(polylines: [
-          Polyline(
-            points: [widget.origin, widget.destination],
-            color: kGreen.withValues(alpha: 0.85),
-            strokeWidth: 4,
-            strokeCap: StrokeCap.round,
-          ),
-        ]),
-        MarkerLayer(markers: [
-          Marker(
-            point: widget.origin,
-            width: 64,
-            height: 54,
-            alignment: Alignment.topCenter,
-            child: _Pin(label: widget.originLabel, color: const Color(0xFF1B5E20), icon: Icons.storefront_rounded),
-          ),
-          Marker(
-            point: widget.destination,
-            width: 56,
-            height: 54,
-            alignment: Alignment.topCenter,
-            child: _Pin(label: widget.destinationLabel, color: kRed, icon: Icons.home_rounded),
-          ),
-        ]),
-        Align(
-          alignment: Alignment.bottomRight,
-          child: Container(
-            margin: const EdgeInsets.all(6),
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.75), borderRadius: BorderRadius.circular(4)),
-            child: const Text('© OpenStreetMap', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: Colors.black87)),
+        Positioned(
+          top: 8,
+          right: 8,
+          child: Material(
+            color: Colors.white,
+            elevation: 2,
+            shape: const CircleBorder(),
+            child: InkWell(
+              onTap: _fit,
+              customBorder: const CircleBorder(),
+              child: const Padding(
+                padding: EdgeInsets.all(7),
+                child: Icon(Icons.my_location_rounded, size: 18, color: kGreen),
+              ),
+            ),
           ),
         ),
       ],

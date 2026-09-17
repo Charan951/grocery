@@ -240,13 +240,11 @@ export const orderController = {
       if (Number.isFinite(dropLat) && Number.isFinite(dropLng)) {
         normalizedOrder.deliveryLocation = { lat: dropLat, lng: dropLng };
       }
-      if (settingsDoc?.storeOrigin) {
-        normalizedOrder.pickup = {
-          name: settingsDoc.storeOrigin.name,
-          lat: settingsDoc.storeOrigin.lat,
-          lng: settingsDoc.storeOrigin.lng,
-        };
-      }
+      normalizedOrder.pickup = {
+        name: settingsDoc?.storeOrigin?.name || 'FreshCart HITEC City',
+        lat: settingsDoc?.storeOrigin?.lat ?? 17.4490,
+        lng: settingsDoc?.storeOrigin?.lng ?? 78.3740,
+      };
 
       // Seed the timeline so an auto-accepted order shows the step in history.
       if (normalizedOrder.status === 'Accepted') {
@@ -295,6 +293,13 @@ export const orderController = {
           at: new Date().toISOString(),
         });
       }
+
+      // Auto-dispatch: trigger instant assignment to nearby online riders
+      Settings.findOne()
+        .then((s) => {
+          if (!s || s.autoAssignEnabled !== false) return tryAssign(order.orderId);
+        })
+        .catch(() => {});
 
       res.status(201).json({ success: true, order });
     } catch (err) {

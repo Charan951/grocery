@@ -8,9 +8,9 @@ import 'package:freshcart/features/orders/data/models/order_model.dart';
 
 class OrdersNotifier extends StateNotifier<AsyncValue<List<OrderModel>>> {
   final ApiService _api;
-  final SocketService _socket;
+  final SocketService? _socket;
 
-  OrdersNotifier(this._api, this._socket) : super(const AsyncValue.loading()) {
+  OrdersNotifier(this._api, [this._socket]) : super(const AsyncValue.loading()) {
     refresh();
   }
 
@@ -106,7 +106,7 @@ class OrdersNotifier extends StateNotifier<AsyncValue<List<OrderModel>>> {
     );
     state = AsyncValue.data([optimistic, ...(state.asData?.value ?? const [])]);
 
-    if (orderId.isNotEmpty) _socket.joinOrderRoom(orderId);
+    if (orderId.isNotEmpty) _socket?.joinOrderRoom(orderId);
     return orderId;
   }
 
@@ -136,7 +136,9 @@ class OrdersNotifier extends StateNotifier<AsyncValue<List<OrderModel>>> {
 
 final ordersProvider =
     StateNotifierProvider<OrdersNotifier, AsyncValue<List<OrderModel>>>((ref) {
-  return OrdersNotifier(getIt<ApiService>(), getIt<SocketService>());
+  final api = ref.watch(apiServiceProvider);
+  final socket = getIt.isRegistered<SocketService>() ? getIt<SocketService>() : null;
+  return OrdersNotifier(api, socket);
 });
 
 /// Single order detail (fresh fetch, includes the status timeline).

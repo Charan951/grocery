@@ -248,8 +248,18 @@ export const findCandidates = async ({ pickup, excludeUserIds = [], radiusKm = 6
       }
     : base;
 
-  let partners = (await DeliveryPartner.find(query).limit(CANDIDATE_LIMIT).lean())
-    .filter((p) => (p.activeOrderIds || []).length < (p.maxConcurrent || 1));
+  let partners = [];
+  try {
+    partners = (await DeliveryPartner.find(query).limit(CANDIDATE_LIMIT).lean())
+      .filter((p) => (p.activeOrderIds || []).length < (p.maxConcurrent || 1));
+  } catch (_) {
+    partners = (await DeliveryPartner.find(base).limit(CANDIDATE_LIMIT).lean())
+      .filter((p) => (p.activeOrderIds || []).length < (p.maxConcurrent || 1));
+  }
+  if (!partners.length && hasGeo) {
+    partners = (await DeliveryPartner.find(base).limit(CANDIDATE_LIMIT).lean())
+      .filter((p) => (p.activeOrderIds || []).length < (p.maxConcurrent || 1));
+  }
 
   // Batching guard: a partner who is already carrying a delivery may only take a
   // second one when the new drop is close to a drop they already have — otherwise
@@ -311,7 +321,9 @@ export const tryAssign = async (orderOrId) => {
   const order = typeof orderOrId === 'string' ? await Order.findOne({ orderId: orderOrId }) : orderOrId;
   if (!order) return { ok: false, code: 'no_order' };
   if (order.deliveryPartnerUserId) return { ok: false, code: 'already_assigned' };
-  if (order.status !== 'Ready') return { ok: false, code: 'not_ready' };
+  if (['Delivered', 'Cancelled', 'Returned', 'Refunded', 'Failed'].includes(order.status)) {
+    return { ok: false, code: 'terminal_status' };
+  }
   if (await Assignment.findOne({ orderId: order.orderId, status: 'offered' })) {
     return { ok: false, code: 'offer_pending' };
   }

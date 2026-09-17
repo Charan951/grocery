@@ -43,12 +43,9 @@ class StorageService {
     try {
       final current = _settingsBox.get(_ownerKey) as String?;
       if (current == userKey) return;
-      // Only wipe when handing off between two *different* real identities —
-      // a guest's cart (current == null) is allowed to carry into their first
-      // login. Logout already clears local data itself (see AuthNotifier.logout),
-      // so this just needs to stop a stale owner's leftovers from surviving
-      // into someone else's fresh login.
-      if (current != null && userKey != null) {
+      // Wipe whenever handing off between identities or registering a new account —
+      // so one customer's cart/wishlist/searches never leak into another's session.
+      if (current != userKey) {
         await clearAll();
         await clearRecentSearches();
       }

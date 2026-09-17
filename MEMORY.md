@@ -2549,3 +2549,10 @@ smart default) web+mobile.
 - **Web Storefront (`frontend`)**: Preconnected and imported Manrope & Inter in `index.html` and `index.css`, configured `--font-display: 'Manrope'` and `--font-sans: 'Inter'`, implemented `.fc-*` scale and component classes, and aligned `ProductCard.tsx` typography.
 - **Design System Documentation**: Updated `DESIGN.md` with complete typography system rules, scale matrix, tabular figure guidelines, intelligent truncation (2-line title, 3-4 line description), button architecture, and dynamic type accessibility.
 - **Verification**: `flutter analyze lib/` 0 issues, all 123 `flutter test` pass, `npx tsc -b` 0 errors, `npm run build` production bundle built cleanly.
+
+2026-09-17 — Customer Cart & Session Data Isolation (Web & Mobile):
+- **Web Frontend (`frontend/src/context/CartWishlistContext.tsx`)**: User-scoped cart & wishlist storage keys (`freshcart_cart_<userKey>` and `freshcart_wishlist_<userKey>`). Added listener for `customer_auth_changed` & `storage` events to immediately re-sync or clear active cart/wishlist when customer login/register/logout occurs.
+- **Web Registration Clean Start (`frontend/src/components/CustomerAuthModal.tsx`)**: When a brand-new customer registers an account, `finishLogin` explicitly initializes their isolated storage with empty arrays (`0 items`), preventing guest browsing or prior session items from bleeding into new user accounts.
+- **Web Sign Out Teardown (`frontend/src/pages/CustomerProfile.tsx`)**: `handleLogout` and `handleDeleteAccount` clear `customer_user` and `customer_token` and dispatch `customer_auth_changed` to clear active in-memory cart and wishlist state.
+- **Mobile App Data Isolation (`mobileapp/lib/core/services/storage_service.dart` & `cart_controller.dart`)**: Updated `syncOwner` in Hive storage to call `clearAll()` whenever identity/owner changes (`current != userKey`), and added `reloadCart()` to `CartNotifier` to keep Riverpod in-memory state in sync with isolated storage.
+- **Verification**: `npx tsc --noEmit` passed with 0 errors; all 122 `flutter test` integration/unit tests passed cleanly.

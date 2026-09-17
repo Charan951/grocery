@@ -727,44 +727,56 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
               />
             )}
 
-            {/* Blinkit/Zepto Promotional Cards Row (WEB ONLY - 2 Cards Per Row, Full Bleed Image) */}
+            {/* Blinkit/Zepto Promotional Cards Row (WEB ONLY - 2 Cards Per Row, Equal Heights) */}
             {activePromoCards.length > 0 && (
               <section className="hidden md:block mb-4 w-full">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
                   {activePromoCards.map((card) => {
                     const targetLink = card.categoryId
-                      ? `/products?category=${card.categoryId}&subCategory=All`
+                      ? `/products?category=${card.categoryId}&subCategory=${card.subCategoryName || 'All'}`
                       : card.linkUrl || '/products';
 
-                    const promoImg = card.bgImageUrl || card.imageUrl;
+                    // Card is a full-bleed image banner ONLY if bgType === 'image' and bgImageUrl exists
+                    const isFullImageBanner = card.bgType === 'image' && Boolean(card.bgImageUrl);
+
+                    // Target Category / Subcategory label
+                    const targetCat = categories.find((c) => (c.id || c.slug) === card.categoryId);
+                    const catLabel = card.subCategoryName
+                      ? `${targetCat?.name || card.categoryId} › ${card.subCategoryName}`
+                      : targetCat?.name || card.categoryId;
 
                     return (
                       <Link
                         key={card.id}
                         to={targetLink}
-                        className="group relative rounded-2xl md:rounded-[24px] overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 min-h-[200px] sm:min-h-[230px] md:min-h-[250px] w-full border border-divider/40 bg-surface block"
+                        className="group relative rounded-2xl md:rounded-[24px] overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 h-[225px] sm:h-[245px] md:h-[260px] w-full border border-divider/40 block shrink-0"
+                        style={{
+                          background: isFullImageBanner
+                            ? 'none'
+                            : card.bgGradient || 'linear-gradient(135deg, #0284c7, #06b6d4)',
+                          color: card.textColor || '#ffffff'
+                        }}
                       >
-                        {promoImg ? (
-                          /* Full Bleed Image - Edge-to-Edge with ZERO whitespace */
+                        {isFullImageBanner ? (
+                          /* Full Bleed Image Banner */
                           <img
-                            src={promoImg}
-                            alt={card.title}
+                            src={card.bgImageUrl}
+                            alt={card.title || 'Promotional Card'}
                             className="w-full h-full object-cover rounded-2xl md:rounded-[24px] block transition-transform duration-300 group-hover:scale-[1.01]"
                             onError={(e) => {
                               (e.target as HTMLElement).style.display = 'none';
                             }}
                           />
                         ) : (
-                          /* Solid / Gradient Color Fallback Card */
-                          <div
-                            className="w-full h-full p-6 sm:p-7 pr-32 sm:pr-40 flex flex-col justify-between"
-                            style={{
-                              background: card.bgGradient || 'linear-gradient(135deg, #0284c7, #06b6d4)',
-                              color: card.textColor || '#ffffff'
-                            }}
-                          >
-                            <div>
-                              <h3 className="text-lg sm:text-xl font-black leading-tight tracking-tight drop-shadow-xs">
+                          /* Solid / Gradient Color Manual Promotional Card */
+                          <div className="relative w-full h-full p-5 sm:p-6 flex flex-col justify-between z-10">
+                            <div className="max-w-[62%] sm:max-w-[68%]">
+                              {catLabel && (
+                                <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-black/30 text-white/95 border border-white/20 inline-block mb-2 backdrop-blur-xs">
+                                  {catLabel}
+                                </span>
+                              )}
+                              <h3 className="text-lg sm:text-xl font-black leading-tight tracking-tight drop-shadow-xs line-clamp-2">
                                 {card.title}
                               </h3>
                               {card.subtitle && (
@@ -773,10 +785,23 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                                 </p>
                               )}
                             </div>
-                            <div className="mt-4 sm:mt-5 inline-flex items-center gap-1.5 bg-black/80 group-hover:bg-black text-white font-black text-xs px-4 py-2 rounded-xl shadow-sm transition-transform group-hover:scale-105 w-fit">
+
+                            <div className="inline-flex items-center gap-1.5 bg-black/80 group-hover:bg-black text-white font-bold text-xs px-4 py-2 rounded-xl shadow-sm transition-transform group-hover:scale-105 w-fit">
                               <span>{card.buttonText || 'Order Now'}</span>
                               <ArrowRight size={14} />
                             </div>
+
+                            {/* Overlay product graphic on the right side */}
+                            {card.imageUrl && (
+                              <img
+                                src={card.imageUrl}
+                                alt={card.title}
+                                className="absolute right-3.5 bottom-3 max-w-[38%] max-h-[82%] sm:max-w-[42%] sm:max-h-[85%] object-contain z-10 pointer-events-none drop-shadow-lg transition-transform duration-300 group-hover:scale-105"
+                                onError={(e) => {
+                                  (e.target as HTMLElement).style.display = 'none';
+                                }}
+                              />
+                            )}
                           </div>
                         )}
                       </Link>

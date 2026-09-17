@@ -38,14 +38,30 @@ export function getProductStockQuantity(product: Product | any): number {
   return 50;
 }
 
+export function getActiveUserKey(): string {
+  try {
+    const raw = localStorage.getItem('customer_user');
+    if (!raw) return 'guest';
+    const parsed = JSON.parse(raw);
+    const key = parsed?.customerId || parsed?.phone || parsed?.email || 'guest';
+    return String(key).replace(/\s+/g, '_');
+  } catch {
+    return 'guest';
+  }
+}
+
 export const CartWishlistProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [activeUserKey, setActiveUserKey] = useState<string>(() => getActiveUserKey());
+
   const [cart, setCart] = useState<CartItem[]>(() => {
-    const cached = localStorage.getItem('freshcart_cart');
+    const userKey = getActiveUserKey();
+    const cached = localStorage.getItem(`freshcart_cart_${userKey}`);
     return cached ? JSON.parse(cached) : [];
   });
 
   const [wishlist, setWishlist] = useState<Product[]>(() => {
-    const cached = localStorage.getItem('freshcart_wishlist');
+    const userKey = getActiveUserKey();
+    const cached = localStorage.getItem(`freshcart_wishlist_${userKey}`);
     return cached ? JSON.parse(cached) : [];
   });
 
@@ -59,12 +75,30 @@ export const CartWishlistProvider: React.FC<{ children: React.ReactNode }> = ({ 
   };
 
   useEffect(() => {
-    localStorage.setItem('freshcart_cart', JSON.stringify(cart));
-  }, [cart]);
+    const handleAuthChange = () => {
+      const newKey = getActiveUserKey();
+      setActiveUserKey(newKey);
+      const cachedCart = localStorage.getItem(`freshcart_cart_${newKey}`);
+      setCart(cachedCart ? JSON.parse(cachedCart) : []);
+      const cachedWishlist = localStorage.getItem(`freshcart_wishlist_${newKey}`);
+      setWishlist(cachedWishlist ? JSON.parse(cachedWishlist) : []);
+    };
+
+    window.addEventListener('customer_auth_changed', handleAuthChange);
+    window.addEventListener('storage', handleAuthChange);
+    return () => {
+      window.removeEventListener('customer_auth_changed', handleAuthChange);
+      window.removeEventListener('storage', handleAuthChange);
+    };
+  }, []);
 
   useEffect(() => {
-    localStorage.setItem('freshcart_wishlist', JSON.stringify(wishlist));
-  }, [wishlist]);
+    localStorage.setItem(`freshcart_cart_${activeUserKey}`, JSON.stringify(cart));
+  }, [cart, activeUserKey]);
+
+  useEffect(() => {
+    localStorage.setItem(`freshcart_wishlist_${activeUserKey}`, JSON.stringify(wishlist));
+  }, [wishlist, activeUserKey]);
 
   const addToCart = (product: Product, quantity = 1, weight?: string) => {
     const stockQty = getProductStockQuantity(product);

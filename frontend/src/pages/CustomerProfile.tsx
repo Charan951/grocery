@@ -68,7 +68,9 @@ export const CustomerProfile: React.FC = () => {
 
   const handleLogout = () => {
     localStorage.removeItem('customer_user');
+    localStorage.removeItem('customer_token');
     setCustomerUser(null);
+    window.dispatchEvent(new Event('customer_auth_changed'));
     window.dispatchEvent(new Event('storage'));
     navigate('/');
   };
@@ -99,6 +101,7 @@ export const CustomerProfile: React.FC = () => {
 
     localStorage.setItem('customer_user', JSON.stringify(updatedCustomer));
     setCustomerUser(updatedCustomer);
+    window.dispatchEvent(new Event('customer_auth_changed'));
     window.dispatchEvent(new Event('storage'));
     setSuccessMsg('Profile updated.');
     setIsEditingProfile(false);
@@ -113,7 +116,10 @@ export const CustomerProfile: React.FC = () => {
       console.warn('Account deletion API unavailable — cleared locally');
     }
     localStorage.removeItem('customer_user');
+    localStorage.removeItem('customer_token');
     setCustomerUser(null);
+    window.dispatchEvent(new Event('customer_auth_changed'));
+    window.dispatchEvent(new Event('storage'));
     navigate('/');
   };
 

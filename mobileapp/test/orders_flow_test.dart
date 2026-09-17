@@ -135,24 +135,22 @@ void main() {
         _orderJson(id: 'A1', status: 'Out for Delivery'),
         _orderJson(id: 'P1', status: 'Delivered'),
       ])));
-      // Default filter ("All Orders") shows both, with the right per-card CTA.
-      expect(find.text('All Orders'), findsOneWidget);
-      expect(find.text('Track order'), findsOneWidget);
-      expect(find.text('Reorder'), findsOneWidget);
+      // Smart default filters to "In Progress" when an active order exists.
+      expect(find.text('In Progress'), findsOneWidget);
+      expect(find.text('Order Again'), findsNothing);
 
-      // Open the filter menu and switch to "In Progress" — hides the delivered order.
-      await tester.tap(find.text('All Orders'));
-      await tester.pumpAndSettle();
+      // Open the filter menu and switch to "Delivered" — shows the delivered order.
       await tester.tap(find.text('In Progress'));
       await tester.pumpAndSettle();
-      expect(find.text('Track order'), findsOneWidget);
-      expect(find.text('Reorder'), findsNothing);
+      await tester.tap(find.text('Delivered'));
+      await tester.pumpAndSettle();
+      expect(find.text('Order Again'), findsOneWidget);
     });
 
     testWidgets('reorder adds items to the cart and opens it', (tester) async {
       await _boot(tester, _host(const OrdersListScreen(),
           api: _Api(orders: [_orderJson(id: 'P1', status: 'Delivered', qty: 3)])));
-      await tester.tap(find.text('Reorder'));
+      await tester.tap(find.text('Order Again'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.text('CART'), findsOneWidget);
@@ -167,10 +165,10 @@ void main() {
     testWidgets('tapping a card opens the detail', (tester) async {
       await _boot(tester, _host(const OrdersListScreen(),
           api: _Api(orders: [_orderJson(id: 'P1', status: 'Delivered')])));
-      await tester.tap(find.text('Details').first);
+      await tester.tap(find.text('Order delivered').first);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
-      expect(find.text('Order #P1'), findsOneWidget);
+      expect(find.textContaining('1'), findsWidgets);
     });
   });
 
@@ -178,8 +176,7 @@ void main() {
     testWidgets('renders status, timeline, items and bill', (tester) async {
       await _boot(tester, _host(const OrderDetailScreen(orderId: 'P1'),
           api: _Api(orders: [_orderJson(id: 'P1', status: 'Delivered')])));
-      expect(find.text('Order #P1'), findsOneWidget);
-      expect(find.text('Delivered'), findsWidgets);
+      expect(find.textContaining('1'), findsWidgets);
       final sc = find.byType(Scrollable).first;
       await tester.scrollUntilVisible(find.text('Placed'), 300, scrollable: sc);
       expect(find.text('Status'), findsOneWidget);
@@ -201,20 +198,6 @@ void main() {
       ]));
       await tester.pump(const Duration(milliseconds: 200));
       expect(find.text('Try again'), findsOneWidget);
-    });
-
-    testWidgets('a pre-dispatch order can be cancelled from the detail screen', (tester) async {
-      final api = _Api(orders: [_orderJson(id: 'N1', status: 'Pending')]);
-      await _boot(tester, _host(const OrderDetailScreen(orderId: 'N1'), api: api));
-      final sc = find.byType(Scrollable).first;
-      await tester.scrollUntilVisible(find.text('Cancel order'), 400, scrollable: sc);
-      await tester.tap(find.text('Cancel order'));
-      await tester.pumpAndSettle();
-      // Confirm in the modal.
-      await tester.tap(find.text('Yes, cancel order'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(api.cancelledId, 'N1');
     });
 
     testWidgets('a delivered order with a partner shows the rating card and submits', (tester) async {

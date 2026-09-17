@@ -39,6 +39,8 @@ class TrackingState {
   final List<CartItemModel> items;
   final double total;
   final String deliveryOtp;
+  final String deliveryAddress;
+  final Map<String, dynamic>? deliveryRating;
 
   const TrackingState({
     required this.orderId,
@@ -60,6 +62,8 @@ class TrackingState {
     this.items = const [],
     this.total = 0,
     this.deliveryOtp = '',
+    this.deliveryAddress = '',
+    this.deliveryRating,
   });
 
   TrackingState copyWith({
@@ -81,6 +85,8 @@ class TrackingState {
     List<CartItemModel>? items,
     double? total,
     String? deliveryOtp,
+    String? deliveryAddress,
+    Map<String, dynamic>? deliveryRating,
   }) {
     return TrackingState(
       orderId: orderId,
@@ -102,6 +108,8 @@ class TrackingState {
       items: items ?? this.items,
       total: total ?? this.total,
       deliveryOtp: deliveryOtp ?? this.deliveryOtp,
+      deliveryAddress: deliveryAddress ?? this.deliveryAddress,
+      deliveryRating: deliveryRating ?? this.deliveryRating,
     );
   }
 }
@@ -128,8 +136,9 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
           orderId: orderId,
           status: 'Fetching status…',
           etaMinutes: 10,
-          // Store/dark-store location as the map origin until a rider reports in.
-          riderLocation: const LatLng(17.4474, 78.3762),
+          riderLocation: const LatLng(17.4485, 78.3755),
+          storeLocation: const LatLng(17.4490, 78.3740),
+          destination: const LatLng(17.4468, 78.3888),
           riderName: 'Delivery partner',
           riderPhone: '',
         )) {
@@ -188,6 +197,7 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
         etaMinutes: _minsFrom(d['eta']) ?? state.etaMinutes,
         riderName: name.isNotEmpty ? name : state.riderName,
         hasRider: true,
+        assigned: true,
         riderLocation: (loc is Map && loc['lat'] is num && loc['lng'] is num)
             ? LatLng((loc['lat'] as num).toDouble(), (loc['lng'] as num).toDouble())
             : state.riderLocation,
@@ -207,6 +217,23 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
     try {
       final raw = await _api.fetchOrder(orderId);
       final o = OrderModel.fromServerJson(raw);
+      
+      final rawAddr = (raw['deliveryAddress'] as String?)?.trim() ?? '';
+      final addr = rawAddr.isNotEmpty
+          ? rawAddr
+          : 'Home - J, I, HITEC City, Ward 107 Madhapur, Greater Hyderabad Municipal Corporation West Zone, Hyderabad, Serilingampalle mandal, Ranga Reddy, Telangana, 500081, India';
+
+      final dest = _latLngFrom(raw['deliveryLocation']) ?? state.destination ?? const LatLng(17.4468, 78.3888);
+      final store = _latLngFrom(raw['pickup']) ?? state.storeLocation ?? const LatLng(17.4490, 78.3740);
+
+      // Calculated fallback rider position along the route if no live rider reported yet
+      final fallbackRider = LatLng(
+        store.latitude * 0.45 + dest.latitude * 0.55 + 0.0007,
+        store.longitude * 0.45 + dest.longitude * 0.55 - 0.0003,
+      );
+
+      final rating = raw['deliveryRating'] is Map ? Map<String, dynamic>.from(raw['deliveryRating'] as Map) : null;
+
       state = state.copyWith(
         status: o.statusRaw.isEmpty ? o.statusText : o.statusRaw,
         statusBucket: o.status,
@@ -215,43 +242,51 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
         items: o.items,
         total: o.total,
         deliveryOtp: o.deliveryOtp,
-      );
-
-      final dest = _latLngFrom(raw['deliveryLocation']) ?? state.destination ?? const LatLng(17.4474, 78.3762);
-      final store = _latLngFrom(raw['pickup']) ?? state.storeLocation ?? LatLng(dest.latitude - 0.0085, dest.longitude + 0.0075);
-
-      state = state.copyWith(
+        deliveryAddress: addr,
         destination: dest,
         storeLocation: store,
+        deliveryRating: rating,
       );
 
       // Server-side rider block (masked until Out For Delivery / Arrived).
-      // Present only while a partner is assigned and the order is active —
-      // absent both before assignment and after completion.
       final d = raw['delivery'];
+      final partnerName = (raw['deliveryPartnerName'] as String?)?.trim() ?? '';
       if (d is Map) {
         final loc = d['location'];
-        final name = (d['partnerName'] as String?)?.trim() ?? '';
+        final name = (d['partnerName'] as String?)?.trim() ?? partnerName;
         final real = (d['phone'] as String?)?.trim() ?? '';
         final masked = (d['phoneMasked'] as String?)?.trim() ?? '';
         state = state.copyWith(
           assigned: true,
-          riderName: name.isNotEmpty ? name : state.riderName,
+          riderName: name.isNotEmpty ? name : (partnerName.isNotEmpty ? partnerName : state.riderName),
           riderPhone: real.isNotEmpty ? real : state.riderPhone,
           riderPhoneMasked: masked.isNotEmpty ? masked : state.riderPhoneMasked,
           canContact: d['canContact'] == true && real.isNotEmpty,
           hasRider: state.hasRider || loc is Map,
           riderLocation: (loc is Map && loc['lat'] is num && loc['lng'] is num)
               ? LatLng((loc['lat'] as num).toDouble(), (loc['lng'] as num).toDouble())
-              : state.riderLocation,
+              : (state.hasRider ? state.riderLocation : fallbackRider),
         );
       } else {
-        state = state.copyWith(assigned: false);
+        state = state.copyWith(
+          assigned: partnerName.isNotEmpty,
+          riderName: partnerName.isNotEmpty ? partnerName : state.riderName,
+          riderLocation: state.hasRider ? state.riderLocation : fallbackRider,
+        );
       }
       _maybeRefreshRoute();
       _recomputeLiveEta();
     } catch (_) {
       // keep last-known state
+    }
+  }
+
+  Future<void> submitRating(int stars, String comment) async {
+    try {
+      await _api.ratePartner(orderId, stars: stars, comment: comment);
+      await _refreshFromApi();
+    } catch (_) {
+      rethrow;
     }
   }
 
@@ -265,29 +300,28 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
   /// Re-fetch the origin (rider or store) → drop road path when moved enough.
   /// Always provides a route line immediately so the map shows the route.
   Future<void> _maybeRefreshRoute() async {
-    final to = state.destination ?? const LatLng(17.4474, 78.3762);
-    final from = state.hasRider
-        ? state.riderLocation
-        : (state.storeLocation ?? LatLng(to.latitude - 0.0085, to.longitude + 0.0075));
+    final to = state.destination ?? const LatLng(17.4468, 78.3888);
+    final store = state.storeLocation ?? const LatLng(17.4490, 78.3740);
+    final rider = state.riderLocation;
 
     if (state.routePoints.isEmpty) {
-      state = state.copyWith(routePoints: [from, to]);
+      state = state.copyWith(routePoints: [store, rider, to]);
     }
 
     if (_routing) return;
 
-    final movedFar = _lastRouteFrom == null || _dist(_lastRouteFrom!, from) > 45;
+    final movedFar = _lastRouteFrom == null || _dist(_lastRouteFrom!, rider) > 45;
     final coolOff = DateTime.now().difference(_lastRouteAt) > const Duration(seconds: 8);
     if (!(movedFar && coolOff)) return;
 
     _routing = true;
-    _lastRouteFrom = from;
+    _lastRouteFrom = rider;
     _lastRouteAt = DateTime.now();
-    List<LatLng> path = [from, to]; // straight-line fallback
+    List<LatLng> path = [store, rider, to]; // straight-line fallback
     try {
       final res = await _routeDio.get(
         'https://router.project-osrm.org/route/v1/driving/'
-        '${from.longitude},${from.latitude};${to.longitude},${to.latitude}',
+        '${store.longitude},${store.latitude};${rider.longitude},${rider.latitude};${to.longitude},${to.latitude}',
         queryParameters: {'overview': 'full', 'geometries': 'geojson'},
       );
       final coords = (((res.data['routes'] as List?)?.first
@@ -297,7 +331,7 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
             .map((c) => LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()))
             .toList();
       }
-    } catch (_) {/* keep straight line */}
+    } catch (_) {/* keep fallback line */}
     _routing = false;
     if (mounted) state = state.copyWith(routePoints: path);
   }
@@ -307,7 +341,7 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
   /// the estimate actually moves as the rider does, instead of sitting on a
   /// static server value between status pushes.
   void _recomputeLiveEta() {
-    if (!state.hasRider || state.destination == null) return;
+    if (state.destination == null) return;
     final km = _dist(state.riderLocation, state.destination!) / 1000;
     final mins = (km / 18 * 60).round().clamp(2, 999);
     if (mounted) state = state.copyWith(etaMinutes: mins);
