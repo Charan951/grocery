@@ -612,26 +612,31 @@ export const TrackOrder: React.FC = () => {
   const rider = useMemo(() => {
     if (terminal) return null;
     if (liveRider) return liveRider;
+    const hasPartner = !!(order?.deliveryPartnerUserId || order?.deliveryPartnerName || order?.delivery?.partnerName);
+    if (!hasPartner) return null;
+
     const loc = order?.delivery?.location;
     if (loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng)) {
-      // If courier is already heading to drop and separated from destination, use live loc
       const distToDest = haversineKm(loc, dest);
       if (distToDest > 0.1) {
         return loc;
       }
     }
-    // Realistic courier location along HITEC City route heading towards user drop
     return {
       lat: pickup.lat * 0.45 + dest.lat * 0.55 + 0.0007,
       lng: pickup.lng * 0.45 + dest.lng * 0.55 - 0.0003,
     };
-  }, [terminal, liveRider, order?.delivery?.location, pickup, dest]);
+  }, [terminal, liveRider, order?.delivery?.location, order?.deliveryPartnerUserId, order?.deliveryPartnerName, order?.delivery?.partnerName, pickup, dest]);
 
   const etaMins = useMemo(() => {
-    if (!rider || !dest) return 2;
-    const km = haversineKm(rider, dest);
-    return Math.max(2, Math.round((km / 18) * 60)); // ~18 km/h city average
-  }, [rider, dest, tick]);
+    if (isDelivered) return 0;
+    if (rider && dest) {
+      const km = haversineKm(rider, dest);
+      return Math.max(2, Math.round((km / 18) * 60));
+    }
+    const distKm = haversineKm(pickup, dest);
+    return Math.max(10, Math.min(25, Math.round((distKm / 20) * 60 + 8)));
+  }, [rider, dest, pickup, isDelivered, tick]);
 
   const [mapReady, setMapReady] = useState(0);
 
@@ -653,7 +658,7 @@ export const TrackOrder: React.FC = () => {
         map.setView(pts[0], 16);
       }
     } catch {
-      // Swallow — see comment above.
+      // Swallow
     }
   }, [pickup, rider, dest]);
 
@@ -672,25 +677,14 @@ export const TrackOrder: React.FC = () => {
     if (order?.trackingTimeline && order.trackingTimeline.length > 0) {
       return [...order.trackingTimeline].reverse();
     }
-    const partner = order?.delivery?.partnerName || order?.deliveryPartnerName || 'Delivery partner';
     return [
       {
-        status: 'Arrived At Store',
-        note: 'Delivery partner arrived at the store',
-        at: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-      },
-      {
-        status: 'Assigned',
-        note: `Assigned to ${partner}`,
-        at: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
-      },
-      {
-        status: 'Ready',
-        note: 'Your order is ready',
-        at: new Date(Date.now() - 16 * 60 * 1000).toISOString(),
+        status: normalizedStatus || 'Accepted',
+        note: normalizedStatus === 'Accepted' ? 'Order placed and accepted' : `Status: ${normalizedStatus}`,
+        at: new Date().toISOString(),
       },
     ];
-  }, [order?.trackingTimeline, order?.delivery, order?.deliveryPartnerName]);
+  }, [order?.trackingTimeline, normalizedStatus]);
 
   // Map initialization via callback ref so it reliably mounts even if order was initially null
   const mapCallbackRef = useCallback(
@@ -990,9 +984,15 @@ export const TrackOrder: React.FC = () => {
             <p className="text-base sm:text-lg font-black text-white leading-snug truncate">
               {isDelivered
                 ? 'Order delivered'
-                : rider
+                : normalizedStatus === 'Out For Delivery'
                   ? 'Delivery partner is heading to your drop'
-                  : 'Order is being prepared'}
+                  : normalizedStatus === 'Assigned'
+                    ? 'Delivery partner assigned'
+                    : normalizedStatus === 'Ready'
+                      ? 'Order is ready for pickup'
+                      : normalizedStatus === 'Packed'
+                        ? 'Order packed'
+                        : 'Order accepted — preparing your order'}
             </p>
             <div className="mt-2 inline-flex items-center gap-2 bg-white/15 rounded-full pl-3 pr-1 py-1">
               <span className="text-xs font-extrabold text-white">
@@ -1126,9 +1126,15 @@ export const TrackOrder: React.FC = () => {
                   <p className="text-[11px] sm:text-xs text-gray-600 font-medium leading-snug">
                     {isDelivered
                       ? 'Groceries delivered with care'
-                      : rider
+                      : normalizedStatus === 'Out For Delivery'
                         ? 'Delivery partner is heading to your drop'
-                        : 'Items being packed at FreshCart Dark Store'}
+                        : normalizedStatus === 'Assigned'
+                          ? 'Partner assigned and heading to store'
+                          : normalizedStatus === 'Ready'
+                            ? 'Order is ready for pickup'
+                            : normalizedStatus === 'Packed'
+                              ? 'Order packed and ready'
+                              : 'Items being packed at FreshCart Dark Store'}
                   </p>
 
                   <div className="mt-auto flex items-center gap-1.5 sm:gap-2">

@@ -41,7 +41,7 @@ class AppConfig {
   /// Your dev machine's LAN IP, for a physical device on the same WiFi. Only
   /// used as one candidate in [autoDetectDevHost] — update it (or pass
   /// --dart-define DEV_LAN_IP=...) if your machine's IP changes.
-  static const String _devLanIp = String.fromEnvironment('DEV_LAN_IP', defaultValue: '192.168.29.245');
+  static const String _devLanIp = String.fromEnvironment('DEV_LAN_IP', defaultValue: '10.147.52.1');
 
   static String? _detectedHost;
 

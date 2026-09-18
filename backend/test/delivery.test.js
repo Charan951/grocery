@@ -55,6 +55,7 @@ test.before(async () => {
       User.deleteMany({ _id: { $in: staleIds } }),
     ]);
   }
+  await DeliveryPartner.updateMany({}, { $set: { isOnline: false } });
 
   const rider = await User.create({ name: 'QA Rider', email: RIDER_EMAIL, password: 'delivery123', role: 'Delivery', status: 'Active', phone: '9876500000' });
   riderUserId = rider._id.toString();

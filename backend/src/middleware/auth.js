@@ -33,6 +33,9 @@ export const protect = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'supersecretjwtkey_987654321');
+    if (decoded.type === 'customer') {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
     let user = await User.findById(decoded.id).select('-password');
     if (!user) {
       user = await User.findOne({ role: 'Admin' }).select('-password');

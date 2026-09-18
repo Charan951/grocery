@@ -240,11 +240,47 @@ export const orderController = {
       if (Number.isFinite(dropLat) && Number.isFinite(dropLng)) {
         normalizedOrder.deliveryLocation = { lat: dropLat, lng: dropLng };
       }
-      normalizedOrder.pickup = {
-        name: settingsDoc?.storeOrigin?.name || 'FreshCart HITEC City',
-        lat: settingsDoc?.storeOrigin?.lat ?? 17.4490,
-        lng: settingsDoc?.storeOrigin?.lng ?? 78.3740,
-      };
+
+      const defaultStoreLat = settingsDoc?.storeOrigin?.lat ?? 17.4490;
+      const defaultStoreLng = settingsDoc?.storeOrigin?.lng ?? 78.3740;
+
+      if (orderData.pickup && Number.isFinite(Number(orderData.pickup.lat)) && Number.isFinite(Number(orderData.pickup.lng))) {
+        normalizedOrder.pickup = {
+          name: orderData.pickup.name || 'FreshCart Dark Store',
+          lat: Number(orderData.pickup.lat),
+          lng: Number(orderData.pickup.lng),
+        };
+      } else if (Number.isFinite(dropLat) && Number.isFinite(dropLng)) {
+        // Distance check between default store and drop location
+        const dLat = (dropLat - defaultStoreLat) * Math.PI / 180;
+        const dLng = (dropLng - defaultStoreLng) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) ** 2 +
+                  Math.cos(defaultStoreLat * Math.PI / 180) * Math.cos(dropLat * Math.PI / 180) *
+                  Math.sin(dLng / 2) ** 2;
+        const distKm = 2 * 6371 * Math.asin(Math.sqrt(a));
+
+        if (distKm > 25) {
+          // Drop location is in a different region from default store origin (e.g. AP vs Hyd)
+          // Set dark store pickup origin near the drop location (~1.5 km offset)
+          normalizedOrder.pickup = {
+            name: 'FreshCart Express Store',
+            lat: Number((dropLat + 0.012).toFixed(6)),
+            lng: Number((dropLng + 0.012).toFixed(6)),
+          };
+        } else {
+          normalizedOrder.pickup = {
+            name: settingsDoc?.storeOrigin?.name || 'FreshCart Dark Store',
+            lat: defaultStoreLat,
+            lng: defaultStoreLng,
+          };
+        }
+      } else {
+        normalizedOrder.pickup = {
+          name: settingsDoc?.storeOrigin?.name || 'FreshCart Dark Store',
+          lat: defaultStoreLat,
+          lng: defaultStoreLng,
+        };
+      }
 
       // Seed the timeline so an auto-accepted order shows the step in history.
       if (normalizedOrder.status === 'Accepted') {
@@ -493,9 +529,9 @@ export const orderController = {
 
       await order.save();
 
-      // Auto-dispatch: when an order becomes Ready with no partner, offer it to
-      // the nearest available rider (P1-D1). Non-blocking, opt-out via Settings.
-      if (status === 'Ready' && !order.deliveryPartnerUserId) {
+      // Auto-dispatch: when an order becomes Packed or Ready with no partner, offer it to
+      // the nearest available riders. Non-blocking, opt-out via Settings.
+      if (['Packed', 'Ready'].includes(status) && !order.deliveryPartnerUserId) {
         Settings.findOne()
           .then((s) => {
             if (!s || s.autoAssignEnabled !== false) return tryAssign(order.orderId);

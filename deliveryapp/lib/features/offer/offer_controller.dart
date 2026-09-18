@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freshcart_delivery/core/error/api_exception.dart';
 import 'package:freshcart_delivery/core/providers.dart';
+// ignore: unused_import
 import 'package:freshcart_delivery/core/routes/app_router.dart';
 import 'package:freshcart_delivery/models/delivery_models.dart';
 
@@ -12,23 +13,24 @@ class OfferController extends StateNotifier<DeliveryOffer?> {
 
   OfferController(this._ref) : super(null) {
     final s = _ref.read(socketProvider);
-    _subs.add(s.offers.listen((j) => _onOfferReceived(DeliveryOffer.fromJson(j))));
-    _subs.add(s.revoked.listen((j) {
-      if (state?.assignmentId == j['assignmentId'] || j['orderId'] == state?.orderId) state = null;
-    }));
+    _subs.add(
+      s.offers.listen((j) => _onOfferReceived(DeliveryOffer.fromJson(j))),
+    );
+    _subs.add(
+      s.revoked.listen((j) {
+        if (state?.assignmentId == j['assignmentId'] ||
+            j['orderId'] == state?.orderId)
+          // ignore: curly_braces_in_flow_control_structures
+          state = null;
+      }),
+    );
     checkPending();
   }
 
   void dismiss() => state = null;
 
-  void _onOfferReceived(DeliveryOffer o) async {
+  void _onOfferReceived(DeliveryOffer o) {
     state = o;
-    try {
-      final order = await accept();
-      if (order != null) {
-        _ref.read(routerProvider).go('/order/${order.orderId}');
-      }
-    } catch (_) {}
   }
 
   /// Pull the live offer from the API in case the socket missed it (cold start,
@@ -38,14 +40,18 @@ class OfferController extends StateNotifier<DeliveryOffer?> {
     try {
       final o = await _ref.read(apiProvider).pendingAssignment();
       if (o != null && state == null) _onOfferReceived(o);
-    } on ApiException {/* ignore — socket remains the primary channel */}
+    } on ApiException {
+      /* ignore — socket remains the primary channel */
+    }
   }
 
   Future<DeliveryOrder?> accept() async {
     final o = state;
     if (o == null) return null;
     try {
-      final order = await _ref.read(apiProvider).acceptAssignment(o.assignmentId);
+      final order = await _ref
+          .read(apiProvider)
+          .acceptAssignment(o.assignmentId);
       state = null;
       return order;
     } on ApiException {
@@ -59,8 +65,12 @@ class OfferController extends StateNotifier<DeliveryOffer?> {
     if (o == null) return;
     state = null;
     try {
-      await _ref.read(apiProvider).rejectAssignment(o.assignmentId, reason: reason);
-    } on ApiException {/* already gone */}
+      await _ref
+          .read(apiProvider)
+          .rejectAssignment(o.assignmentId, reason: reason);
+    } on ApiException {
+      /* already gone */
+    }
   }
 
   @override
@@ -72,4 +82,6 @@ class OfferController extends StateNotifier<DeliveryOffer?> {
   }
 }
 
-final offerProvider = StateNotifierProvider<OfferController, DeliveryOffer?>((ref) => OfferController(ref));
+final offerProvider = StateNotifierProvider<OfferController, DeliveryOffer?>(
+  (ref) => OfferController(ref),
+);

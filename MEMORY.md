@@ -161,6 +161,22 @@
 
 ## 5. Completed Major Work
 
+- **2026-09-18 — Delivery Partner Homepage Redesign, Live Rider Location Map Tracking & Offer Auto-Accept Fix (web + Flutter parity).**
+  - **Delivery Partner App (`deliveryapp/`) Dashboard & Order UI Redesign**:
+    - **Dashboard (`dashboard_screen.dart`)**: Streamlined delivery partner home page with active order cards, online/offline status toggle, key metric cards (earnings, completed orders, online hours), quick action buttons, and structured list items.
+    - **Order Cards & Detail (`orders_screen.dart`, `order_detail_screen.dart`)**: Modernized order cards with clear status badges (`Ready`, `Assigned`, `Out For Delivery`, `Delivered`, `Cancelled`), customer name & phone details, item breakdown (count, price, specs), COD badge indicator, and delivery address formatting.
+  - **Live Delivery Map & Rider Location Tracking (`delivery_map.dart`, `order_detail_screen.dart`)**:
+    - Added live rider GPS position tracking to `DeliveryMap` (`_driverPos`), rendering custom vehicle markers (bike, scooter, EV, cycle, etc.) along the store-to-customer route map.
+    - Integrated `locationServiceProvider` in `order_detail_screen.dart` to fetch real-time device coordinates and display the rider location alongside pickup (Store) and drop (Customer) markers.
+  - **Offer Controller & Offer Sheet (`offer_controller.dart`, `offer_sheet.dart`)**:
+    - Fixed offer controller logic: removed automatic auto-accept on offer receipt so delivery partners explicitly review and choose Accept/Reject on incoming assignment popups.
+  - **Backend Assignment & Tracking Improvements (`assignmentService.js`, `orderController.js`, `fix_fake_distances.js`)**:
+    - Refined candidate search radius calculations and created `backend/scripts/fix_fake_distances.js` script to resolve placeholder coordinates and candidate distances.
+    - Refined delivery partner order lookup and authorization handling.
+  - **Customer Live Tracking Parity (`TrackOrder.tsx`, `tracking_screen.dart`)**:
+    - Updated web `TrackOrder.tsx` status headlines and timeline stages to accurately match backend states (`Accepted`, `Packed`, `Ready`, `Assigned`, `Out For Delivery`, `Delivered`).
+    - Gated rider location fallback conditionally so simulated route positions only render when a partner is actively assigned.
+
 - **2026-09-15 — Customer order-tracking/order-detail redesign pass (web + mobile
   parity throughout) + several real bug fixes.** Large, mostly UI-driven session
   touching `CustomerOrders.tsx`/`order_detail_screen.dart` (order detail + list),
@@ -2456,6 +2472,8 @@ middleware, `GET /api/orders/mine`, `POST /api/customers/:id/devices` (FCM token
   117/117, `flutter build apk --debug` succeeded.
 
 ## 13. Last Updated
+
+2026-09-18 — see §5 top entry: Delivery Partner homepage redesign (`deliveryapp/dashboard_screen.dart`), live rider GPS map tracking with vehicle markers (`delivery_map.dart`, `order_detail_screen.dart`), offer sheet manual accept fix (`offer_controller.dart`), backend assignment distance fixes (`assignmentService.js`), and customer `TrackOrder.tsx` live tracking status headline parity. `flutter analyze` clean (0 issues), `npx tsc --noEmit` clean (0 errors).
 
 2026-09-16 — see §5 top entry: `TrackOrder.tsx` full scroll-choreography
 rebuild confirmed working end-to-end (single `scrollProgress` source of

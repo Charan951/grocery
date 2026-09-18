@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { Assignment } from '../models/Assignment.js';
 import { Order } from '../models/Order.js';
 import { User } from '../models/User.js';
@@ -7,7 +8,7 @@ import { DeliveryZone } from '../models/DeliveryZone.js';
 import { DeliveryEarning } from '../models/DeliveryEarning.js';
 import { sendToOwner } from './pushService.js';
 
-const CANDIDATE_LIMIT = 10;
+const CANDIDATE_LIMIT = 100;
 
 let _io = null;
 export const setIo = (io) => { _io = io; };
@@ -233,8 +234,18 @@ const onOfferDeclined = async (orderId, why, { source } = {}) => {
  * Uses the 2dsphere `$near` index when the pickup has coords, else a plain scan.
  */
 export const findCandidates = async ({ pickup, excludeUserIds = [], radiusKm = 6, restrictUserIds = null, drop = null, batchRadiusKm = 0 }) => {
-  const base = { isOnline: true, userId: { $nin: excludeUserIds } };
-  if (Array.isArray(restrictUserIds) && restrictUserIds.length) base.userId = { $nin: excludeUserIds, $in: restrictUserIds };
+  const excludeObjectIds = (excludeUserIds || [])
+    .filter((id) => id && mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+  const excludedSet = new Set((excludeUserIds || []).map((id) => String(id)));
+
+  const base = { isOnline: true, userId: { $nin: excludeObjectIds } };
+  if (Array.isArray(restrictUserIds) && restrictUserIds.length) {
+    const restrictObjectIds = restrictUserIds
+      .filter((id) => id && mongoose.Types.ObjectId.isValid(id))
+      .map((id) => new mongoose.Types.ObjectId(id));
+    base.userId = { $nin: excludeObjectIds, $in: restrictObjectIds };
+  }
   const hasGeo = pickup && pickup.lat != null && pickup.lng != null;
   const query = hasGeo
     ? {
@@ -250,16 +261,14 @@ export const findCandidates = async ({ pickup, excludeUserIds = [], radiusKm = 6
 
   let partners = [];
   try {
-    partners = (await DeliveryPartner.find(query).limit(CANDIDATE_LIMIT).lean())
-      .filter((p) => (p.activeOrderIds || []).length < (p.maxConcurrent || 1));
+    partners = await DeliveryPartner.find(query).limit(CANDIDATE_LIMIT).lean();
   } catch (_) {
-    partners = (await DeliveryPartner.find(base).limit(CANDIDATE_LIMIT).lean())
-      .filter((p) => (p.activeOrderIds || []).length < (p.maxConcurrent || 1));
+    partners = await DeliveryPartner.find(base).limit(CANDIDATE_LIMIT).lean();
   }
   if (!partners.length && hasGeo) {
-    partners = (await DeliveryPartner.find(base).limit(CANDIDATE_LIMIT).lean())
-      .filter((p) => (p.activeOrderIds || []).length < (p.maxConcurrent || 1));
+    partners = await DeliveryPartner.find(base).limit(CANDIDATE_LIMIT).lean();
   }
+  partners = partners.filter((p) => !excludedSet.has(String(p.userId)));
 
   // Batching guard: a partner who is already carrying a delivery may only take a
   // second one when the new drop is close to a drop they already have — otherwise
@@ -284,8 +293,8 @@ export const findCandidates = async ({ pickup, excludeUserIds = [], radiusKm = 6
 
   const users = await User.find({
     _id: { $in: partners.map((p) => p.userId) },
-    role: 'Delivery',
-    status: 'Active',
+    role: { $in: ['Delivery', 'delivery', /^delivery$/i] },
+    status: { $in: ['Active', 'active', null, undefined, /^active$/i] },
   }).select('name').lean();
   const byId = Object.fromEntries(users.map((u) => [String(u._id), u]));
 
@@ -323,6 +332,10 @@ export const tryAssign = async (orderOrId) => {
   if (order.deliveryPartnerUserId) return { ok: false, code: 'already_assigned' };
   if (['Delivered', 'Cancelled', 'Returned', 'Refunded', 'Failed'].includes(order.status)) {
     return { ok: false, code: 'terminal_status' };
+  }
+  // Delivery offer requests are dispatched ONLY when Admin sets order status to Ready or Packed.
+  if (!['Ready', 'Packed'].includes(order.status)) {
+    return { ok: false, code: 'not_ready' };
   }
   if (await Assignment.findOne({ orderId: order.orderId, status: 'offered' })) {
     return { ok: false, code: 'offer_pending' };

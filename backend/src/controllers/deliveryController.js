@@ -625,7 +625,7 @@ export const deliveryController = {
   getEarnings: async (req, res) => {
     try {
       const uid = req.user._id;
-      const range = String(req.query.range || 'week');
+      const range = String(req.query.range || 'today');
 
       // Auto-heal: Ensure delivered orders assigned to this partner have earnings recorded
       const unrecordedDelivered = await Order.find({
@@ -649,21 +649,67 @@ export const deliveryController = {
       if (since) q.earnedAt = { $gte: since };
       const items = await DeliveryEarning.find(q).sort({ earnedAt: -1 }).limit(200).lean();
 
+      // Today specific items for 24h bonus calculation
+      const todayItems = await DeliveryEarning.find({ partnerUserId: uid, earnedAt: { $gte: istMidnight } })
+        .sort({ earnedAt: -1 })
+        .lean();
+
+      const todayCount = todayItems.length;
+
+      // Bonus Tiers based on 24h order milestone
+      const BONUS_TIERS = [
+        { orders: 5, bonus: 20 },
+        { orders: 10, bonus: 50 },
+        { orders: 15, bonus: 100 },
+        { orders: 20, bonus: 180 },
+      ];
+
+      let todayBonus = 0;
+      if (todayCount >= 20) todayBonus = 180;
+      else if (todayCount >= 15) todayBonus = 100;
+      else if (todayCount >= 10) todayBonus = 50;
+      else if (todayCount >= 5) todayBonus = 20;
+
       const sum = (arr, k) => arr.reduce((s, e) => s + (e[k] || 0), 0);
       const pending = items.filter((e) => e.status === 'pending');
       const settled = items.filter((e) => e.status === 'settled');
+
+      const todayDirect = sum(todayItems, 'total');
+      const todayTotal = todayDirect + todayBonus;
+
+      // Calculate approximate login/duty duration for today in minutes
+      const partner = req.partner;
+      let loginDurationMins = 0;
+      if (todayCount > 0) {
+        const earliest = todayItems[todayItems.length - 1]?.earnedAt || istMidnight;
+        const elapsed = Math.max(0, Date.now() - new Date(earliest).getTime());
+        loginDurationMins = Math.min(1440, Math.max(45, Math.round(elapsed / 60000) + 30));
+      } else if (partner?.isOnline) {
+        const elapsed = Math.max(0, Date.now() - new Date(partner.updatedAt || Date.now()).getTime());
+        loginDurationMins = Math.min(1440, Math.max(15, Math.round(elapsed / 60000)));
+      }
 
       res.json({
         success: true,
         range,
         summary: {
           count: items.length,
-          total: sum(items, 'total'),
+          total: sum(items, 'total') + todayBonus,
+          todayTotal,
           pending: sum(pending, 'total'),
           settled: sum(settled, 'total'),
           base: sum(items, 'baseFee'),
           distance: sum(items, 'distanceFee'),
           tips: sum(items, 'tips'),
+          bonusTotal: todayBonus,
+          loginDurationMins,
+          todayCount,
+        },
+        bonus: {
+          todayBonus,
+          timeframe: '12:00 AM - 11:59 PM',
+          completedCount: todayCount,
+          tiers: BONUS_TIERS,
         },
         earnings: items,
       });

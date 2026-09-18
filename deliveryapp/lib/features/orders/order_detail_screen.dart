@@ -7,8 +7,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:freshcart_delivery/core/error/api_exception.dart';
+import 'package:freshcart_delivery/core/providers.dart';
 import 'package:freshcart_delivery/core/theme.dart';
 import 'package:freshcart_delivery/core/widgets/delivery_map.dart';
+import 'package:freshcart_delivery/features/auth/auth_controller.dart';
 import 'package:freshcart_delivery/features/orders/order_chat_sheet.dart';
 import 'package:freshcart_delivery/features/orders/order_controller.dart';
 import 'package:freshcart_delivery/models/delivery_models.dart';
@@ -83,8 +85,26 @@ class _Body extends ConsumerStatefulWidget {
 
 class _BodyState extends ConsumerState<_Body> {
   bool _busy = false;
+  LatLng? _driverPos;
 
   DeliveryOrder get o => widget.order;
+
+  @override
+  void initState() {
+    super.initState();
+    _initDriverLocation();
+  }
+
+  Future<void> _initDriverLocation() async {
+    try {
+      final pos = await ref.read(locationServiceProvider).fetchAndPushCurrentPosition();
+      if (pos != null && mounted) {
+        setState(() {
+          _driverPos = LatLng(pos.latitude, pos.longitude);
+        });
+      }
+    } catch (_) {}
+  }
 
   void _snack(String m) => ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
@@ -923,12 +943,15 @@ class _BodyState extends ConsumerState<_Body> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(13),
                 child: SizedBox(
-                  height: 200,
+                  height: 220,
                   child: DeliveryMap(
                     origin: _latLngFrom(o.pickup)!,
                     destination: _latLngFrom(o.deliveryLocation)!,
+                    driverLocation: _driverPos,
                     originLabel: 'Store',
                     destinationLabel: 'Drop',
+                    driverLabel: 'You (Rider)',
+                    vehicleType: ref.watch(authProvider.select((s) => s.profile?.vehicleType)) ?? 'bike',
                   ),
                 ),
               ),
