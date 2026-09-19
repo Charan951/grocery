@@ -36,6 +36,8 @@ router.post('/delivery/location', locationLimiter, protectDelivery, deliveryCont
 router.get('/delivery/orders/active', protectDelivery, deliveryController.getActiveOrders);
 router.get('/delivery/orders/history', protectDelivery, deliveryController.getHistory);
 router.get('/delivery/earnings', protectDelivery, deliveryController.getEarnings);
+router.get('/delivery/settlements', protectDelivery, deliveryController.getSettlements);
+router.get('/delivery/settlements/:id', protectDelivery, deliveryController.getSettlementDetail);
 router.get('/delivery/assignments/pending', protectDelivery, deliveryController.getPendingAssignment);
 router.post('/delivery/assignments/:id/accept', protectDelivery, deliveryController.acceptAssignment);
 router.post('/delivery/assignments/:id/reject', protectDelivery, deliveryController.rejectAssignment);
@@ -65,6 +67,8 @@ router.get('/admin/delivery/partners/:userId/deliveries', protect, authorize('Ad
 router.get('/admin/delivery/partners/:userId/performance', protect, authorize('Admin', 'Manager'), adminDeliveryController.partnerPerformance);
 router.get('/admin/delivery/partners/:userId/earnings', protect, authorize('Admin', 'Manager'), adminDeliveryController.partnerEarnings);
 router.post('/admin/delivery/partners/:userId/earnings/settle', protect, authorize('Admin'), adminDeliveryController.settlePartnerEarnings);
+router.get('/admin/delivery/settlements', protect, authorize('Admin', 'Manager'), adminDeliveryController.listSettlements);
+router.get('/admin/delivery/settlements/:id', protect, authorize('Admin', 'Manager'), adminDeliveryController.getSettlementDetail);
 router.post('/admin/delivery/partners/:userId/reset-password', protect, authorize('Admin'), adminDeliveryController.resetPartnerPassword);
 router.post('/admin/delivery/partners/:userId/account', protect, authorize('Admin'), adminDeliveryController.setPartnerAccount);
 router.delete('/admin/delivery/partners/:userId', protect, authorize('Admin'), adminDeliveryController.deletePartner);

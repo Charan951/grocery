@@ -5,6 +5,8 @@ import { Order } from '../models/Order.js';
 import { Assignment } from '../models/Assignment.js';
 import { Notification, Settings } from '../models/Operations.js';
 import { DeliveryEarning } from '../models/DeliveryEarning.js';
+import { DeliverySettlement } from '../models/DeliverySettlement.js';
+import { autoSettlePendingEarnings } from '../services/settlementService.js';
 import { uploadToCloudinary } from '../config/cloudinary.js';
 import { acceptOffer, rejectOffer } from '../services/assignmentService.js';
 import { registerDeviceToken, removeDeviceToken, sendToOwner } from '../services/pushService.js';
@@ -469,14 +471,21 @@ export const deliveryController = {
   // POST /api/delivery/orders/:id/pickup-arrived
   pickupArrived: step(['Assigned', 'Ready'], 'Arrived At Store', 'Delivery partner arrived at the store'),
 
-  // POST /api/delivery/orders/:id/picked-up  → issues the doorstep OTP
+  // POST /api/delivery/orders/:id/picked-up  → issues the doorstep OTP for prepaid orders
   pickedUp: step(['Assigned', 'Arrived At Store'], 'Out For Delivery', 'Order picked up — on the way',
     async (order) => {
       order.pickedUpAt = new Date();
-      order.deliveryOtp = String(Math.floor(1000 + Math.random() * 9000));
-      order.otpAttempts = 0;
-      await notifyCustomer(order, 'Your order is on the way',
-        `Share code ${order.deliveryOtp} with the delivery partner at your door.`);
+      const isCod = /cash|cod/i.test(order.paymentMethod || '');
+      if (!isCod) {
+        order.deliveryOtp = String(Math.floor(1000 + Math.random() * 9000));
+        order.otpAttempts = 0;
+        await notifyCustomer(order, 'Your order is on the way',
+          `Share code ${order.deliveryOtp} with the delivery partner at your door.`);
+      } else {
+        order.deliveryOtp = undefined;
+        await notifyCustomer(order, 'Your order is on the way',
+          `Your order ${order.orderId} is out for delivery. Please keep exact cash ready.`);
+      }
     }),
 
   // POST /api/delivery/orders/:id/arrived
@@ -492,7 +501,9 @@ export const deliveryController = {
         return res.status(409).json({ success: false, message: `Cannot complete from "${order.status}"` });
       }
 
-      if (order.deliveryOtp) {
+      const isCod = /cash|cod/i.test(order.paymentMethod || '');
+      // OTP verification is only enforced for Prepaid (non-COD) orders
+      if (!isCod && order.deliveryOtp) {
         const otp = String(req.body.otp || '').trim();
         if (otp !== order.deliveryOtp) {
           order.otpAttempts = (order.otpAttempts || 0) + 1;
@@ -640,6 +651,10 @@ export const deliveryController = {
       const IST_OFFSET = 5.5 * 3600000;
       const nowIst = new Date(Date.now() + IST_OFFSET);
       const istMidnight = new Date(Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate()) - IST_OFFSET);
+
+      // Auto-settle any pending earnings from previous days so each day starts freshly
+      await autoSettlePendingEarnings({ onlyBeforeDate: istMidnight });
+
       let since = null;
       if (range === 'today') since = istMidnight;
       else if (range === 'week') since = new Date(Date.now() - 7 * 86400000);
@@ -671,6 +686,13 @@ export const deliveryController = {
       else if (todayCount >= 5) todayBonus = 20;
 
       const sum = (arr, k) => arr.reduce((s, e) => s + (e[k] || 0), 0);
+
+      // Lifetime partner totals for summary
+      const allEarnings = await DeliveryEarning.find({ partnerUserId: uid }).select('total status').lean();
+      const lifetimePending = sum(allEarnings.filter((e) => e.status === 'pending'), 'total');
+      const lifetimeSettled = sum(allEarnings.filter((e) => e.status === 'settled'), 'total');
+      const totalEarned = lifetimePending + lifetimeSettled;
+
       const pending = items.filter((e) => e.status === 'pending');
       const settled = items.filter((e) => e.status === 'settled');
 
@@ -698,6 +720,9 @@ export const deliveryController = {
           todayTotal,
           pending: sum(pending, 'total'),
           settled: sum(settled, 'total'),
+          totalEarned,
+          pendingAmount: lifetimePending,
+          settledAmount: lifetimeSettled,
           base: sum(items, 'baseFee'),
           distance: sum(items, 'distanceFee'),
           tips: sum(items, 'tips'),
@@ -848,6 +873,55 @@ export const deliveryController = {
       await user.save();
 
       res.json({ success: true, message: 'Password updated. Please sign in.' });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // GET /api/delivery/settlements
+  getSettlements: async (req, res) => {
+    try {
+      const uid = req.user._id;
+      const settlements = await DeliverySettlement.find({ deliveryPartnerId: uid })
+        .sort({ settledAt: -1 })
+        .lean();
+
+      res.json({
+        success: true,
+        settlements: settlements.map((s) => ({
+          _id: s._id,
+          settlementId: s.settlementId,
+          amount: s.amount,
+          orderCount: s.orderCount || (s.orderIds ? s.orderIds.length : 0),
+          orderIds: s.orderIds || [],
+          status: s.status,
+          settledAt: s.settledAt,
+        })),
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // GET /api/delivery/settlements/:id
+  getSettlementDetail: async (req, res) => {
+    try {
+      const uid = req.user._id;
+      const { id } = req.params;
+      const query = mongoose.Types.ObjectId.isValid(id)
+        ? { deliveryPartnerId: uid, $or: [{ _id: id }, { settlementId: id }] }
+        : { deliveryPartnerId: uid, settlementId: id };
+
+      const s = await DeliverySettlement.findOne(query).lean();
+      if (!s) return res.status(404).json({ success: false, message: 'Settlement record not found' });
+
+      const earnings = await DeliveryEarning.find({ settlementId: s.settlementId }).sort({ earnedAt: -1 }).lean();
+
+      res.json({
+        success: true,
+        settlement: s,
+        earnings,
+      });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
     }

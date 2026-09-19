@@ -446,31 +446,23 @@ export const PartnerDetail: React.FC = () => {
       {/* Earnings */}
       {earnings && (
         <div className={`${PANEL} p-5 sm:p-6 flex flex-col gap-4`}>
-          <SectionHead icon={<Wallet size={15} />} title="Earnings">
-            <button
-              onClick={settleAll}
-              disabled={settling || pendingPayout <= 0}
-              className="bg-primary text-white font-bold py-2 px-5 rounded-full text-[11px] hover:bg-secondary disabled:opacity-40 cursor-pointer transition-colors"
-            >
-              {settling ? 'Settling…' : 'Settle pending'}
-            </button>
-          </SectionHead>
+          <SectionHead icon={<Wallet size={15} />} title="Earnings Overview" />
 
           <MetricGrid cols="grid-cols-2 sm:grid-cols-4">
-            <Metric label="Lifetime earned" lead value={`₹${earnings.summary.lifetimeTotal}`} />
+            <Metric label="Total Earned" lead value={`₹${earnings.summary.lifetimeTotal ?? earnings.summary.totalEarned ?? 0}`} />
             <Metric
-              label="Pending payout"
+              label="Pending Settlement"
               lead
               value={
                 pendingPayout > 0 ? (
-                  <span className="text-warning">₹{earnings.summary.pendingTotal}</span>
+                  <span className="text-warning">₹{pendingPayout}</span>
                 ) : (
                   '₹0'
                 )
               }
             />
-            <Metric label="Settled" lead value={`₹${earnings.summary.settledTotal}`} />
-            <Metric label="Deliveries paid" lead value={earnings.summary.count} />
+            <Metric label="Settled" lead value={`₹${earnings.summary.settledTotal ?? earnings.summary.settledAmount ?? 0}`} />
+            <Metric label="Deliveries paid" lead value={earnings.summary.count ?? 0} />
           </MetricGrid>
 
           {earnings.earnings.length > 0 ? (
@@ -479,26 +471,30 @@ export const PartnerDetail: React.FC = () => {
                 <thead>
                   <tr className="text-text-tertiary">
                     <th className="px-2 py-2 border-b border-divider font-bold uppercase text-[11px] tracking-wide">
-                      Order
+                      Order ID
                     </th>
-                    {['Base', 'Distance', 'Total'].map((h) => (
-                      <th
-                        key={h}
-                        className="px-2 py-2 border-b border-divider font-bold uppercase text-[11px] tracking-wide text-right"
-                      >
-                        {h}
-                      </th>
-                    ))}
+                    <th className="px-2 py-2 border-b border-divider font-bold uppercase text-[11px] tracking-wide text-right">
+                      Base Pay
+                    </th>
+                    <th className="px-2 py-2 border-b border-divider font-bold uppercase text-[11px] tracking-wide text-right">
+                      Distance Pay
+                    </th>
+                    <th className="px-2 py-2 border-b border-divider font-bold uppercase text-[11px] tracking-wide text-right">
+                      Bonus
+                    </th>
+                    <th className="px-2 py-2 border-b border-divider font-bold uppercase text-[11px] tracking-wide text-right">
+                      Total Earning
+                    </th>
                     <th className="px-2 py-2 border-b border-divider font-bold uppercase text-[11px] tracking-wide">
                       Status
                     </th>
                     <th className="px-2 py-2 border-b border-divider font-bold uppercase text-[11px] tracking-wide text-right">
-                      Earned
+                      Earned Date
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {earnings.earnings.slice(0, 30).map((e: any) => (
+                  {earnings.earnings.slice(0, 50).map((e: any) => (
                     <tr key={e._id} className="border-b border-divider last:border-0 hover:bg-background/60">
                       <td className="px-2 py-2 font-bold text-text-primary whitespace-nowrap">
                         {e.orderId}
@@ -509,12 +505,15 @@ export const PartnerDetail: React.FC = () => {
                       <td className="px-2 py-2 tabular-nums text-text-secondary text-right whitespace-nowrap">
                         {e.distanceKm} km · ₹{e.distanceFee}
                       </td>
+                      <td className="px-2 py-2 tabular-nums text-text-secondary text-right whitespace-nowrap">
+                        ₹{e.bonus || 0}
+                      </td>
                       <td className="px-2 py-2 tabular-nums font-extrabold text-text-primary text-right">
                         ₹{e.total}
                       </td>
                       <td className="px-2 py-2">
                         <ShelfTag tone={e.status === 'settled' ? 'green' : 'amber'}>
-                          {e.status}
+                          {e.status === 'settled' ? 'Settled' : 'Pending'}
                         </ShelfTag>
                       </td>
                       <td className="px-2 py-2 text-text-secondary text-right whitespace-nowrap">

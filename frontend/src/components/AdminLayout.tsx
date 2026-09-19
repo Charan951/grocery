@@ -5,7 +5,7 @@ import {
   LayoutDashboard, ShoppingBag, Package, FolderTree, Award, Boxes, Warehouse, 
   Users, Truck, UserCheck, Ticket, Tag, Megaphone, Layers, DollarSign, FileText, 
   Star, LifeBuoy, Bell, Settings, ShieldAlert, ChevronLeft, ChevronRight, ChevronDown,
-  Search, Sun, Moon, LogOut, CheckCircle2, AlertTriangle, Info
+  Search, Sun, Moon, LogOut, CheckCircle2, AlertTriangle, Info, Receipt
 } from 'lucide-react';
 
 import { useCMS } from '../context/CMSContext';

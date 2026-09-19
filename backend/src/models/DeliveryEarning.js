@@ -9,12 +9,15 @@ const deliveryEarningSchema = new mongoose.Schema({
   baseFee: { type: Number, default: 0 },       // Settings.deliveryBaseFee at time of delivery
   distanceKm: { type: Number, default: 0 },     // pickup → drop, haversine
   distanceFee: { type: Number, default: 0 },    // round(distanceKm * Settings.deliveryPerKmFee)
+  bonus: { type: Number, default: 0 },          // incentive / bonus pay
   tips: { type: Number, default: 0 },           // customer tip (no input surface yet — always 0)
   total: { type: Number, default: 0 },
 
   status: { type: String, enum: ['pending', 'settled'], default: 'pending', index: true },
   earnedAt: { type: Date, default: Date.now },
   settledAt: { type: Date },
+  settlementId: { type: String, index: true },
+  settledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 }, { timestamps: true });
 
 deliveryEarningSchema.index({ partnerUserId: 1, earnedAt: -1 });

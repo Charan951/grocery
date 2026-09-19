@@ -181,6 +181,20 @@ class ApiClient {
     }
   }
 
+  /// `GET /api/delivery/settlements`
+  Future<List<Map<String, dynamic>>> settlements() async {
+    try {
+      final r = await _dio.get('/delivery/settlements');
+      final m = Map<String, dynamic>.from(r.data as Map);
+      final list = ((m['settlements'] as List?) ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      return list;
+    } on DioException catch (e) {
+      _rethrow(e);
+    }
+  }
+
   Future<DeliveryOrder> order(String orderId) async {
     try {
       final r = await _dio.get('/delivery/orders/${Uri.encodeComponent(orderId)}');

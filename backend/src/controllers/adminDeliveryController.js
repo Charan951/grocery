@@ -1,9 +1,11 @@
+import mongoose from 'mongoose';
 import { User } from '../models/User.js';
 import { DeliveryPartner } from '../models/DeliveryPartner.js';
 import { Order } from '../models/Order.js';
 import { Assignment } from '../models/Assignment.js';
 import { Settings, Notification } from '../models/Operations.js';
 import { DeliveryEarning } from '../models/DeliveryEarning.js';
+import { DeliverySettlement } from '../models/DeliverySettlement.js';
 import { DeliveryZone } from '../models/DeliveryZone.js';
 import { DeviceToken } from '../models/DeviceToken.js';
 import { createOffer, acceptOffer, cancelForOrder, tryAssign } from '../services/assignmentService.js';
@@ -308,7 +310,7 @@ export const adminDeliveryController = {
   partnerEarnings: async (req, res) => {
     try {
       const { userId } = req.params;
-      const user = await User.findOne({ _id: userId, role: 'Delivery' }).select('name').lean();
+      const user = await User.findOne({ _id: userId, role: 'Delivery' }).select('name email').lean();
       if (!user) return res.status(404).json({ success: false, message: 'Delivery partner not found' });
 
       const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 500);
@@ -319,14 +321,23 @@ export const adminDeliveryController = {
       const all = await DeliveryEarning.find({ partnerUserId: userId }).select('total status').lean();
       const sum = (arr) => arr.reduce((s, e) => s + (e.total || 0), 0);
 
+      const pendingTotal = sum(all.filter((e) => e.status === 'pending'));
+      const settledTotal = sum(all.filter((e) => e.status === 'settled'));
+      const lifetimeTotal = pendingTotal + settledTotal;
+
       res.json({
         success: true,
-        partner: { userId, name: user.name },
+        partner: { userId, name: user.name, email: user.email },
         summary: {
-          lifetimeTotal: sum(all),
-          pendingTotal: sum(all.filter((e) => e.status === 'pending')),
-          settledTotal: sum(all.filter((e) => e.status === 'settled')),
+          lifetimeTotal,
+          pendingTotal,
+          settledTotal,
+          totalEarned: lifetimeTotal,
+          pendingAmount: pendingTotal,
+          settledAmount: settledTotal,
           count: all.length,
+          pendingCount: all.filter((e) => e.status === 'pending').length,
+          settledCount: all.filter((e) => e.status === 'settled').length,
         },
         earnings: items,
       });
@@ -339,18 +350,143 @@ export const adminDeliveryController = {
   settlePartnerEarnings: async (req, res) => {
     try {
       const { userId } = req.params;
-      const user = await User.findOne({ _id: userId, role: 'Delivery' }).select('name').lean();
+      const user = await User.findOne({ _id: userId, role: 'Delivery' }).select('name email').lean();
       if (!user) return res.status(404).json({ success: false, message: 'Delivery partner not found' });
 
-      const ids = Array.isArray(req.body?.ids) ? req.body.ids : null;
+      const ids = Array.isArray(req.body?.ids) && req.body.ids.length > 0 ? req.body.ids : null;
       const filter = { partnerUserId: userId, status: 'pending', ...(ids ? { _id: { $in: ids } } : {}) };
-      const r = await DeliveryEarning.updateMany(filter, { $set: { status: 'settled', settledAt: new Date() } });
-      const settled = r.modifiedCount ?? r.nModified ?? 0;
 
-      await logAudit(String(req.user._id), req.user.name, 'Delivery Earnings Settled',
-        `${user.name}: ${settled} payout(s)${ids ? ' (selected)' : ' (all pending)'}`);
+      const pendingItems = await DeliveryEarning.find(filter).lean();
+      if (!pendingItems || pendingItems.length === 0) {
+        return res.status(400).json({ success: false, message: 'No pending earnings found to settle for this delivery partner' });
+      }
 
-      res.json({ success: true, settled });
+      const settlementAmount = pendingItems.reduce((s, e) => s + (e.total || 0), 0);
+      if (settlementAmount <= 0) {
+        return res.status(400).json({ success: false, message: 'Settlement amount must be greater than zero' });
+      }
+
+      const count = await DeliverySettlement.countDocuments();
+      const settlementId = `SET_${String(1001 + count).padStart(3, '0')}`;
+      const now = new Date();
+      const settledBy = req.user?._id;
+      const itemIds = pendingItems.map((e) => e._id);
+      const orderIds = pendingItems.map((e) => e.orderId);
+
+      const updateRes = await DeliveryEarning.updateMany(
+        { _id: { $in: itemIds }, status: 'pending' },
+        { $set: { status: 'settled', settlementId, settledAt: now, settledBy } }
+      );
+
+      const actualSettledCount = updateRes.modifiedCount ?? updateRes.nModified ?? 0;
+      if (actualSettledCount === 0) {
+        return res.status(400).json({ success: false, message: 'Earnings were already settled by another process' });
+      }
+
+      const settlement = await DeliverySettlement.create({
+        settlementId,
+        deliveryPartnerId: userId,
+        amount: settlementAmount,
+        earningIds: itemIds,
+        orderIds,
+        orderCount: pendingItems.length,
+        status: 'SETTLED',
+        settledAt: now,
+        settledBy,
+      });
+
+      await logAudit(
+        String(req.user._id),
+        req.user.name,
+        'Delivery Earnings Settled',
+        `${user.name}: ₹${settlementAmount} (${actualSettledCount} earnings settled, ID: ${settlementId})`
+      );
+
+      res.json({
+        success: true,
+        message: `Successfully settled ₹${settlementAmount} for ${user.name}`,
+        settlement: {
+          settlementId: settlement.settlementId,
+          deliveryPartnerId: settlement.deliveryPartnerId,
+          partnerName: user.name,
+          amount: settlement.amount,
+          orderCount: settlement.orderCount,
+          orderIds: settlement.orderIds,
+          status: settlement.status,
+          settledAt: settlement.settledAt,
+          settledBy: req.user.name || String(settledBy),
+        },
+        settled: actualSettledCount,
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // GET /api/admin/delivery/settlements
+  listSettlements: async (req, res) => {
+    try {
+      const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 500);
+      const settlements = await DeliverySettlement.find()
+        .populate('deliveryPartnerId', 'name email phone vehicleType')
+        .populate('settledBy', 'name email')
+        .sort({ settledAt: -1 })
+        .limit(limit)
+        .lean();
+
+      res.json({
+        success: true,
+        settlements: settlements.map((s) => ({
+          _id: s._id,
+          settlementId: s.settlementId,
+          deliveryPartner: s.deliveryPartnerId
+            ? { _id: s.deliveryPartnerId._id, name: s.deliveryPartnerId.name, email: s.deliveryPartnerId.email }
+            : null,
+          amount: s.amount,
+          orderCount: s.orderCount || (s.orderIds ? s.orderIds.length : 0),
+          orderIds: s.orderIds || [],
+          status: s.status,
+          settledAt: s.settledAt,
+          settledBy: s.settledBy ? s.settledBy.name : 'Admin',
+        })),
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // GET /api/admin/delivery/settlements/:id
+  getSettlementDetail: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const query = mongoose.Types.ObjectId.isValid(id)
+        ? { $or: [{ _id: id }, { settlementId: id }] }
+        : { settlementId: id };
+
+      const s = await DeliverySettlement.findOne(query)
+        .populate('deliveryPartnerId', 'name email phone vehicleType')
+        .populate('settledBy', 'name email')
+        .lean();
+
+      if (!s) return res.status(404).json({ success: false, message: 'Settlement record not found' });
+
+      const earnings = await DeliveryEarning.find({ settlementId: s.settlementId }).sort({ earnedAt: -1 }).lean();
+
+      res.json({
+        success: true,
+        settlement: {
+          _id: s._id,
+          settlementId: s.settlementId,
+          deliveryPartner: s.deliveryPartnerId,
+          amount: s.amount,
+          orderCount: s.orderCount || earnings.length,
+          orderIds: s.orderIds || [],
+          status: s.status,
+          settledAt: s.settledAt,
+          settledBy: s.settledBy ? s.settledBy.name : 'Admin',
+        },
+        earnings,
+      });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
     }

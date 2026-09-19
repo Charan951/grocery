@@ -19,6 +19,10 @@ final earningsProvider = FutureProvider.autoDispose<
   return ref.read(apiProvider).earnings(range: range);
 });
 
+final settlementsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  return ref.read(apiProvider).settlements();
+});
+
 class EarningsScreen extends ConsumerWidget {
   const EarningsScreen({super.key});
 
@@ -54,42 +58,54 @@ class EarningsScreen extends ConsumerWidget {
           final bonusData = data.bonus;
           final items = data.items;
 
-          final todayTotal = s['todayTotal'] ?? s['total'] ?? 0;
-          final loginMins = (s['loginDurationMins'] ?? 0).toInt();
-          final loginHours = loginMins ~/ 60;
-          final loginRemMins = loginMins % 60;
-          final durationStr = '$loginHours:${loginRemMins.toString().padLeft(2, '0')} mins';
+          final totalEarned = s['totalEarned'] ?? s['total'] ?? 0;
+          final pendingAmount = s['pendingAmount'] ?? s['pending'] ?? 0;
+          final settledAmount = s['settledAmount'] ?? s['settled'] ?? 0;
 
           final todayBonus = (bonusData['todayBonus'] ?? s['bonusTotal'] ?? 0).toInt();
           final completedCount = (s['todayCount'] ?? s['count'] ?? items.length).toInt();
 
           return RefreshIndicator(
             color: kGreen,
-            onRefresh: () async => ref.invalidate(earningsProvider),
+            onRefresh: () async {
+              ref.invalidate(earningsProvider);
+              ref.invalidate(settlementsProvider);
+            },
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               children: [
-                // 1. Top Header Cards (Today's Earning & Login Duration)
+                // 1. Top Header Cards (Total Earned, Pending Settlement, Settled)
                 Row(
                   children: [
                     Expanded(
                       child: _HeaderSummaryCard(
-                        title: 'Today\'s earning',
-                        value: '₹${todayTotal.toStringAsFixed(0)}',
+                        title: 'Total Earned',
+                        value: '₹${totalEarned.toStringAsFixed(0)}',
                         icon: Icons.account_balance_wallet_rounded,
                         bgColor: kInk,
                         textColor: Colors.white,
                         accentColor: kGreen,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: _HeaderSummaryCard(
-                        title: 'Login duration',
-                        value: durationStr,
-                        icon: Icons.timer_rounded,
+                        title: 'Pending Settlement',
+                        value: '₹${pendingAmount.toStringAsFixed(0)}',
+                        icon: Icons.hourglass_top_rounded,
                         bgColor: kSurface,
-                        textColor: kText,
+                        textColor: Colors.orange.shade800,
+                        accentColor: Colors.orange,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _HeaderSummaryCard(
+                        title: 'Settled',
+                        value: '₹${settledAmount.toStringAsFixed(0)}',
+                        icon: Icons.check_circle_rounded,
+                        bgColor: kSurface,
+                        textColor: kGreen,
                         accentColor: kGreen,
                       ),
                     ),
@@ -193,6 +209,10 @@ class EarningsScreen extends ConsumerWidget {
 
                 // 5. Detailed Pay Breakdown (Expandable Summary)
                 _DetailedBreakdownExpansionTile(s: s),
+                const SizedBox(height: 16),
+
+                // 6. Settlement History
+                const _SettlementHistorySection(),
                 const SizedBox(height: 24),
               ],
             ),
@@ -786,5 +806,176 @@ class _DetailedBreakdownExpansionTile extends StatelessWidget {
           ],
         ),
       );
+}
+
+class _SettlementHistorySection extends ConsumerWidget {
+  const _SettlementHistorySection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncSettlements = ref.watch(settlementsProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Settlement History',
+          style: GoogleFonts.rubik(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: kText,
+          ),
+        ),
+        const SizedBox(height: 10),
+        asyncSettlements.when(
+          loading: () => const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator(color: kGreen)),
+          ),
+          error: (e, _) => const SizedBox.shrink(),
+          data: (items) {
+            if (items.isEmpty) {
+              return Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: kSurface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: kLedgerLine),
+                ),
+                child: const Center(
+                  child: Text(
+                    'No settlements processed yet',
+                    style: TextStyle(color: kTextMuted, fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              );
+            }
+            return Column(
+              children: items.map((s) {
+                final amount = (s['amount'] ?? 0).toDouble();
+                final settlementId = s['settlementId'] ?? 'SET_000';
+                final orderCount = s['orderCount'] ?? (s['orderIds'] as List?)?.length ?? 0;
+                final dateRaw = s['settledAt'];
+                final dateStr = _formatDate(dateRaw);
+
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: const BorderSide(color: kLedgerLine),
+                  ),
+                  child: ListTile(
+                    onTap: () => _showSettlementDialog(context, s),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: kGreenSoft,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.receipt_long_rounded, color: kGreen, size: 22),
+                    ),
+                    title: Text(
+                      settlementId,
+                      style: GoogleFonts.rubik(fontWeight: FontWeight.w700, fontSize: 14.5, color: kText),
+                    ),
+                    subtitle: Text(
+                      '$orderCount Orders • $dateStr',
+                      style: const TextStyle(fontSize: 12, color: kTextMuted),
+                    ),
+                    trailing: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '₹${amount.toStringAsFixed(0)}',
+                          style: GoogleFonts.rubik(fontWeight: FontWeight.w800, fontSize: 15, color: kGreen),
+                        ),
+                        const SizedBox(height: 2),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: kGreenSoft,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'Settled',
+                            style: GoogleFonts.nunitoSans(fontSize: 10, fontWeight: FontWeight.w700, color: kGreen),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  static String _formatDate(dynamic dateRaw) {
+    if (dateRaw == null) return '';
+    try {
+      final dt = DateTime.parse(dateRaw.toString()).toLocal();
+      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  static void _showSettlementDialog(BuildContext context, Map<String, dynamic> s) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Settlement ${s['settlementId']}',
+                  style: GoogleFonts.rubik(fontWeight: FontWeight.w700, fontSize: 18),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            const Divider(),
+            const SizedBox(height: 8),
+            _infoRow('Settled Amount', '₹${(s['amount'] ?? 0)}'),
+            _infoRow('Orders Included', '${s['orderCount'] ?? 0} Orders'),
+            _infoRow('Settled Date', _formatDate(s['settledAt'])),
+            _infoRow('Status', 'Settled'),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static Widget _infoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 14, color: kTextMuted)),
+          Text(value, style: GoogleFonts.rubik(fontSize: 14, fontWeight: FontWeight.w700, color: kText)),
+        ],
+      ),
+    );
+  }
 }
 

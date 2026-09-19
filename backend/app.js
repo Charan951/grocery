@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import mongoSanitize from 'express-mongo-sanitize';
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 
 import apiRouter from './src/routes/api.js';
 import { User } from './src/models/User.js';
@@ -121,12 +122,14 @@ export function createApp({ logRequests = true } = {}) {
     const token = socket.handshake.auth?.token || socket.handshake.query?.token;
     if (token) {
       try {
-        const decoded = jwt.verify(String(token), process.env.JWT_SECRET);
-        if (decoded && decoded.type !== 'customer') {
-          const user = await User.findById(decoded.id).select('role status');
-          if (user && user.status === 'Active') {
-            if (user.role === 'Delivery') socket.join('partner:' + String(user._id));
-            if (user.role === 'Admin' || user.role === 'Manager') socket.join('admin_fleet');
+        if (mongoose.connection.readyState === 1) {
+          const decoded = jwt.verify(String(token), process.env.JWT_SECRET);
+          if (decoded && decoded.type !== 'customer') {
+            const user = await User.findById(decoded.id).select('role status');
+            if (user && user.status === 'Active') {
+              if (user.role === 'Delivery') socket.join('partner:' + String(user._id));
+              if (user.role === 'Admin' || user.role === 'Manager') socket.join('admin_fleet');
+            }
           }
         }
       } catch (_) { /* anonymous socket */ }

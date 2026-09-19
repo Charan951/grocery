@@ -189,41 +189,92 @@ class _BodyState extends ConsumerState<_Body> {
                     Container(
                       width: 40,
                       height: 40,
-                      decoration: BoxDecoration(color: kGreenSoft, borderRadius: BorderRadius.circular(12)),
-                      child: const Icon(Icons.verified_user_rounded, color: kGreen, size: 22),
+                      decoration: BoxDecoration(
+                        color: o.isCOD ? kAmberSoft : kGreenSoft,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        o.isCOD ? Icons.payments_rounded : Icons.verified_user_rounded,
+                        color: o.isCOD ? kAmber : kGreen,
+                        size: 22,
+                      ),
                     ),
                     const SizedBox(width: 12),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Confirm Delivery', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: kText)),
-                          Text('Ask customer for their 4-digit code', style: TextStyle(color: kTextMuted, fontSize: 13)),
+                          const Text('Confirm Delivery', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: kText)),
+                          Text(
+                            o.isCOD
+                                ? 'Collect ₹${o.totalAmount.toStringAsFixed(0)} Cash on Delivery'
+                                : 'Ask customer for their 4-digit code',
+                            style: TextStyle(
+                              color: o.isCOD ? kAmber : kTextMuted,
+                              fontWeight: o.isCOD ? FontWeight.w700 : FontWeight.w500,
+                              fontSize: 13,
+                            ),
+                          ),
                         ],
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 18),
-                TextField(
-                  controller: otpCtrl,
-                  keyboardType: TextInputType.number,
-                  maxLength: 4,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.rubik(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: 8),
-                  decoration: InputDecoration(
-                    hintText: '• • • •',
-                    hintStyle: const TextStyle(color: kTextFaint, letterSpacing: 8),
-                    filled: true,
-                    fillColor: kPaper,
-                    counterText: '',
-                    contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: kLedgerLine)),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: kLedgerLine)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: kGreen, width: 2)),
+                if (!o.isCOD) ...[
+                  TextField(
+                    controller: otpCtrl,
+                    keyboardType: TextInputType.number,
+                    maxLength: 4,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.rubik(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: 8),
+                    decoration: InputDecoration(
+                      hintText: '• • • •',
+                      hintStyle: const TextStyle(color: kTextFaint, letterSpacing: 8),
+                      filled: true,
+                      fillColor: kPaper,
+                      counterText: '',
+                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: kLedgerLine)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: kLedgerLine)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: kGreen, width: 2)),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
+                  const SizedBox(height: 12),
+                ],
+                if (o.isCOD) ...[
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: kAmberSoft,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: kAmber.withValues(alpha: 0.4)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.account_balance_wallet_rounded, color: kAmber, size: 22),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Cash Collection Required',
+                                style: GoogleFonts.rubik(fontWeight: FontWeight.w700, fontSize: 13.5, color: kText),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Please collect exact cash amount ₹${o.totalAmount.toStringAsFixed(0)} before handing over.',
+                                style: const TextStyle(fontSize: 12, color: kTextMuted),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                ],
                 OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
                     backgroundColor: photoB64 != null ? kGreenSoft : Colors.transparent,
@@ -251,7 +302,10 @@ class _BodyState extends ConsumerState<_Body> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                   onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text('Complete & Handover', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                  child: Text(
+                    o.isCOD ? 'Confirm Cash & Handover' : 'Complete & Handover',
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                  ),
                 ),
               ],
             ),
@@ -260,7 +314,10 @@ class _BodyState extends ConsumerState<_Body> {
       ),
     ).then((confirmed) async {
       if (confirmed == true) {
-        await _do(() => ctl.complete(otp: otpCtrl.text.trim().isEmpty ? null : otpCtrl.text.trim(), photoBase64: photoB64));
+        await _do(() => ctl.complete(
+          otp: o.isCOD ? null : (otpCtrl.text.trim().isEmpty ? null : otpCtrl.text.trim()),
+          photoBase64: photoB64,
+        ));
       }
     });
   }
