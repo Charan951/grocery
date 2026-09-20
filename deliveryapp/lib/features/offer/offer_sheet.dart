@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:freshcart_delivery/core/delivery_numbering.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -94,7 +95,7 @@ class _OfferSheetState extends ConsumerState<OfferSheet> {
               const SizedBox(height: 14),
               const Text('New delivery', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
               const SizedBox(height: 4),
-              Text('Order ${o.orderId}', style: const TextStyle(color: kTextMuted)),
+              Text(deliveryLabel(ref.watch(deliveryNumberingProvider).valueOrNull ?? const <String, int>{}, o.orderId), style: const TextStyle(color: kTextMuted)),
               const SizedBox(height: 16),
               _row(Icons.payments_rounded, '₹${o.amount.toStringAsFixed(0)}  ·  ${o.isCOD ? 'COLLECT CASH' : 'Prepaid'}'),
               _row(Icons.shopping_bag_rounded, '${o.itemCount} item${o.itemCount == 1 ? '' : 's'}'),

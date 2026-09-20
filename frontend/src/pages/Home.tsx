@@ -10,6 +10,7 @@ import { FestivalCampaignWrapper } from '../components/FestivalCampaignWrapper';
 import { SuperCategoryNav } from '../components/SuperCategoryNav';
 import { HorizontalProductShelf } from '../components/HorizontalProductShelf';
 import { LazyRender } from '../components/LazyRender';
+import { CategoryShelves } from '../components/CategoryShelves';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowRight, ShieldCheck, Truck, Clock,
@@ -851,6 +852,9 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                 </div>
               </section>
             )}
+
+        {/* Bestsellers + Top deals category shelves (mobile only) */}
+        <CategoryShelves categories={categories} products={products} />
 
         {/* 2. Dynamic Subcategories Home Sections & Dynamic Inter-Section Banners & In-Between Mobile Special Groups */}
         {subCategorySections.map((sec, secIdx) => (

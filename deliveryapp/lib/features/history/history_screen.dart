@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:freshcart_delivery/core/delivery_numbering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:freshcart_delivery/core/providers.dart';
@@ -34,12 +35,13 @@ class HistoryScreen extends ConsumerWidget {
               itemCount: orders.length,
               itemBuilder: (c, i) {
                 final o = orders[i];
+                final numbers = ref.watch(deliveryNumberingProvider).valueOrNull ?? const <String, int>{};
                 final done = o.status == 'Delivered';
                 return Card(
                   child: ListTile(
                     leading: Icon(done ? Icons.check_circle : Icons.info_outline,
                         color: done ? Colors.green : Colors.orange),
-                    title: Text(o.orderId, style: const TextStyle(fontWeight: FontWeight.w700)),
+                    title: Text(deliveryLabel(numbers, o.orderId), style: const TextStyle(fontWeight: FontWeight.w700)),
                     subtitle: Text('${o.status}  ·  ₹${o.totalAmount.toStringAsFixed(0)}'),
                     onTap: () => context.push('/order/${o.orderId}'),
                   ),

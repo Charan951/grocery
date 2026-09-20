@@ -1,3 +1,5 @@
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:freshcart_delivery/core/delivery_numbering.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -15,6 +17,9 @@ import 'package:freshcart_delivery/features/orders/order_chat_sheet.dart';
 import 'package:freshcart_delivery/features/orders/order_controller.dart';
 import 'package:freshcart_delivery/models/delivery_models.dart';
 
+// TODO: replace with the real merchant UPI ID.
+const kMerchantUpiId = 'freshcart@upi';
+
 class OrderDetailScreen extends ConsumerWidget {
   final String orderId;
   const OrderDetailScreen({super.key, required this.orderId});
@@ -22,6 +27,7 @@ class OrderDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(orderProvider(orderId));
+    final numbers = ref.watch(deliveryNumberingProvider).valueOrNull ?? const <String, int>{};
     return Scaffold(
       backgroundColor: kPaper,
       appBar: AppBar(
@@ -38,7 +44,7 @@ class OrderDetailScreen extends ConsumerWidget {
               style: GoogleFonts.rubik(fontWeight: FontWeight.w700, fontSize: 17, color: kText),
             ),
             Text(
-              '#$orderId',
+              deliveryLabel(numbers, orderId),
               style: GoogleFonts.nunitoSans(fontSize: 12, fontWeight: FontWeight.w600, color: kTextMuted),
             ),
           ],
@@ -53,7 +59,7 @@ class OrderDetailScreen extends ConsumerWidget {
                 SnackBar(
                   behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  content: Text('Order ID #$orderId copied to clipboard'),
+                  content: const Text('Order ID copied to clipboard'),
                   duration: const Duration(seconds: 2),
                 ),
               );
@@ -161,6 +167,7 @@ class _BodyState extends ConsumerState<_Body> {
     final ctl = ref.read(orderProvider(o.orderId).notifier);
     final otpCtrl = TextEditingController();
     String? photoB64;
+    String? payMode; // COD only: 'cash' | 'upi'
 
     await showModalBottomSheet(
       context: context,
@@ -243,36 +250,56 @@ class _BodyState extends ConsumerState<_Body> {
                   const SizedBox(height: 12),
                 ],
                 if (o.isCOD) ...[
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: kAmberSoft,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: kAmber.withValues(alpha: 0.4)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.account_balance_wallet_rounded, color: kAmber, size: 22),
-                        const SizedBox(width: 12),
+                  Row(
+                    children: [
+                      for (final m in const [('cash', 'Cash', Icons.payments_rounded), ('upi', 'UPI', Icons.qr_code_2_rounded)]) ...[
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Cash Collection Required',
-                                style: GoogleFonts.rubik(fontWeight: FontWeight.w700, fontSize: 13.5, color: kText),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Please collect exact cash amount ₹${o.totalAmount.toStringAsFixed(0)} before handing over.',
-                                style: const TextStyle(fontSize: 12, color: kTextMuted),
-                              ),
-                            ],
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: payMode == m.$1 ? kGreenSoft : Colors.transparent,
+                              side: BorderSide(color: payMode == m.$1 ? kGreen : kLedgerLine, width: payMode == m.$1 ? 2 : 1),
+                              minimumSize: const Size.fromHeight(48),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            onPressed: () => setSt(() => payMode = m.$1),
+                            icon: Icon(m.$3, color: payMode == m.$1 ? kGreen : kTextMuted),
+                            label: Text(m.$2, style: TextStyle(color: payMode == m.$1 ? kGreen : kText, fontWeight: FontWeight.w700)),
                           ),
                         ),
+                        if (m.$1 == 'cash') const SizedBox(width: 10),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  if (payMode == 'cash')
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: kAmberSoft,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: kAmber.withValues(alpha: 0.4)),
+                      ),
+                      child: Text(
+                        'Collect exact cash ₹${o.totalAmount.toStringAsFixed(0)} before handing over.',
+                        style: GoogleFonts.rubik(fontWeight: FontWeight.w700, fontSize: 13.5, color: kText),
+                      ),
+                    ),
+                  if (payMode == 'upi')
+                    Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: kLedgerLine)),
+                          child: QrImageView(
+                            data: 'upi://pay?pa=$kMerchantUpiId&pn=FreshCart&am=${o.totalAmount.toStringAsFixed(2)}&cu=INR&tn=${Uri.encodeComponent(o.orderId)}',
+                            size: 200,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text('Customer scans & pays ₹${o.totalAmount.toStringAsFixed(0)}. Confirm once payment shows success.',
+                            textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, color: kTextMuted)),
                       ],
                     ),
-                  ),
                   const SizedBox(height: 14),
                 ],
                 OutlinedButton.icon(
@@ -301,9 +328,9 @@ class _BodyState extends ConsumerState<_Body> {
                     minimumSize: const Size.fromHeight(50),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
-                  onPressed: () => Navigator.pop(ctx, true),
+                  onPressed: o.isCOD && payMode == null ? null : () => Navigator.pop(ctx, true),
                   child: Text(
-                    o.isCOD ? 'Confirm Cash & Handover' : 'Complete & Handover',
+                    o.isCOD ? (payMode == 'upi' ? 'UPI Received & Handover' : 'Cash Collected & Handover') : 'Complete & Handover',
                     style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
                   ),
                 ),
@@ -460,7 +487,7 @@ class _BodyState extends ConsumerState<_Body> {
       case 'Out For Delivery':
         return (label: 'I Have Arrived at Doorstep', icon: Icons.pin_drop_rounded, run: () => _do(ctl.arrived));
       case 'Arrived':
-        return (label: 'Collect OTP & Complete', icon: Icons.task_alt_rounded, run: _completeFlow);
+        return (label: o.isCOD ? 'Collect Payment & Complete' : 'Collect OTP & Complete', icon: Icons.task_alt_rounded, run: _completeFlow);
       case 'Failed':
         if (o.needsReturn) {
           return (label: 'Returned Order to Store', icon: Icons.store_mall_directory_rounded, run: () => _do(ctl.markReturned));
@@ -663,7 +690,7 @@ class _BodyState extends ConsumerState<_Body> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
-                                  o.orderId.length > 12 ? '#${o.orderId.substring(0, 12)}…' : '#${o.orderId}',
+                                  deliveryLabel(ref.watch(deliveryNumberingProvider).valueOrNull ?? const <String, int>{}, o.orderId),
                                   style: GoogleFonts.nunitoSans(fontSize: 11, fontWeight: FontWeight.w700, color: kTextMuted),
                                 ),
                                 const SizedBox(width: 4),

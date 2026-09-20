@@ -21,6 +21,8 @@ const orderSchema = new mongoose.Schema({
   itemTotal: { type: Number, required: true },
   itemTotalMrp: { type: Number, default: 0 },
   discount: { type: Number, default: 0 },
+  couponCode: { type: String },      // snapshot of the coupon applied at purchase time
+  couponDiscount: { type: Number, default: 0 },
   deliveryFee: { type: Number, default: 0 },
   handlingFee: { type: Number, default: 0 },
   totalAmount: { type: Number, required: true },

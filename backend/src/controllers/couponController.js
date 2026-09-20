@@ -19,6 +19,28 @@ import { signToken, maskPhone, isPaymentsTestMode, razorpayInstance, RAZORPAY_KE
 // ==========================================
 // 6. COUPON CONTROLLER
 // ==========================================
+// Single source of truth for coupon eligibility + discount. Used by both the
+// validate endpoint and createOrder so web / Flutter can't diverge.
+export const evaluateCoupon = (coupon, subtotal) => {
+  if (!coupon || coupon.active === false) return { ok: false, discount: 0, message: 'This coupon is not valid' };
+  if (subtotal < (coupon.minOrder || 0)) {
+    return { ok: false, discount: 0, message: `Add items worth ₹${(coupon.minOrder - subtotal).toFixed(0)} more to use ${coupon.code}` };
+  }
+  let discount = coupon.isPercent
+    ? Math.round((subtotal * Number(coupon.value)) / 100)
+    : Number(coupon.value);
+  // Percentage coupons are capped at ₹100 (matches the web storefront).
+  if (coupon.isPercent) discount = Math.min(discount, 100);
+  discount = Math.max(0, Math.min(discount, subtotal));
+  return { ok: true, discount, message: `${coupon.code} applied — you saved ₹${discount}` };
+};
+
+export const findCouponByCode = (raw) => {
+  const code = String(raw || '').trim().toUpperCase();
+  if (!code || !/^[A-Z0-9_-]+$/.test(code)) return null;
+  return Coupon.findOne({ code });
+};
+
 export const couponController = {
   getCoupons: async (req, res) => {
     try {
@@ -39,25 +61,10 @@ export const couponController = {
         return res.status(400).json({ success: false, valid: false, message: 'Coupon code is required' });
       }
 
-      const coupon = await Coupon.findOne({ code: new RegExp(`^${code}$`, 'i') });
-      if (!coupon || coupon.active === false) {
-        return res.json({ success: true, valid: false, discount: 0, message: 'This coupon is not valid' });
-      }
-      if (subtotal < (coupon.minOrder || 0)) {
-        return res.json({
-          success: true,
-          valid: false,
-          discount: 0,
-          message: `Add items worth ₹${(coupon.minOrder - subtotal).toFixed(0)} more to use ${coupon.code}`
-        });
-      }
-
-      let discount = coupon.isPercent
-        ? Math.round((subtotal * Number(coupon.value)) / 100)
-        : Number(coupon.value);
-      // Percentage coupons are capped at ₹100 (matches the web storefront).
-      if (coupon.isPercent) discount = Math.min(discount, 100);
-      discount = Math.max(0, Math.min(discount, subtotal));
+      const coupon = await findCouponByCode(code);
+      const r = evaluateCoupon(coupon, subtotal);
+      if (!r.ok) return res.json({ success: true, valid: false, discount: 0, message: r.message });
+      const discount = r.discount;
 
       res.json({
         success: true,

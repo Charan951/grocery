@@ -15,6 +15,10 @@ final bannersProvider = FutureProvider<List<Map<String, dynamic>>>((ref) {
   return ref.watch(apiServiceProvider).fetchBanners();
 });
 
+final categorySalesProvider = FutureProvider<Map<String, int>>((ref) {
+  return ref.watch(apiServiceProvider).fetchCategorySales();
+});
+
 final categoriesProvider = FutureProvider<List<CategoryModel>>((ref) {
   return ref.watch(apiServiceProvider).fetchCategories();
 });

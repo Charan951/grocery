@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCartWishlist, getProductStockQuantity } from '../context/CartWishlistContext';
 import { useCMS } from '../context/CMSContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -6,6 +6,7 @@ import { X, ShoppingBag, Plus, Minus, Trash2, Tag, AlertCircle, Heart, PiggyBank
 import { useNavigate } from 'react-router-dom';
 import { CheckoutModal } from './CheckoutModal';
 import { getProductImage } from '../utils/imageUtils';
+import { apiUrl } from '../config/api';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -26,22 +27,30 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
   const [couponError, setCouponError] = useState('');
 
-  const handleApplyCoupon = () => {
+  // The server is the only place a coupon discount is calculated.
+  const validateCouponOnServer = async (code: string) => {
+    const res = await fetch(apiUrl('/coupons/validate'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, subtotal: cartSubtotal }),
+    });
+    return res.json();
+  };
+
+  const handleApplyCoupon = async () => {
     setCouponError('');
     const code = couponCode.trim().toUpperCase();
-    const match = coupons.find((c) => c.code === code);
-
-    if (!match) {
-      setCouponError('Invalid coupon code.');
-      return;
+    if (!code) return;
+    try {
+      const r = await validateCouponOnServer(code);
+      if (!r?.valid) {
+        setCouponError(r?.message || 'Invalid coupon code.');
+        return;
+      }
+      setAppliedCoupon({ code: r.code, discount: Number(r.discount) || 0 });
+    } catch {
+      setCouponError('Could not apply the coupon. Please try again.');
     }
-
-    if (cartSubtotal < match.minOrder) {
-      setCouponError(`Min order value to apply is ₹${match.minOrder}`);
-      return;
-    }
-
-    setAppliedCoupon(match);
   };
 
   const handleRemoveCoupon = () => {
@@ -50,14 +59,28 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
     setCouponError('');
   };
 
-  const calculateDiscount = () => {
-    if (!appliedCoupon) return 0;
-    if (appliedCoupon.isPercent) {
-      const calc = (cartSubtotal * appliedCoupon.value) / 100;
-      return Math.min(calc, 100);
-    }
-    return appliedCoupon.value;
-  };
+  // Cart changed after applying: re-check with the server, drop the coupon if
+  // it no longer qualifies (e.g. subtotal fell below the minimum order).
+  useEffect(() => {
+    if (!appliedCoupon) return;
+    let cancelled = false;
+    validateCouponOnServer(appliedCoupon.code)
+      .then((r) => {
+        if (cancelled) return;
+        if (r?.valid) {
+          setAppliedCoupon({ code: r.code, discount: Number(r.discount) || 0 });
+        } else {
+          setAppliedCoupon(null);
+          setCouponCode('');
+          setCouponError(`${appliedCoupon.code} removed: ${r?.message || 'no longer valid'}`);
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartSubtotal]);
+
+  const calculateDiscount = () => (appliedCoupon ? Number(appliedCoupon.discount) || 0 : 0);
 
   const discount = calculateDiscount();
   const total = Math.max(cartSubtotal - discount, 0);
@@ -434,6 +457,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
           onClose();
         }}
         selectedAddress={activeAddress}
+        couponCode={appliedCoupon?.code}
+        couponDiscount={discount}
         onOpenAddressSelector={() => {
           setIsCheckoutOpen(false);
           onClose();

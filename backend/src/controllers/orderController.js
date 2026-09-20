@@ -15,6 +15,7 @@ import { uploadToCloudinary } from '../config/cloudinary.js';
 import { cancelForOrder, completeForOrder, tryAssign } from '../services/assignmentService.js';
 import { sendDeliveryCredentials } from '../services/mailService.js';
 import { registerDeviceToken, removeDeviceToken, sendToOwner } from '../services/pushService.js';
+import { evaluateCoupon, findCouponByCode } from './couponController.js';
 import { signToken, maskPhone, isPaymentsTestMode, razorpayInstance, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, logAudit } from './_shared.js';
 
 // ==========================================
@@ -204,6 +205,20 @@ export const orderController = {
       const freeThreshold = Number(settingsDoc?.freeDeliveryThreshold ?? 499);
       const serverDeliveryFee = calculatedSubtotal >= freeThreshold ? 0 : feeRule;
 
+      // Coupon discount is always recomputed here from the DB coupon; any
+      // `discount` the client sends is ignored.
+      let couponCode;
+      let couponDiscount = 0;
+      if (orderData.couponCode) {
+        const coupon = await findCouponByCode(orderData.couponCode);
+        const r = evaluateCoupon(coupon, calculatedSubtotal);
+        if (!r.ok) {
+          return res.status(400).json({ success: false, message: r.message });
+        }
+        couponCode = coupon.code;
+        couponDiscount = r.discount;
+      }
+
       const normalizedOrder = {
         orderId: orderData.orderId || orderData.orderNumber || 'PNNHJHTYP' + Math.floor(100000 + Math.random() * 900000),
         customerId: authedCustomer?.customerId || orderData.customerId || 'cust_' + cleanPhone,
@@ -211,8 +226,10 @@ export const orderController = {
         customerPhone: `+91 ${cleanPhone}`,
         items: validatedItems,
         itemTotal: calculatedSubtotal,
-        totalAmount: calculatedSubtotal + serverDeliveryFee + Number(orderData.handlingFee || 0) - Number(orderData.discount || 0),
-        discount: Number(orderData.discount || 0),
+        totalAmount: calculatedSubtotal + serverDeliveryFee + Number(orderData.handlingFee || 0) - couponDiscount,
+        discount: couponDiscount,
+        couponCode,
+        couponDiscount,
         deliveryFee: serverDeliveryFee,
         handlingFee: Number(orderData.handlingFee || 0),
         // COD/cash is collected on delivery — it is Pending until then, never

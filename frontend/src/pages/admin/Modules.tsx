@@ -2724,6 +2724,16 @@ export const CouponsModule: React.FC = () => {
   const [minOrder, setMinOrder] = useState(499);
   const [editingCoupon, setEditingCoupon] = useState<any | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [couponParams, setCouponParams] = useSearchParams();
+
+  // Deep link from the dashboard's "Create Coupon" quick action.
+  useEffect(() => {
+    if (couponParams.get('new') === '1') {
+      handleOpenAdd();
+      setCouponParams({}, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const getAuthHeader = (): Record<string, string> => {
     const token = localStorage.getItem('admin_token');

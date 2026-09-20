@@ -1,10 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:freshcart_delivery/core/delivery_numbering.dart';
 import 'package:freshcart_delivery/core/providers.dart';
 import 'package:freshcart_delivery/core/theme.dart';
-import 'package:freshcart_delivery/core/widgets/filter_sheet.dart';
 import 'package:freshcart_delivery/core/widgets/tab_back_button.dart';
 import 'package:freshcart_delivery/models/delivery_models.dart';
 
@@ -62,14 +61,6 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
       appBar: AppBar(
         leading: const TabBackButton(),
         title: const Text('Orders'),
-        actions: [
-          FilterAction<String>(
-            title: 'Filter history',
-            selected: _filterLabel,
-            options: _filters.keys.map((label) => FilterOption(label, label)).toList(),
-            onChanged: (label) => setState(() => _filterLabel = label),
-          ),
-        ],
       ),
       body: RefreshIndicator(
         color: kGreen,
@@ -77,16 +68,8 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _label('History', history.valueOrNull?.length),
-                if (_filterLabel != 'All')
-                  Text(_filterLabel,
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: kGreen)),
-              ],
-            ),
-            const SizedBox(height: 12),
+            _chips(),
+            const SizedBox(height: 14),
             history.when(
               loading: _loader,
               error: (e, _) => _empty(Icons.wifi_off_rounded, "Couldn't load history", '$e'),
@@ -106,69 +89,128 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
     );
   }
 
-  Widget _label(String text, int? count) => Row(
-        children: [
-          Text(text.toUpperCase(),
-              style: const TextStyle(
-                  fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.1, color: kTextFaint)),
-          if (count != null && count > 0) ...[
-            const SizedBox(width: 6),
-            Text('· $count',
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: kTextFaint)),
-          ],
-        ],
+  static const _chipIcons = <String, IconData>{
+    'All': Icons.dashboard_rounded,
+    'Delivered': Icons.check_circle_rounded,
+    'Failed': Icons.cancel_rounded,
+    'Returned': Icons.undo_rounded,
+  };
+
+  Widget _chips() => SizedBox(
+        height: 40,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          children: _filters.keys.map((label) {
+            final sel = label == _filterLabel;
+            final fg = sel ? Colors.white : (label == 'All' ? kTextMuted : _tone(label));
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: GestureDetector(
+                onTap: () => setState(() => _filterLabel = label),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  decoration: BoxDecoration(
+                    color: sel ? kGreen : Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: sel ? kGreen : Colors.black12),
+                  ),
+                  child: Row(children: [
+                    Icon(_chipIcons[label], size: 16, color: fg),
+                    const SizedBox(width: 6),
+                    Text(label,
+                        style: TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600, color: sel ? Colors.white : kTextMuted)),
+                  ]),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
       );
+
+  String? _placedAt(DeliveryOrder o) {
+    for (final t in o.timeline) {
+      final raw = t['timestamp'] ?? t['time'] ?? t['at'] ?? t['date'];
+      final d = raw == null ? null : DateTime.tryParse(raw.toString());
+      if (d != null) {
+        final l = d.toUtc().add(const Duration(hours: 5, minutes: 30));
+        const m = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        final h = l.hour % 12 == 0 ? 12 : l.hour % 12;
+        return '${l.day} ${m[l.month - 1]} ${l.year} • $h:${l.minute.toString().padLeft(2, '0')} ${l.hour >= 12 ? 'PM' : 'AM'}';
+      }
+    }
+    return null;
+  }
 
   Widget _tile(DeliveryOrder o, int? number) {
     final subtitle = o.deliveryAddress.isEmpty ? o.status : o.deliveryAddress;
-    final label = number != null ? 'Delivery #$number' : o.orderId;
+    final label = number != null ? 'Delivery #$number' : 'Delivery';
+    final when = _placedAt(o);
+    final count = o.items.fold<int>(0, (a, i) => a + i.quantity);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Card(
+        margin: EdgeInsets.zero,
         child: InkWell(
           onTap: () => context.push('/order/${o.orderId}'),
           borderRadius: BorderRadius.circular(16),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            child: Row(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+            child: Column(
               children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: _toneSoft(o.status),
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: Icon(Icons.place_rounded, size: 18, color: _tone(o.status)),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(color: kGreenSoft, borderRadius: BorderRadius.circular(14)),
+                      child: const Icon(Icons.local_shipping_rounded, size: 26, color: kGreen),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Flexible(
-                            child: Text(label,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                          ),
-                          const SizedBox(width: 6),
+                          Text(label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                          if (when != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(when, style: const TextStyle(color: kTextMuted, fontSize: 12)),
+                            ),
+                          const SizedBox(height: 4),
+                          Row(children: [
+                            const Icon(Icons.location_on_outlined, size: 14, color: kTextMuted),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(subtitle,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(color: kTextMuted, fontSize: 12)),
+                            ),
+                          ]),
+                          const SizedBox(height: 8),
                           _pill(o.status),
                         ],
                       ),
-                      const SizedBox(height: 3),
-                      Text(subtitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: kTextMuted, fontSize: 11.5)),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text('₹${o.totalAmount.toStringAsFixed(0)}',
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+                    const Icon(Icons.chevron_right_rounded, color: kTextFaint),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Text('₹${o.totalAmount.toStringAsFixed(0)}',
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5)),
-                const Icon(Icons.chevron_right_rounded, color: kTextFaint),
+                const Divider(height: 22),
+                Row(children: [
+                  const Icon(Icons.inventory_2_outlined, size: 16, color: kTextMuted),
+                  const SizedBox(width: 6),
+                  Text('$count ${count == 1 ? 'item' : 'items'}',
+                      style: const TextStyle(color: kTextMuted, fontSize: 12.5)),
+                  const SizedBox(width: 14),
+                  Icon(o.isCOD ? Icons.payments_outlined : Icons.credit_score_rounded, size: 16, color: kTextMuted),
+                  const SizedBox(width: 6),
+                  Text(o.isCOD ? 'COD' : 'Prepaid', style: const TextStyle(color: kTextMuted, fontSize: 12.5)),
+                ]),
               ],
             ),
           ),
@@ -178,11 +220,13 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
   }
 
   Widget _pill(String status) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(color: _toneSoft(status), borderRadius: BorderRadius.circular(4)),
-        child: Text(status.toUpperCase(),
-            style: TextStyle(
-                fontSize: 8.5, fontWeight: FontWeight.w800, letterSpacing: 0.6, color: _tone(status))),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(color: _toneSoft(status), borderRadius: BorderRadius.circular(12)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(status == 'Delivered' ? Icons.check_circle_rounded : Icons.info_rounded, size: 14, color: _tone(status)),
+          const SizedBox(width: 4),
+          Text(status, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _tone(status))),
+        ]),
       );
 
   static Widget _loader() =>

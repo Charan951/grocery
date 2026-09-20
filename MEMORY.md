@@ -161,6 +161,16 @@
 
 ## 5. Completed Major Work
 
+- **2026-09-20 — Delivery Partner Orders page redesign (`deliveryapp/lib/features/orders/orders_screen.dart`).**
+  Matches user-supplied mock: app-bar filter icon replaced by a horizontal
+  chip row (All / Delivered / Failed / Returned — real history statuses, not the
+  mock's Active/Cancelled); cards now have a green truck icon tile, "Delivery #N",
+  IST date·time (parsed from `trackingTimeline` entries; hidden if absent),
+  address with pin, status pill with icon, price + chevron, and a footer
+  (item count, COD/Prepaid). Mock's per-order **distance (km) is omitted** —
+  `DeliveryOrder` has no distance field. Web `frontend/src/partner/` orders page
+  NOT yet updated (parity pending). `flutter analyze` clean; no tests run.
+
 - **2026-09-18 — Delivery Partner Homepage Redesign, Live Rider Location Map Tracking & Offer Auto-Accept Fix (web + Flutter parity).**
   - **Delivery Partner App (`deliveryapp/`) Dashboard & Order UI Redesign**:
     - **Dashboard (`dashboard_screen.dart`)**: Streamlined delivery partner home page with active order cards, online/offline status toggle, key metric cards (earnings, completed orders, online hours), quick action buttons, and structured list items.
@@ -2574,3 +2584,7 @@ smart default) web+mobile.
 - **Web Sign Out Teardown (`frontend/src/pages/CustomerProfile.tsx`)**: `handleLogout` and `handleDeleteAccount` clear `customer_user` and `customer_token` and dispatch `customer_auth_changed` to clear active in-memory cart and wishlist state.
 - **Mobile App Data Isolation (`mobileapp/lib/core/services/storage_service.dart` & `cart_controller.dart`)**: Updated `syncOwner` in Hive storage to call `clearAll()` whenever identity/owner changes (`current != userKey`), and added `reloadCart()` to `CartNotifier` to keep Riverpod in-memory state in sync with isolated storage.
 - **Verification**: `npx tsc --noEmit` passed with 0 errors; all 122 `flutter test` integration/unit tests passed cleanly.
+2026-09-20 — Customer Track Order parity (Flutter mobileapp ↔ web mobile) & Home category shelves:
+- **Track order (`mobileapp/lib/features/tracking/presentation/screens/tracking_screen.dart`)**: Rebuilt to mirror web `TrackOrder.tsx`. Mint "Estimated Arrival" card (0.85fr) sits beside the map (1.15fr) in a pinned `SliverPersistentHeader`; on scroll (transition = banner height, 46% of screen) the ETA card collapses/fades and the map grows to full width under the app bar. Added "Live GPS" map badge, web-style app-bar headlines, "DELIVERY PARTNER" label, "Status Updates" timeline (newest first, with times), pill bottom buttons, "Back to Store". Banner slot is now only reserved when a banner has a valid http image (was leaving a blank 46% gap). Still not matched: partner rating/avatar, uppercase items header with total, map recenter/layers buttons.
+- **Home "Bestsellers" & "Top deals" shelves (mobile web + Flutter only)**: Blinkit-style cards (2×2 product image grid, "+N more" pill, category name), 3 per row, max 6 categories, placed right after "Shop by category". Bestsellers ranked by real units sold per category; Top deals by average discount (discounted products only). New backend route `GET /api/category-sales` (in `catalog.routes.js`, aggregates non-cancelled/failed/refunded orders → product categoryId). Web: `frontend/src/components/CategoryShelves.tsx` (hidden ≥640px) wired in `Home.tsx`. Flutter: `features/home/presentation/widgets/category_shelf_section.dart`, `ApiService.fetchCategorySales`, `categorySalesProvider`, wired in `home_screen.dart`. Without sales data it falls back to isBestSeller count then product count.
+- **Verification**: `flutter analyze` clean on tracking + home; frontend tsc no errors in touched files; backend route file syntax-checked. Not run in emulator — needs full Flutter restart (not hot reload) and backend restart (`localhost:5000`).

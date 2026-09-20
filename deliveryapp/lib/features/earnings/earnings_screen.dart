@@ -188,8 +188,7 @@ class EarningsScreen extends ConsumerWidget {
                 else
                   ...items.map((e) {
                     final settled = e['status'] == 'settled';
-                    final number = numberByOrderId[e['orderId']];
-                    final label = number != null ? 'Delivery #$number' : '${e['orderId']}';
+                    final label = deliveryLabel(numberByOrderId, e['orderId']?.toString());
                     final earnedAt = e['earnedAt'];
                     final timeStr = _formatTime(earnedAt);
 
@@ -853,7 +852,6 @@ class _SettlementHistorySection extends ConsumerWidget {
             return Column(
               children: items.map((s) {
                 final amount = (s['amount'] ?? 0).toDouble();
-                final settlementId = s['settlementId'] ?? 'SET_000';
                 final orderCount = s['orderCount'] ?? (s['orderIds'] as List?)?.length ?? 0;
                 final dateRaw = s['settledAt'];
                 final dateStr = _formatDate(dateRaw);
@@ -877,7 +875,7 @@ class _SettlementHistorySection extends ConsumerWidget {
                       child: const Icon(Icons.receipt_long_rounded, color: kGreen, size: 22),
                     ),
                     title: Text(
-                      settlementId,
+                      'Settlement',
                       style: GoogleFonts.rubik(fontWeight: FontWeight.w700, fontSize: 14.5, color: kText),
                     ),
                     subtitle: Text(
@@ -943,7 +941,7 @@ class _SettlementHistorySection extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Settlement ${s['settlementId']}',
+                  'Settlement details',
                   style: GoogleFonts.rubik(fontWeight: FontWeight.w700, fontSize: 18),
                 ),
                 IconButton(

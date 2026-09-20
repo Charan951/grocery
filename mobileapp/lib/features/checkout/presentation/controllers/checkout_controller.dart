@@ -151,6 +151,7 @@ class CheckoutController extends StateNotifier<CheckoutState> {
             deliveryFee: cart.deliveryFee,
             platformFee: cart.platformFee,
             discount: cart.couponDiscount,
+            couponCode: cart.appliedCoupon?['code'] as String?,
             tax: cart.taxAmount,
             total: total,
             address: address,

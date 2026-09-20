@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:freshcart_delivery/core/delivery_numbering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:freshcart_delivery/core/error/api_exception.dart';
@@ -471,7 +472,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with WidgetsB
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Order : #${o.orderId}',
+                            deliveryLabel(ref.watch(deliveryNumberingProvider).valueOrNull ?? const <String, int>{}, o.orderId),
                             style: const TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 15,

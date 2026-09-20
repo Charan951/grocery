@@ -27,6 +27,9 @@ interface CheckoutModalProps {
   onClose: () => void;
   selectedAddress: SavedAddress | null;
   onOpenAddressSelector: () => void;
+  /** Coupon chosen in the cart. Only the code is sent to the server, which recomputes the discount. */
+  couponCode?: string;
+  couponDiscount?: number;
 }
 
 declare global {
@@ -44,6 +47,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onClose,
   selectedAddress,
   onOpenAddressSelector,
+  couponCode,
+  couponDiscount = 0,
 }) => {
   const { cart, updateCartQuantity, cartSubtotal, clearCart } = useCartWishlist();
   const navigate = useNavigate();
@@ -69,7 +74,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [freeThreshold, setFreeThreshold] = useState(499);
 
   const deliveryFee = cartSubtotal >= freeThreshold ? 0 : feeRule;
-  const finalPayable = Math.max(cartSubtotal + deliveryFee, 0);
+  const couponSaving = couponCode ? Math.min(couponDiscount, cartSubtotal) : 0;
+  const finalPayable = Math.max(cartSubtotal + deliveryFee - couponSaving, 0);
   const savedOnDelivery = cartSubtotal >= freeThreshold ? feeRule : 0;
 
   // Load Razorpay Checkout SDK (only needed for the online path).
@@ -137,6 +143,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           image: item.product.imageUrl || (item.product as any).image || '',
         })),
         itemTotal: cartSubtotal,
+        ...(couponCode ? { couponCode } : {}),
         deliveryFee,
         totalAmount: finalPayable,
         ...(opts.paymentStatus ? { paymentStatus: opts.paymentStatus } : {}),
@@ -479,6 +486,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     <span>Item total</span>
                     <span className="font-bold text-text-primary">₹{cartSubtotal}</span>
                   </div>
+                  {couponSaving > 0 && (
+                    <div className="flex justify-between text-primary font-bold">
+                      <span>Coupon ({couponCode})</span>
+                      <span>-₹{couponSaving}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span>Delivery fee</span>
                     {deliveryFee > 0 ? (

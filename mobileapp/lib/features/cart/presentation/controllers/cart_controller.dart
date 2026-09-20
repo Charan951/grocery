@@ -4,6 +4,7 @@ import 'package:freshcart/core/services/pricing.dart';
 import 'package:freshcart/core/services/storage_service.dart';
 import 'package:freshcart/features/cart/data/models/cart_item_model.dart';
 import 'package:freshcart/features/cart/presentation/controllers/commerce_providers.dart';
+import 'package:freshcart/features/home/presentation/controllers/catalog_providers.dart';
 import 'package:freshcart/features/products/data/models/product_model.dart';
 
 /// Seller limit — one customer may buy at most this many of a single item
@@ -82,8 +83,9 @@ class CartState {
 
 class CartNotifier extends StateNotifier<CartState> {
   final StorageService _storage;
+  final Ref _ref;
 
-  CartNotifier(this._storage, Ref ref) : super(CartState(items: [])) {
+  CartNotifier(this._storage, Ref ref) : _ref = ref, super(CartState(items: [])) {
     _loadCart();
     // Keep pricing in sync with backend settings.
     state = state.copyWith(pricing: ref.read(pricingConfigProvider));
@@ -132,6 +134,7 @@ class CartNotifier extends StateNotifier<CartState> {
     }
     state = state.copyWith(items: next);
     _persistCart();
+    _revalidateCoupon();
     return true;
   }
 
@@ -151,6 +154,7 @@ class CartNotifier extends StateNotifier<CartState> {
     }
     state = state.copyWith(items: next, clearCoupon: next.isEmpty);
     _persistCart();
+    _revalidateCoupon();
   }
 
   void deleteItem(CartItemModel item) {
@@ -158,11 +162,30 @@ class CartNotifier extends StateNotifier<CartState> {
       ..removeWhere((i) => i.product.id == item.product.id && i.selectedWeight == item.selectedWeight);
     state = state.copyWith(items: next, clearCoupon: next.isEmpty);
     _persistCart();
+    _revalidateCoupon();
   }
 
   /// Applies a discount that has already been validated by the backend.
   void applyValidatedCoupon(String code, double discount) {
     state = state.copyWith(appliedCoupon: {'code': code, 'discount': discount});
+  }
+
+  /// Cart changed while a coupon is applied: ask the server again. The server
+  /// decides whether it still qualifies and what the discount is now.
+  Future<void> _revalidateCoupon() async {
+    final code = state.appliedCoupon?['code'] as String?;
+    if (code == null || state.items.isEmpty) return;
+    try {
+      final res = await _ref.read(apiServiceProvider).validateCoupon(code, state.subtotal);
+      if (state.appliedCoupon?['code'] != code) return; // removed/changed meanwhile
+      if (res['valid'] == true) {
+        applyValidatedCoupon(code, (res['discount'] as num).toDouble());
+      } else {
+        removeCoupon();
+      }
+    } catch (_) {
+      // Offline blip: keep the coupon; the server re-checks on order placement.
+    }
   }
 
   void removeCoupon() => state = state.copyWith(clearCoupon: true);

@@ -22,6 +22,17 @@ String formatOrderNumber(String orderId) {
   return clean.isNotEmpty ? clean : orderId.replaceAll('#', '');
 }
 
+/// Only banners with a usable image — otherwise the 46% banner slot is
+/// reserved as blank space (the web hides the banner block in that case).
+List<dynamic> _activeBanners(List<dynamic> all) => all.where((item) {
+      if (item is! Map) return false;
+      final b = Map<String, dynamic>.from(item);
+      final active = b['active'] ?? b['isActive'];
+      if (active == false || active == 0) return false;
+      final img = (b['imageUrl'] ?? b['image'] ?? '').toString().trim();
+      return img.startsWith('http');
+    }).toList();
+
 class TrackingScreen extends ConsumerStatefulWidget {
   final String orderId;
 
@@ -65,7 +76,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     final t = ref.watch(trackingProvider(widget.orderId));
     final bucket = t.statusBucket;
     final orderId = widget.orderId;
-    final banners = ref.watch(bannersProvider).valueOrNull ?? const [];
+    final banners = _activeBanners(ref.watch(bannersProvider).valueOrNull ?? const []);
     final hasBanner = banners.isNotEmpty;
 
     return Scaffold(
@@ -103,7 +114,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                     color: isDark ? AppColors.dividerDark : const Color(0xFFD1D5DB),
                   ),
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
                 ),
               ),
             ),
@@ -113,14 +124,14 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                 onPressed: () => context.go('/'),
                 icon: const Icon(Icons.storefront_rounded, size: 18, color: Colors.white),
                 label: const Text(
-                  'Back to Home',
+                  'Back to Store',
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Colors.white),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   elevation: 1,
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
                 ),
               ),
             ),
@@ -155,6 +166,10 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                 delegate: _MapHeaderDelegate(
                   t: t,
                   isDark: isDark,
+                  controller: _scrollController,
+                  transitionPx: hasBanner
+                      ? MediaQuery.of(context).size.height * 0.46
+                      : 160.0,
                   topInset: MediaQuery.of(context).padding.top + 56,
                 ),
               ),
@@ -163,11 +178,6 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
-                    const SizedBox(height: 2),
-
-                    // ETA & LIVE STATUS HERO CARD
-                    _EtaHeroCard(t: t, bucket: bucket, isDark: isDark),
-                    const SizedBox(height: 14),
 
                     // DOORSTEP OTP CODE (when available)
                     if (t.deliveryOtp.isNotEmpty) ...[
@@ -197,7 +207,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
 
                     // TRACKING TIMELINE
                     if (t.timeline.isNotEmpty) ...[
-                      _TimelineCard(entries: t.timeline, isDark: isDark),
+                      _TimelineCard(entries: t.timeline.reversed.toList(), isDark: isDark),
                       const SizedBox(height: 14),
                     ],
 
@@ -335,7 +345,9 @@ class _TrackingAppBar extends StatelessWidget {
                                 ? 'Order delivered'
                                 : (t.hasRider
                                     ? 'Delivery partner is heading to your drop'
-                                    : 'Order is being prepared'),
+                                    : (t.statusBucket == OrderStatus.processing
+                                        ? 'Order packed'
+                                        : 'Order accepted — preparing your order')),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.white),
@@ -521,150 +533,239 @@ class _TrackingBannerCarouselState extends State<_TrackingBannerCarousel> {
 class _MapHeaderDelegate extends SliverPersistentHeaderDelegate {
   final TrackingState t;
   final bool isDark;
+  final ScrollController controller;
+  // Scroll distance over which the ETA card collapses and the map grows —
+  // the banner's height, same as the web tracker's TRANSITION_PX.
+  final double transitionPx;
   // Height of the app bar the map must sit flush below once pinned —
   // matches the web tracker's `appBarH`-driven map top offset.
   final double topInset;
-  static const double _mapH = 258;
+  static const double _startH = 228;
+  static const double _pinnedH = 250;
 
-  _MapHeaderDelegate({required this.t, required this.isDark, required this.topInset});
+  _MapHeaderDelegate({
+    required this.t,
+    required this.isDark,
+    required this.controller,
+    required this.transitionPx,
+    required this.topInset,
+  });
 
   @override
-  double get minExtent => topInset + _mapH + 12;
+  double get minExtent => topInset + _pinnedH + 12;
 
   @override
-  double get maxExtent => topInset + _mapH + 12;
+  double get maxExtent => topInset + _pinnedH + 12;
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(16, topInset + 12, 16, 0),
-      child: Container(
-        height: _mapH,
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF242426) : const Color(0xFFF3F4F6),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isDark ? AppColors.dividerDark : const Color(0xFFE5E7EB),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final p = controller.hasClients
+            ? (controller.offset / transitionPx).clamp(0.0, 1.0)
+            : 0.0;
+        final h = _startH + (_pinnedH - _startH) * p;
+        return Padding(
+          padding: EdgeInsets.fromLTRB(16, topInset + 12, 16, 0),
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: SizedBox(
+              height: h,
+              // ETA column (0.85fr) collapses to 0 while the map (1.15fr →
+              // 2fr) grows to fill the row, like the web tracker's grid.
+              child: LayoutBuilder(
+                builder: (context, c) {
+                  final gap = 14.0 * (1 - p);
+                  final etaFr = 0.85 * (1 - p);
+                  final mapFr = 1.15 + 0.85 * p;
+                  final usable = c.maxWidth - gap;
+                  final etaW = usable * etaFr / (etaFr + mapFr);
+                  final mapW = usable - etaW;
+                  return Row(
+                    children: [
+                      if (etaW > 1)
+                        Opacity(
+                          opacity: 1 - p,
+                          child: SizedBox(
+                            width: etaW,
+                            height: h,
+                            child: ClipRect(
+                              child: OverflowBox(
+                                alignment: Alignment.topLeft,
+                                minWidth: usable * 0.85 / 2,
+                                maxWidth: usable * 0.85 / 2,
+                                child: _EtaSideCard(t: t, isDark: isDark),
+                              ),
+                            ),
+                          ),
+                        ),
+                      SizedBox(width: gap),
+                      SizedBox(
+                        width: mapW,
+                        height: h,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF242426) : const Color(0xFFF3F4F6),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: isDark ? AppColors.dividerDark : const Color(0xFFE5E7EB),
+                            ),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: Stack(
+                            children: [
+                              Positioned.fill(child: _LiveMap(t: t, isDark: isDark)),
+                              Positioned(
+                                top: 10,
+                                left: 10,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.95),
+                                    borderRadius: BorderRadius.circular(100),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.circle, size: 8, color: Color(0xFF10B981)),
+                                      SizedBox(width: 5),
+                                      Text(
+                                        'Live GPS',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF1F2937),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: _LiveMap(t: t, isDark: isDark),
-      ),
+          ),
+        );
+      },
     );
   }
 
   @override
   bool shouldRebuild(covariant _MapHeaderDelegate oldDelegate) {
-    return oldDelegate.t != t || oldDelegate.isDark != isDark || oldDelegate.topInset != topInset;
+    return oldDelegate.t != t ||
+        oldDelegate.isDark != isDark ||
+        oldDelegate.topInset != topInset ||
+        oldDelegate.transitionPx != transitionPx;
   }
 }
 
-class _EtaHeroCard extends StatelessWidget {
+/// Compact mint ETA card shown left of the map (web tracker's hero card).
+class _EtaSideCard extends StatelessWidget {
   final TrackingState t;
-  final OrderStatus bucket;
   final bool isDark;
 
-  const _EtaHeroCard({required this.t, required this.bucket, required this.isDark});
+  const _EtaSideCard({required this.t, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
-    final isDelivered = bucket == OrderStatus.delivered;
+    final isDelivered = t.statusBucket == OrderStatus.delivered;
+    final sub = isDelivered
+        ? 'Groceries delivered with care'
+        : (t.hasRider
+            ? 'Delivery partner is heading to your drop'
+            : 'Items being packed at FreshCart Dark Store');
 
     return Container(
+      height: double.infinity,
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark ? AppColors.dividerDark : const Color(0xFFE5E7EB),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: isDark ? const Color(0xFF1E2922) : const Color(0xFFE8F8F0),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFD1FAE5)),
       ),
-      padding: const EdgeInsets.all(16),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              isDelivered ? Icons.check_circle_rounded : Icons.bolt_rounded,
-              color: AppColors.primaryText,
-              size: 26,
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFA7F3D0).withOpacity(0.7),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.bolt_rounded, size: 20, color: Color(0xFF065F46)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Estimated Arrival',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? AppColors.textSecondaryDark : const Color(0xFF4B5563),
+                      ),
+                    ),
+                    Text(
+                      isDelivered ? 'Delivered' : '${t.etaMinutes} mins',
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        height: 1.15,
+                        color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            sub,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11,
+              height: 1.3,
+              fontWeight: FontWeight.w500,
+              color: isDark ? AppColors.textSecondaryDark : const Color(0xFF4B5563),
             ),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.95),
+              borderRadius: BorderRadius.circular(100),
+              border: Border.all(color: const Color(0xFFA7F3D0)),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
+                Icon(Icons.circle, size: 8, color: Color(0xFF10B981)),
+                SizedBox(width: 6),
                 Text(
-                  'ESTIMATED ARRIVAL',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.6,
-                    color: isDark ? AppColors.textSecondaryDark : const Color(0xFF6B7280),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  isDelivered ? 'Delivered' : '${t.etaMinutes} mins',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  isDelivered
-                      ? 'Groceries delivered with care'
-                      : (t.hasRider
-                          ? 'Delivery partner is heading to your drop'
-                          : 'Items being packed at FreshCart Dark Store'),
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark ? AppColors.textSecondaryDark : const Color(0xFF6B7280),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  'Live',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF1F2937)),
                 ),
               ],
             ),
           ),
-          if (!isDelivered)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE8F5E9),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                '${t.etaMinutes} MINS',
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.primaryText,
-                ),
-              ),
-            ),
         ],
       ),
     );
@@ -762,7 +863,7 @@ class _DeliveryPartnerCard extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Text(
-            'DELIVERY PARTNER DETAILS',
+            'DELIVERY PARTNER',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
@@ -998,6 +1099,13 @@ class _OrderItemsCard extends StatelessWidget {
   }
 }
 
+String _fmtTime(DateTime d) {
+  final l = d.toLocal();
+  final h = l.hour % 12 == 0 ? 12 : l.hour % 12;
+  final m = l.minute.toString().padLeft(2, '0');
+  return '${h.toString().padLeft(2, '0')}:$m ${l.hour >= 12 ? 'pm' : 'am'}';
+}
+
 class _TimelineCard extends StatelessWidget {
   final List<OrderTimelineEntry> entries;
   final bool isDark;
@@ -1025,13 +1133,20 @@ class _TimelineCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Order Status Updates',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-            ),
+          Row(
+            children: [
+              Icon(Icons.format_list_bulleted_rounded,
+                  size: 18, color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary),
+              const SizedBox(width: 8),
+              Text(
+                'Status Updates',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 14),
           for (var i = 0; i < entries.length; i++)
@@ -1063,13 +1178,23 @@ class _TimelineCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          entries[i].status,
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
-                            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              entries[i].status,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w800,
+                                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                              ),
+                            ),
+                            if (entries[i].at != null)
+                              Text(
+                                _fmtTime(entries[i].at!),
+                                style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+                              ),
+                          ],
                         ),
                         if (entries[i].note.isNotEmpty)
                           Text(

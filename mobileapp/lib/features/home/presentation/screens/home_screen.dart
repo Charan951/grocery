@@ -16,6 +16,7 @@ import 'package:freshcart/features/categories/data/models/category_model.dart';
 import 'package:freshcart/features/home/presentation/controllers/catalog_providers.dart';
 import 'package:freshcart/features/home/presentation/widgets/home_header.dart';
 import 'package:freshcart/features/home/presentation/widgets/product_rail.dart';
+import 'package:freshcart/features/home/presentation/widgets/category_shelf_section.dart';
 import 'package:freshcart/features/products/data/models/product_model.dart';
 import '../utils/festival_theme_resolver.dart';
 import '../widgets/festival_campaign_section.dart';
@@ -631,6 +632,24 @@ class _HomeContent extends ConsumerWidget {
             },
           ),
         ],
+
+        // Blinkit-style category shelves, ranked dynamically (max 6 each)
+        CategoryShelfSection(
+          title: 'Bestsellers',
+          kind: CategoryShelfKind.bestsellers,
+          categories: categories,
+          products: products,
+          sales: ref.watch(categorySalesProvider).valueOrNull ?? const {},
+          onOpenCategory: onOpenCategory,
+        ),
+        CategoryShelfSection(
+          title: 'Top deals',
+          kind: CategoryShelfKind.topDeals,
+          categories: categories,
+          products: products,
+          sales: const {},
+          onOpenCategory: onOpenCategory,
+        ),
 
         // Promotional banners (Only on All tab or when banners exist)
         if (selectedSlug == 'all' && banners.isNotEmpty)

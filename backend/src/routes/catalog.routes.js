@@ -14,12 +14,33 @@ import {
   superCategoryController
 } from '../controllers/apiController.js';
 
+import { Order } from '../models/Order.js';
+
 const router = express.Router();
 
 // ==========================================
 // 3. PRODUCT ROUTES
 // ==========================================
 router.get('/products', productController.getProducts);
+// Units sold per category (non-cancelled orders), highest first. Drives the
+// home page "Bestsellers" shelf; clients fall back to catalog order when empty.
+router.get('/category-sales', async (_req, res) => {
+  try {
+    const rows = await Order.aggregate([
+      { $match: { status: { $nin: ['Cancelled', 'Failed', 'Refunded'] } } },
+      { $unwind: '$items' },
+      { $group: { _id: '$items.productId', sold: { $sum: { $ifNull: ['$items.quantity', 1] } } } },
+      { $lookup: { from: 'products', localField: '_id', foreignField: 'id', as: 'p' } },
+      { $unwind: '$p' },
+      { $group: { _id: '$p.categoryId', sold: { $sum: '$sold' } } },
+      { $sort: { sold: -1 } },
+      { $limit: 20 },
+    ]);
+    res.json({ success: true, data: rows.map((r) => ({ categoryId: r._id, sold: r.sold })) });
+  } catch (e) {
+    res.json({ success: true, data: [] });
+  }
+});
 router.get('/products/:id', productController.getProduct);
 router.post('/products', productController.createProduct);
 router.put('/products/:id', productController.updateProduct);

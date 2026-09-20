@@ -10,3 +10,10 @@ final deliveryNumberingProvider = FutureProvider.autoDispose<Map<String, int>>((
   final total = orders.length;
   return {for (var i = 0; i < total; i++) orders[i].orderId: total - i};
 });
+
+/// User-facing label for a delivery. Never falls back to the raw DB orderId —
+/// orders not yet in history (still active / just earned) get a plain label.
+String deliveryLabel(Map<String, int> numberByOrderId, String? orderId) {
+  final n = numberByOrderId[orderId];
+  return n != null ? 'Delivery #$n' : 'Delivery';
+}

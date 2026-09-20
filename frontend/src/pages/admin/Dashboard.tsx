@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   TrendingUp, TrendingDown, IndianRupee, ShoppingBag, Percent, Users2,
   RotateCcw, Activity, HardDrive, CreditCard, PackageOpen, Plus,
@@ -10,6 +11,7 @@ import { ShelfTag } from '../../components/admin/ShelfTag';
 import { API_URL } from '../../config/api';
 
 export const Dashboard: React.FC = () => {
+  const navigate = useNavigate();
   const { products } = useCMS();
   const [stats, setStats] = useState({
     todayRevenue: 0,
@@ -410,7 +412,7 @@ export const Dashboard: React.FC = () => {
           <button className="flex items-center gap-2 p-3 bg-admin-paper border border-admin-ledger-line rounded-md hover:border-admin-green/40 hover:bg-admin-green-soft/40 transition-all text-xs font-semibold text-admin-text cursor-pointer">
             <Plus size={15} className="text-admin-green" /> Add Product
           </button>
-          <button className="flex items-center gap-2 p-3 bg-admin-paper border border-admin-ledger-line rounded-md hover:border-admin-green/40 hover:bg-admin-green-soft/40 transition-all text-xs font-semibold text-admin-text cursor-pointer">
+          <button onClick={() => navigate('/admin/coupons?new=1')} className="flex items-center gap-2 p-3 bg-admin-paper border border-admin-ledger-line rounded-md hover:border-admin-green/40 hover:bg-admin-green-soft/40 transition-all text-xs font-semibold text-admin-text cursor-pointer">
             <Ticket size={15} className="text-admin-green" /> Create Coupon
           </button>
           <button className="flex items-center gap-2 p-3 bg-admin-paper border border-admin-ledger-line rounded-md hover:border-admin-green/40 hover:bg-admin-green-soft/40 transition-all text-xs font-semibold text-admin-text cursor-pointer">
