@@ -105,6 +105,8 @@ const specialGroupSchema = new mongoose.Schema({
   slug: { type: String },
   displayOrder: { type: Number, default: 0 },
   insertAfterSubCategoryIndex: { type: Number, default: 0 },
+  // Where the group shows: 'all' = Home page, otherwise super-category slugs.
+  superCategories: { type: [String], default: ['all'] },
   active: { type: Boolean, default: true },
   items: [specialGroupItemSchema]
 }, { timestamps: true });

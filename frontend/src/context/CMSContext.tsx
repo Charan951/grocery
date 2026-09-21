@@ -35,6 +35,8 @@ export interface SpecialCategoryGroup {
   slug?: string;
   displayOrder?: number;
   insertAfterSubCategoryIndex?: number;
+  /** 'all' = Home page; otherwise super-category slugs/ids. Missing = Home only. */
+  superCategories?: string[];
   active?: boolean;
   items: SpecialGroupItem[];
 }
@@ -1502,6 +1504,41 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     };
     syncWithBackend();
+  }, []);
+
+  // Keep special sub-category groups live: whatever the admin creates, edits,
+  // reorders or deletes shows up here without a page refresh. Refetches every
+  // 10s while the tab is visible and instantly when the user comes back to it.
+  useEffect(() => {
+    let stopped = false;
+    const refreshGroups = async () => {
+      try {
+        const res = await apiFetch('/api/special-groups');
+        if (!res.ok) return;
+        const d = await res.json();
+        // offlineMode = DB unreachable placeholder; never let it wipe real data.
+        if (stopped || !d?.success || d.offlineMode || !Array.isArray(d.groups)) return;
+        setState((prev) =>
+          JSON.stringify(prev.specialCategoryGroups) === JSON.stringify(d.groups)
+            ? prev
+            : { ...prev, specialCategoryGroups: d.groups },
+        );
+      } catch {
+        /* keep current groups on a network blip */
+      }
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refreshGroups();
+    };
+    const timer = setInterval(onVisible, 10000);
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', refreshGroups);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', refreshGroups);
+    };
   }, []);
 
 

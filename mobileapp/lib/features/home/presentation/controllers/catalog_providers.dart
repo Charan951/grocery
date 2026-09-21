@@ -15,8 +15,10 @@ final bannersProvider = FutureProvider<List<Map<String, dynamic>>>((ref) {
   return ref.watch(apiServiceProvider).fetchBanners();
 });
 
-final categorySalesProvider = FutureProvider<Map<String, int>>((ref) {
-  return ref.watch(apiServiceProvider).fetchCategorySales();
+/// Units sold per product. autoDispose so it is refetched each time the home
+/// screen is re-entered (plus on pull-to-refresh).
+final productSalesProvider = FutureProvider.autoDispose<Map<String, int>>((ref) {
+  return ref.watch(apiServiceProvider).fetchProductSales();
 });
 
 final categoriesProvider = FutureProvider<List<CategoryModel>>((ref) {

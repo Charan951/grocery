@@ -569,6 +569,10 @@ export const AdminCMS: React.FC = () => {
   const [editingSpecialGroupId, setEditingSpecialGroupId] = useState<string | null>(null);
   const [sgTitle, setSgTitle] = useState('');
   const [sgInsertAfterIndex, setSgInsertAfterIndex] = useState<number>(0);
+  // Pages the group shows on: 'all' = Home, otherwise super-category slugs.
+  const [sgSuperCats, setSgSuperCats] = useState<string[]>(['all']);
+  const toggleSgSuperCat = (slug: string) =>
+    setSgSuperCats((prev) => (prev.includes(slug) ? prev.filter((x) => x !== slug) : [...prev, slug]));
   const [sgItems, setSgItems] = useState<any[]>([]);
   const [itemSubName, setItemSubName] = useState('');
   const [itemCatId, setItemCatId] = useState('');
@@ -625,6 +629,7 @@ export const AdminCMS: React.FC = () => {
     setEditingSpecialGroupId(g.id);
     setSgTitle(g.title);
     setSgInsertAfterIndex(g.insertAfterSubCategoryIndex !== undefined ? Number(g.insertAfterSubCategoryIndex) : 0);
+    setSgSuperCats(Array.isArray(g.superCategories) && g.superCategories.length ? g.superCategories : ['all']);
     setSgItems(g.items || []);
     setEditingItemIdx(null);
     setItemSubName('');
@@ -689,6 +694,7 @@ export const AdminCMS: React.FC = () => {
         slug: (sgTitle.trim() || 'Special Group').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
         displayOrder: specialCategoryGroups.length + 1,
         insertAfterSubCategoryIndex: Number(sgInsertAfterIndex),
+        superCategories: sgSuperCats.length ? sgSuperCats : ['all'],
         active: true,
         items: nextItems
       };
@@ -727,6 +733,7 @@ export const AdminCMS: React.FC = () => {
       slug: sgTitle.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'),
       displayOrder: specialCategoryGroups.length + 1,
       insertAfterSubCategoryIndex: Number(sgInsertAfterIndex),
+      superCategories: sgSuperCats.length ? sgSuperCats : ['all'],
       active: true,
       items: sgItems
     };
@@ -744,6 +751,7 @@ export const AdminCMS: React.FC = () => {
     setEditingItemIdx(null);
     setSgTitle('');
     setSgInsertAfterIndex(0);
+    setSgSuperCats(['all']);
     setSgItems([]);
     setItemSubName('');
     setItemImg('');
@@ -3743,6 +3751,31 @@ export const AdminCMS: React.FC = () => {
                           <option value={5}>📍 Mid-Page Section 5 (Placed after 5th Homepage Subcategory section)</option>
                           <option value={99}>📍 Bottom Footer Position (Placed below all Homepage sections & products)</option>
                         </select>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5 sm:col-span-2">
+                        <label className="text-xs font-bold text-text-primary">Show this group on</label>
+                        <div className="flex flex-wrap gap-2">
+                          {[{ slug: 'all', name: 'Home (All)' },
+                            ...(superCategories && superCategories.length > 0 ? superCategories : defaultSuperCategories)
+                              .filter((sc: any) => (sc.slug || sc.id) !== 'all' && sc.id !== 'sc_all')
+                              .map((sc: any) => ({ slug: sc.slug || sc.id, name: sc.name }))].map((opt) => {
+                            const on = sgSuperCats.includes(opt.slug);
+                            return (
+                              <button
+                                key={opt.slug}
+                                type="button"
+                                onClick={() => toggleSgSuperCat(opt.slug)}
+                                className={`px-3 py-1.5 rounded-full text-[11px] font-bold border transition-colors cursor-pointer ${on ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-surface text-text-secondary border-divider hover:border-emerald-400'}`}
+                              >
+                                {on ? '✓ ' : ''}{opt.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <p className="text-[10px] text-text-secondary">
+                          The position above counts sections on the page it appears on. Pick several to reuse one group on multiple pages.
+                        </p>
                       </div>
                     </div>
 

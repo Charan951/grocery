@@ -504,13 +504,15 @@ export const specialGroupController = {
 
   createSpecialGroup: async (req, res) => {
     try {
-      const { id, title, displayOrder, active, items } = req.body;
+      const { id, title, displayOrder, insertAfterSubCategoryIndex, superCategories, active, items } = req.body;
       const groupId = id || 'sg_' + Date.now();
       const group = await SpecialGroup.create({
         id: groupId,
         title,
         slug: title ? title.toLowerCase().replace(/[^a-z0-9]+/g, '-') : '',
         displayOrder: displayOrder || 0,
+        insertAfterSubCategoryIndex: Number(insertAfterSubCategoryIndex) || 0,
+        superCategories: Array.isArray(superCategories) && superCategories.length ? superCategories : ['all'],
         active: active !== undefined ? active : true,
         items: items || []
       });

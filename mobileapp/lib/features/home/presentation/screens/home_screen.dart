@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -76,6 +77,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   void _refresh() {
     ref.invalidate(bannersProvider);
+    ref.invalidate(productSalesProvider);
     ref.invalidate(categoriesProvider);
     ref.invalidate(specialGroupsProvider);
     ref.invalidate(allProductsProvider);
@@ -521,6 +523,26 @@ class _HomeContent extends ConsumerWidget {
     final organic = products.where((p) => p.isOrganic).take(10).toList();
     final bestSellers = products.where((p) => p.isBestSeller).take(10).toList();
 
+    // Admin-managed special groups for the current tab (Home = 'all', or a
+    // super category), filtered by position.
+    String norm(String v) => v.toLowerCase().replaceFirst(RegExp(r'^sc_'), '');
+    final page = norm(selectedSlug.isEmpty ? 'all' : selectedSlug);
+    bool targetsThisPage(Map<String, dynamic> g) {
+      final t = (g['superCategories'] as List?)?.map((e) => norm('$e')).toList() ?? const [];
+      return (t.isEmpty ? const ['all'] : t).contains(page);
+    }
+
+    List<Widget> groupsAt(bool Function(int position) test) {
+      return [
+        for (final g in groups)
+          if (g['active'] != false &&
+              ((g['items'] as List?)?.isNotEmpty ?? false) &&
+              targetsThisPage(g) &&
+              test(((g['insertAfterSubCategoryIndex'] as num?)?.toInt() ?? 0)))
+            _SpecialGroup(group: Map<String, dynamic>.from(g)),
+      ];
+    }
+
     ProductRail rail(
       String title,
       String? sub,
@@ -534,6 +556,23 @@ class _HomeContent extends ConsumerWidget {
       onAdd: onAdd,
       onSeeAll: catId == null ? null : () => onOpenCategory(catId),
     );
+
+    final shelfCategories = [
+      for (final c in categories)
+        if (products.any((p) => p.categoryId == c.id)) c,
+    ];
+    final categoryShelfCount = shelfCategories.length;
+    final categoryBlocks = <Widget>[
+      for (var i = 0; i < shelfCategories.length; i++) ...[
+        rail(
+          shelfCategories[i].name,
+          null,
+          products.where((p) => p.categoryId == shelfCategories[i].id).take(12).toList(),
+          shelfCategories[i].id,
+        ),
+        ...groupsAt((n) => n == i + 1),
+      ],
+    ];
 
     final bannerUrl = selectedSuperCategory?['banner'] as String?;
 
@@ -633,21 +672,12 @@ class _HomeContent extends ConsumerWidget {
           ),
         ],
 
-        // Blinkit-style category shelves, ranked dynamically (max 6 each)
+        // Bestsellers: only products that have actually sold, ranked live.
         CategoryShelfSection(
           title: 'Bestsellers',
-          kind: CategoryShelfKind.bestsellers,
           categories: categories,
           products: products,
-          sales: ref.watch(categorySalesProvider).valueOrNull ?? const {},
-          onOpenCategory: onOpenCategory,
-        ),
-        CategoryShelfSection(
-          title: 'Top deals',
-          kind: CategoryShelfKind.topDeals,
-          categories: categories,
-          products: products,
-          sales: const {},
+          productSales: ref.watch(productSalesProvider).valueOrNull ?? const {},
           onOpenCategory: onOpenCategory,
         ),
 
@@ -655,10 +685,8 @@ class _HomeContent extends ConsumerWidget {
         if (selectedSlug == 'all' && banners.isNotEmpty)
           _BannerCarousel(banners: banners),
 
-        // Special groups (Only on All tab or relevant)
-        if (selectedSlug == 'all')
-          for (final g in groups)
-            _SpecialGroup(group: Map<String, dynamic>.from(g as Map)),
+        // Special groups placed at the top (position 0 / unset).
+        ...groupsAt((n) => n <= 0),
 
         // Curated shelves
         if (fresh.isNotEmpty)
@@ -676,15 +704,11 @@ class _HomeContent extends ConsumerWidget {
             bestSellers,
           ),
 
-        // Per-category shelves
-        for (final c in categories)
-          if (products.any((p) => p.categoryId == c.id))
-            rail(
-              c.name,
-              null,
-              products.where((p) => p.categoryId == c.id).take(12).toList(),
-              c.id,
-            ),
+        // Per-category shelves; a special group with position N appears right
+        // after the Nth shelf (same rule as the web), anything beyond the last
+        // shelf (e.g. 99) goes at the bottom.
+        ...categoryBlocks,
+        ...groupsAt((n) => n > categoryShelfCount),
 
         const _TrustRow(),
         const SizedBox(height: 32),
@@ -788,84 +812,74 @@ class _SpecialGroup extends StatelessWidget {
     if (items.isEmpty) return const SizedBox.shrink();
     final title = (group['title'] as String?) ?? 'Explore';
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : AppColors.surface,
-        borderRadius: AppRadius.brLg,
-        border: Border.all(
-          color: isDark ? AppColors.dividerDark : AppColors.divider,
-        ),
-      ),
+    // Blinkit style: no card around the group — heading, then a plain 4-column
+    // grid of tinted rounded tiles with the name underneath.
+    final textColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimary;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: AppTypography.title(
-              isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-            ),
-          ),
+          Text(title, style: AppTypography.h3(textColor)),
           const SizedBox(height: 12),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            padding: EdgeInsets.zero,
-            itemCount: items.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 0.78,
-            ),
-            itemBuilder: (context, i) {
-              final it = Map<String, dynamic>.from(items[i] as Map);
-              final img = (it['image'] ?? '') as String;
-              final name = (it['name'] ?? '') as String;
-              final route = resolveAppRoute((it['link'] ?? '') as String);
-              return GestureDetector(
-                onTap: route == null ? null : () => context.push(route),
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        width: double.infinity,
-                        clipBehavior: Clip.antiAlias,
-                        decoration: BoxDecoration(
-                          color: isDark ? Colors.white10 : AppColors.background,
-                          borderRadius: AppRadius.brMd,
-                        ),
-                        child: img.startsWith('http')
-                            ? Padding(
-                                padding: const EdgeInsets.all(6),
-                                child: CachedNetworkImage(
-                                  imageUrl: img,
-                                  fit: BoxFit.contain,
-                                  // ignore: unnecessary_underscores
-                                  errorWidget: (_, _, ___) => const Icon(
-                                    Icons.category_outlined,
-                                    size: 20,
-                                  ),
-                                ),
-                              )
-                            : const Icon(Icons.category_outlined, size: 20),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style: AppTypography.labelSmall(
-                        isDark
-                            ? AppColors.textPrimaryDark
-                            : AppColors.textPrimary,
-                      ),
-                    ),
-                  ],
+          LayoutBuilder(
+            builder: (context, c) {
+              const gap = 10.0;
+              final tile = (c.maxWidth - gap * 3) / 4;
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: EdgeInsets.zero,
+                itemCount: items.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  mainAxisSpacing: 16,
+                  crossAxisSpacing: gap,
+                  mainAxisExtent: tile + 6 + 32, // tile + gap + two label lines
                 ),
+                itemBuilder: (context, i) {
+                  final it = Map<String, dynamic>.from(items[i] as Map);
+                  final img = (it['image'] ?? '') as String;
+                  final name = (it['name'] ?? '') as String;
+                  final route = resolveAppRoute((it['link'] ?? '') as String);
+                  return GestureDetector(
+                    onTap: route == null ? null : () => context.push(route),
+                    behavior: HitTestBehavior.opaque,
+                    child: Column(
+                      children: [
+                        Container(
+                          width: tile,
+                          height: tile,
+                          clipBehavior: Clip.antiAlias,
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF1E2A2E) : const Color(0xFFEAF4F7),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: img.startsWith('http')
+                              ? CachedNetworkImage(
+                                  imageUrl: img,
+                                  fit: BoxFit.cover,
+                                  errorWidget: (_, _, _) => const Icon(Icons.category_outlined, size: 20),
+                                )
+                              : const Icon(Icons.category_outlined, size: 20),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.25,
+                            fontWeight: FontWeight.w600,
+                            color: textColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               );
             },
           ),
@@ -966,33 +980,20 @@ class _SuperCategoryNavState extends ConsumerState<_SuperCategoryNav> {
     super.dispose();
   }
 
+  // Same Lucide outline icons and keyword mapping as the web SuperCategoryNav.
   IconData _iconFor(String? name, String? iconKey) {
-    final key = '${iconKey ?? ''} ${name ?? ''}'.toLowerCase();
-    if (key.contains('grid') || key.contains('all')) {
-      return Icons.grid_view_rounded;
-    }
-    if (key.contains('coffee') || key.contains('cafe')) {
-      return Icons.local_cafe_rounded;
-    }
-    if (key.contains('decor') || key.contains('chair') || key.contains('home')) {
-      return Icons.chair_rounded;
-    }
-    if (key.contains('pharmacy') || key.contains('medicine') || key.contains('health')) {
-      return Icons.local_pharmacy_rounded;
-    }
-    if (key.contains('leaf') || key.contains('fresh')) {
-      return Icons.eco_rounded;
-    }
-    if (key.contains('headphone') || key.contains('electronic')) {
-      return Icons.headphones_rounded;
-    }
-    if (key.contains('sparkle') || key.contains('beauty')) {
-      return Icons.auto_awesome_rounded;
-    }
-    if (key.contains('shirt') || key.contains('fashion')) {
-      return Icons.checkroom_rounded;
-    }
-    return Icons.category_rounded;
+    final k = '${iconKey ?? ''} ${name ?? ''}'.toLowerCase();
+    bool has(List<String> words) => words.any(k.contains);
+    if (has(['grid', 'all'])) return LucideIcons.layoutGrid;
+    if (has(['coffee', 'cafe'])) return LucideIcons.coffee;
+    if (has(['decor', 'chair', 'home', 'furniture', 'sofa'])) return LucideIcons.armchair;
+    if (has(['toy', 'shape', 'game'])) return LucideIcons.shapes;
+    if (has(['leaf', 'fresh', 'eco'])) return LucideIcons.leaf;
+    if (has(['headphone', 'electronic'])) return LucideIcons.headphones;
+    if (has(['mobile', 'phone', 'smartphone'])) return LucideIcons.smartphone;
+    if (has(['sparkle', 'beauty'])) return LucideIcons.sparkles;
+    if (has(['shirt', 'fashion', 'hanger', 'cloth'])) return LucideIcons.shirt;
+    return LucideIcons.layoutGrid;
   }
 
   void _scrollToIndex(int index, double itemWidth, double screenWidth) {
@@ -1105,7 +1106,7 @@ class _SuperCategoryNavState extends ConsumerState<_SuperCategoryNav> {
                     children: [
                       Icon(
                         icon,
-                        size: 22,
+                        size: 20,
                         color: isSelected
                             ? activeColor
                             : (useDarkPalette ? Colors.white54 : const Color(0xFF757575)),
@@ -1117,7 +1118,7 @@ class _SuperCategoryNavState extends ConsumerState<_SuperCategoryNav> {
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 10.5,
+                          fontSize: 11,
                           fontWeight:
                               isSelected ? FontWeight.w800 : FontWeight.w500,
                           color: isSelected
@@ -1129,7 +1130,7 @@ class _SuperCategoryNavState extends ConsumerState<_SuperCategoryNav> {
                       AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
                         height: 2.5,
-                        width: isSelected ? itemWidth * 0.7 : 0,
+                        width: isSelected ? 28 : 0,
                         decoration: BoxDecoration(
                           color: activeColor,
                           borderRadius: BorderRadius.circular(2),

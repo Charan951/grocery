@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class BottomNavDestination {
   final IconData icon;
@@ -13,10 +14,11 @@ class BottomNavDestination {
 /// storefront's bottom nav. Search is NOT a tab — it's reached from the home
 /// search bar and pushed full-screen (`/search`).
 const kBottomNavDestinations = <BottomNavDestination>[
-  BottomNavDestination(Icons.grid_3x3_rounded, Icons.grid_3x3_rounded, 'Categories'),
-  BottomNavDestination(Icons.home_outlined, Icons.home_rounded, 'Home'),
-  BottomNavDestination(Icons.shopping_bag_outlined, Icons.shopping_bag_rounded, 'Orders'),
-  BottomNavDestination(Icons.account_circle_outlined, Icons.account_circle_rounded, 'Account'),
+  // Same Lucide outline icons as the web BottomNav (active = same glyph, bolder label).
+  BottomNavDestination(LucideIcons.grid3x3, LucideIcons.grid3x3, 'Categories'),
+  BottomNavDestination(LucideIcons.house, LucideIcons.house, 'Home'),
+  BottomNavDestination(LucideIcons.package, LucideIcons.package, 'Orders'),
+  BottomNavDestination(LucideIcons.circleUser, LucideIcons.circleUser, 'Account'),
 ];
 
 /// Index of the Home tab in [kBottomNavDestinations]. Home is centre, not
@@ -83,9 +85,12 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final active = isDark ? AppColors.textPrimaryDark : AppColors.textPrimary;
-    final inactive = isDark ? AppColors.textSecondaryDark : AppColors.textSecondary;
-    final color = selected ? active : inactive;
+    // Web parity: icon is always gray-700; label is gray-900 extrabold when
+    // active, gray-600 medium otherwise.
+    final iconColor = isDark ? AppColors.textPrimaryDark : const Color(0xFF374151);
+    final labelColor = selected
+        ? (isDark ? AppColors.textPrimaryDark : const Color(0xFF111827))
+        : (isDark ? AppColors.textSecondaryDark : const Color(0xFF4B5563));
 
     return Semantics(
       button: true,
@@ -100,13 +105,18 @@ class _NavItem extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(selected ? destination.activeIcon : destination.icon, color: color, size: 24),
-              const SizedBox(height: 3),
+              Icon(selected ? destination.activeIcon : destination.icon, color: iconColor, size: 22),
+              const SizedBox(height: 4),
               Text(
                 destination.label,
-                style: selected
-                    ? AppTypography.navigationStyles.activeBottomNav(color)
-                    : AppTypography.navigationStyles.bottomNav(color),
+                style: (selected
+                        ? AppTypography.navigationStyles.activeBottomNav(labelColor)
+                        : AppTypography.navigationStyles.bottomNav(labelColor))
+                    .copyWith(
+                  fontSize: 11,
+                  height: 1.2,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                ),
               ),
             ],
           ),

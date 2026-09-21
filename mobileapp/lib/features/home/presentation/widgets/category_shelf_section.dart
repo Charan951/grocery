@@ -5,30 +5,24 @@ import 'package:freshcart/core/theme/app_typography.dart';
 import 'package:freshcart/features/categories/data/models/category_model.dart';
 import 'package:freshcart/features/products/data/models/product_model.dart';
 
-/// Which ranking a shelf uses.
-enum CategoryShelfKind { bestsellers, topDeals }
-
-/// Blinkit-style shelf: up to 6 category cards (3 per row), each showing a
-/// 2×2 grid of product images, a "+N more" pill and the category name.
-/// Categories are ranked dynamically — by units sold (bestsellers) or by
-/// average discount (top deals).
+/// Bestsellers shelf: up to 6 category cards (3 per row). Each card shows only
+/// the products that have actually sold (top sellers first, max 4) and the
+/// tiles fill the whole card. Ranking comes live from `/product-sales`.
 class CategoryShelfSection extends StatelessWidget {
   final String title;
-  final CategoryShelfKind kind;
   final List<CategoryModel> categories;
   final List<ProductModel> products;
 
-  /// categoryId → units sold, from `/category-sales`. May be empty.
-  final Map<String, int> sales;
+  /// productId → units sold. Products with no sales are never shown.
+  final Map<String, int> productSales;
   final void Function(String categoryId) onOpenCategory;
 
   const CategoryShelfSection({
     super.key,
     required this.title,
-    required this.kind,
     required this.categories,
     required this.products,
-    required this.sales,
+    required this.productSales,
     required this.onOpenCategory,
   });
 
@@ -37,29 +31,13 @@ class CategoryShelfSection extends StatelessWidget {
   List<_ShelfEntry> _entries() {
     final entries = <_ShelfEntry>[];
     for (final c in categories) {
-      final inCat = products.where((p) => p.categoryId == c.id).toList();
-      if (inCat.isEmpty) continue;
-
-      double score;
-      if (kind == CategoryShelfKind.bestsellers) {
-        // Real sales first; ties/no sales fall back to best-seller flags.
-        score = (sales[c.id] ?? 0) * 1000.0 +
-            inCat.where((p) => p.isBestSeller).length * 10 +
-            inCat.length * 0.01;
-        inCat.sort((a, b) {
-          if (a.isBestSeller != b.isBestSeller) return a.isBestSeller ? -1 : 1;
-          return b.reviewsCount.compareTo(a.reviewsCount);
-        });
-      } else {
-        final deals = inCat.where((p) => p.hasDiscount).toList();
-        if (deals.isEmpty) continue;
-        score = deals.fold<double>(0, (s, p) => s + p.discountPercent) / deals.length;
-        deals.sort((a, b) => b.discountPercent.compareTo(a.discountPercent));
-        inCat
-          ..clear()
-          ..addAll(deals);
-      }
-      entries.add(_ShelfEntry(c, inCat, score));
+      final sold = products
+          .where((p) => p.categoryId == c.id && p.imageUrl.isNotEmpty && (productSales[p.id] ?? 0) > 0)
+          .toList()
+        ..sort((a, b) => productSales[b.id]!.compareTo(productSales[a.id]!));
+      if (sold.isEmpty) continue;
+      final score = sold.fold<int>(0, (s, p) => s + productSales[p.id]!);
+      entries.add(_ShelfEntry(c, sold.take(4).toList(), score));
     }
     entries.sort((a, b) => b.score.compareTo(a.score));
     return entries.take(maxCategories).toList();
@@ -111,7 +89,7 @@ class CategoryShelfSection extends StatelessWidget {
 class _ShelfEntry {
   final CategoryModel category;
   final List<ProductModel> products;
-  final double score;
+  final int score;
   const _ShelfEntry(this.category, this.products, this.score);
 }
 
@@ -124,9 +102,41 @@ class _ShelfCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shown = entry.products.take(4).toList();
-    final more = entry.products.length - shown.length;
+    final shown = entry.products;
     final tileBg = isDark ? const Color(0xFF2A2A2C) : Colors.white;
+
+    Widget tile(ProductModel p) => Expanded(
+          child: Container(
+            decoration: BoxDecoration(color: tileBg, borderRadius: BorderRadius.circular(9)),
+            clipBehavior: Clip.antiAlias,
+            padding: const EdgeInsets.all(3),
+            child: CachedNetworkImage(
+              imageUrl: p.imageUrl,
+              fit: BoxFit.contain,
+              errorWidget: (_, _, _) => const SizedBox.shrink(),
+            ),
+          ),
+        );
+
+    Widget row(List<ProductModel> ps) => Expanded(
+          child: Row(
+            children: [
+              for (var i = 0; i < ps.length; i++) ...[
+                if (i > 0) const SizedBox(width: 4),
+                tile(ps[i]),
+              ],
+            ],
+          ),
+        );
+
+    // Tiles always fill the card: 1 → full, 2 → side by side,
+    // 3 → one wide on top + two below, 4 → 2×2.
+    final List<Widget> rows = switch (shown.length) {
+      1 => [row([shown[0]])],
+      2 => [row(shown)],
+      3 => [row([shown[0]]), row(shown.sublist(1))],
+      _ => [row(shown.sublist(0, 2)), row(shown.sublist(2, 4))],
+    };
 
     return GestureDetector(
       onTap: onTap,
@@ -142,61 +152,16 @@ class _ShelfCard extends StatelessWidget {
                 color: isDark ? AppColors.dividerDark : const Color(0xFFE5E7EB),
               ),
             ),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                GridView.count(
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 4,
-                  crossAxisSpacing: 4,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  children: [
-                    for (var i = 0; i < 4; i++)
-                      Container(
-                        decoration: BoxDecoration(
-                          color: tileBg,
-                          borderRadius: BorderRadius.circular(9),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        padding: const EdgeInsets.all(3),
-                        child: i < shown.length
-                            ? CachedNetworkImage(
-                                imageUrl: shown[i].imageUrl,
-                                fit: BoxFit.contain,
-                                errorWidget: (_, _, _) => const SizedBox.shrink(),
-                              )
-                            : null,
-                      ),
+            child: AspectRatio(
+              aspectRatio: 1,
+              child: Column(
+                children: [
+                  for (var i = 0; i < rows.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 4),
+                    rows[i],
                   ],
-                ),
-                if (more > 0)
-                  Positioned(
-                    bottom: -2,
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1.5),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFF1F3F8),
-                          borderRadius: BorderRadius.circular(100),
-                          border: Border.all(
-                            color: isDark ? AppColors.dividerDark : const Color(0xFFE5E7EB),
-                          ),
-                        ),
-                        child: Text(
-                          '+$more more',
-                          style: TextStyle(
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w600,
-                            color: isDark ? AppColors.textSecondaryDark : const Color(0xFF6B7280),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 8),

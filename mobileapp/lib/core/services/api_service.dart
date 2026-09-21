@@ -168,15 +168,15 @@ class ApiService {
   // show a real loading / error / retry state (no demo fallback in the app).
   // ==========================================================================
 
-  /// `GET /category-sales` → categoryId → units sold (best-selling first).
-  Future<Map<String, int>> fetchCategorySales() async {
+  /// `GET /product-sales` → productId → units sold, computed live from orders.
+  Future<Map<String, int>> fetchProductSales() async {
     try {
-      final res = await _dio.get('/category-sales');
+      final res = await _dio.get('/product-sales');
       final data = res.data;
       final list = (data is Map && data['data'] is List) ? data['data'] as List : const [];
       return {
         for (final e in list)
-          if (e is Map) '${e['categoryId']}': (e['sold'] as num?)?.toInt() ?? 0,
+          if (e is Map) '${e['productId']}': (e['sold'] as num?)?.toInt() ?? 0,
       };
     } on DioException {
       return const {};

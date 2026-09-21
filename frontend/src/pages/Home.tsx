@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useTransition } from 'react';
+import { SpecialGroupBlock, groupAppliesTo } from '../components/SpecialGroupBlock';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useCMS, getSubCategoryImage, getCategoryImage, hexToRgba, hexToTintOnWhite, Product, deduplicateSubCategories, defaultSuperCategories } from '../context/CMSContext';
 import { ProductCard } from '../components/ProductCard';
@@ -64,6 +65,25 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
       navigate(slug === 'all' ? '/' : `/?superCategory=${encodeURIComponent(slug)}`);
     });
   };
+
+  // Special groups targeted at the active super-category page (mobile only).
+  // position 0 = top, N = after the Nth shelf, >= 99 / beyond the last = bottom.
+  const superPageGroups = (test: (position: number) => boolean) => (
+    <div className="md:hidden w-full">
+      {(specialCategoryGroups || [])
+        .filter(
+          (g) =>
+            g.active !== false &&
+            g.items &&
+            g.items.length > 0 &&
+            groupAppliesTo(g, activeSuperCatSlug) &&
+            test(g.insertAfterSubCategoryIndex ?? 0),
+        )
+        .map((g, i) => (
+          <SpecialGroupBlock key={g.id || `sp_${i}`} group={g} />
+        ))}
+    </div>
+  );
 
   const currentSuperCategoryObj = useMemo(() => {
     if (activeSuperCatSlug === 'all') return null;
@@ -640,6 +660,8 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
               </section>
             )}
 
+            {superPageGroups((pos) => pos <= 0)}
+
             {/* Super Category Horizontal Product Shelves (Zepto View - NO Status Bar!) */}
             {superCategoryShelves.length > 0 ? (
               <div className="flex flex-col gap-4 mt-0.5">
@@ -654,8 +676,8 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                   })
                   .slice(0, 1)
                   .map((shelf) => (
+                    <React.Fragment key={shelf.id}>
                     <HorizontalProductShelf
-                      key={shelf.id}
                       id={`shelf-${shelf.id}`}
                       title={shelf.title}
                       subtitle={`${shelf.products.length} items`}
@@ -668,6 +690,8 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                       }
                       categoryColor="#10b981"
                     />
+                    {superPageGroups((pos) => pos === 1)}
+                    </React.Fragment>
                   ))}
 
                 {/* 3. Additional Shelves */}
@@ -680,8 +704,9 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                     );
                   })
                   .slice(1)
-                  .map((shelf) => (
-                    <LazyRender key={shelf.id} placeholderHeight={300}>
+                  .map((shelf, i) => (
+                    <React.Fragment key={shelf.id}>
+                    <LazyRender placeholderHeight={300}>
                       <HorizontalProductShelf
                         id={`shelf-${shelf.id}`}
                         title={shelf.title}
@@ -696,7 +721,12 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                         categoryColor="#10b981"
                       />
                     </LazyRender>
+                    {superPageGroups((pos) => pos === i + 2)}
+                    </React.Fragment>
                   ))}
+
+                {/* groups placed below every shelf (e.g. 99) */}
+                {superPageGroups((pos) => pos > superCategoryShelves.length)}
               </div>
             ) : superCategoryProducts.length > 0 ? (
               <>
@@ -853,8 +883,19 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
               </section>
             )}
 
-        {/* Bestsellers + Top deals category shelves (mobile only) */}
+        {/* Bestsellers category shelf (mobile only) */}
         <CategoryShelves categories={categories} products={products} />
+
+        {/* Special category groups positioned at the top (insertAfterSubCategoryIndex 0 / unset) */}
+        {specialCategoryGroups && specialCategoryGroups.length > 0 && (
+          <div className="md:hidden w-full">
+            {specialCategoryGroups
+              .filter(g => g.active !== false && g.items && g.items.length > 0 && groupAppliesTo(g, null) && !((g.insertAfterSubCategoryIndex ?? 0) > 0))
+              .map((group, grpIdx) => (
+                <SpecialGroupBlock key={group.id || `top_grp_${grpIdx}`} group={group} />
+              ))}
+          </div>
+        )}
 
         {/* 2. Dynamic Subcategories Home Sections & Dynamic Inter-Section Banners & In-Between Mobile Special Groups */}
         {subCategorySections.map((sec, secIdx) => (
@@ -900,49 +941,9 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
             {specialCategoryGroups && specialCategoryGroups.length > 0 && (
               <div className="md:hidden w-full">
                 {specialCategoryGroups
-                  .filter(g => g.active !== false && g.items && g.items.length > 0 && g.insertAfterSubCategoryIndex === (secIdx + 1))
+                  .filter(g => g.active !== false && g.items && g.items.length > 0 && groupAppliesTo(g, null) && g.insertAfterSubCategoryIndex === (secIdx + 1))
                   .map((group, grpIdx) => (
-                    <div key={group.id || `sp_grp_${secIdx}_${grpIdx}`} className="mb-3 bg-surface rounded-3xl border border-divider/60 p-2 sm:p-4 shadow-sm">
-                      {group.title && (
-                        <h2 className="text-lg font-black text-text-primary tracking-tight font-display px-3 pt-2 pb-1">
-                          {group.title}
-                        </h2>
-                      )}
-                      <div className="flex cursor-pointer flex-row flex-wrap items-center justify-start gap-y-3 gap-x-2 p-2">
-                        {group.items.map((item, idx) => {
-                          const isWide = item.isFeatured || idx === 0;
-                          const targetLink = item.link || `/products?subCategory=${encodeURIComponent(item.name)}`;
-                          return (
-                            <div
-                              key={item.id || `item_${secIdx}_${idx}`}
-                              id="CATEGORY_GRID_V3-element"
-                              className={isWide
-                                ? "relative w-[calc(50%-0.25rem)] rounded-lg overflow-hidden group"
-                                : "relative box-border flex w-[calc(25%-0.4rem)] flex-col items-center justify-between overflow-hidden rounded-lg p-1 group"
-                              }
-                              style={{ aspectRatio: isWide ? '16 / 9' : '9 / 12' }}
-                            >
-                              <Link className="contents" to={targetLink}>
-                                <img
-                                  alt={item.name}
-                                  loading="lazy"
-                                  decoding="async"
-                                  className="relative overflow-hidden rounded-lg w-full h-full object-contain transition-transform group-hover:scale-105"
-                                  src={item.image}
-                                  style={{ color: 'transparent', objectFit: 'contain' }}
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=300&auto=format&fit=crop';
-                                  }}
-                                />
-                                <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] sm:text-[10px] font-extrabold p-1 text-center truncate rounded-b-lg tracking-wide z-10 backdrop-blur-[1px]">
-                                  {item.name}
-                                </div>
-                              </Link>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
+                    <SpecialGroupBlock key={group.id || `sp_grp_${secIdx}_${grpIdx}`} group={group} />
                   ))}
               </div>
             )}
@@ -959,49 +960,9 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
         {specialCategoryGroups && specialCategoryGroups.length > 0 && (
           <div className="md:hidden w-full">
             {specialCategoryGroups
-              .filter(g => g.active !== false && g.items && g.items.length > 0 && g.insertAfterSubCategoryIndex !== undefined && g.insertAfterSubCategoryIndex >= 99)
+              .filter(g => g.active !== false && g.items && g.items.length > 0 && groupAppliesTo(g, null) && g.insertAfterSubCategoryIndex !== undefined && g.insertAfterSubCategoryIndex >= 99)
               .map((group, grpIdx) => (
-                <div key={group.id || `btm_grp_${grpIdx}`} className="mb-3 bg-surface rounded-3xl border border-divider/60 p-2 sm:p-4 shadow-sm">
-                  {group.title && (
-                    <h2 className="text-lg font-black text-text-primary tracking-tight font-display px-3 pt-2 pb-1">
-                      {group.title}
-                    </h2>
-                  )}
-                  <div className="flex cursor-pointer flex-row flex-wrap items-center justify-start gap-y-3 gap-x-2 p-2">
-                    {group.items.map((item, idx) => {
-                      const isWide = item.isFeatured || idx === 0;
-                      const targetLink = item.link || `/products?subCategory=${encodeURIComponent(item.name)}`;
-                      return (
-                        <div
-                          key={item.id || `btm_item_${grpIdx}_${idx}`}
-                          id="CATEGORY_GRID_V3-element"
-                          className={isWide
-                            ? "relative w-[calc(50%-0.25rem)] rounded-lg overflow-hidden group"
-                            : "relative box-border flex w-[calc(25%-0.4rem)] flex-col items-center justify-between overflow-hidden rounded-lg p-1 group"
-                          }
-                          style={{ aspectRatio: isWide ? '16 / 9' : '9 / 12' }}
-                        >
-                          <Link className="contents" to={targetLink}>
-                            <img
-                              alt={item.name}
-                              loading="lazy"
-                              decoding="async"
-                              className="relative overflow-hidden rounded-lg w-full h-full object-contain transition-transform group-hover:scale-105"
-                              src={item.image}
-                              style={{ color: 'transparent', objectFit: 'contain' }}
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=300&auto=format&fit=crop';
-                              }}
-                            />
-                            <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] sm:text-[10px] font-extrabold p-1 text-center truncate rounded-b-lg tracking-wide z-10 backdrop-blur-[1px]">
-                              {item.name}
-                            </div>
-                          </Link>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                <SpecialGroupBlock key={group.id || `btm_grp_${grpIdx}`} group={group} />
               ))}
           </div>
         )}

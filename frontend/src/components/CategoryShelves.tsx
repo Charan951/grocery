@@ -10,14 +10,13 @@ interface ShelfCategory {
   displayName?: string;
 }
 
-type Kind = 'bestsellers' | 'topDeals';
+type Kind = 'bestsellers';
 
 const MAX_CATEGORIES = 6;
 
-const discountOf = (p: Product) => (p.mrp > p.price ? ((p.mrp - p.price) / p.mrp) * 100 : 0);
 const productImage = (p: Product) => p.imageUrl || p.image || p.images?.[0] || '';
 
-/** Ranks categories by units sold (bestsellers) or average discount (top deals). */
+/** Ranks categories by units sold. */
 function buildEntries(
   kind: Kind,
   categories: ShelfCategory[],
@@ -28,20 +27,13 @@ function buildEntries(
   for (const cat of categories) {
     let items = products.filter((p) => p.categoryId === cat.id);
     if (items.length === 0) continue;
-    let score: number;
-    if (kind === 'bestsellers') {
-      score =
-        (sales[cat.id] || 0) * 1000 +
-        items.filter((p) => p.isBestSeller).length * 10 +
-        items.length * 0.01;
-      items = [...items].sort(
-        (a, b) => Number(!!b.isBestSeller) - Number(!!a.isBestSeller) || (b.reviewsCount || 0) - (a.reviewsCount || 0),
-      );
-    } else {
-      items = items.filter((p) => discountOf(p) > 0).sort((a, b) => discountOf(b) - discountOf(a));
-      if (items.length === 0) continue;
-      score = items.reduce((s, p) => s + discountOf(p), 0) / items.length;
-    }
+    const score =
+      (sales[cat.id] || 0) * 1000 +
+      items.filter((p) => p.isBestSeller).length * 10 +
+      items.length * 0.01;
+    items = [...items].sort(
+      (a, b) => Number(!!b.isBestSeller) - Number(!!a.isBestSeller) || (b.reviewsCount || 0) - (a.reviewsCount || 0),
+    );
     out.push({ cat, items, score });
   }
   return out.sort((a, b) => b.score - a.score).slice(0, MAX_CATEGORIES);
@@ -108,7 +100,7 @@ const Shelf: React.FC<{
   );
 };
 
-/** Blinkit-style "Bestsellers" + "Top deals" category shelves (max 6 categories each). */
+/** Blinkit-style "Bestsellers" category shelf (max 6 categories). */
 export const CategoryShelves: React.FC<{ categories: ShelfCategory[]; products: Product[] }> = ({
   categories,
   products,
@@ -134,7 +126,6 @@ export const CategoryShelves: React.FC<{ categories: ShelfCategory[]; products: 
   return (
     <div className="sm:hidden">
       <Shelf title="Bestsellers" kind="bestsellers" categories={categories} products={products} sales={sales} />
-      <Shelf title="Top deals" kind="topDeals" categories={categories} products={products} sales={sales} />
     </div>
   );
 };

@@ -41,6 +41,24 @@ router.get('/category-sales', async (_req, res) => {
     res.json({ success: true, data: [] });
   }
 });
+// Units sold per product (non-cancelled orders), highest first. Computed live
+// from orders on every request so the Bestsellers shelf always reflects what
+// is actually selling.
+router.get('/product-sales', async (_req, res) => {
+  try {
+    const rows = await Order.aggregate([
+      { $match: { status: { $nin: ['Cancelled', 'Failed', 'Refunded'] } } },
+      { $unwind: '$items' },
+      { $group: { _id: '$items.productId', sold: { $sum: { $ifNull: ['$items.quantity', 1] } } } },
+      { $sort: { sold: -1 } },
+      { $limit: 300 },
+    ]);
+    res.set('Cache-Control', 'no-store');
+    res.json({ success: true, data: rows.map((r) => ({ productId: r._id, sold: r.sold })) });
+  } catch (e) {
+    res.json({ success: true, data: [] });
+  }
+});
 router.get('/products/:id', productController.getProduct);
 router.post('/products', productController.createProduct);
 router.put('/products/:id', productController.updateProduct);
