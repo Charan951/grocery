@@ -150,6 +150,18 @@ class AppTypography {
         color: color,
       );
 
+  /// Content section heading (e.g. "Trending Now", a product-shelf title,
+  /// "Recent" on Search): 18px, Weight 800, tight tracking. Mirrors the
+  /// web's `font-black tracking-tight` heading treatment so every content
+  /// section reads the same across web and the mobile app.
+  static TextStyle sectionHeading(Color color) => manrope(
+        fontSize: 18.0,
+        fontWeight: FontWeight.w800,
+        height: 24.0 / 18.0,
+        letterSpacing: -0.3,
+        color: color,
+      );
+
   // ------------------------------------------------------------
   // SECTION 4: BODY TYPOGRAPHY (Inter)
   // ------------------------------------------------------------

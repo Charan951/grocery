@@ -309,6 +309,20 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen>
     }
   }
 
+  /// The area heading (e.g. "KPHB COLONY") is already shown above this text,
+  /// so strip a matching segment out of the full address line to avoid
+  /// showing the same locality twice.
+  String get _displayAddressText {
+    final area = _areaName.trim();
+    if (area.isEmpty) return _fullAddressText;
+    final parts = _fullAddressText
+        .split(',')
+        .map((p) => p.trim())
+        .where((p) => p.isNotEmpty && p.toLowerCase() != area.toLowerCase())
+        .toList();
+    return parts.isEmpty ? _fullAddressText : parts.join(', ');
+  }
+
   bool _saving = false;
 
   Future<void> _confirmAndDeliver() async {
@@ -949,7 +963,7 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen>
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  _fullAddressText,
+                                  _displayAddressText,
                                   style:
                                       AppTypography.bodySmall(
                                         isDark

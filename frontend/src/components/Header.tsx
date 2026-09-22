@@ -41,7 +41,9 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
   const isHomeActive = location.pathname === '/' && !activeCategory;
 
   const isProductListingPage =
-    location.pathname === '/products' || location.pathname.startsWith('/products/');
+    location.pathname === '/products' ||
+    location.pathname.startsWith('/products/') ||
+    location.pathname.startsWith('/category/');
 
   const isProductDetailPage =
     location.pathname.startsWith('/product/') || location.pathname.startsWith('/prn/');

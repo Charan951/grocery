@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +9,7 @@ import 'package:freshcart/core/theme/app_typography.dart';
 import 'package:freshcart/core/widgets/category_card.dart';
 import 'package:freshcart/core/widgets/feedback_states.dart';
 import 'package:freshcart/core/widgets/app_toast.dart';
+import 'package:freshcart/core/widgets/smart_image.dart';
 import 'package:freshcart/core/services/location_permission.dart';
 import 'package:freshcart/features/authentication/presentation/controllers/auth_controller.dart';
 import 'package:freshcart/features/cart/presentation/controllers/cart_controller.dart';
@@ -113,6 +113,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       filteredCategories,
       filteredProducts,
       currentSuperCat,
+      trendingCategories,
     ) = _filterCatalog(
       selectedSuperCat,
       superCats,
@@ -202,11 +203,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       } else {
         bodyContent = _HomeContent(
           categories: filteredCategories,
+          trendingCategories: trendingCategories,
           products: filteredProducts,
           selectedSuperCategory: currentSuperCat,
           selectedSlug: selectedSuperCat,
           onOpenProduct: (p) => context.push('/product/${p.id}'),
-          onOpenCategory: (id) => context.push('/category/$id'),
+          onOpenCategory: (id) => context.push(
+            selectedSuperCat != 'all' && selectedSuperCat.isNotEmpty
+                ? '/category/$id?superCategory=${Uri.encodeComponent(selectedSuperCat)}'
+                : '/category/$id',
+          ),
           onAdd: (p) {
             final added = ref.read(cartProvider.notifier).addToCart(p);
             if (added) {
@@ -324,7 +330,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  (List<CategoryModel>, List<ProductModel>, Map<String, dynamic>?)
+  (
+    List<CategoryModel>,
+    List<ProductModel>,
+    Map<String, dynamic>?,
+    List<CategoryModel>,
+  )
   _filterCatalog(
     String selectedSlug,
     List<Map<String, dynamic>> superCats,
@@ -332,7 +343,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     List<ProductModel> allProducts,
   ) {
     if (selectedSlug == 'all' || selectedSlug.isEmpty) {
-      return (allCategories, allProducts, null);
+      return (allCategories, allProducts, null, allCategories);
     }
 
     Map<String, dynamic>? currentSc;
@@ -382,7 +393,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         if (hasProd) return true;
       }
 
-      // Predefined slug keyword matchers
+      // Predefined slug keyword matchers — only used as a fallback when the
+      // admin hasn't explicitly configured this super category yet, so a
+      // configured tab shows exactly the same categories as the web (which
+      // has no keyword heuristics), instead of extra guessed matches.
+      if (scCats.isNotEmpty || scSubCats.isNotEmpty || scProds.isNotEmpty) {
+        return false;
+      }
       final sel = selectedSlug.toLowerCase();
       if (sel == 'cafe' || sel == 'sc_cafe') {
         return catId.contains('dairy') ||
@@ -448,7 +465,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       return matchedCatIds.contains(pCat);
     }).toList();
 
-    return (matchedCategories, matchedProducts, currentSc);
+    // Whole categories explicitly assigned by the admin (as opposed to a
+    // category pulled in only because one of its subcategories was picked).
+    // This is what the "Trending Now" / category circles row shows — it must
+    // match the web, which only ever shows explicit whole-category picks.
+    final explicitCategories = scCats.isNotEmpty
+        ? matchedCategories.where((c) {
+            final catId = c.id.toLowerCase();
+            final catName = c.name.toLowerCase();
+            return scCats.contains(catId) || scCats.contains(catName);
+          }).toList()
+        : matchedCategories;
+
+    return (matchedCategories, matchedProducts, currentSc, explicitCategories);
   }
 }
 
@@ -481,6 +510,7 @@ class _HeaderNavSliverDelegate extends SliverPersistentHeaderDelegate {
 
 class _HomeContent extends ConsumerWidget {
   final List<CategoryModel> categories;
+  final List<CategoryModel>? trendingCategories;
   final List<ProductModel> products;
   final Map<String, dynamic>? selectedSuperCategory;
   final String selectedSlug;
@@ -490,6 +520,7 @@ class _HomeContent extends ConsumerWidget {
 
   const _HomeContent({
     required this.categories,
+    this.trendingCategories,
     required this.products,
     this.selectedSuperCategory,
     this.selectedSlug = 'all',
@@ -583,27 +614,36 @@ class _HomeContent extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             child: ClipRRect(
               borderRadius: AppRadius.brLg,
-              child: CachedNetworkImage(
-                imageUrl: bannerUrl,
+              child: SizedBox(
                 height: 130,
                 width: double.infinity,
-                fit: BoxFit.cover,
-                errorWidget: (context, url, error) => const SizedBox.shrink(),
+                child: smartImage(
+                  url: bannerUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_) => const SizedBox.shrink(),
+                ),
               ),
             ),
           ),
         ],
 
-        // Shop by category
-        if (categories.isNotEmpty) ...[
+        // Special groups placed at the top (position 0 / unset). On a super
+        // category tab they appear right after the banner, before the
+        // category circles row, matching the web super-category layout. On
+        // the main Home ("all") tab they instead appear after "Shop by
+        // category" + "Bestsellers" below.
+        if (selectedSlug != 'all') ...groupsAt((n) => n <= 0),
+
+        // Shop by category — uses only the admin's explicit whole-category
+        // picks for this super category (not categories pulled in only
+        // because one of their subcategories was picked), matching the web.
+        if ((trendingCategories ?? categories).isNotEmpty) ...[
           const SizedBox(height: 16),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
-              selectedSlug == 'all'
-                  ? 'Shop by category'
-                  : '${selectedSuperCategory?['name'] ?? selectedSlug} Categories',
-              style: AppTypography.h3(
+              selectedSlug == 'all' ? 'Shop by category' : 'Trending Now',
+              style: AppTypography.sectionHeading(
                 isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
               ),
             ),
@@ -611,16 +651,17 @@ class _HomeContent extends ConsumerWidget {
           const SizedBox(height: 12),
           Builder(
             builder: (context) {
+              final gridCategories = trendingCategories ?? categories;
               final screenW = MediaQuery.of(context).size.width;
               final availableW = screenW - 32;
-              final isMultiRow = categories.length > 4;
+              final isMultiRow = gridCategories.length > 4;
 
               final int numCols;
               if (!isMultiRow) {
-                numCols = categories.length;
+                numCols = gridCategories.length;
               } else {
-                final fullBlocks = categories.length ~/ 8;
-                final rem = categories.length % 8;
+                final fullBlocks = gridCategories.length ~/ 8;
+                final rem = gridCategories.length % 8;
                 final extraCols = rem == 0 ? 0 : (rem <= 4 ? rem : 4);
                 numCols = fullBlocks * 4 + extraCols;
               }
@@ -636,7 +677,7 @@ class _HomeContent extends ConsumerWidget {
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   physics: const BouncingScrollPhysics(),
-                  itemCount: isMultiRow ? numCols * 2 : categories.length,
+                  itemCount: isMultiRow ? numCols * 2 : gridCategories.length,
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: isMultiRow ? 2 : 1,
                     mainAxisSpacing: 10,
@@ -657,13 +698,13 @@ class _HomeContent extends ConsumerWidget {
                       catIndex = i;
                     }
 
-                    if (catIndex >= categories.length) {
+                    if (catIndex >= gridCategories.length) {
                       return const SizedBox.shrink();
                     }
 
                     return CategoryCard(
-                      category: categories[catIndex],
-                      onTap: () => onOpenCategory(categories[catIndex].id),
+                      category: gridCategories[catIndex],
+                      onTap: () => onOpenCategory(gridCategories[catIndex].id),
                     );
                   },
                 ),
@@ -673,20 +714,24 @@ class _HomeContent extends ConsumerWidget {
         ],
 
         // Bestsellers: only products that have actually sold, ranked live.
-        CategoryShelfSection(
-          title: 'Bestsellers',
-          categories: categories,
-          products: products,
-          productSales: ref.watch(productSalesProvider).valueOrNull ?? const {},
-          onOpenCategory: onOpenCategory,
-        ),
+        // Only shown on the main Home ("all") tab — super category pages
+        // don't need it, matching the web layout.
+        if (selectedSlug == 'all')
+          CategoryShelfSection(
+            title: 'Bestsellers',
+            categories: categories,
+            products: products,
+            productSales: ref.watch(productSalesProvider).valueOrNull ?? const {},
+            onOpenCategory: onOpenCategory,
+          ),
+
+        // Special groups placed at the top (position 0 / unset) — on Home,
+        // these render after "Shop by category" + "Bestsellers" above.
+        if (selectedSlug == 'all') ...groupsAt((n) => n <= 0),
 
         // Promotional banners (Only on All tab or when banners exist)
         if (selectedSlug == 'all' && banners.isNotEmpty)
           _BannerCarousel(banners: banners),
-
-        // Special groups placed at the top (position 0 / unset).
-        ...groupsAt((n) => n <= 0),
 
         // Curated shelves
         if (fresh.isNotEmpty)
@@ -770,7 +815,11 @@ class _BannerCarouselState extends State<_BannerCarousel> {
                       borderRadius: AppRadius.brLg,
                       color: Colors.black12,
                     ),
-                    child: CachedNetworkImage(imageUrl: img, fit: BoxFit.cover),
+                    child: smartImage(
+                      url: img,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_) => const SizedBox.shrink(),
+                    ),
                   ),
                 );
               },
@@ -801,6 +850,23 @@ class _BannerCarouselState extends State<_BannerCarousel> {
   }
 }
 
+// Admin-uploaded group item images may be a normal http(s) URL, or a raw
+// `data:image/...;base64,` URI when the CDN upload failed and the web admin
+// fell back to storing the picked file inline — same fallback the web uses
+// (SpecialGroupBlock.tsx) so a group item without a usable image still shows
+// a real photo instead of a bare icon glyph.
+const _kGroupItemImageFallback =
+    'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=300&auto=format&fit=crop';
+
+Widget _groupItemImage(String img) {
+  final usable = img.trim().isEmpty ? _kGroupItemImageFallback : img;
+  return smartImage(
+    url: usable,
+    fit: BoxFit.cover,
+    errorBuilder: (_) => const Icon(Icons.category_outlined, size: 20),
+  );
+}
+
 class _SpecialGroup extends StatelessWidget {
   final Map<String, dynamic> group;
   const _SpecialGroup({required this.group});
@@ -820,7 +886,7 @@ class _SpecialGroup extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: AppTypography.h3(textColor)),
+          Text(title, style: AppTypography.sectionHeading(textColor)),
           const SizedBox(height: 12),
           LayoutBuilder(
             builder: (context, c) {
@@ -855,13 +921,7 @@ class _SpecialGroup extends StatelessWidget {
                             color: isDark ? const Color(0xFF1E2A2E) : const Color(0xFFEAF4F7),
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          child: img.startsWith('http')
-                              ? CachedNetworkImage(
-                                  imageUrl: img,
-                                  fit: BoxFit.cover,
-                                  errorWidget: (_, _, _) => const Icon(Icons.category_outlined, size: 20),
-                                )
-                              : const Icon(Icons.category_outlined, size: 20),
+                          child: _groupItemImage(img),
                         ),
                         const SizedBox(height: 6),
                         Text(

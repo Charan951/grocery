@@ -191,6 +191,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             productIds: idsList,
             searchQuery: s.uri.queryParameters['q'] ?? s.uri.queryParameters['search'],
             hideSubcategories: hideSub,
+            superCategorySlug: s.uri.queryParameters['superCategory'],
           );
         },
       ),

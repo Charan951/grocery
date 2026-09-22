@@ -1,6 +1,5 @@
 // ignore_for_file: unused_local_variable
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,8 +8,10 @@ import 'package:freshcart/core/constants/app_radius.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
 import 'package:freshcart/core/widgets/feedback_states.dart';
 import 'package:freshcart/core/widgets/skeletons.dart';
+import 'package:freshcart/core/widgets/smart_image.dart';
 import 'package:freshcart/core/widgets/tab_back_button.dart';
 import 'package:freshcart/features/categories/data/models/category_model.dart';
+import 'package:freshcart/features/categories/data/subcategory_image_resolver.dart';
 import 'package:freshcart/features/home/presentation/controllers/catalog_providers.dart';
 import 'package:freshcart/features/products/data/models/product_model.dart';
 
@@ -142,7 +143,7 @@ class CategoriesScreen extends ConsumerWidget {
                   const SizedBox(height: 8),
                   Text(
                     'Trending searches',
-                    style: AppTypography.h3(
+                    style: AppTypography.sectionHeading(
                       isDark
                           ? AppColors.textPrimaryDark
                           : AppColors.textPrimary,
@@ -234,7 +235,7 @@ class _CategorySection extends StatelessWidget {
               Expanded(
                 child: Text(
                   category.name,
-                  style: AppTypography.title(textColor),
+                  style: AppTypography.sectionHeading(textColor),
                 ),
               ),
               GestureDetector(
@@ -277,16 +278,23 @@ class _CategorySection extends StatelessWidget {
                 crossAxisSpacing: 12,
                 childAspectRatio: 0.65,
               ),
-              itemBuilder: (context, i) => _SubTile(
-                label: subs[i],
-                color: category.color,
-                icon: CategoriesScreen.iconFor('', subs[i]),
-                imageUrl: category.imageUrl,
-                isDark: isDark,
-                onTap: () => context.push(
-                  '/category/${category.id}?sub=${Uri.encodeComponent(subs[i])}',
-                ),
-              ),
+              itemBuilder: (context, i) {
+                final sub = subs[i];
+                final match = category.subCategoryItems.firstWhere(
+                  (s) => s.name.toLowerCase() == sub.toLowerCase(),
+                  orElse: () => SubCategoryModel(id: sub, name: sub),
+                );
+                return _SubTile(
+                  label: sub,
+                  color: category.color,
+                  icon: CategoriesScreen.iconFor('', sub),
+                  imageUrl: resolveSubCategoryImage(sub, category.name, match.imageUrl),
+                  isDark: isDark,
+                  onTap: () => context.push(
+                    '/category/${category.id}?sub=${Uri.encodeComponent(sub)}',
+                  ),
+                );
+              },
             ),
         ],
       ),
@@ -313,10 +321,6 @@ class _SubTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasValidUrl =
-        imageUrl != null &&
-        imageUrl!.trim().startsWith(RegExp(r'https?://', caseSensitive: false));
-
     final fallbackIcon = Icon(
       icon,
       color: isDark ? AppColors.accent : color,
@@ -334,16 +338,15 @@ class _SubTile extends StatelessWidget {
               borderRadius: AppRadius.brMd,
               child: Container(
                 color: color.withOpacity(isDark ? 0.14 : 0.09),
-                child: hasValidUrl
-                    ? CachedNetworkImage(
-                        imageUrl: imageUrl!,
+                width: double.infinity,
+                height: double.infinity,
+                child: (imageUrl == null || imageUrl!.trim().isEmpty)
+                    ? Center(child: fallbackIcon)
+                    : smartImage(
+                        url: imageUrl!,
                         fit: BoxFit.cover,
-                        width: double.infinity,
-                        height: double.infinity,
-                        errorWidget: (context, url, error) =>
-                            Center(child: fallbackIcon),
-                      )
-                    : Center(child: fallbackIcon),
+                        errorBuilder: (_) => Center(child: fallbackIcon),
+                      ),
               ),
             ),
           ),

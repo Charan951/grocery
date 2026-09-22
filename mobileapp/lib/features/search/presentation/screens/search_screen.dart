@@ -154,7 +154,7 @@ class _Discovery extends ConsumerWidget {
         if (recents.isNotEmpty) ...[
           Row(
             children: [
-              Expanded(child: Text('Recent', style: AppTypography.h3(
+              Expanded(child: Text('Recent', style: AppTypography.sectionHeading(
                 isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
               ))),
               TextButton(
@@ -170,7 +170,7 @@ class _Discovery extends ConsumerWidget {
           const SizedBox(height: 24),
         ],
         if (trending.isNotEmpty) ...[
-          Text('Trending', style: AppTypography.h3(
+          Text('Trending', style: AppTypography.sectionHeading(
             isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
           )),
           const SizedBox(height: 12),

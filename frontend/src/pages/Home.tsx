@@ -413,6 +413,19 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
     return list;
   }, [currentSuperCategoryObj, categories]);
 
+  // "Trending Now" circles for active Super Category — categories only (no
+  // subcategories mixed in); tapping one opens that category's subcategories
+  // + items page instead of filtering in place.
+  const superCategoryTrendingCards = useMemo(() => {
+    const seen = new Set<string>();
+    return superCategoryCategoryCards.filter((card) => {
+      if (card.subName) return false;
+      if (seen.has(card.catSlug)) return false;
+      seen.add(card.catSlug);
+      return true;
+    });
+  }, [superCategoryCategoryCards]);
+
   // Filtered products for active Super Category
   const superCategoryProducts = useMemo(() => {
     if (!currentSuperCategoryObj) return [];
@@ -586,9 +599,10 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
         {currentSuperCategoryObj ? (
           /* SUPER CATEGORY LANDING PAGE VIEW (Zepto Style Cafe/Branch Layout) */
           <div className="flex flex-col gap-4 mt-2 sm:mt-3">
-            {/* Super Category Hero Banner (Zepto Compact Banner, Max Height ~260px) */}
+            {/* Super Category Hero Banner — taller on mobile to match the
+                mobile app's banner proportions, flatter on larger screens. */}
             {currentSuperCategoryObj.banner && (
-              <div className="w-full max-h-[260px] aspect-[4/1] rounded-2xl md:rounded-3xl overflow-hidden shadow-sm border border-divider/60 bg-surface">
+              <div className="w-full max-h-[260px] aspect-[2.5/1] sm:aspect-[4/1] rounded-2xl md:rounded-3xl overflow-hidden shadow-sm border border-divider/60 bg-surface">
                 <Link to={currentSuperCategoryObj.bannerLink || '/products'} className="block w-full h-full">
                   <img
                     src={currentSuperCategoryObj.banner}
@@ -600,8 +614,11 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
               </div>
             )}
 
-            {/* Trending Now Category Circles Row (Zepto Compact Circular Tabs) */}
-            {superCategoryCategoryCards.length > 0 && (
+            {/* Special category groups positioned at the top (insertAfterSubCategoryIndex 0 / unset) — before Trending Now */}
+            {superPageGroups((pos) => pos <= 0)}
+
+            {/* Trending Now Category Circles Row (Zepto Compact Circular Tabs) — categories only */}
+            {superCategoryTrendingCards.length > 0 && (
               <section className="w-full my-1 sm:my-2">
                 <div className="flex items-center justify-between mb-2.5">
                   <h2 className="text-base sm:text-lg font-black text-text-primary tracking-tight font-display flex items-center gap-2">
@@ -609,16 +626,12 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                   </h2>
                 </div>
                 <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-8 lg:grid-cols-10 gap-2 sm:gap-3">
-                  {superCategoryCategoryCards.map((card) => {
-                    const isSelected = selectedCategoryFilter === card.name || selectedCategoryFilter === card.id;
-
+                  {superCategoryTrendingCards.map((card) => {
                     const handleCategoryClick = (e: React.MouseEvent) => {
                       e.preventDefault();
-                      if (isSelected) {
-                        setSelectedCategoryFilter(null);
-                      } else {
-                        setSelectedCategoryFilter(card.name);
-                      }
+                      navigate(`/category/${encodeURIComponent(card.catSlug)}?superCategory=${encodeURIComponent(activeSuperCatSlug)}`, {
+                        state: { from: `${location.pathname}${location.search}` },
+                      });
                     };
 
                     return (
@@ -626,14 +639,10 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                         key={card.id}
                         onClick={handleCategoryClick}
                         className="flex flex-col items-center group cursor-pointer text-center outline-none bg-transparent border-none p-0"
-                        title={`Click to view ${card.name} items`}
+                        title={`Click to view ${card.name} categories`}
                       >
                         <div
-                          className={`w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full p-0.5 flex items-center justify-center overflow-hidden transition-all duration-200 ${
-                            isSelected
-                              ? 'bg-emerald-100 dark:bg-emerald-900/60 ring-4 ring-emerald-500 ring-offset-2 scale-105 shadow-md border-2 border-emerald-600'
-                              : 'bg-[#f4f7f6] dark:bg-emerald-950/30 border border-emerald-100/80 dark:border-emerald-900/40 group-hover:scale-105 shadow-2xs'
-                          }`}
+                          className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full p-0.5 flex items-center justify-center overflow-hidden transition-all duration-200 bg-[#f4f7f6] dark:bg-emerald-950/30 border border-emerald-100/80 dark:border-emerald-900/40 group-hover:scale-105 shadow-2xs"
                         >
                           <img
                             src={card.image || 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=300'}
@@ -644,13 +653,7 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                             }}
                           />
                         </div>
-                        <span
-                          className={`text-[11px] sm:text-xs font-bold line-clamp-2 leading-tight mt-1 transition-colors ${
-                            isSelected
-                              ? 'text-emerald-600 font-extrabold dark:text-emerald-400'
-                              : 'text-text-primary group-hover:text-emerald-600'
-                          }`}
-                        >
+                        <span className="text-[11px] sm:text-xs font-bold line-clamp-2 leading-tight mt-1 transition-colors text-text-primary group-hover:text-emerald-600">
                           {card.name}
                         </span>
                       </button>
@@ -659,8 +662,6 @@ export const Home: React.FC<HomeProps> = ({ onQuickView }) => {
                 </div>
               </section>
             )}
-
-            {superPageGroups((pos) => pos <= 0)}
 
             {/* Super Category Horizontal Product Shelves (Zepto View - NO Status Bar!) */}
             {superCategoryShelves.length > 0 ? (

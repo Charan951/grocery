@@ -147,7 +147,10 @@ const AppContent: React.FC = () => {
   const isMobile = useIsMobile(640);
 
   const isPDP = location.pathname.startsWith('/product/') || location.pathname.startsWith('/prn/');
-  const isProductsListingPage = location.pathname === '/products' || location.pathname.startsWith('/products/');
+  const isProductsListingPage =
+    location.pathname === '/products' ||
+    location.pathname.startsWith('/products/') ||
+    location.pathname.startsWith('/category/');
   const isCategoriesPage = location.pathname === '/categories' || location.pathname.startsWith('/categories/');
   const isSearchPage = location.pathname === '/search' || location.pathname.startsWith('/search');
   const isProfilePage = location.pathname === '/profile' || location.pathname.startsWith('/account/profile');

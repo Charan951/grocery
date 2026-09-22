@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,9 +10,11 @@ import 'package:freshcart/core/widgets/app_toast.dart';
 import 'package:freshcart/core/widgets/feedback_states.dart';
 import 'package:freshcart/core/widgets/product_card.dart';
 import 'package:freshcart/core/widgets/skeletons.dart';
+import 'package:freshcart/core/widgets/smart_image.dart';
 import 'package:freshcart/features/cart/presentation/controllers/cart_controller.dart';
 import 'package:freshcart/features/cart/presentation/widgets/catalog_cart_bar.dart';
 import 'package:freshcart/features/categories/data/models/category_model.dart';
+import 'package:freshcart/features/categories/data/subcategory_image_resolver.dart';
 import 'package:freshcart/features/categories/presentation/screens/categories_screen.dart'
     show availableSubCategoriesFor;
 import 'package:freshcart/features/home/presentation/controllers/catalog_providers.dart';
@@ -24,55 +25,6 @@ const _sortLabels = {
   'price-high': 'Price: high to low',
   'rating': 'Top rated',
 };
-
-String _resolveSubCategoryImage(String subName, String? catName, [String? customImg]) {
-  if (customImg != null && customImg.trim().isNotEmpty) {
-    final trimmed = customImg.trim();
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:') || trimmed.startsWith('/')) {
-      return trimmed;
-    }
-  }
-
-  final subLower = subName.toLowerCase().trim();
-
-  if (subLower.contains('veg')) return 'https://images.unsplash.com/photo-1597362925123-77861d3fbac7?w=200&auto=format&fit=crop';
-  if (subLower.contains('fruit')) return 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=200&auto=format&fit=crop';
-  if (subLower.contains('exotic') || subLower.contains('premium')) return 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=200&auto=format&fit=crop';
-  if (subLower.contains('organic') || subLower.contains('hydro')) return 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=200&auto=format&fit=crop';
-  if (subLower.contains('leafy') || subLower.contains('herb') || subLower.contains('season')) return 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=200&auto=format&fit=crop';
-  if (subLower.contains('mango') || subLower.contains('melon')) return 'https://images.unsplash.com/photo-1553279768-865429fa0078?w=200&auto=format&fit=crop';
-  if (subLower.contains('cut') || subLower.contains('sprout')) return 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=200&auto=format&fit=crop';
-
-  if (subLower.contains('milk')) return 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=200&auto=format&fit=crop';
-  if (subLower.contains('bread') || subLower.contains('bun')) return 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=200&auto=format&fit=crop';
-  if (subLower.contains('egg')) return 'https://images.unsplash.com/photo-1506976785307-8732e854ad03?w=200&auto=format&fit=crop';
-  if (subLower.contains('curd') || subLower.contains('yogurt') || subLower.contains('drink')) return 'https://images.unsplash.com/photo-1571212515416-fef01fc43637?w=200&auto=format&fit=crop';
-  if (subLower.contains('paneer') || subLower.contains('cream') || subLower.contains('cheese')) return 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=200&auto=format&fit=crop';
-  if (subLower.contains('butter')) return 'https://images.unsplash.com/photo-1589985270826-4b7bb135bc9d?w=200&auto=format&fit=crop';
-
-  if (subLower.contains('chip') || subLower.contains('namkeen') || subLower.contains('snack')) return 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=200&auto=format&fit=crop';
-  if (subLower.contains('noodle') || subLower.contains('pasta')) return 'https://images.unsplash.com/photo-1612927601601-6638404737ce?w=200&auto=format&fit=crop';
-  if (subLower.contains('biscuit') || subLower.contains('cookie')) return 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=200&auto=format&fit=crop';
-  if (subLower.contains('chocolate') || subLower.contains('sweet')) return 'https://images.unsplash.com/photo-1549007994-cb92caebd54b?w=200&auto=format&fit=crop';
-
-  if (subLower.contains('atta') || subLower.contains('flour')) return 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=200&auto=format&fit=crop';
-  if (subLower.contains('rice')) return 'https://images.unsplash.com/photo-1536304929831-ee1ca9d44906?w=200&auto=format&fit=crop';
-  if (subLower.contains('oil')) return 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=200&auto=format&fit=crop';
-  if (subLower.contains('dal') || subLower.contains('pulse')) return 'https://images.unsplash.com/photo-1585994191611-726a88060c2d?w=200&auto=format&fit=crop';
-  if (subLower.contains('ghee')) return 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=200&auto=format&fit=crop';
-
-  if (subLower.contains('chicken')) return 'https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=200&auto=format&fit=crop';
-  if (subLower.contains('mutton') || subLower.contains('meat')) return 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=200&auto=format&fit=crop';
-  if (subLower.contains('fish') || subLower.contains('seafood')) return 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?w=200&auto=format&fit=crop';
-
-  if (subLower.contains('spice') || subLower.contains('masala')) return 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=200&auto=format&fit=crop';
-  if (subLower.contains('dry fruit') || subLower.contains('nut') || subLower.contains('cashew') || subLower.contains('almond')) return 'https://images.unsplash.com/photo-1599599810769-bcde5a160d32?w=200&auto=format&fit=crop';
-
-  if (subLower.contains('cereal') || subLower.contains('oats')) return 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=200&auto=format&fit=crop';
-  if (subLower.contains('sauce') || subLower.contains('ketchup') || subLower.contains('spread')) return 'https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=200&auto=format&fit=crop';
-
-  return 'https://images.unsplash.com/photo-1597362925123-77861d3fbac7?w=200&auto=format&fit=crop';
-}
 
 class _SubCategoryItemData {
   final String name;
@@ -87,6 +39,7 @@ class CategoryCatalogScreen extends ConsumerStatefulWidget {
   final List<String>? productIds;
   final String? searchQuery;
   final bool hideSubcategories;
+  final String? superCategorySlug;
 
   const CategoryCatalogScreen({
     super.key,
@@ -96,6 +49,7 @@ class CategoryCatalogScreen extends ConsumerStatefulWidget {
     this.productIds,
     this.searchQuery,
     this.hideSubcategories = false,
+    this.superCategorySlug,
   });
 
   @override
@@ -166,7 +120,34 @@ class _CategoryCatalogScreenState extends ConsumerState<CategoryCatalogScreen> {
         ? widget.title!.trim()
         : (category?.name ?? 'Category');
     final allProducts = ref.watch(allProductsProvider).valueOrNull ?? const [];
-    final subNames = category != null ? availableSubCategoriesFor(category, allProducts) : <String>[];
+    var subNames = category != null ? availableSubCategoriesFor(category, allProducts) : <String>[];
+
+    // When arriving from a Super Category tab, admins may have hand-picked
+    // only a subset of this category's subcategories for that tab — scope
+    // the rail down to that subset instead of showing every subcategory.
+    final scSlug = widget.superCategorySlug;
+    if (scSlug != null && scSlug.trim().isNotEmpty) {
+      final superCats = ref.watch(superCategoriesProvider).valueOrNull ?? const [];
+      String norm(String v) => v.toLowerCase().replaceFirst(RegExp(r'^sc_'), '');
+      final target = norm(scSlug);
+      Map<String, dynamic>? sc;
+      for (final s in superCats) {
+        final slug = norm((s['slug'] ?? '').toString());
+        final id = norm((s['id'] ?? '').toString());
+        if (slug == target || id == target) {
+          sc = s;
+          break;
+        }
+      }
+      final scSubs = (sc?['subCategories'] as List?)
+              ?.map((e) => e.toString().toLowerCase())
+              .toSet() ??
+          const <String>{};
+      if (scSubs.isNotEmpty) {
+        final scoped = subNames.where((n) => scSubs.contains(n.toLowerCase())).toList();
+        if (scoped.isNotEmpty) subNames = scoped;
+      }
+    }
 
     final subItems = <_SubCategoryItemData>[
       _SubCategoryItemData(
@@ -182,7 +163,7 @@ class _CategoryCatalogScreenState extends ConsumerState<CategoryCatalogScreen> {
             orElse: () => SubCategoryModel(id: name, name: name),
           );
           final customImg = match?.imageUrl ?? '';
-          final resolvedImg = _resolveSubCategoryImage(name, category?.name, customImg);
+          final resolvedImg = resolveSubCategoryImage(name, category?.name, customImg);
           return _SubCategoryItemData(name: name, imageUrl: resolvedImg);
         }()
       ]
@@ -469,20 +450,14 @@ class _SubcategoryRailItem extends StatelessWidget {
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(22),
-                        child: imageUrl.startsWith('http')
-                            ? CachedNetworkImage(
-                                imageUrl: imageUrl,
-                                fit: BoxFit.cover,
-                                fadeInDuration: const Duration(milliseconds: 150),
-                                errorWidget: (context, url, error) => Container(
-                                  color: isDark ? Colors.white10 : Colors.black12,
-                                  child: Icon(Icons.shopping_bag_rounded, size: 20, color: AppColors.primary),
-                                ),
-                              )
-                            : Container(
-                                color: isDark ? Colors.white10 : Colors.black12,
-                                child: Icon(Icons.shopping_bag_rounded, size: 20, color: AppColors.primary),
-                              ),
+                        child: smartImage(
+                          url: imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_) => Container(
+                            color: isDark ? Colors.white10 : Colors.black12,
+                            child: Icon(Icons.shopping_bag_rounded, size: 20, color: AppColors.primary),
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 4),

@@ -56,7 +56,7 @@ class CategoryShelfSection extends StatelessWidget {
         children: [
           Text(
             title,
-            style: AppTypography.h3(isDark ? AppColors.textPrimaryDark : AppColors.textPrimary),
+            style: AppTypography.sectionHeading(isDark ? AppColors.textPrimaryDark : AppColors.textPrimary),
           ),
           const SizedBox(height: 12),
           LayoutBuilder(

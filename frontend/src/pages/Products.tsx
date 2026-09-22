@@ -15,7 +15,7 @@ interface ProductsProps {
 }
 
 export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChange }) => {
-  const { products, categories, seoSettings, banners = [] } = useCMS();
+  const { products, categories, seoSettings, banners = [], superCategories = [] } = useCMS();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -83,6 +83,7 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
   const urlSearch = searchParams.get('search') || '';
   const urlCategory = searchParams.get('category') || categorySlug || '';
   const urlSubCategory = searchParams.get('subCategory') || '';
+  const urlSuperCategory = searchParams.get('superCategory') || '';
   const urlOrganic = searchParams.get('organic') === 'true';
   // Explicit product-id list (e.g. a festival group's curated products).
   const urlIds = searchParams.get('ids') || '';
@@ -284,13 +285,41 @@ export const Products: React.FC<ProductsProps> = ({ onQuickView, onListViewChang
   // A curated id list (?ids=) or a plain search (?search=) has no subcategories.
   const showSubRail = idList.length === 0 && !urlSearch && Boolean(urlCategory);
 
+  // When arriving from a Super Category tab, admins may have hand-picked only
+  // a subset of this category's subcategories for that tab — scope the
+  // sidebar down to that subset instead of showing every subcategory.
+  const activeSuperCategoryObj = useMemo(() => {
+    if (!urlSuperCategory) return null;
+    const norm = (v: string) => v.toLowerCase().replace(/^sc_/, '');
+    const target = norm(urlSuperCategory);
+    return (
+      superCategories.find(
+        (sc: any) =>
+          norm(sc.slug || '') === target ||
+          norm(sc.id || '') === target
+      ) || null
+    );
+  }, [superCategories, urlSuperCategory]);
+
   // Extract subcategories for active main category (deduplicated)
   const activeSubCategories = useMemo(() => {
-    if (currentCategoryObj && currentCategoryObj.subCategories) {
-      return deduplicateSubCategories(currentCategoryObj.subCategories);
+    if (!currentCategoryObj || !currentCategoryObj.subCategories) return [];
+    const deduped = deduplicateSubCategories(currentCategoryObj.subCategories);
+
+    const scSubNames = activeSuperCategoryObj?.subCategories;
+    if (scSubNames && scSubNames.length > 0) {
+      const allowed = new Set(scSubNames.map((s: string) => s.toLowerCase()));
+      const scoped = deduped.filter((s: any) => {
+        const name = typeof s === 'string' ? s : s.name;
+        return name && allowed.has(name.toLowerCase());
+      });
+      // Only restrict when the super category actually curated subcategories
+      // for THIS category — otherwise fall back to the full list (e.g. the
+      // whole category was assigned without any explicit subcategory picks).
+      if (scoped.length > 0) return scoped;
     }
-    return [];
-  }, [currentCategoryObj]);
+    return deduped;
+  }, [currentCategoryObj, activeSuperCategoryObj]);
 
   // Filter and Sort Logic
   const filteredProducts = useMemo(() => {

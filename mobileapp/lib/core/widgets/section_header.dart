@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
 
-/// The one section heading for the whole app. One size (`h3` = 18), optional
+/// The one section heading for the whole app — matches the web's
+/// `font-black tracking-tight` shelf/section title treatment. Optional
 /// one-line subtitle, optional trailing text action. Use this instead of an
 /// inline `AppTypography.h3` / `.title` for anything that labels a block.
 class SectionHeader extends StatelessWidget {
@@ -36,7 +37,7 @@ class SectionHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: AppTypography.h3(textColor)),
+                Text(title, style: AppTypography.sectionHeading(textColor)),
                 if (subtitle != null) ...[
                   const SizedBox(height: 2),
                   Text(subtitle!, style: AppTypography.bodySmall(subColor)),

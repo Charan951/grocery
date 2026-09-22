@@ -146,6 +146,7 @@ export const AdminCMS: React.FC = () => {
   const [scActive, setScActive] = useState(true);
   const [scCategories, setScCategories] = useState<string[]>([]);
   const [scSubCategories, setScSubCategories] = useState<string[]>([]);
+  const [scPendingCatId, setScPendingCatId] = useState<string>('');
   const [scProducts, setScProducts] = useState<string[]>([]);
   const [isUploadingScBanner, setIsUploadingScBanner] = useState(false);
   const [prodSearchTerm, setProdSearchTerm] = useState('');
@@ -1099,6 +1100,7 @@ export const AdminCMS: React.FC = () => {
     setScCategories(sc.categories || []);
     setScSubCategories(sc.subCategories || []);
     setScProducts(sc.products || []);
+    setScPendingCatId('');
   };
 
   const handleSaveSuperCat = (scId: string) => {
@@ -1138,16 +1140,32 @@ export const AdminCMS: React.FC = () => {
     }
   };
 
-  const toggleCategorySelection = (catId: string) => {
-    setScCategories(prev =>
-      prev.includes(catId) ? prev.filter(c => c !== catId) : [...prev, catId]
-    );
+  const addSuperCatCategory = () => {
+    if (!scPendingCatId || scCategories.includes(scPendingCatId)) return;
+    setScCategories(prev => [...prev, scPendingCatId]);
+    setScPendingCatId('');
+  };
+
+  const removeSuperCatCategory = (catId: string) => {
+    const subsOfCat = allSubCategories.filter(s => s.catId === catId).map(s => s.name);
+    setScCategories(prev => prev.filter(c => c !== catId));
+    setScSubCategories(prev => prev.filter(s => !subsOfCat.includes(s)));
   };
 
   const toggleSubCategorySelection = (subName: string) => {
     setScSubCategories(prev =>
       prev.includes(subName) ? prev.filter(s => s !== subName) : [...prev, subName]
     );
+  };
+
+  const toggleAllSubCategoriesForCat = (catId: string) => {
+    const subsOfCat = allSubCategories.filter(s => s.catId === catId).map(s => s.name);
+    const allSelected = subsOfCat.every(s => scSubCategories.includes(s));
+    setScSubCategories(prev => {
+      if (allSelected) return prev.filter(s => !subsOfCat.includes(s));
+      const merged = new Set([...prev, ...subsOfCat]);
+      return Array.from(merged);
+    });
   };
 
   const toggleProductSelection = (prodId: string) => {
@@ -1388,62 +1406,105 @@ export const AdminCMS: React.FC = () => {
                                 </div>
                               </div>
 
-                              {/* Multi-Select Main Catalog Categories */}
+                              {/* Add Category (one at a time) + per-category Subcategory picker */}
                               <div>
                                 <label className="block text-xs font-bold text-text-primary mb-2">
-                                  Select Categories (Multi-Select):
+                                  Add Category, then pick its Subcategories:
                                 </label>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-40 overflow-y-auto p-2 border border-divider rounded-xl bg-background">
-                                  {categories.map((c) => {
-                                    const isSelected = scCategories.includes(c.id) || scCategories.includes(c.slug || '');
-                                    return (
-                                      <button
-                                        type="button"
-                                        key={c.id}
-                                        onClick={() => toggleCategorySelection(c.id)}
-                                        className={`flex items-center gap-2 p-2 rounded-lg text-left text-xs font-semibold border transition-all ${
-                                          isSelected
-                                            ? 'bg-emerald-500/10 border-emerald-500 text-emerald-700 dark:text-emerald-400'
-                                            : 'border-divider text-text-primary hover:bg-surface'
-                                        }`}
-                                      >
-                                        <div className={`w-4 h-4 rounded flex items-center justify-center text-white text-[10px] ${isSelected ? 'bg-emerald-600' : 'border border-gray-300'}`}>
-                                          {isSelected && <Check size={12} />}
-                                        </div>
-                                        <span className="truncate">{c.name}</span>
-                                      </button>
-                                    );
-                                  })}
+                                <div className="flex items-center gap-2 mb-3">
+                                  <select
+                                    value={scPendingCatId}
+                                    onChange={(e) => setScPendingCatId(e.target.value)}
+                                    className="flex-1 text-xs p-2 rounded-xl border border-divider bg-background"
+                                  >
+                                    <option value="">Select a category to add…</option>
+                                    {categories
+                                      .filter((c) => !scCategories.includes(c.id) && !scCategories.includes(c.slug || ''))
+                                      .map((c) => (
+                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                      ))}
+                                  </select>
+                                  <button
+                                    type="button"
+                                    onClick={addSuperCatCategory}
+                                    disabled={!scPendingCatId}
+                                    className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center gap-1.5 shrink-0"
+                                  >
+                                    <Plus size={14} />
+                                    <span>Add</span>
+                                  </button>
                                 </div>
-                              </div>
 
-                              {/* Multi-Select Subcategories */}
-                              <div>
-                                <label className="block text-xs font-bold text-text-primary mb-2">
-                                  Select Subcategories (Multi-Select):
-                                </label>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-40 overflow-y-auto p-2 border border-divider rounded-xl bg-background">
-                                  {allSubCategories.map((scItem, idx) => {
-                                    const isSelected = scSubCategories.includes(scItem.name);
-                                    return (
-                                      <button
-                                        type="button"
-                                        key={`subsel_${idx}_${scItem.name}`}
-                                        onClick={() => toggleSubCategorySelection(scItem.name)}
-                                        className={`flex items-center gap-2 p-2 rounded-lg text-left text-xs font-semibold border transition-all ${
-                                          isSelected
-                                            ? 'bg-emerald-500/10 border-emerald-500 text-emerald-700 dark:text-emerald-400'
-                                            : 'border-divider text-text-primary hover:bg-surface'
-                                        }`}
-                                      >
-                                        <div className={`w-4 h-4 rounded flex items-center justify-center text-white text-[10px] ${isSelected ? 'bg-emerald-600' : 'border border-gray-300'}`}>
-                                          {isSelected && <Check size={12} />}
+                                {scCategories.length === 0 ? (
+                                  <div className="p-4 rounded-xl border border-dashed border-divider text-center text-xs text-text-secondary">
+                                    No categories added yet. Add a category above to configure its subcategories.
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col gap-3">
+                                    {scCategories.map((catId) => {
+                                      const cat = categories.find((c) => c.id === catId || c.slug === catId);
+                                      const subsOfCat = allSubCategories.filter((s) => s.catId === catId || s.catId === cat?.id);
+                                      const allSelected = subsOfCat.length > 0 && subsOfCat.every((s) => scSubCategories.includes(s.name));
+                                      return (
+                                        <div key={catId} className="border border-divider rounded-xl p-3 bg-background">
+                                          <div className="flex items-center justify-between mb-2">
+                                            <span className="text-xs font-extrabold text-text-primary">
+                                              {cat?.name || catId}
+                                              <span className="ml-2 text-[10px] font-semibold text-text-secondary">
+                                                {subsOfCat.length} subcategories
+                                              </span>
+                                            </span>
+                                            <div className="flex items-center gap-2">
+                                              {subsOfCat.length > 0 && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => toggleAllSubCategoriesForCat(catId)}
+                                                  className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 hover:underline"
+                                                >
+                                                  {allSelected ? 'Unselect all' : 'Select all'}
+                                                </button>
+                                              )}
+                                              <button
+                                                type="button"
+                                                onClick={() => removeSuperCatCategory(catId)}
+                                                className="text-text-secondary hover:text-error p-0.5"
+                                                title="Remove category"
+                                              >
+                                                <X size={14} />
+                                              </button>
+                                            </div>
+                                          </div>
+                                          {subsOfCat.length === 0 ? (
+                                            <p className="text-[11px] text-text-secondary">No subcategories under this category.</p>
+                                          ) : (
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-40 overflow-y-auto">
+                                              {subsOfCat.map((scItem, idx) => {
+                                                const isSelected = scSubCategories.includes(scItem.name);
+                                                return (
+                                                  <button
+                                                    type="button"
+                                                    key={`subsel_${catId}_${idx}_${scItem.name}`}
+                                                    onClick={() => toggleSubCategorySelection(scItem.name)}
+                                                    className={`flex items-center gap-2 p-2 rounded-lg text-left text-xs font-semibold border transition-all ${
+                                                      isSelected
+                                                        ? 'bg-emerald-500/10 border-emerald-500 text-emerald-700 dark:text-emerald-400'
+                                                        : 'border-divider text-text-primary hover:bg-surface'
+                                                    }`}
+                                                  >
+                                                    <div className={`w-4 h-4 rounded flex items-center justify-center text-white text-[10px] ${isSelected ? 'bg-emerald-600' : 'border border-gray-300'}`}>
+                                                      {isSelected && <Check size={12} />}
+                                                    </div>
+                                                    <span className="truncate">{scItem.name}</span>
+                                                  </button>
+                                                );
+                                              })}
+                                            </div>
+                                          )}
                                         </div>
-                                        <span className="truncate">{scItem.name}</span>
-                                      </button>
-                                    );
-                                  })}
-                                </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
                               </div>
 
                               {/* Action buttons */}

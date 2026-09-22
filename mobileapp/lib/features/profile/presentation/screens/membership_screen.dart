@@ -63,7 +63,7 @@ class MembershipScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 24),
-          Text('Benefits', style: AppTypography.h3(textColor)),
+          Text('Benefits', style: AppTypography.sectionHeading(textColor)),
           const SizedBox(height: 12),
           for (final (icon, title, body) in _perks)
             Padding(
