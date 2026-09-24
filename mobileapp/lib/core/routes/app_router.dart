@@ -26,6 +26,7 @@ import 'package:freshcart/features/profile/presentation/screens/stores_screen.da
 import 'package:freshcart/features/orders/presentation/screens/orders_list_screen.dart';
 import 'package:freshcart/features/orders/presentation/screens/order_placed_screen.dart';
 import 'package:freshcart/features/orders/presentation/screens/order_detail_screen.dart';
+import 'package:freshcart/features/returns/presentation/screens/return_request_screen.dart';
 import 'package:freshcart/features/profile/presentation/screens/notifications_screen.dart';
 import 'package:freshcart/features/profile/presentation/screens/profile_edit_screen.dart';
 import 'package:freshcart/features/search/presentation/screens/search_screen.dart';
@@ -224,6 +225,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: '/order/:id',
         builder: (c, s) => OrderDetailScreen(orderId: s.pathParameters['id'] ?? ''),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/order/:id/return',
+        builder: (c, s) => ReturnRequestScreen(orderId: s.pathParameters['id'] ?? ''),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,

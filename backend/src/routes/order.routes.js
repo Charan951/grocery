@@ -25,6 +25,7 @@ router.get('/orders/:id', attachCustomerOptional, orderController.getOrder);
 router.post('/orders', attachCustomerOptional, orderController.createOrder); // client app placements; uses customer token when present
 router.post('/orders/:id/cancel', attachCustomerOptional, orderController.cancelOrder); // customer self-service cancel (token OR body {phone}); wallet refund if prepaid
 router.post('/orders/:id/rate-partner', attachCustomerOptional, orderController.ratePartner); // customer rates the delivery partner after Delivered (token OR body {phone})
+router.post('/orders/:id/tip', attachCustomerOptional, orderController.tipPartner); // customer tips the delivery partner after Delivered (token OR body {phone}); one tip per order
 router.put('/orders/:id/status', protect, authorize('Admin', 'Manager', 'Delivery'), orderController.updateStatus);
 router.post('/orders/:id/rider-location', protect, authorize('Admin', 'Manager', 'Delivery'), orderController.updateRiderLocation);
 router.get('/orders/:id/chat', attachCustomerOptional, orderController.getOrderChat); // owner-only when a customer token is present

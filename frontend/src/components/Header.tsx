@@ -219,6 +219,8 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
   const handleCustomerLogout = () => {
     setCustomerUser(null);
     localStorage.removeItem('customer_user');
+    localStorage.removeItem('customer_token');
+    window.dispatchEvent(new Event('customer_auth_changed'));
     updateUserLocation(null);
     setIsCustomerProfileOpen(false);
     setShowProfileMenu(false);

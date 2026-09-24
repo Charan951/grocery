@@ -681,12 +681,37 @@ class _CouponSectionState extends ConsumerState<_CouponSection> {
   bool _busy = false;
 
   @override
+  void initState() {
+    super.initState();
+    // New customer: apply their first-order coupon as soon as the cart qualifies.
+    ref.listenManual<AsyncValue<Map<String, dynamic>>>(
+      availableCouponsProvider,
+      (_, next) {
+        final auto = next.valueOrNull?['autoApplyCode']?.toString();
+        if (auto == null || auto.isEmpty) return;
+        if (ref.read(cartProvider).appliedCoupon != null) return;
+        if (ref.read(autoCouponDismissedProvider)) return;
+        _apply(auto, successMessage: '$auto auto-applied on your first order');
+      },
+      fireImmediately: true,
+    );
+  }
+
+  @override
   void dispose() {
     _code.dispose();
     super.dispose();
   }
 
-  Future<void> _apply(String code) async {
+  void _remove(Map<String, dynamic> applied) {
+    final auto = ref.read(availableCouponsProvider).valueOrNull?['autoApplyCode'];
+    if (applied['code'] == auto) {
+      ref.read(autoCouponDismissedProvider.notifier).state = true;
+    }
+    ref.read(cartProvider.notifier).removeCoupon();
+  }
+
+  Future<void> _apply(String code, {String? successMessage}) async {
     final c = code.trim().toUpperCase();
     if (c.isEmpty || _busy) return;
     setState(() => _busy = true);
@@ -703,7 +728,7 @@ class _CouponSectionState extends ConsumerState<_CouponSection> {
               (res['discount'] as num?)?.toDouble() ?? 0,
             );
         _code.clear();
-        AppToast.success(res['message']?.toString() ?? 'Coupon applied');
+        AppToast.success(successMessage ?? res['message']?.toString() ?? 'Coupon applied');
       } else {
         AppToast.error(
           res['message']?.toString() ?? 'This coupon is not valid',
@@ -720,6 +745,17 @@ class _CouponSectionState extends ConsumerState<_CouponSection> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final applied = ref.watch(cartProvider.select((c) => c.appliedCoupon));
+    final available = ref.watch(availableCouponsProvider).valueOrNull;
+    final coupons = ((available?['coupons'] as List?) ?? const [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+    // Closest locked first-order coupon, for the "add ₹X more" nudge.
+    final nudge = applied == null
+        ? coupons.where((c) =>
+            c['firstOrderOnly'] == true &&
+            c['eligible'] != true &&
+            ((c['amountNeeded'] as num?) ?? 0) > 0).firstOrNull
+        : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -775,8 +811,7 @@ class _CouponSectionState extends ConsumerState<_CouponSection> {
                   ),
                 ),
                 TextButton(
-                  onPressed: () =>
-                      ref.read(cartProvider.notifier).removeCoupon(),
+                  onPressed: () => _remove(applied),
                   child: Text(
                     'Remove',
                     style: AppTypography.labelMedium(
@@ -826,7 +861,172 @@ class _CouponSectionState extends ConsumerState<_CouponSection> {
               ),
             ],
           ),
+        if (nudge != null) ...[
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.warning.withOpacity(0.12),
+              borderRadius: AppRadius.brLg,
+            ),
+            child: Text(
+              'Add ₹${nudge['amountNeeded']} more to get ₹${nudge['savings']} off your first order with ${nudge['code']}',
+              style: AppTypography.labelMedium(AppColors.warningText)
+                  .copyWith(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+        if (coupons.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          Text(
+            'AVAILABLE COUPONS',
+            style: AppTypography.labelSmall(
+              isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+            ).copyWith(fontWeight: FontWeight.w800, letterSpacing: 0.8),
+          ),
+          const SizedBox(height: 8),
+          for (final c in coupons)
+            _AvailableCouponTile(
+              coupon: c,
+              isApplied: applied?['code'] == c['code'],
+              busy: _busy,
+              onApply: () => _apply(c['code'].toString()),
+            ),
+        ],
       ],
+    );
+  }
+}
+
+class _AvailableCouponTile extends ConsumerWidget {
+  final Map<String, dynamic> coupon;
+  final bool isApplied;
+  final bool busy;
+  final VoidCallback onApply;
+
+  const _AvailableCouponTile({
+    required this.coupon,
+    required this.isApplied,
+    required this.busy,
+    required this.onApply,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final eligible = coupon['eligible'] == true;
+    final minOrder = (coupon['minOrder'] as num?) ?? 0;
+    final needed = (coupon['amountNeeded'] as num?) ?? 0;
+    final savings = (coupon['savings'] as num?) ?? 0;
+    final subtotal = ref.watch(cartProvider.select((c) => c.subtotal));
+    final primaryText = isDark ? AppColors.textPrimaryDark : AppColors.textPrimary;
+    final mutedText = isDark ? AppColors.textSecondaryDark : AppColors.textSecondary;
+
+    final status = eligible
+        ? (coupon['message']?.toString() ?? 'Save ₹$savings on this order')
+        : needed > 0
+            ? 'Add ₹$needed more to unlock ₹$savings off'
+            : (coupon['message']?.toString() ?? '');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : AppColors.surface,
+        borderRadius: AppRadius.brLg,
+        border: Border.all(
+          color: eligible
+              ? AppColors.primary.withOpacity(0.5)
+              : (isDark ? AppColors.dividerDark : AppColors.divider),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text(
+                          coupon['code'].toString(),
+                          style: AppTypography.labelLarge(
+                            eligible ? primaryText : mutedText,
+                          ).copyWith(fontWeight: FontWeight.w900),
+                        ),
+                        if (coupon['firstOrderOnly'] == true)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.deepPurple.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'FIRST ORDER',
+                              style: AppTypography.labelSmall(Colors.deepPurple)
+                                  .copyWith(fontWeight: FontWeight.w900, fontSize: 9),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      status,
+                      style: AppTypography.bodySmall(
+                        eligible ? AppColors.primaryText : mutedText,
+                      ).copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    Text(
+                      '${coupon['discount'] ?? ''}${minOrder > 0 ? ' · min order ₹$minOrder' : ''}',
+                      style: AppTypography.labelSmall(mutedText),
+                    ),
+                  ],
+                ),
+              ),
+              if (eligible)
+                isApplied
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          'APPLIED',
+                          style: AppTypography.labelSmall(AppColors.primaryText)
+                              .copyWith(fontWeight: FontWeight.w900),
+                        ),
+                      )
+                    : TextButton(
+                        onPressed: busy ? null : onApply,
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(48, 36),
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                        ),
+                        child: const Text(
+                          'APPLY',
+                          style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.primaryText),
+                        ),
+                      ),
+            ],
+          ),
+          if (!eligible && needed > 0 && minOrder > 0) ...[
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(2),
+              child: LinearProgressIndicator(
+                value: (subtotal / minOrder).clamp(0.0, 1.0).toDouble(),
+                minHeight: 4,
+                backgroundColor: isDark ? AppColors.dividerDark : AppColors.divider,
+                color: AppColors.warning,
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

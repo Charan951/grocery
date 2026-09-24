@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useCartWishlist, getProductStockQuantity } from '../context/CartWishlistContext';
+import { useCartWishlist, getProductStockQuantity, getActiveUserKey } from '../context/CartWishlistContext';
 import { useCMS } from '../context/CMSContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ShoppingBag, Plus, Minus, Trash2, Tag, AlertCircle, Heart, PiggyBank, Zap, Clock, ShieldCheck, ArrowRight, Home, MapPin, Share2 } from 'lucide-react';
@@ -7,6 +7,27 @@ import { useNavigate } from 'react-router-dom';
 import { CheckoutModal } from './CheckoutModal';
 import { getProductImage } from '../utils/imageUtils';
 import { apiUrl } from '../config/api';
+
+interface AvailableCoupon {
+  code: string;
+  discount: string;
+  description: string;
+  minOrder: number;
+  firstOrderOnly: boolean;
+  eligible: boolean;
+  amountNeeded: number;
+  savings: number;
+  message: string;
+}
+
+// Sends the customer token when present so the server can tell a first order.
+const couponHeaders = (): Record<string, string> => {
+  const token = localStorage.getItem('customer_token');
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -26,20 +47,48 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
   const [couponError, setCouponError] = useState('');
+  const [couponNotice, setCouponNotice] = useState('');
+  const [availableCoupons, setAvailableCoupons] = useState<AvailableCoupon[]>([]);
+  const [autoApplyCode, setAutoApplyCode] = useState<string | null>(null);
+  // Once the shopper removes an auto-applied coupon, don't force it back on.
+  const [autoCouponDismissed, setAutoCouponDismissed] = useState(false);
+
+  // Coupons belong to the signed-in shopper: switching accounts (or logging
+  // out) must drop whatever the previous customer applied.
+  const [userKey, setUserKey] = useState(() => getActiveUserKey());
+  useEffect(() => {
+    const onAuthChange = () => setUserKey(getActiveUserKey());
+    window.addEventListener('customer_auth_changed', onAuthChange);
+    window.addEventListener('storage', onAuthChange);
+    return () => {
+      window.removeEventListener('customer_auth_changed', onAuthChange);
+      window.removeEventListener('storage', onAuthChange);
+    };
+  }, []);
+  useEffect(() => {
+    setAppliedCoupon(null);
+    setCouponCode('');
+    setCouponError('');
+    setCouponNotice('');
+    setAvailableCoupons([]);
+    setAutoApplyCode(null);
+    setAutoCouponDismissed(false);
+  }, [userKey]);
 
   // The server is the only place a coupon discount is calculated.
   const validateCouponOnServer = async (code: string) => {
     const res = await fetch(apiUrl('/coupons/validate'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: couponHeaders(),
       body: JSON.stringify({ code, subtotal: cartSubtotal }),
     });
     return res.json();
   };
 
-  const handleApplyCoupon = async () => {
+  const applyCoupon = async (raw: string, notice = '') => {
     setCouponError('');
-    const code = couponCode.trim().toUpperCase();
+    setCouponNotice('');
+    const code = raw.trim().toUpperCase();
     if (!code) return;
     try {
       const r = await validateCouponOnServer(code);
@@ -48,16 +97,55 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
         return;
       }
       setAppliedCoupon({ code: r.code, discount: Number(r.discount) || 0 });
+      setCouponCode('');
+      setCouponNotice(notice);
     } catch {
       setCouponError('Could not apply the coupon. Please try again.');
     }
   };
 
+  const handleApplyCoupon = () => applyCoupon(couponCode);
+
   const handleRemoveCoupon = () => {
+    if (appliedCoupon?.code === autoApplyCode) setAutoCouponDismissed(true);
     setAppliedCoupon(null);
     setCouponCode('');
     setCouponError('');
+    setCouponNotice('');
   };
+
+  // Coupon list for this cart value; refreshed whenever the subtotal changes so
+  // a coupon shows as unlocked the moment its minimum order is reached.
+  useEffect(() => {
+    if (!isOpen || cart.length === 0) return;
+    let cancelled = false;
+    fetch(apiUrl('/coupons/available'), {
+      method: 'POST',
+      headers: couponHeaders(),
+      body: JSON.stringify({ subtotal: cartSubtotal }),
+    })
+      .then((res) => res.json())
+      .then((r) => {
+        if (cancelled || !r?.success) return;
+        setAvailableCoupons(r.coupons || []);
+        setAutoApplyCode(r.autoApplyCode || null);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [isOpen, cartSubtotal, cart.length, userKey]);
+
+  // New customer: apply their first-order coupon automatically.
+  useEffect(() => {
+    if (autoApplyCode && !appliedCoupon && !autoCouponDismissed) {
+      applyCoupon(autoApplyCode, `${autoApplyCode} auto-applied on your first order`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoApplyCode, appliedCoupon, autoCouponDismissed]);
+
+  // Closest locked first-order coupon, for the "add ₹X more" nudge.
+  const firstOrderNudge = !appliedCoupon
+    ? availableCoupons.find((c) => c.firstOrderOnly && !c.eligible && c.amountNeeded > 0)
+    : undefined;
 
   // Cart changed after applying: re-check with the server, drop the coupon if
   // it no longer qualifies (e.g. subtotal fell below the minimum order).
@@ -382,9 +470,67 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose }) => {
                     </div>
                     {couponError && <span className="text-rose-600 text-[10px] font-bold mt-1 block">{couponError}</span>}
                     {appliedCoupon && (
-                      <div className="mt-2 p-2 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-[11px] font-bold flex items-center justify-between">
-                        <span>Coupon applied: <strong>{appliedCoupon.code}</strong></span>
-                        <span className="text-emerald-700 font-black">₹{discount} OFF</span>
+                      <div className="mt-2 p-2 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-[11px] font-bold">
+                        <div className="flex items-center justify-between">
+                          <span>Coupon applied: <strong>{appliedCoupon.code}</strong></span>
+                          <span className="text-emerald-700 font-black">₹{discount} OFF</span>
+                        </div>
+                        {couponNotice && <div className="text-[10px] font-semibold text-emerald-700 mt-0.5">{couponNotice}</div>}
+                      </div>
+                    )}
+                    {firstOrderNudge && (
+                      <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-[11px] font-bold">
+                        Add ₹{firstOrderNudge.amountNeeded} more to get ₹{firstOrderNudge.savings} off your first order with {firstOrderNudge.code}
+                      </div>
+                    )}
+
+                    {availableCoupons.length > 0 && (
+                      <div className="mt-3 flex flex-col gap-2">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-gray-500">Available coupons</span>
+                        {availableCoupons.map((c) => {
+                          const isApplied = appliedCoupon?.code === c.code;
+                          const progress = c.minOrder > 0 ? Math.min(100, Math.round((cartSubtotal / c.minOrder) * 100)) : 100;
+                          return (
+                            <div
+                              key={c.code}
+                              className={`p-2.5 rounded-xl border text-[11px] ${c.eligible ? 'border-emerald-200 bg-white' : 'border-gray-100 bg-gray-50'}`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className={`font-mono font-black ${c.eligible ? 'text-gray-900' : 'text-gray-400'}`}>{c.code}</span>
+                                    {c.firstOrderOnly && (
+                                      <span className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 text-[9px] font-black uppercase">First order</span>
+                                    )}
+                                  </div>
+                                  <div className={`font-semibold mt-0.5 ${c.eligible ? 'text-emerald-700' : 'text-gray-500'}`}>
+                                    {c.eligible ? c.message : c.amountNeeded > 0 ? `Add ₹${c.amountNeeded} more to unlock ₹${c.savings} off` : c.message}
+                                  </div>
+                                  <div className="text-gray-400 text-[10px]">
+                                    {c.discount}{c.minOrder > 0 ? ` · min order ₹${c.minOrder}` : ''}
+                                  </div>
+                                </div>
+                                {c.eligible && (
+                                  isApplied ? (
+                                    <span className="text-emerald-700 font-black text-[10px] shrink-0">APPLIED</span>
+                                  ) : (
+                                    <button
+                                      onClick={() => applyCoupon(c.code)}
+                                      className="shrink-0 text-emerald-700 font-black text-[11px] hover:underline"
+                                    >
+                                      APPLY
+                                    </button>
+                                  )
+                                )}
+                              </div>
+                              {!c.eligible && c.amountNeeded > 0 && (
+                                <div className="mt-1.5 h-1 rounded-full bg-gray-200 overflow-hidden">
+                                  <div className="h-full bg-amber-400" style={{ width: `${progress}%` }} />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>

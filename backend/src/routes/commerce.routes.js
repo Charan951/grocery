@@ -19,7 +19,8 @@ const router = express.Router();
 // 6. COUPON ROUTES
 // ==========================================
 router.get('/coupons', couponController.getCoupons);
-router.post('/coupons/validate', couponController.validateCoupon);
+router.post('/coupons/validate', attachCustomerOptional, couponController.validateCoupon);
+router.post('/coupons/available', attachCustomerOptional, couponController.availableCoupons);
 router.post('/coupons', protect, authorize('Admin', 'Manager'), couponController.createCoupon);
 router.put('/coupons/:code', protect, authorize('Admin', 'Manager'), couponController.updateCoupon);
 router.delete('/coupons/:code', protect, authorize('Admin'), couponController.deleteCoupon);

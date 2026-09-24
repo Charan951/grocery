@@ -204,23 +204,24 @@ class _LocationSelectScreenState extends ConsumerState<LocationSelectScreen>
         ref.read(authProvider.notifier).grantLocationPermission();
       }
 
+      // A fresh high-accuracy fix first — the last-known position can be stale
+      // or a coarse network guess, which pins the wrong street. It is only a
+      // fallback when no live fix arrives in time.
       Position? position;
       try {
-        position = await Geolocator.getLastKnownPosition();
-      } catch (_) {}
-
-      if (position == null) {
+        position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.best,
+          timeLimit: const Duration(seconds: 12),
+        );
+      } catch (_) {
         try {
           position = await Geolocator.getCurrentPosition(
             desiredAccuracy: LocationAccuracy.medium,
-            timeLimit: const Duration(seconds: 8),
+            timeLimit: const Duration(seconds: 6),
           );
         } catch (_) {
           try {
-            position = await Geolocator.getCurrentPosition(
-              desiredAccuracy: LocationAccuracy.lowest,
-              timeLimit: const Duration(seconds: 5),
-            );
+            position = await Geolocator.getLastKnownPosition();
           } catch (_) {}
         }
       }

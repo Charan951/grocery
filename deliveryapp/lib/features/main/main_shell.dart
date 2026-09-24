@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:freshcart_delivery/features/offer/offer_controller.dart';
 import 'package:freshcart_delivery/features/offer/offer_sheet.dart';
+import 'package:freshcart_delivery/features/returns/return_offer_controller.dart';
+import 'package:freshcart_delivery/features/returns/return_offer_sheet.dart';
 
 /// Bottom-nav scaffold for the authed area (Home · Orders · Earnings · Profile),
 /// with the live delivery-offer sheet layered above every tab.
@@ -18,6 +20,7 @@ class MainShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final offer = ref.watch(offerProvider);
+    final returnOffer = ref.watch(returnOfferProvider);
     final onHome = navigationShell.currentIndex == 0;
 
     return PopScope(
@@ -32,7 +35,11 @@ class MainShell extends ConsumerWidget {
         body: Stack(
           children: [
             navigationShell,
-            if (offer != null) Positioned.fill(child: OfferSheet(offer: offer)),
+            if (offer != null)
+              Positioned.fill(child: OfferSheet(offer: offer))
+            // A delivery offer takes priority; the pickup offer waits behind it.
+            else if (returnOffer != null)
+              Positioned.fill(child: ReturnOfferSheet(key: ValueKey(returnOffer.returnId), offer: returnOffer)),
           ],
         ),
         bottomNavigationBar: NavigationBar(

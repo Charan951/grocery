@@ -7,6 +7,8 @@ import 'package:freshcart_delivery/core/providers.dart';
 import 'package:freshcart_delivery/core/theme.dart';
 import 'package:freshcart_delivery/features/auth/auth_controller.dart';
 import 'package:freshcart_delivery/features/offer/offer_controller.dart';
+import 'package:freshcart_delivery/features/returns/return_offer_controller.dart';
+import 'package:freshcart_delivery/models/return_models.dart';
 import 'package:freshcart_delivery/models/delivery_models.dart';
 
 final activeOrdersProvider = FutureProvider.autoDispose<List<DeliveryOrder>>((ref) {
@@ -58,8 +60,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with WidgetsB
     if (state == AppLifecycleState.resumed) {
       // The socket may have dropped a `delivery_offer` while backgrounded.
       ref.read(offerProvider.notifier).checkPending();
+      ref.read(returnOfferProvider.notifier).checkPending();
       ref.read(authProvider.notifier).refreshProfile();
       ref.invalidate(activeOrdersProvider);
+      ref.invalidate(activeReturnsProvider);
       ref.invalidate(recentHistoryProvider);
     }
   }
@@ -101,6 +105,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with WidgetsB
     final p = ref.watch(authProvider.select((s) => s.profile));
     final online = p?.isOnline ?? false;
     final active = ref.watch(activeOrdersProvider);
+    final returns = ref.watch(activeReturnsProvider).valueOrNull ?? const <PartnerReturn>[];
     final unread = ref.watch(unreadCountProvider).valueOrNull ?? 0;
 
     return Scaffold(
@@ -210,6 +215,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with WidgetsB
           onRefresh: () async {
             await ref.read(authProvider.notifier).refreshProfile();
             ref.invalidate(activeOrdersProvider);
+            ref.invalidate(activeReturnsProvider);
             ref.invalidate(recentHistoryProvider);
           },
           child: ListView(
@@ -245,6 +251,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with WidgetsB
               ),
 
               const SizedBox(height: 24),
+
+              // ── 2b. Return / exchange pickups (only when there are any) ──
+              if (returns.isNotEmpty) ...[
+                const Text(
+                  'Return Pickups',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: kText),
+                ),
+                const SizedBox(height: 12),
+                for (final r in returns) _returnCard(r),
+                const SizedBox(height: 12),
+              ],
 
               // ── 3. Assigned Deliveries Section Header ───────────────────
               Row(
@@ -293,6 +310,57 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with WidgetsB
 
               const SizedBox(height: 20),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _returnCard(PartnerReturn r) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: Color(0xFFFDE68A), width: 1.2),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () async {
+            await context.push('/return/${r.returnId}');
+            ref.invalidate(activeReturnsProvider);
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                const CircleAvatar(
+                  radius: 18,
+                  backgroundColor: kAmberSoft,
+                  child: Icon(Icons.assignment_return_outlined, color: kAmber, size: 19),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('${r.returnId} · ${r.isExchange ? 'Exchange' : 'Return'}',
+                          style: const TextStyle(fontWeight: FontWeight.w800, color: kText)),
+                      const SizedBox(height: 3),
+                      Text(r.pickupAddress,
+                          maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, color: kTextMuted)),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(color: kAmberSoft, borderRadius: BorderRadius.circular(6)),
+                  child: Text(r.status.toUpperCase(),
+                      style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, color: kAmber, letterSpacing: 0.5)),
+                ),
+              ],
+            ),
           ),
         ),
       ),

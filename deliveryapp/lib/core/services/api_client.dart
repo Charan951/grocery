@@ -3,6 +3,7 @@ import 'package:freshcart_delivery/core/config/app_config.dart';
 import 'package:freshcart_delivery/core/error/api_exception.dart';
 import 'package:freshcart_delivery/core/services/token_store.dart';
 import 'package:freshcart_delivery/models/delivery_models.dart';
+import 'package:freshcart_delivery/models/return_models.dart';
 
 class ApiClient {
   late final Dio _dio;
@@ -139,6 +140,63 @@ class ApiClient {
     }
   }
 
+  // ---- return / exchange pickups ----
+  /// Live pickup offers for this partner (socket `return_offer` fallback).
+  Future<List<ReturnOffer>> returnOffers() async {
+    try {
+      final r = await _dio.get('/delivery/returns/offers');
+      final list = ((r.data as Map)['offers'] as List?) ?? const [];
+      return list.map((e) => ReturnOffer.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+    } on DioException catch (e) {
+      _rethrow(e);
+    }
+  }
+
+  Future<List<PartnerReturn>> activeReturns() async {
+    try {
+      final r = await _dio.get('/delivery/returns/active');
+      final list = ((r.data as Map)['returns'] as List?) ?? const [];
+      return list.map((e) => PartnerReturn.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+    } on DioException catch (e) {
+      _rethrow(e);
+    }
+  }
+
+  Future<PartnerReturn> getReturn(String id) async {
+    try {
+      final r = await _dio.get('/delivery/returns/${Uri.encodeComponent(id)}');
+      return PartnerReturn.fromJson(Map<String, dynamic>.from((r.data as Map)['returnRequest'] as Map));
+    } on DioException catch (e) {
+      _rethrow(e);
+    }
+  }
+
+  Future<PartnerReturn?> _returnStep(String id, String path, [Map<String, dynamic>? body, Duration? timeout]) async {
+    try {
+      final r = await _dio.post(
+        '/delivery/returns/${Uri.encodeComponent(id)}/$path',
+        data: body ?? const {},
+        options: timeout == null ? null : Options(sendTimeout: timeout, receiveTimeout: timeout),
+      );
+      final rr = (r.data as Map)['returnRequest'];
+      return rr is Map ? PartnerReturn.fromJson(Map<String, dynamic>.from(rr)) : null;
+    } on DioException catch (e) {
+      _rethrow(e);
+    }
+  }
+
+  Future<PartnerReturn?> acceptReturn(String id) => _returnStep(id, 'accept');
+  Future<void> rejectReturn(String id, {String? reason}) => _returnStep(id, 'reject', {'reason': reason});
+  Future<PartnerReturn?> returnArrived(String id) => _returnStep(id, 'arrived');
+  /// Proof of pickup: the customer's code + at least one photo (data URI).
+  Future<PartnerReturn?> collectReturn(String id,
+          {required String otp, required List<String> photos, String? note}) =>
+      _returnStep(id, 'collect', {'otp': otp, 'photos': photos, 'itemsVerified': true, 'note': ?note},
+          const Duration(seconds: 60));
+  Future<PartnerReturn?> refuseReturn(String id, String reason) => _returnStep(id, 'refuse', {'reason': reason});
+  Future<PartnerReturn?> failReturn(String id, String reason) => _returnStep(id, 'fail', {'reason': reason});
+  Future<PartnerReturn?> completeReturn(String id) => _returnStep(id, 'complete');
+
   // ---- orders ----
   Future<List<DeliveryOrder>> activeOrders() async {
     try {
@@ -181,10 +239,10 @@ class ApiClient {
     }
   }
 
-  /// `GET /api/delivery/settlements`
-  Future<List<Map<String, dynamic>>> settlements() async {
+  /// `GET /api/delivery/settlements?range=today|week|month|all`
+  Future<List<Map<String, dynamic>>> settlements({String range = 'all'}) async {
     try {
-      final r = await _dio.get('/delivery/settlements');
+      final r = await _dio.get('/delivery/settlements', queryParameters: {'range': range});
       final m = Map<String, dynamic>.from(r.data as Map);
       final list = ((m['settlements'] as List?) ?? const [])
           .map((e) => Map<String, dynamic>.from(e as Map))

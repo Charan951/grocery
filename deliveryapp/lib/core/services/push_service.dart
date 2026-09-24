@@ -37,8 +37,10 @@ class PushService {
   }
 
   void _handleTap(RemoteMessage m) {
-    if (m.data['type'] == 'delivery_offer') {
-      final id = m.data['orderId']?.toString() ?? '';
+    // Return pickups ride the same "bring me to the dashboard" path — the
+    // offer sheet there re-fetches any live offer.
+    if (m.data['type'] == 'delivery_offer' || m.data['type'] == 'return_offer' || m.data['type'] == 'return_assigned') {
+      final id = (m.data['orderId'] ?? m.data['returnId'])?.toString() ?? '';
       if (id.isNotEmpty) onOfferTapped?.call(id);
     }
   }

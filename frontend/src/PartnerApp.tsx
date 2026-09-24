@@ -4,6 +4,7 @@ import { PartnerProvider } from './partner/PartnerContext';
 import { PartnerShell } from './partner/PartnerShell';
 import { Dashboard } from './partner/screens/Dashboard';
 import { OrderDetail } from './partner/screens/OrderDetail';
+import { ReturnDetail } from './partner/screens/ReturnDetail';
 import { Orders } from './partner/screens/Orders';
 import { Earnings } from './partner/screens/Earnings';
 import { History } from './partner/screens/History';
@@ -32,6 +33,10 @@ const PartnerApp: React.FC<Props> = ({ onLogout }) => (
       <Route
         path="/partner/orders/:orderId"
         element={<PartnerShell onLogout={onLogout}><OrderDetail /></PartnerShell>}
+      />
+      <Route
+        path="/partner/returns/:returnId"
+        element={<PartnerShell onLogout={onLogout}><ReturnDetail /></PartnerShell>}
       />
       <Route
         path="/partner/earnings"

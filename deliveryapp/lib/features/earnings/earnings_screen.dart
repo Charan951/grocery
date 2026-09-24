@@ -20,7 +20,8 @@ final earningsProvider = FutureProvider.autoDispose<
 });
 
 final settlementsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-  return ref.read(apiProvider).settlements();
+  final range = ref.watch(_rangeProvider);
+  return ref.read(apiProvider).settlements(range: range);
 });
 
 class EarningsScreen extends ConsumerWidget {
@@ -36,7 +37,7 @@ class EarningsScreen extends ConsumerWidget {
       backgroundColor: kPaper,
       appBar: AppBar(
         leading: const TabBackButton(),
-        title: Text('Todays earnings details', style: GoogleFonts.rubik(fontWeight: FontWeight.w700, fontSize: 18)),
+        title: Text('${_rangeTitle(range)} earnings', style: GoogleFonts.rubik(fontWeight: FontWeight.w700, fontSize: 18)),
         actions: [
           FilterAction<String>(
             title: 'Time range',
@@ -62,8 +63,10 @@ class EarningsScreen extends ConsumerWidget {
           final pendingAmount = s['pendingAmount'] ?? s['pending'] ?? 0;
           final settledAmount = s['settledAmount'] ?? s['settled'] ?? 0;
 
-          final todayBonus = (bonusData['todayBonus'] ?? s['bonusTotal'] ?? 0).toInt();
-          final completedCount = (s['todayCount'] ?? s['count'] ?? items.length).toInt();
+          final todayBonus = (bonusData['todayBonus'] ?? 0).toInt();
+          // Bonus milestones reset daily, so the card always tracks today.
+          final todayCount = (bonusData['completedCount'] ?? s['todayCount'] ?? 0).toInt();
+          final completedCount = (s['count'] ?? items.length).toInt();
 
           return RefreshIndicator(
             color: kGreen,
@@ -115,7 +118,7 @@ class EarningsScreen extends ConsumerWidget {
 
                 // 2. Today's Bonus Pay (24h Order Milestone Progress)
                 _BonusPayCard(
-                  completedCount: completedCount,
+                  completedCount: todayCount,
                   todayBonus: todayBonus,
                 ),
                 const SizedBox(height: 20),
@@ -128,7 +131,7 @@ class EarningsScreen extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '$completedCount Trips completed',
+                          '$completedCount ${completedCount == 1 ? 'Delivery' : 'Deliveries'} completed',
                           style: GoogleFonts.rubik(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
@@ -138,8 +141,8 @@ class EarningsScreen extends ConsumerWidget {
                         const SizedBox(height: 2),
                         Text(
                           items.isNotEmpty
-                              ? 'last trip ended ${_getTimeAgo(items.first['earnedAt'])}'
-                              : 'no trips today yet',
+                              ? 'last delivery ${_getTimeAgo(items.first['earnedAt'])}'
+                              : 'no deliveries ${_rangePhrase(range)} yet',
                           style: const TextStyle(fontSize: 12, color: kTextMuted),
                         ),
                       ],
@@ -180,17 +183,19 @@ class EarningsScreen extends ConsumerWidget {
                     ),
                     child: const Center(
                       child: Text(
-                        'No completed earnings in this period',
+                        'No completed deliveries in this period',
                         style: TextStyle(color: kTextMuted, fontWeight: FontWeight.w600),
                       ),
                     ),
                   )
                 else
                   ...items.map((e) {
-                    final settled = e['status'] == 'settled';
+                    final status = (e['status'] ?? 'pending').toString();
                     final label = deliveryLabel(numberByOrderId, e['orderId']?.toString());
                     final earnedAt = e['earnedAt'];
-                    final timeStr = _formatTime(earnedAt);
+                    final timeStr = range == 'today'
+                        ? _formatTime(earnedAt)
+                        : '${_SettlementHistorySection._formatDate(earnedAt)}, ${_formatTime(earnedAt)}';
 
                     return _OrderItemCard(
                       label: label,
@@ -200,7 +205,8 @@ class EarningsScreen extends ConsumerWidget {
                       distanceKm: (e['distanceKm'] ?? 0).toDouble(),
                       distanceFee: (e['distanceFee'] ?? 0).toDouble(),
                       tips: (e['tips'] ?? 0).toDouble(),
-                      settled: settled,
+                      status: status,
+                      settledAt: e['settledAt'],
                     );
                   }),
 
@@ -211,7 +217,7 @@ class EarningsScreen extends ConsumerWidget {
                 const SizedBox(height: 16),
 
                 // 6. Settlement History
-                const _SettlementHistorySection(),
+                _SettlementHistorySection(periodLabel: _rangePhrase(range)),
                 const SizedBox(height: 24),
               ],
             ),
@@ -220,6 +226,18 @@ class EarningsScreen extends ConsumerWidget {
       ),
     );
   }
+
+  static String _rangeTitle(String range) => switch (range) {
+        'week' => "This week's",
+        'month' => "This month's",
+        _ => "Today's",
+      };
+
+  static String _rangePhrase(String range) => switch (range) {
+        'week' => 'this week',
+        'month' => 'this month',
+        _ => 'today',
+      };
 
   static String _formatTime(dynamic dateRaw) {
     if (dateRaw == null) return 'Recent';
@@ -573,7 +591,8 @@ class _OrderItemCard extends StatefulWidget {
   final double distanceKm;
   final double distanceFee;
   final double tips;
-  final bool settled;
+  final String status; // pending | eligible | settled
+  final dynamic settledAt;
 
   const _OrderItemCard({
     required this.label,
@@ -583,7 +602,8 @@ class _OrderItemCard extends StatefulWidget {
     required this.distanceKm,
     required this.distanceFee,
     required this.tips,
-    required this.settled,
+    required this.status,
+    this.settledAt,
   });
 
   @override
@@ -592,6 +612,18 @@ class _OrderItemCard extends StatefulWidget {
 
 class _OrderItemCardState extends State<_OrderItemCard> {
   bool _expanded = false;
+
+  String get _statusLabel => switch (widget.status) {
+        'settled' => 'Settled',
+        'eligible' => 'Eligible',
+        _ => 'Pending',
+      };
+
+  Color get _statusColor => switch (widget.status) {
+        'settled' => kGreen,
+        'eligible' => Colors.blue,
+        _ => Colors.orange,
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -655,11 +687,11 @@ class _OrderItemCardState extends State<_OrderItemCard> {
                       Row(
                         children: [
                           Text(
-                            widget.settled ? 'Delivered' : 'Pending',
+                            _statusLabel,
                             style: GoogleFonts.nunitoSans(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
-                              color: widget.settled ? kGreen : Colors.orange,
+                              color: _statusColor,
                             ),
                           ),
                           const SizedBox(width: 4),
@@ -698,20 +730,32 @@ class _OrderItemCardState extends State<_OrderItemCard> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: widget.settled ? kGreenSoft : Colors.orange.shade50,
+                        color: _statusColor.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        widget.settled ? 'Settled to Bank' : 'Awaiting Settlement',
+                        widget.status == 'settled'
+                            ? 'Settled to Bank'
+                            : widget.status == 'eligible'
+                                ? 'Eligible for Settlement'
+                                : 'Awaiting Eligibility',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
-                          color: widget.settled ? kGreen : Colors.orange.shade800,
+                          color: _statusColor,
                         ),
                       ),
                     ),
                   ],
                 ),
+                if (widget.status == 'settled' && widget.settledAt != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      'Settled on ${EarningsScreen._formatTime(widget.settledAt)}',
+                      style: const TextStyle(fontSize: 11, color: kTextMuted),
+                    ),
+                  ),
               ],
             ],
           ),
@@ -771,8 +815,8 @@ class _DetailedBreakdownExpansionTile extends StatelessWidget {
                 _line('Tips Total', money(s['tips'])),
                 _line('Bonus Pay Total', money(s['bonusTotal'])),
                 const Divider(height: 16),
-                _line('Awaiting Payout', money(s['pending']), strong: true),
-                _line('Settled Payout', money(s['settled'])),
+                _line('Awaiting Payout', money(s['pendingAmount'] ?? s['pending']), strong: true),
+                _line('Settled Payout', money(s['settledAmount'] ?? s['settled'])),
               ],
             ),
           ),
@@ -808,7 +852,8 @@ class _DetailedBreakdownExpansionTile extends StatelessWidget {
 }
 
 class _SettlementHistorySection extends ConsumerWidget {
-  const _SettlementHistorySection();
+  final String periodLabel;
+  const _SettlementHistorySection({required this.periodLabel});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -841,10 +886,10 @@ class _SettlementHistorySection extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: kLedgerLine),
                 ),
-                child: const Center(
+                child: Center(
                   child: Text(
-                    'No settlements processed yet',
-                    style: TextStyle(color: kTextMuted, fontSize: 13, fontWeight: FontWeight.w600),
+                    'No settlements $periodLabel',
+                    style: const TextStyle(color: kTextMuted, fontSize: 13, fontWeight: FontWeight.w600),
                   ),
                 ),
               );
@@ -855,6 +900,10 @@ class _SettlementHistorySection extends ConsumerWidget {
                 final orderCount = s['orderCount'] ?? (s['orderIds'] as List?)?.length ?? 0;
                 final dateRaw = s['settledAt'];
                 final dateStr = _formatDate(dateRaw);
+                final payoutStatus = (s['status'] ?? 'PENDING').toString();
+                final isSuccess = payoutStatus == 'SUCCESS';
+                final isFailed = payoutStatus == 'FAILED';
+                final statusColor = isSuccess ? kGreen : (isFailed ? kRed : Colors.orange);
 
                 return Card(
                   margin: const EdgeInsets.only(bottom: 8),
@@ -888,18 +937,18 @@ class _SettlementHistorySection extends ConsumerWidget {
                       children: [
                         Text(
                           '₹${amount.toStringAsFixed(0)}',
-                          style: GoogleFonts.rubik(fontWeight: FontWeight.w800, fontSize: 15, color: kGreen),
+                          style: GoogleFonts.rubik(fontWeight: FontWeight.w800, fontSize: 15, color: statusColor),
                         ),
                         const SizedBox(height: 2),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                           decoration: BoxDecoration(
-                            color: kGreenSoft,
+                            color: statusColor.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            'Settled',
-                            style: GoogleFonts.nunitoSans(fontSize: 10, fontWeight: FontWeight.w700, color: kGreen),
+                            payoutStatus,
+                            style: GoogleFonts.nunitoSans(fontSize: 10, fontWeight: FontWeight.w700, color: statusColor),
                           ),
                         ),
                       ],
@@ -952,10 +1001,14 @@ class _SettlementHistorySection extends ConsumerWidget {
             ),
             const Divider(),
             const SizedBox(height: 8),
-            _infoRow('Settled Amount', '₹${(s['amount'] ?? 0)}'),
+            _infoRow('Amount', '₹${(s['amount'] ?? 0)}'),
             _infoRow('Orders Included', '${s['orderCount'] ?? 0} Orders'),
-            _infoRow('Settled Date', _formatDate(s['settledAt'])),
-            _infoRow('Status', 'Settled'),
+            _infoRow('Date', _formatDate(s['settledAt'])),
+            _infoRow('Status', (s['status'] ?? 'PENDING').toString()),
+            if ((s['paymentReference'] ?? '').toString().isNotEmpty)
+              _infoRow('Reference', s['paymentReference'].toString()),
+            if ((s['failureReason'] ?? '').toString().isNotEmpty)
+              _infoRow('Reason', s['failureReason'].toString()),
             const SizedBox(height: 16),
           ],
         ),

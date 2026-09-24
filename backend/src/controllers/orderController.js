@@ -11,11 +11,13 @@ import { Customer } from '../models/Customer.js';
 import { Coupon, Offer, Payment, WalletTransaction } from '../models/Finance.js';
 import { FestivalCampaign } from '../models/FestivalCampaign.js';
 import { Review, Notification, CMSPage, Blog, Settings, AuditLog, SupportTicket } from '../models/Operations.js';
+import { Tip } from '../models/Tip.js';
+import { DeliveryEarning } from '../models/DeliveryEarning.js';
 import { uploadToCloudinary } from '../config/cloudinary.js';
 import { cancelForOrder, completeForOrder, tryAssign } from '../services/assignmentService.js';
 import { sendDeliveryCredentials } from '../services/mailService.js';
 import { registerDeviceToken, removeDeviceToken, sendToOwner } from '../services/pushService.js';
-import { evaluateCoupon, findCouponByCode } from './couponController.js';
+import { evaluateCoupon, findCouponByCode, isFirstOrderFor } from './couponController.js';
 import { signToken, maskPhone, isPaymentsTestMode, razorpayInstance, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, logAudit } from './_shared.js';
 
 // ==========================================
@@ -116,6 +118,14 @@ export const orderController = {
       }
       view.pickup = view.pickup || null;
 
+      // Let the customer app know whether a tip has already been given,
+      // without a second round trip — tips are shown from the moment a
+      // partner is assigned through to after delivery.
+      if (order.deliveryPartnerUserId) {
+        const tip = await Tip.findOne({ orderId: order.orderId }).select('amount status createdAt').lean();
+        view.tip = tip ? { amount: tip.amount, status: tip.status, at: tip.createdAt } : null;
+      }
+
       res.json({ success: true, order: view });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
@@ -211,7 +221,10 @@ export const orderController = {
       let couponDiscount = 0;
       if (orderData.couponCode) {
         const coupon = await findCouponByCode(orderData.couponCode);
-        const r = evaluateCoupon(coupon, calculatedSubtotal);
+        const isFirstOrder = coupon?.firstOrderOnly
+          ? await isFirstOrderFor({ customer: authedCustomer, phone: cleanPhone })
+          : null;
+        const r = evaluateCoupon(coupon, calculatedSubtotal, { isFirstOrder });
         if (!r.ok) {
           return res.status(400).json({ success: false, message: r.message });
         }
@@ -503,6 +516,88 @@ export const orderController = {
       }
 
       res.json({ success: true, deliveryRating: order.deliveryRating, partnerRating: rating, partnerRatingCount: ratingCount });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // POST /api/orders/:id/tip
+  // { amount, razorpay_order_id, razorpay_payment_id, razorpay_signature }
+  // Customer tip, paid via the same Razorpay checkout used for order payment
+  // (frontend calls the existing /payment/create-order to get the order_id,
+  // opens Razorpay checkout, then posts the result here). This endpoint
+  // verifies the signature itself and never touches Order.paymentStatus/
+  // paymentId/totalAmount — a tip is fully separate from the order payment.
+  // Can be given any time from partner-assignment through to after delivery;
+  // one tip per order (unique index on Tip.orderId), never counted twice.
+  tipPartner: async (req, res) => {
+    try {
+      const order = await Order.findOne({ orderId: req.params.id });
+      if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+      let cust = req.customer;
+      if (!cust) {
+        const raw = String(req.body.phone || '').replace(/\D/g, '').slice(-10);
+        if (raw) cust = await Customer.findOne({ phone: new RegExp(raw + '$') });
+      }
+      if (!cust) return res.status(401).json({ success: false, message: 'Sign in to tip your delivery partner' });
+
+      const phone10 = String(cust.phone || '').replace(/\D/g, '').slice(-10);
+      const owns = order.customerId === cust.customerId
+        || (phone10 && String(order.customerPhone || '').endsWith(phone10));
+      if (!owns) return res.status(403).json({ success: false, message: 'Not your order' });
+
+      if (!order.deliveryPartnerUserId) {
+        return res.status(409).json({ success: false, message: 'This order has no delivery partner assigned yet' });
+      }
+      if (['Cancelled', 'Returned', 'Refunded', 'Failed'].includes(order.status)) {
+        return res.status(409).json({ success: false, message: 'This order is no longer eligible for a tip' });
+      }
+
+      const amount = Number(req.body.amount);
+      if (!Number.isFinite(amount) || amount < 1) {
+        return res.status(400).json({ success: false, message: 'Tip amount must be at least ₹1' });
+      }
+
+      const existing = await Tip.findOne({ orderId: order.orderId });
+      if (existing) return res.status(409).json({ success: false, message: 'A tip has already been recorded for this order' });
+
+      // Verify the Razorpay payment, same HMAC check as the order-payment flow
+      // (paymentController.verifyPayment) but scoped to this Tip only.
+      const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+      let paymentId = razorpay_payment_id;
+
+      if (isPaymentsTestMode() || razorpay_signature === 'simulated') {
+        paymentId = paymentId || `tip_sim_${Date.now()}`;
+      } else {
+        if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+          return res.status(400).json({ success: false, message: 'Missing payment verification details' });
+        }
+        const body = `${razorpay_order_id}|${razorpay_payment_id}`;
+        const expected = crypto.createHmac('sha256', RAZORPAY_KEY_SECRET).update(body).digest('hex');
+        const a = Buffer.from(expected, 'utf8');
+        const b = Buffer.from(String(razorpay_signature), 'utf8');
+        const valid = a.length === b.length && crypto.timingSafeEqual(a, b);
+        if (!valid) return res.status(400).json({ success: false, message: 'Tip payment signature verification failed' });
+      }
+
+      const tip = await Tip.create({
+        orderId: order.orderId,
+        customerId: order.customerId,
+        deliveryPartnerId: order.deliveryPartnerUserId,
+        amount: Math.round(amount),
+        paymentId,
+        status: 'paid',
+      });
+
+      // Roll the tip into the already-recorded delivery earning, if one exists
+      // (the earning is only written once the delivery actually completes).
+      await DeliveryEarning.updateOne(
+        { orderId: order.orderId, status: { $in: ['pending', 'eligible'] } },
+        [{ $set: { tips: tip.amount, total: { $add: ['$baseFee', '$distanceFee', tip.amount] } } }]
+      );
+
+      res.json({ success: true, tip });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
     }

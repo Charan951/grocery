@@ -26,6 +26,8 @@ import 'package:freshcart/features/home/presentation/controllers/catalog_provide
 import 'package:freshcart/features/orders/data/models/order_model.dart';
 import 'package:freshcart/features/orders/presentation/controllers/orders_controller.dart';
 import 'package:freshcart/features/orders/presentation/screens/orders_list_screen.dart' show reorder;
+import 'package:freshcart/features/returns/presentation/returns_providers.dart' show orderReturnsProvider;
+import 'package:freshcart/features/returns/presentation/widgets/order_returns_section.dart';
 
 /// Stable per-customer order number (#1 = this customer's very first order),
 /// derived from the full orders list (newest-first from the backend) instead
@@ -77,7 +79,10 @@ class OrderDetailScreen extends ConsumerWidget {
         error: (e, _) => ErrorState(onRetry: () => ref.invalidate(orderDetailProvider(orderId))),
         data: (order) => RefreshIndicator(
           color: AppColors.primary,
-          onRefresh: () async => ref.invalidate(orderDetailProvider(orderId)),
+          onRefresh: () async {
+            ref.invalidate(orderDetailProvider(orderId));
+            ref.invalidate(orderReturnsProvider(orderId));
+          },
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
@@ -100,6 +105,8 @@ class OrderDetailScreen extends ConsumerWidget {
               _sectionTitle('${order.items.length} item${order.items.length == 1 ? '' : 's'} in order', isDark),
               const SizedBox(height: 8),
               _ItemsCard(items: order.items, isDark: isDark),
+              if (order.status == OrderStatus.delivered)
+                OrderReturnsSection(orderId: order.id, isDark: isDark),
               const SizedBox(height: 16),
               _sectionTitle('Bill Summary', isDark),
               const SizedBox(height: 8),

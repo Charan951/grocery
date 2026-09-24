@@ -393,6 +393,21 @@ class ApiService {
     }
   }
 
+  /// `POST /api/coupons/available` — coupons for this cart value, each with
+  /// `eligible`, `amountNeeded`, `savings`; plus `isFirstOrder` and
+  /// `autoApplyCode` (best first-order coupon for a new customer, or null).
+  Future<Map<String, dynamic>> availableCoupons(num subtotal) async {
+    try {
+      final res = await _dio.post(
+        '/coupons/available',
+        data: {'subtotal': subtotal},
+      );
+      return Map<String, dynamic>.from(res.data as Map);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
   /// `POST /api/coupons/validate` — server computes the discount.
   /// Returns `{ valid: bool, discount: num, code?, message }`.
   Future<Map<String, dynamic>> validateCoupon(String code, num subtotal) async {
@@ -609,6 +624,72 @@ class ApiService {
         },
       );
       return Map<String, dynamic>.from(res.data as Map);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  // ==========================================================================
+  // RETURNS & EXCHANGES
+  // ==========================================================================
+
+  /// `GET /api/returns/config` → issue list, window and refund delay. Shared
+  /// with the web so both render the same reasons.
+  Future<Map<String, dynamic>> fetchReturnConfig() async {
+    try {
+      final res = await _dio.get('/returns/config');
+      return Map<String, dynamic>.from((res.data as Map)['config'] as Map);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  /// `GET /api/orders/:id/returns` → `{ eligible, reason, windowEndsAt,
+  /// refundMethods[], items[], requests[] }`.
+  Future<Map<String, dynamic>> fetchOrderReturns(String orderId) async {
+    try {
+      final res = await _dio.get('/orders/${Uri.encodeComponent(orderId)}/returns');
+      return Map<String, dynamic>.from(res.data as Map);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  /// `POST /api/orders/:id/returns` → `{ returnRequest }`. `photos` are
+  /// `data:image/jpeg;base64,…` URIs.
+  Future<Map<String, dynamic>> createReturn(
+    String orderId, {
+    required String type,
+    required List<Map<String, dynamic>> items,
+    required String reasonCode,
+    String? comment,
+    List<String> photos = const [],
+    String? refundMethod,
+  }) async {
+    try {
+      final res = await _dio.post(
+        '/orders/${Uri.encodeComponent(orderId)}/returns',
+        data: {
+          'type': type,
+          'items': items,
+          'reasonCode': reasonCode,
+          if (comment != null && comment.trim().isNotEmpty) 'comment': comment.trim(),
+          'photos': photos,
+          'refundMethod': ?refundMethod,
+        },
+        // Photos make this body large — give the upload room.
+        options: Options(sendTimeout: const Duration(seconds: 60), receiveTimeout: const Duration(seconds: 60)),
+      );
+      return Map<String, dynamic>.from((res.data as Map)['returnRequest'] as Map);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  /// `POST /api/returns/:id/cancel` — only before pickup.
+  Future<void> cancelReturn(String returnId) async {
+    try {
+      await _dio.post('/returns/${Uri.encodeComponent(returnId)}/cancel');
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
     }

@@ -8,6 +8,7 @@ import { useSmartBack } from '../hooks/useSmartBack';
 import { useHideBottomNav } from '../context/BottomNavContext';
 import { downloadInvoice } from '../utils/invoice';
 import { apiUrl } from '../config/api';
+import { OrderReturns } from '../components/OrderReturns';
 import { 
   Package,
   Clock,
@@ -776,6 +777,9 @@ export const CustomerOrders: React.FC = () => {
               })}
             </div>
           </div>
+
+          {/* 3b. RETURNS & EXCHANGES (delivered orders only) */}
+          <OrderReturns orderId={orderKey(selectedOrder)} status={selectedOrder.status} />
 
           {/* 4. BILL SUMMARY */}
           <div className="bg-white rounded-2xl border border-gray-200/90 shadow-sm p-4 sm:p-5">

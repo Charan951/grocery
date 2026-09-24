@@ -11,6 +11,7 @@ import 'package:freshcart_delivery/features/notifications/notifications_screen.d
 import 'package:freshcart_delivery/features/orders/orders_screen.dart';
 import 'package:freshcart_delivery/features/orders/order_detail_screen.dart';
 import 'package:freshcart_delivery/features/profile/profile_screen.dart';
+import 'package:freshcart_delivery/features/returns/return_detail_screen.dart';
 import 'package:freshcart_delivery/features/splash/splash_screen.dart';
 
 class _AuthRefresh extends ChangeNotifier {
@@ -53,6 +54,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootKey,
         path: '/order/:id',
         builder: (c, s) => OrderDetailScreen(orderId: s.pathParameters['id'] ?? ''),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/return/:id',
+        builder: (c, s) => ReturnDetailScreen(returnId: s.pathParameters['id'] ?? ''),
       ),
       GoRoute(
         parentNavigatorKey: _rootKey,

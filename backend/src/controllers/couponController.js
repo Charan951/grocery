@@ -21,8 +21,17 @@ import { signToken, maskPhone, isPaymentsTestMode, razorpayInstance, RAZORPAY_KE
 // ==========================================
 // Single source of truth for coupon eligibility + discount. Used by both the
 // validate endpoint and createOrder so web / Flutter can't diverge.
-export const evaluateCoupon = (coupon, subtotal) => {
+// `ctx.isFirstOrder`: true / false when the customer is known, null for a guest.
+export const evaluateCoupon = (coupon, subtotal, ctx = {}) => {
   if (!coupon || coupon.active === false) return { ok: false, discount: 0, message: 'This coupon is not valid' };
+  if (coupon.firstOrderOnly) {
+    if (ctx.isFirstOrder === false) {
+      return { ok: false, discount: 0, message: `${coupon.code} is only valid on your first order` };
+    }
+    if (ctx.isFirstOrder !== true) {
+      return { ok: false, discount: 0, message: `Log in to use ${coupon.code} on your first order` };
+    }
+  }
   if (subtotal < (coupon.minOrder || 0)) {
     return { ok: false, discount: 0, message: `Add items worth ₹${(coupon.minOrder - subtotal).toFixed(0)} more to use ${coupon.code}` };
   }
@@ -33,6 +42,19 @@ export const evaluateCoupon = (coupon, subtotal) => {
   if (coupon.isPercent) discount = Math.min(discount, 100);
   discount = Math.max(0, Math.min(discount, subtotal));
   return { ok: true, discount, message: `${coupon.code} applied — you saved ₹${discount}` };
+};
+
+// A customer is "new" until they have an order that wasn't cancelled/failed.
+// Matches on customerId and phone, since guest orders are keyed by phone.
+export const isFirstOrderFor = async ({ customer, phone } = {}) => {
+  const digits = String(customer?.phone || phone || '').replace(/\D/g, '').slice(-10);
+  const ids = [customer?.customerId, digits && `cust_${digits}`].filter(Boolean);
+  if (!ids.length && !digits) return null;
+  const or = [];
+  if (ids.length) or.push({ customerId: { $in: ids } });
+  if (digits) or.push({ customerPhone: `+91 ${digits}` });
+  const prior = await Order.countDocuments({ $or: or, status: { $nin: ['Cancelled', 'Failed'] } });
+  return prior === 0;
 };
 
 export const findCouponByCode = (raw) => {
@@ -62,7 +84,8 @@ export const couponController = {
       }
 
       const coupon = await findCouponByCode(code);
-      const r = evaluateCoupon(coupon, subtotal);
+      const isFirstOrder = coupon?.firstOrderOnly ? await isFirstOrderFor({ customer: req.customer }) : null;
+      const r = evaluateCoupon(coupon, subtotal, { isFirstOrder });
       if (!r.ok) return res.json({ success: true, valid: false, discount: 0, message: r.message });
       const discount = r.discount;
 
@@ -76,6 +99,52 @@ export const couponController = {
       });
     } catch (err) {
       res.status(500).json({ success: false, valid: false, message: err.message });
+    }
+  },
+
+  // POST /api/coupons/available  { subtotal }  (customer token optional)
+  // Every active coupon this shopper can see, with whether the current cart
+  // unlocks it, how much more is needed, and the saving. For a new customer,
+  // `autoApplyCode` names the best first-order coupon the cart qualifies for.
+  availableCoupons: async (req, res) => {
+    try {
+      const subtotal = Math.max(0, Number(req.body.subtotal) || 0);
+      const isFirstOrder = await isFirstOrderFor({ customer: req.customer });
+      const all = await Coupon.find({ active: { $ne: false } }).lean();
+
+      const coupons = all
+        // Returning customers never see first-order coupons.
+        .filter((c) => !(c.firstOrderOnly && isFirstOrder === false))
+        .map((c) => {
+          const minOrder = Number(c.minOrder) || 0;
+          const r = evaluateCoupon(c, subtotal, { isFirstOrder });
+          // What the coupon would save once unlocked, for the "add ₹X more" nudge.
+          const potential = evaluateCoupon(c, Math.max(subtotal, minOrder), { isFirstOrder: true });
+          return {
+            code: c.code,
+            discount: c.discount,
+            description: c.description || '',
+            minOrder,
+            value: c.value,
+            isPercent: !!c.isPercent,
+            firstOrderOnly: !!c.firstOrderOnly,
+            eligible: r.ok,
+            amountNeeded: Math.max(0, Math.ceil(minOrder - subtotal)),
+            savings: r.ok ? r.discount : potential.discount,
+            message: r.ok ? `Save ₹${r.discount} on this order` : r.message,
+          };
+        })
+        .sort((a, b) =>
+          (b.eligible - a.eligible)
+          || (a.eligible ? b.savings - a.savings : a.amountNeeded - b.amountNeeded));
+
+      const autoApply = isFirstOrder
+        ? coupons.filter((c) => c.firstOrderOnly && c.eligible).sort((a, b) => b.savings - a.savings)[0]
+        : null;
+
+      res.json({ success: true, isFirstOrder, autoApplyCode: autoApply?.code || null, coupons });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
     }
   },
 

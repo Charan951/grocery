@@ -155,8 +155,8 @@ export const SettlementHistory: React.FC = () => {
                       })}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <ShelfTag tone="green">
-                        <CheckCircle size={10} className="inline mr-1" />
+                      <ShelfTag tone={s.status === 'SUCCESS' ? 'green' : s.status === 'FAILED' ? 'red' : 'amber'}>
+                        {s.status === 'SUCCESS' && <CheckCircle size={10} className="inline mr-1" />}
                         {s.status}
                       </ShelfTag>
                     </td>
@@ -219,8 +219,28 @@ export const SettlementHistory: React.FC = () => {
                 <div>
                   <span className="text-[10px] font-bold uppercase text-text-tertiary">Status</span>
                   <div className="mt-0.5">
-                    <ShelfTag tone="green">{selectedSettlement.settlement.status}</ShelfTag>
+                    <ShelfTag
+                      tone={
+                        selectedSettlement.settlement.status === 'SUCCESS'
+                          ? 'green'
+                          : selectedSettlement.settlement.status === 'FAILED'
+                          ? 'red'
+                          : 'amber'
+                      }
+                    >
+                      {selectedSettlement.settlement.status}
+                    </ShelfTag>
                   </div>
+                  {selectedSettlement.settlement.paymentReference && (
+                    <p className="text-[10px] text-text-tertiary font-medium mt-1">
+                      Ref: {selectedSettlement.settlement.paymentReference}
+                    </p>
+                  )}
+                  {selectedSettlement.settlement.failureReason && (
+                    <p className="text-[10px] text-error font-semibold mt-1">
+                      {selectedSettlement.settlement.failureReason}
+                    </p>
+                  )}
                 </div>
               </div>
 

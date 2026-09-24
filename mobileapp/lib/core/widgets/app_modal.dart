@@ -70,16 +70,24 @@ class AppModal {
           const SizedBox(height: 8),
           Text(message, textAlign: TextAlign.center, style: AppTypography.bodyMedium(subColor)),
           const SizedBox(height: 24),
-          PrimaryButton(
-            text: confirmLabel,
-            height: 48,
-            onPressed: () => Navigator.of(context).pop(true),
+          // Pop with the dialog's own context, not the caller's: showDialog
+          // lives on the root navigator, while a caller inside the tab shell
+          // resolves to its branch navigator — popping that removes the tab
+          // page instead of the dialog (blank screen + navigator assertion).
+          Builder(
+            builder: (dialogContext) => PrimaryButton(
+              text: confirmLabel,
+              height: 48,
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+            ),
           ),
           const SizedBox(height: 10),
-          SecondaryButton(
-            text: cancelLabel,
-            height: 48,
-            onPressed: () => Navigator.of(context).pop(false),
+          Builder(
+            builder: (dialogContext) => SecondaryButton(
+              text: cancelLabel,
+              height: 48,
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+            ),
           ),
         ],
       ),

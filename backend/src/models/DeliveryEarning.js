@@ -13,8 +13,12 @@ const deliveryEarningSchema = new mongoose.Schema({
   tips: { type: Number, default: 0 },           // customer tip (no input surface yet — always 0)
   total: { type: Number, default: 0 },
 
-  status: { type: String, enum: ['pending', 'settled'], default: 'pending', index: true },
+  // pending: just earned, not yet eligible for settlement.
+  // eligible: available for admin to include in a settlement.
+  // settled: payout for the settlement containing this earning succeeded.
+  status: { type: String, enum: ['pending', 'eligible', 'settled'], default: 'pending', index: true },
   earnedAt: { type: Date, default: Date.now },
+  eligibleAt: { type: Date },
   settledAt: { type: Date },
   settlementId: { type: String, index: true },
   settledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

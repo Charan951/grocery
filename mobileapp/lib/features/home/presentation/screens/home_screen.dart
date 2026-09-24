@@ -722,7 +722,6 @@ class _HomeContent extends ConsumerWidget {
             categories: categories,
             products: products,
             productSales: ref.watch(productSalesProvider).valueOrNull ?? const {},
-            onOpenCategory: onOpenCategory,
           ),
 
         // Special groups placed at the top (position 0 / unset) — on Home,

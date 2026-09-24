@@ -90,6 +90,22 @@ export const partnerApi = {
   earnings: (range: 'today' | 'week' | 'month' | 'all' = 'week') =>
     req('/delivery/earnings', { query: { range } }),
 
+  // Return / exchange pickups
+  returnOffers: () => req('/delivery/returns/offers'),
+  activeReturns: () => req('/delivery/returns/active'),
+  returnHistory: () => req('/delivery/returns/history'),
+  getReturn: (id: string) => req(`/delivery/returns/${encodeURIComponent(id)}`),
+  returnStep: (id: string, path: string, body?: any) =>
+    req(`/delivery/returns/${encodeURIComponent(id)}/${path}`, { method: 'POST', body: body || {} }),
+  acceptReturn: (id: string) => partnerApi.returnStep(id, 'accept'),
+  rejectReturn: (id: string, reason?: string) => partnerApi.returnStep(id, 'reject', { reason }),
+  returnArrived: (id: string) => partnerApi.returnStep(id, 'arrived'),
+  collectReturn: (id: string, body: { otp: string; photos: string[]; itemsVerified: boolean; note?: string }) =>
+    partnerApi.returnStep(id, 'collect', body),
+  refuseReturn: (id: string, reason: string) => partnerApi.returnStep(id, 'refuse', { reason }),
+  failReturn: (id: string, reason: string) => partnerApi.returnStep(id, 'fail', { reason }),
+  completeReturn: (id: string) => partnerApi.returnStep(id, 'complete'),
+
   // Notifications
   notifications: (unreadOnly = false) =>
     req('/delivery/notifications', { query: { unreadOnly: unreadOnly ? '1' : undefined } }),
@@ -128,4 +144,41 @@ export type DeliveryOffer = {
   pickup?: { name?: string; lat?: number; lng?: number } | null;
   drop?: { lat?: number; lng?: number } | null;
   deliveryAddress?: string;
+};
+
+export type ReturnOffer = {
+  kind: 'return';
+  returnId: string;
+  offerId: string;
+  orderId: string;
+  type: 'return' | 'exchange';
+  attempt: number;
+  expiresAt?: string;
+  distanceMeters?: number;
+  itemCount: number;
+  items: { name: string; quantity: number }[];
+  reason?: string;
+  pickupAddress?: string;
+  pickup?: { lat?: number; lng?: number } | null;
+  store?: { name?: string; lat?: number; lng?: number } | null;
+};
+
+export type PartnerReturn = {
+  kind: 'return';
+  returnId: string;
+  orderId: string;
+  type: 'return' | 'exchange';
+  status: 'Requested' | 'Assigned' | 'Arrived' | 'Picked Up' | 'Completed' | 'Rejected' | 'Pickup Failed' | 'Cancelled';
+  customerName?: string;
+  customerPhone?: string;
+  items: { productId: string; name: string; image?: string; price: number; quantity: number; weightSpec?: string }[];
+  reasonLabel: string;
+  comment?: string;
+  photos: string[];
+  proofPhotos: string[];
+  pickupAddress?: string;
+  pickupLocation?: { lat?: number; lng?: number };
+  store?: { name?: string; lat?: number; lng?: number };
+  timeline: { status: string; note?: string; at?: string }[];
+  updatedAt?: string;
 };

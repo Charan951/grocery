@@ -5,7 +5,7 @@ import {
   LayoutDashboard, ShoppingBag, Package, FolderTree, Award, Boxes, Warehouse, 
   Users, Truck, UserCheck, Ticket, Tag, Megaphone, Layers, DollarSign, FileText, 
   Star, LifeBuoy, Bell, Settings, ShieldAlert, ChevronLeft, ChevronRight, ChevronDown,
-  Search, Sun, Moon, LogOut, CheckCircle2, AlertTriangle, Info, Receipt
+  Search, Sun, Moon, LogOut, CheckCircle2, AlertTriangle, Info, Receipt, RotateCcw
 } from 'lucide-react';
 
 import { useCMS } from '../context/CMSContext';
@@ -45,6 +45,7 @@ const sidebarSections: SidebarSection[] = [
     title: 'Sales & Fleet',
     items: [
       { name: 'Orders', path: '/admin/orders', icon: ShoppingBag },
+      { name: 'Returns & Exchanges', path: '/admin/returns', icon: RotateCcw },
       { name: 'Customers', path: '/admin/customers', icon: Users },
       { name: 'Delivery Partners', path: '/admin/delivery', icon: Truck },
       { name: 'Employees', path: '/admin/employees', icon: UserCheck },

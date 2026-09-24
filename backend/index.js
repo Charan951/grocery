@@ -5,7 +5,8 @@ import { createApp } from './app.js';
 import { connectDB } from './src/config/db.js';
 import { seedDatabase } from './src/config/seed.js';
 import { expireStaleOffers } from './src/services/assignmentService.js';
-import { autoSettlePendingEarnings } from './src/services/settlementService.js';
+import { autoMarkEligibleEarnings } from './src/services/settlementService.js';
+import { expireStaleReturnOffers, processDueRefunds } from './src/services/returnService.js';
 
 // Load config variables
 dotenv.config();
@@ -23,11 +24,14 @@ async function startServer() {
   const sweeper = setInterval(() => {
     if (mongoose.connection.readyState === 1) {
       expireStaleOffers().catch(() => {});
+      expireStaleReturnOffers().catch(() => {});
     }
   }, 15000);
   sweeper.unref?.();
 
-  // Dispatch: Auto-settle daily partner earnings before day ends (23:59 IST)
+  // Dispatch: mark the day's partner earnings ELIGIBLE for admin settlement
+  // before day ends (23:59 IST). This never pays anyone or marks anything
+  // SETTLED — only a successful admin-triggered payout does that.
   const IST_OFFSET = 5.5 * 3600000;
   let lastSettlementCheckDay = null;
 
@@ -38,15 +42,21 @@ async function startServer() {
     const minute = nowIst.getUTCMinutes();
     const todayStr = nowIst.toISOString().slice(0, 10);
 
-    // Trigger auto-settlement at 23:59 IST or on new day rollover
+    // Trigger at 23:59 IST or on new day rollover
     if (hour === 23 && minute >= 58) {
       if (lastSettlementCheckDay !== todayStr) {
         lastSettlementCheckDay = todayStr;
-        autoSettlePendingEarnings().catch(() => {});
+        autoMarkEligibleEarnings().catch(() => {});
       }
     }
   }, 30000);
   settlementSweeper.unref?.();
+
+  // Returns: transfer refunds whose post-pickup delay (default 24h) has elapsed.
+  const refundSweeper = setInterval(() => {
+    if (mongoose.connection.readyState === 1) processDueRefunds().catch(() => {});
+  }, 60000);
+  refundSweeper.unref?.();
 
   const PORT = process.env.PORT || 5000;
   httpServer.listen(PORT, () => {

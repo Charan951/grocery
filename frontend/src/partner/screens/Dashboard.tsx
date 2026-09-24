@@ -8,12 +8,14 @@ import {
   MapPinned,
   MapPin,
   Package,
+  RotateCcw,
 } from 'lucide-react';
 import { usePartner } from '../PartnerContext';
 import { usePartnerSocket } from '../usePartnerSocket';
 import { useLocationHeartbeat } from '../useLocationHeartbeat';
 import { OfferModal } from '../OfferModal';
-import { partnerApi } from '../partnerApi';
+import { ReturnOfferModal } from '../ReturnOfferModal';
+import { partnerApi, type PartnerReturn } from '../partnerApi';
 import { Card, CenterState, Pill, Stat, money } from '../ui';
 
 const greeting = () => {
@@ -28,13 +30,18 @@ export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const [active, setActive] = useState<any[]>([]);
   const [loadingActive, setLoadingActive] = useState(true);
+  const [returns, setReturns] = useState<PartnerReturn[]>([]);
 
   useLocationHeartbeat(!!partner?.isOnline);
 
   const loadActive = useCallback(async () => {
     try {
-      const r = await partnerApi.activeOrders();
+      const [r, rt] = await Promise.all([
+        partnerApi.activeOrders(),
+        partnerApi.activeReturns().catch(() => ({ returns: [] })),
+      ]);
       setActive(r.orders || []);
+      setReturns(rt.returns || []);
     } catch {
       /* keep last */
     } finally {
@@ -42,7 +49,7 @@ export const Dashboard: React.FC = () => {
     }
   }, []);
 
-  const { offer, setOffer } = usePartnerSocket(() => {
+  const { offer, setOffer, returnOffer, setReturnOffer } = usePartnerSocket(() => {
     loadActive();
     refreshMe();
   });
@@ -55,7 +62,13 @@ export const Dashboard: React.FC = () => {
         if (r.offer) setOffer(r.offer);
       })
       .catch(() => {});
-  }, [loadActive, setOffer]);
+    partnerApi
+      .returnOffers()
+      .then((r) => {
+        if (r.offers?.length) setReturnOffer(r.offers[0]);
+      })
+      .catch(() => {});
+  }, [loadActive, setOffer, setReturnOffer]);
 
   const online = !!partner?.isOnline;
   const firstName = (partner?.name || 'Partner').split(' ')[0];
@@ -104,7 +117,7 @@ export const Dashboard: React.FC = () => {
 
       {loadingActive ? (
         <CenterState kind="loading" />
-      ) : active.length === 0 ? (
+      ) : active.length === 0 && returns.length === 0 ? (
         <div className="w-full sm:max-w-[560px] rounded-[20px] border border-admin-green/15 bg-admin-green-soft py-7 px-5 flex flex-col items-center text-center">
           <span className="w-16 h-16 rounded-full bg-admin-surface text-admin-green flex items-center justify-center">
             <Package size={30} />
@@ -147,6 +160,44 @@ export const Dashboard: React.FC = () => {
           ))}
         </div>
       )}
+
+      {/* Return / exchange pickups */}
+      {returns.length > 0 && (
+        <div className="flex flex-col gap-2.5 sm:max-w-[720px] mt-2.5">
+          {returns.map((r) => (
+            <button
+              key={r.returnId}
+              onClick={() => navigate(`/partner/returns/${encodeURIComponent(r.returnId)}`)}
+              className="group text-left bg-admin-surface border border-admin-amber/40 rounded-2xl p-4 flex items-center gap-3 hover:border-admin-amber transition-colors"
+            >
+              <span className="w-9 h-9 rounded-full bg-admin-amber-soft text-admin-amber flex items-center justify-center shrink-0">
+                <RotateCcw size={16} />
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-admin-display font-extrabold text-[15px] text-admin-text">{r.returnId}</span>
+                  <Pill tone="amber">{r.type === 'exchange' ? 'Exchange' : 'Return'} · {r.status}</Pill>
+                </div>
+                <div className="text-[12.5px] text-admin-text-muted mt-1.5 flex items-center gap-1.5 truncate">
+                  <MapPin size={12} className="shrink-0 text-admin-text-faint" />
+                  {r.pickupAddress || 'Address on next screen'}
+                </div>
+              </div>
+              <ChevronRight size={16} className="text-admin-text-faint group-hover:text-admin-amber shrink-0 transition-colors" />
+            </button>
+          ))}
+        </div>
+      )}
+
+      <ReturnOfferModal
+        offer={offer ? null : returnOffer}
+        onResolved={() => setReturnOffer(null)}
+        onAccepted={(returnId) => {
+          loadActive();
+          refreshMe();
+          navigate(`/partner/returns/${encodeURIComponent(returnId)}`);
+        }}
+      />
 
       <OfferModal
         offer={offer}

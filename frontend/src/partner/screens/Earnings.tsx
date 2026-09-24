@@ -4,6 +4,7 @@ import { partnerApi } from '../partnerApi';
 import { useDeliveryNumbering } from '../useDeliveryNumbering';
 
 const RANGES: Array<'today' | 'week' | 'month' | 'all'> = ['today', 'week', 'month', 'all'];
+const RANGE_LABEL: Record<string, string> = { today: 'Today', week: 'This week', month: 'This month', all: 'All time' };
 
 export const Earnings: React.FC = () => {
   const [range, setRange] = useState<'today' | 'week' | 'month' | 'all'>('week');
@@ -31,7 +32,7 @@ export const Earnings: React.FC = () => {
             title="Time range"
             value={range}
             onChange={setRange}
-            options={RANGES.map((r) => ({ value: r, label: r.charAt(0).toUpperCase() + r.slice(1) }))}
+            options={RANGES.map((r) => ({ value: r, label: RANGE_LABEL[r] }))}
           />
         }
       />
@@ -46,13 +47,16 @@ export const Earnings: React.FC = () => {
             <div className="font-admin-display font-bold text-[34px] leading-none text-admin-text tabular-nums">
               {money(s.total)}
             </div>
-            <SectionLabel className="mt-2">Total for {range}</SectionLabel>
+            <SectionLabel className="mt-2">Total earned · {RANGE_LABEL[range].toLowerCase()}</SectionLabel>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
               {[
                 ['Base', s.base],
                 ['Distance', s.distance],
                 ['Tips', s.tips],
+                ['Bonus', s.bonusTotal],
                 ['Pending', s.pending],
+                ['Eligible', s.eligible],
+                ['Settled', s.settled],
               ].map(([label, value]) => (
                 <div
                   key={label as string}
@@ -69,9 +73,11 @@ export const Earnings: React.FC = () => {
             </div>
           </Card>
 
-          <SectionLabel className="mt-7 mb-3">Line items</SectionLabel>
+          <SectionLabel className="mt-7 mb-3">
+            {s.count} {s.count === 1 ? 'delivery' : 'deliveries'} completed
+          </SectionLabel>
           {(data.earnings || []).length === 0 ? (
-            <CenterState kind="empty">No earnings in this period.</CenterState>
+            <CenterState kind="empty">No completed deliveries in this period.</CenterState>
           ) : (
             <div className="flex flex-col gap-2">
               {(data.earnings || []).map((e: any) => (
@@ -85,10 +91,26 @@ export const Earnings: React.FC = () => {
                     </div>
                     <div className="font-admin-mono text-[10px] text-admin-text-faint mt-0.5 uppercase tracking-[0.08em]">
                       {new Date(e.earnedAt).toLocaleDateString()} ·{' '}
-                      <span className={e.status === 'settled' ? 'text-admin-green' : 'text-admin-amber'}>
-                        {e.status}
+                      <span
+                        className={
+                          e.status === 'settled'
+                            ? 'text-admin-green'
+                            : e.status === 'eligible'
+                            ? 'text-admin-blue'
+                            : 'text-admin-amber'
+                        }
+                      >
+                        {e.status === 'settled' ? 'Settled' : e.status === 'eligible' ? 'Eligible' : 'Pending'}
                       </span>
+                      {e.status === 'settled' && e.settledAt && (
+                        <> · Settled on {new Date(e.settledAt).toLocaleDateString()}</>
+                      )}
                     </div>
+                    {(e.baseFee != null || e.distanceFee != null || e.tips != null) && (
+                      <div className="font-admin-mono text-[9px] text-admin-text-faint mt-1">
+                        Base ₹{e.baseFee || 0} · Distance ₹{e.distanceFee || 0} · Tip ₹{e.tips || 0}
+                      </div>
+                    )}
                   </div>
                   <div className="font-admin-display font-bold text-[15px] text-admin-text tabular-nums">
                     {money(e.total)}

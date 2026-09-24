@@ -383,6 +383,7 @@ export interface Coupon {
   minOrder: number;
   value: number; // raw discount number or percentage
   isPercent: boolean;
+  firstOrderOnly?: boolean;
 }
 
 export interface Comment {

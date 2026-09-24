@@ -113,15 +113,19 @@ final categoryProductsProvider =
 
   // If specific productIds are specified for a group, fetch real products for those IDs
   if (q.productIds != null && q.productIds!.isNotEmpty) {
+    // Keep the order the ids were given in (e.g. Bestsellers ranked by sales),
+    // same as the web `/products?ids=` page.
+    final rank = {for (var i = 0; i < q.productIds!.length; i++) q.productIds![i]: i};
+    List<ProductModel> ordered(List<ProductModel> l) =>
+        [...l]..sort((a, b) => (rank[a.id] ?? rank.length).compareTo(rank[b.id] ?? rank.length));
     try {
       final list = await api.fetchProducts(ids: q.productIds);
-      if (list.isNotEmpty) return list;
+      if (list.isNotEmpty) return ordered(list);
     } catch (_) {}
     // Fallback: filter from all products
     final all = await ref.watch(allProductsProvider.future);
-    final set = q.productIds!.toSet();
-    final matched = all.where((p) => set.contains(p.id)).toList();
-    if (matched.isNotEmpty) return matched;
+    final matched = all.where((p) => rank.containsKey(p.id)).toList();
+    if (matched.isNotEmpty) return ordered(matched);
   }
 
   // If a search query or title override is provided for a group without productIds

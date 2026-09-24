@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { LocationPickerMap } from './LocationPickerMap';
+import { getPreciseLocation, formatAccuracy } from '../utils/geolocation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Search, Navigation, X, Check } from 'lucide-react';
 import { searchCitiesByPrefix, CityLocation } from '../data/citiesData';
@@ -45,6 +47,41 @@ export const LocationModal: React.FC<LocationModalProps> = ({
   const [landmark, setLandmark] = useState('');
   const [label, setLabel] = useState<'Home' | 'Work' | 'Other'>('Home');
   const [fullAddressText, setFullAddressText] = useState(initialString);
+  const [detectedArea, setDetectedArea] = useState('KPHB COLONY');
+  const [detectedPincode, setDetectedPincode] = useState('500072');
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
+  const [locateMsg, setLocateMsg] = useState('');
+
+  // Reverse-geocode the pin into a real address / area / pincode.
+  const fetchAddressForCoords = async (lat: number, lng: number) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&zoom=16&lat=${lat}&lon=${lng}`,
+        { signal: controller.signal }
+      );
+      const data = await res.json();
+      if (!data?.display_name) throw new Error('no address');
+      const addr = data.address || {};
+      setFullAddressText(data.display_name);
+      setDetectedArea(String(addr.suburb || addr.neighbourhood || addr.city_district || addr.city || addr.town || data.display_name.split(',')[0]).trim().toUpperCase());
+      setDetectedPincode(addr.postcode || data.display_name.match(/\b\d{6}\b/)?.[0] || '');
+    } catch {
+      setFullAddressText(`Pinned location (${lat.toFixed(5)}, ${lng.toFixed(5)})`);
+      setDetectedArea('PINNED LOCATION');
+      setDetectedPincode('');
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+
+  const handleMapPick = (lat: number, lng: number) => {
+    setGpsAccuracy(null);
+    setPosition([lat, lng]);
+    fetchAddressForCoords(lat, lng);
+  };
 
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [prefixSuggestions, setPrefixSuggestions] = useState<CityLocation[]>([]);
@@ -90,8 +127,11 @@ export const LocationModal: React.FC<LocationModalProps> = ({
     fullAddr?: string
   ) => {
     setPosition([lat, lng]);
+    setGpsAccuracy(null);
     const finalAddr = fullAddr || `${cityName}, ${stateName}${pincode ? ' - ' + pincode : ''}, India`;
     setFullAddressText(finalAddr);
+    setDetectedArea(cityName.split(',')[0].toUpperCase());
+    setDetectedPincode(pincode || '');
     setSearchQuery(cityName);
     setShowSuggestions(false);
   };
@@ -113,19 +153,22 @@ export const LocationModal: React.FC<LocationModalProps> = ({
     ];
   });
 
-  const handleLocateMe = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          setPosition([lat, lng]);
-          setFullAddressText(`New Balaji Nagar, KPHB Colony, Hyderabad, Telangana 500072, India`);
-        },
-        () => {
-          alert('Could not detect exact location. Defaulting to KPHB Colony.');
-        }
-      );
+  const handleLocateMe = async () => {
+    if (isLocating) return;
+    setIsLocating(true);
+    setLocateMsg('');
+    try {
+      const fix = await getPreciseLocation();
+      setGpsAccuracy(fix.accuracy);
+      setPosition([fix.lat, fix.lng]);
+      await fetchAddressForCoords(fix.lat, fix.lng);
+      setLocateMsg(fix.accuracy > 500
+        ? `Approximate location (${formatAccuracy(fix.accuracy)}). Drag the map to your exact spot.`
+        : '');
+    } catch (err) {
+      setLocateMsg((err as Error).message);
+    } finally {
+      setIsLocating(false);
     }
   };
 
@@ -137,9 +180,9 @@ export const LocationModal: React.FC<LocationModalProps> = ({
       label,
       houseNo,
       landmark,
-      area: 'KPHB COLONY',
+      area: detectedArea,
       fullAddress: finalAddressString,
-      pincode: '500072',
+      pincode: detectedPincode,
       lat: position[0],
       lng: position[1],
     };
@@ -310,20 +353,22 @@ export const LocationModal: React.FC<LocationModalProps> = ({
 
               {/* OpenStreetMap Iframe Container matching image copy 2.png */}
               <div className="w-full h-44 rounded-2xl overflow-hidden border border-gray-200 relative shadow-2xs shrink-0">
-                <iframe
-                  title="OpenStreetMap Location Picker"
-                  width="100%"
-                  height="100%"
-                  frameBorder="0"
-                  scrolling="no"
-                  src={`https://www.openstreetmap.org/export/embed.html?bbox=${position[1] - 0.01}%2C${position[0] - 0.01}%2C${position[1] + 0.01}%2C${position[0] + 0.01}&layer=mapnik&marker=${position[0]}%2C${position[1]}`}
-                  className="pointer-events-auto"
+                <LocationPickerMap
+                  position={position}
+                  accuracy={gpsAccuracy}
+                  onPick={handleMapPick}
+                  className="w-full h-full"
                 />
 
-                <div className="absolute top-2 right-2 z-10 bg-white/90 backdrop-blur-xs px-3 py-1 rounded-full text-[10px] font-bold text-gray-700 border border-gray-200 shadow-2xs">
-                  💡 Drag marker or click map
+                <div className="absolute top-2 right-2 z-[500] pointer-events-none bg-white/90 backdrop-blur-xs px-3 py-1 rounded-full text-[10px] font-bold text-gray-700 border border-gray-200 shadow-2xs">
+                  {isLocating ? 'Finding your location…' : '💡 Drag the map to place the pin'}
                 </div>
               </div>
+              {locateMsg && (
+                <div className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                  {locateMsg}
+                </div>
+              )}
 
               {/* Address Form Card matching image copy 2.png */}
               <div className="bg-emerald-50/40 border border-emerald-100 rounded-2xl p-4 flex flex-col gap-3">
@@ -334,10 +379,10 @@ export const LocationModal: React.FC<LocationModalProps> = ({
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
                       <h3 className="text-xs font-black text-[#00A86B] uppercase tracking-wider">
-                        KPHB COLONY
+                        {detectedArea}
                       </h3>
                       <span className="text-[10px] font-bold text-gray-400 bg-white px-2 py-0.5 rounded-md border border-gray-200">
-                        PIN: 500072
+                        PIN: {detectedPincode || '—'}
                       </span>
                     </div>
                     <p className="text-xs font-semibold text-gray-800 leading-snug mt-1">

@@ -8,6 +8,7 @@ import customerRoutes from './customer.routes.js';
 import opsRoutes from './ops.routes.js';
 import paymentRoutes from './payment.routes.js';
 import deliveryRoutes from './delivery.routes.js';
+import returnRoutes from './returns.routes.js';
 
 const router = express.Router();
 
@@ -93,5 +94,6 @@ router.use(customerRoutes);
 router.use(opsRoutes);
 router.use(paymentRoutes);
 router.use(deliveryRoutes);
+router.use(returnRoutes);
 
 export default router;

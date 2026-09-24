@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
-import { partnerToken, type DeliveryOffer } from './partnerApi';
+import { partnerToken, type DeliveryOffer, type ReturnOffer } from './partnerApi';
 import { SOCKET_URL } from '../config/api';
 
 // One socket connection for the whole partner app. The backend joins this
@@ -8,6 +8,7 @@ import { SOCKET_URL } from '../config/api';
 // only listen — we never emit a join.
 export function usePartnerSocket(onOrderStatus?: (p: any) => void) {
   const [offer, setOffer] = useState<DeliveryOffer | null>(null);
+  const [returnOffer, setReturnOffer] = useState<ReturnOffer | null>(null);
   const [connected, setConnected] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const cbRef = useRef(onOrderStatus);
@@ -36,6 +37,16 @@ export function usePartnerSocket(onOrderStatus?: (p: any) => void) {
     socket.on('assignment_confirmed', () => setOffer(null));
     socket.on('order_status_update', (payload: any) => cbRef.current?.(payload));
 
+    // Return / exchange pickups — a separate offer channel from order dispatch.
+    socket.on('return_offer', (payload: ReturnOffer) => {
+      if (payload?.returnId) setReturnOffer(payload);
+    });
+    socket.on('return_offer_revoked', (payload: { returnId?: string }) => {
+      setReturnOffer((cur) => (cur && payload?.returnId === cur.returnId ? null : cur));
+    });
+    socket.on('return_assigned', (payload: any) => cbRef.current?.(payload));
+    socket.on('return_cancelled', (payload: any) => cbRef.current?.(payload));
+
     return () => {
       socket.removeAllListeners();
       socket.close();
@@ -43,5 +54,5 @@ export function usePartnerSocket(onOrderStatus?: (p: any) => void) {
     };
   }, []);
 
-  return { offer, setOffer, connected };
+  return { offer, setOffer, returnOffer, setReturnOffer, connected };
 }

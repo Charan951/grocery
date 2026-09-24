@@ -4,6 +4,10 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Take photos of items you want to return or exchange.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Attach photos of items you want to return or exchange.</string>
 	<key>CFBundleDisplayName</key>
 	<string>Freshcart</string>
 	<key>CFBundleExecutable</key>

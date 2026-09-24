@@ -75,6 +75,10 @@ const settingsSchema = new mongoose.Schema({
   batchRadiusKm: { type: Number, default: 1.5 }, // 2nd order only if its drop is within this of an active drop
   deliveryBaseFee: { type: Number, default: 20 },   // partner earning base (P2)
   deliveryPerKmFee: { type: Number, default: 6 },
+  // --- Returns & exchanges ---
+  returnsEnabled: { type: Boolean, default: true },
+  returnWindowHours: { type: Number, default: 48 },  // measured from deliveredAt
+  refundDelayHours: { type: Number, default: 24 },   // pickup -> refund transfer
   // --- Customer app runtime config (served by GET /api/app/config) ---
   appConfig: {
     minSupportedVersion: { type: String, default: '1.0.0' }, // app blocks below this

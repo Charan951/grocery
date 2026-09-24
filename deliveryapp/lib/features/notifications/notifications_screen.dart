@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:freshcart_delivery/features/returns/return_offer_controller.dart';
 import 'package:freshcart_delivery/core/providers.dart';
 import 'package:freshcart_delivery/models/delivery_models.dart';
 import 'package:freshcart_delivery/core/theme.dart';
@@ -62,6 +64,21 @@ class NotificationsScreen extends ConsumerWidget {
                   trailing: Text(_ago(n.createdAt),
                       style: const TextStyle(fontSize: 11, color: kTextFaint)),
                   tileColor: n.read ? null : Colors.green.withValues(alpha: 0.04),
+                  // Pickup offers pop over the home tabs, not this screen —
+                  // tapping one brings the partner there if it's still live.
+                  onTap: n.title.toLowerCase().contains('pickup')
+                      ? () async {
+                          final live = await ref.read(returnOfferProvider.notifier).checkPending();
+                          if (!c.mounted) return;
+                          if (live) {
+                            c.go('/');
+                          } else {
+                            ScaffoldMessenger.of(c).showSnackBar(
+                              const SnackBar(content: Text('This pickup offer has expired or was taken.')),
+                            );
+                          }
+                        }
+                      : null,
                 );
               },
             ),

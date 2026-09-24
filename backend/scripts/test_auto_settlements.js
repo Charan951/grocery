@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import { User } from '../src/models/User.js';
 import { DeliveryEarning } from '../src/models/DeliveryEarning.js';
 import { DeliverySettlement } from '../src/models/DeliverySettlement.js';
-import { autoSettlePendingEarnings } from '../src/services/settlementService.js';
+import { autoMarkEligibleEarnings } from '../src/services/settlementService.js';
 
 dotenv.config({ path: './.env' });
 
@@ -60,24 +60,24 @@ async function run() {
     const pendingCountBefore = await DeliveryEarning.countDocuments({ orderId: { $in: testOrderIds }, status: 'pending' });
     console.log(`Pending Earnings created before EOD auto-settlement: ${pendingCountBefore} (Expect 3)`);
 
-    console.log('\n--- STEP 2: Simulating 11:59 PM End-of-Day Automatic Settlement ---');
-    const result = await autoSettlePendingEarnings();
-    console.log('AutoSettlement Result:', result);
+    console.log('\n--- STEP 2: Simulating 11:59 PM End-of-Day Eligibility Sweep ---');
+    const result = await autoMarkEligibleEarnings();
+    console.log('AutoMarkEligible Result:', result);
 
-    console.log('\n--- STEP 3: Verifying Database Post Auto-Settlement ---');
+    console.log('\n--- STEP 3: Verifying Database Post Sweep ---');
     const pendingCountAfter = await DeliveryEarning.countDocuments({ orderId: { $in: testOrderIds }, status: 'pending' });
-    const settledCountAfter = await DeliveryEarning.countDocuments({ orderId: { $in: testOrderIds }, status: 'settled' });
-    const settlementDoc = await DeliverySettlement.findOne({ orderIds: { $in: testOrderIds } });
+    const eligibleCountAfter = await DeliveryEarning.countDocuments({ orderId: { $in: testOrderIds }, status: 'eligible' });
 
-    console.log(`Pending test earnings after auto-settlement: ${pendingCountAfter} (Expect 0)`);
-    console.log(`Settled test earnings after auto-settlement: ${settledCountAfter} (Expect 3)`);
-    console.log(`Created Settlement Batch ID: ${settlementDoc?.settlementId}, Amount: ₹${settlementDoc?.amount}, Orders: ${settlementDoc?.orderCount}`);
+    console.log(`Pending test earnings after sweep: ${pendingCountAfter} (Expect 0)`);
+    console.log(`Eligible test earnings after sweep: ${eligibleCountAfter} (Expect 3)`);
+    console.log('Note: the sweep only promotes pending -> eligible. It never creates a settlement');
+    console.log('or marks earnings settled — only a successful admin-triggered payout does that.');
 
-    if (pendingCountAfter !== 0 || settledCountAfter !== 3 || !settlementDoc) {
-      throw new Error('Automated settlement test failed!');
+    if (pendingCountAfter !== 0 || eligibleCountAfter !== 3) {
+      throw new Error('Eligibility sweep test failed!');
     }
 
-    console.log('\nSUCCESS! Automatic daily settlement system verified cleanly.');
+    console.log('\nSUCCESS! Daily eligibility sweep verified cleanly.');
   } catch (err) {
     console.error('Test failed with error:', err);
   } finally {

@@ -11,6 +11,9 @@ class SocketService {
   final _confirmed = StreamController<Map<String, dynamic>>.broadcast();
   final _cancelled = StreamController<Map<String, dynamic>>.broadcast();
   final _orderChat = StreamController<Map<String, dynamic>>.broadcast();
+  final _returnOffer = StreamController<Map<String, dynamic>>.broadcast();
+  final _returnRevoked = StreamController<Map<String, dynamic>>.broadcast();
+  final _returnChanged = StreamController<Map<String, dynamic>>.broadcast();
   final _connection = StreamController<bool>.broadcast();
   final _joinedOrderRooms = <String>{};
 
@@ -20,6 +23,11 @@ class SocketService {
   Stream<Map<String, dynamic>> get cancelled => _cancelled.stream;
   /// One in-order chat message (customer <-> this partner), pushed live.
   Stream<Map<String, dynamic>> get orderChat => _orderChat.stream;
+  /// Return / exchange pickups — a separate offer channel from order dispatch.
+  Stream<Map<String, dynamic>> get returnOffers => _returnOffer.stream;
+  Stream<Map<String, dynamic>> get returnRevoked => _returnRevoked.stream;
+  /// Ops assigned / cancelled a pickup for this partner.
+  Stream<Map<String, dynamic>> get returnChanged => _returnChanged.stream;
   Stream<bool> get connection => _connection.stream;
   bool get isConnected => _socket?.connected ?? false;
 
@@ -65,6 +73,10 @@ class SocketService {
     s.on('assignment_confirmed', (d) => d is Map ? _confirmed.add(Map<String, dynamic>.from(d)) : null);
     s.on('order_cancelled', (d) => d is Map ? _cancelled.add(Map<String, dynamic>.from(d)) : null);
     s.on('order_chat_message', (d) => d is Map ? _orderChat.add(Map<String, dynamic>.from(d)) : null);
+    s.on('return_offer', (d) => d is Map ? _returnOffer.add(Map<String, dynamic>.from(d)) : null);
+    s.on('return_offer_revoked', (d) => d is Map ? _returnRevoked.add(Map<String, dynamic>.from(d)) : null);
+    s.on('return_assigned', (d) => d is Map ? _returnChanged.add(Map<String, dynamic>.from(d)) : null);
+    s.on('return_cancelled', (d) => d is Map ? _returnChanged.add(Map<String, dynamic>.from(d)) : null);
   }
 
   void disconnect() {

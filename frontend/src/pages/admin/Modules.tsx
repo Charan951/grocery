@@ -2722,6 +2722,8 @@ export const CouponsModule: React.FC = () => {
   const [code, setCode] = useState('');
   const [val, setVal] = useState(50);
   const [minOrder, setMinOrder] = useState(499);
+  const [description, setDescription] = useState('');
+  const [firstOrderOnly, setFirstOrderOnly] = useState(false);
   const [editingCoupon, setEditingCoupon] = useState<any | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [couponParams, setCouponParams] = useSearchParams();
@@ -2745,6 +2747,8 @@ export const CouponsModule: React.FC = () => {
     setCode('');
     setVal(50);
     setMinOrder(499);
+    setDescription('');
+    setFirstOrderOnly(false);
     setShowForm(true);
   };
 
@@ -2752,7 +2756,9 @@ export const CouponsModule: React.FC = () => {
     setEditingCoupon(c);
     setCode(c.code);
     setVal(c.value || 50);
-    setMinOrder(c.minOrder || 499);
+    setMinOrder(c.minOrder ?? 499);
+    setDescription(c.description || '');
+    setFirstOrderOnly(!!c.firstOrderOnly);
     setShowForm(true);
   };
 
@@ -2763,10 +2769,11 @@ export const CouponsModule: React.FC = () => {
     const couponData = {
       code: code.toUpperCase().trim(),
       discount: `₹${val} OFF`,
-      description: 'Coupon promo offer',
+      description: description.trim() || (firstOrderOnly ? 'On your first order' : 'Coupon promo offer'),
       minOrder: Number(minOrder),
       value: Number(val),
-      isPercent: false
+      isPercent: false,
+      firstOrderOnly
     };
 
     if (editingCoupon) {
@@ -2850,6 +2857,14 @@ export const CouponsModule: React.FC = () => {
             <label className="text-[11px] font-bold text-text-secondary">Min Order threshold (₹)</label>
             <input type="number" value={minOrder} onChange={(e) => setMinOrder(Number(e.target.value))} className="px-3 py-1.5 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary font-bold" required />
           </div>
+          <div className="flex flex-col gap-1 sm:col-span-2">
+            <label className="text-[11px] font-bold text-text-secondary">Description (shown to customers)</label>
+            <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Flat ₹50 off on your first order" className="px-3 py-1.5 border border-divider rounded-xl text-xs bg-surface focus:outline-none focus:border-primary text-text-primary" />
+          </div>
+          <label className="flex items-center gap-2 self-end h-9 text-[11px] font-bold text-text-secondary cursor-pointer">
+            <input type="checkbox" checked={firstOrderOnly} onChange={(e) => setFirstOrderOnly(e.target.checked)} className="accent-primary" />
+            First order only (auto-applied for new customers)
+          </label>
           <div className="flex gap-2 self-end h-9">
             <button type="submit" className="bg-primary text-white font-bold text-xs rounded-xl px-4 flex-1 hover:bg-secondary cursor-pointer">Save</button>
             <button type="button" onClick={() => { setShowForm(false); setEditingCoupon(null); }} className="bg-surface text-text-secondary border border-divider font-bold text-xs rounded-xl px-4 flex-1 cursor-pointer">Cancel</button>
@@ -2870,7 +2885,12 @@ export const CouponsModule: React.FC = () => {
             {coupons.map(c => (
               <tr key={c.code} className="border-b border-divider hover:bg-background/20 transition-all">
                 <td className="p-3 font-bold text-text-primary font-mono">{c.code}</td>
-                <td className="p-3 font-semibold text-text-secondary">{c.discount} • Min order: ₹{c.minOrder}</td>
+                <td className="p-3 font-semibold text-text-secondary">
+                  {c.discount} • Min order: ₹{c.minOrder}
+                  {c.firstOrderOnly && (
+                    <span className="ml-2 px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 text-[9px] font-black uppercase">First order</span>
+                  )}
+                </td>
                 <td className="p-3 text-right flex justify-end gap-2">
                   <button onClick={() => handleOpenEdit(c)} className="text-primary hover:underline font-bold text-[11px] cursor-pointer">Edit</button>
                   <button onClick={() => handleDelete(c.code)} className="text-error hover:underline font-bold text-[11px] cursor-pointer">Remove</button>
@@ -3595,6 +3615,9 @@ type DeliveryCfg = {
   deliveryPerKmFee: number;
   deliveryFeeRule: number;
   freeDeliveryThreshold: number;
+  returnsEnabled: boolean;
+  returnWindowHours: number;
+  refundDelayHours: number;
   storeName: string;
   storeLat: number | '';
   storeLng: number | '';
@@ -3604,6 +3627,7 @@ const DEFAULT_DELIVERY_CFG: DeliveryCfg = {
   autoAssignEnabled: true, assignRadiusKm: 6, batchRadiusKm: 1.5,
   offerTimeoutSec: 25, maxOfferAttempts: 5, deliveryBaseFee: 20, deliveryPerKmFee: 6,
   deliveryFeeRule: 40, freeDeliveryThreshold: 499,
+  returnsEnabled: true, returnWindowHours: 48, refundDelayHours: 24,
   storeName: '', storeLat: '', storeLng: '',
 };
 
@@ -3638,6 +3662,9 @@ export const SettingsModule: React.FC = () => {
           deliveryPerKmFee: s.deliveryPerKmFee ?? 6,
           deliveryFeeRule: s.deliveryFeeRule ?? 40,
           freeDeliveryThreshold: s.freeDeliveryThreshold ?? 499,
+          returnsEnabled: s.returnsEnabled !== false,
+          returnWindowHours: s.returnWindowHours ?? 48,
+          refundDelayHours: s.refundDelayHours ?? 24,
           storeName: s.storeOrigin?.name || '',
           storeLat: s.storeOrigin?.lat ?? '',
           storeLng: s.storeOrigin?.lng ?? '',
@@ -3666,6 +3693,9 @@ export const SettingsModule: React.FC = () => {
         deliveryPerKmFee: Number(dcfg.deliveryPerKmFee) || 0,
         deliveryFeeRule: Number(dcfg.deliveryFeeRule) || 0,
         freeDeliveryThreshold: Number(dcfg.freeDeliveryThreshold) || 0,
+        returnsEnabled: dcfg.returnsEnabled,
+        returnWindowHours: Number(dcfg.returnWindowHours) || 48,
+        refundDelayHours: Number(dcfg.refundDelayHours) || 0,
       };
       if (dcfg.storeLat !== '' && dcfg.storeLng !== '') {
         body.storeOrigin = { name: dcfg.storeName || 'Dark store', lat: Number(dcfg.storeLat), lng: Number(dcfg.storeLng) };
@@ -3758,6 +3788,11 @@ export const SettingsModule: React.FC = () => {
             onChange={e => setDcfg(c => ({ ...c, autoAssignEnabled: e.target.checked }))} />
           Auto-assign orders when they reach “Ready”
         </label>
+        <label className="flex items-center gap-2 text-xs font-bold text-text-primary">
+          <input type="checkbox" checked={dcfg.returnsEnabled}
+            onChange={e => setDcfg(c => ({ ...c, returnsEnabled: e.target.checked }))} />
+          Allow customers to request returns &amp; exchanges on delivered orders
+        </label>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {[
             { k: 'assignRadiusKm', label: 'Assign radius (km)', step: '0.5' },
@@ -3768,6 +3803,8 @@ export const SettingsModule: React.FC = () => {
             { k: 'deliveryPerKmFee', label: 'Partner per-km fee (₹)', step: '1' },
             { k: 'deliveryFeeRule', label: 'Customer delivery fee (₹)', step: '1' },
             { k: 'freeDeliveryThreshold', label: 'Free delivery above (₹)', step: '10' },
+            { k: 'returnWindowHours', label: 'Return window (hours after delivery)', step: '1' },
+            { k: 'refundDelayHours', label: 'Refund transfer after pickup (hours)', step: '1' },
           ].map(f => (
             <div key={f.k} className="flex flex-col gap-1">
               <label className="text-xs font-bold text-text-primary">{f.label}</label>

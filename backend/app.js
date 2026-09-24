@@ -11,6 +11,7 @@ import mongoose from 'mongoose';
 import apiRouter from './src/routes/api.js';
 import { User } from './src/models/User.js';
 import { setIo as setAssignmentIo } from './src/services/assignmentService.js';
+import { setReturnIo } from './src/services/returnService.js';
 
 // Native apps (the Flutter customer/delivery apps via Dio, curl, Postman,
 // server-to-server calls) don't send an `Origin` header at all, so they are
@@ -100,6 +101,7 @@ export function createApp({ logRequests = true } = {}) {
   // Make io reachable from controllers (used by the order status pipeline).
   app.set('io', io);
   setAssignmentIo(io);
+  setReturnIo(io);
 
   app.get('/', (req, res) => {
     res.json({

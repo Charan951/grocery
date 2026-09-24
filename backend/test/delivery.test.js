@@ -15,6 +15,8 @@ import { tryAssign, rejectOffer, acceptOffer } from '../src/services/assignmentS
 import { DeviceToken } from '../src/models/DeviceToken.js';
 import { Notification } from '../src/models/Operations.js';
 import { DeliveryEarning } from '../src/models/DeliveryEarning.js';
+import { DeliverySettlement } from '../src/models/DeliverySettlement.js';
+import { Tip } from '../src/models/Tip.js';
 import { DeliveryZone } from '../src/models/DeliveryZone.js';
 import { sendToOwner } from '../src/services/pushService.js';
 
@@ -79,6 +81,8 @@ test.after(async () => {
     Order.deleteMany({ orderId: new RegExp(`^${ORDER_PREFIX}`) }),
     Assignment.deleteMany({ orderId: new RegExp(`^${ORDER_PREFIX}`) }),
     DeliveryEarning.deleteMany({ orderId: new RegExp(`^${ORDER_PREFIX}`) }),
+    DeliverySettlement.deleteMany({ deliveryPartnerId: { $in: [riderUserId, rider2UserId] } }),
+    Tip.deleteMany({ orderId: new RegExp(`^${ORDER_PREFIX}`) }),
     DeliveryZone.deleteMany({ name: new RegExp(`^QA Zone ${stamp}`) }),
     DeviceToken.deleteMany({ ownerId: { $in: [riderUserId, rider2UserId] } }),
     Notification.deleteMany({ userId: { $in: [riderUserId, rider2UserId] } }),
@@ -617,7 +621,7 @@ test('GET /delivery/assignments/pending surfaces the live offer and clears once 
   await DeliveryPartner.updateOne({ userId: riderUserId }, { $set: { activeOrderIds: [] } });
 });
 
-test('completing a delivery writes one earning row (base + per-km); admin can settle it', async () => {
+test('completing a delivery writes one earning row (base + per-km); admin can settle it once eligible', async () => {
   const rTok = await riderToken();
   const aTok = await adminToken();
   const orderId = await assignAndAccept(rTok, aTok);
@@ -634,7 +638,7 @@ test('completing a delivery writes one earning row (base + per-km); admin can se
   assert.ok(e.baseFee >= 0 && e.total === e.baseFee + e.distanceFee + e.tips);
   assert.equal(String(e.partnerUserId), riderUserId);
 
-  // a repeat completion must not create a second row
+  // a repeat completion must not create a second row (idempotency)
   await D('complete', { otp });
   assert.equal((await DeliveryEarning.countDocuments({ orderId })), 1);
 
@@ -644,16 +648,30 @@ test('completing a delivery writes one earning row (base + per-km); admin can se
   assert.ok(feed.body.summary.count >= 1);
   assert.ok(feed.body.summary.total >= e.total);
 
-  // admin earnings view + settle
+  // still pending → not yet settleable, and admin's eligible bucket excludes it
   const adminView = await api().get(`/api/admin/delivery/partners/${riderUserId}/earnings`).set('Authorization', `Bearer ${aTok}`);
   assert.equal(adminView.status, 200);
   assert.ok(adminView.body.summary.pendingTotal >= e.total);
 
+  const settleNoneEligible = await api().post(`/api/admin/delivery/partners/${riderUserId}/earnings/settle`)
+    .set('Authorization', `Bearer ${aTok}`).send({});
+  assert.equal(settleNoneEligible.status, 400, 'no eligible earnings yet → settlement action does not proceed');
+
+  // promote pending -> eligible (what the daily sweep does), then settle
+  await DeliveryEarning.updateOne({ _id: e._id }, { $set: { status: 'eligible', eligibleAt: new Date() } });
+
   const settle = await api().post(`/api/admin/delivery/partners/${riderUserId}/earnings/settle`)
     .set('Authorization', `Bearer ${aTok}`).send({});
-  assert.equal(settle.status, 200);
-  assert.ok(settle.body.settled >= 1);
+  assert.equal(settle.status, 200, JSON.stringify(settle.body));
+  assert.equal(settle.body.settled, 1);
+  assert.equal(settle.body.settlement.status, 'SUCCESS');
+  assert.ok(settle.body.settlement.paymentReference, 'mock payout reference recorded');
   assert.equal((await DeliveryEarning.findById(e._id)).status, 'settled');
+
+  // already-settled earning cannot be settled again
+  const settleAgain = await api().post(`/api/admin/delivery/partners/${riderUserId}/earnings/settle`)
+    .set('Authorization', `Bearer ${aTok}`).send({ ids: [String(e._id)] });
+  assert.equal(settleAgain.status, 400, 'settled earning is no longer eligible');
 
   // a customer token cannot reach the partner earnings feed
   const cTok = await custToken();
@@ -661,6 +679,106 @@ test('completing a delivery writes one earning row (base + per-km); admin can se
     (await api().get('/api/delivery/earnings').set('Authorization', `Bearer ${cTok}`)).status));
 
   await DeliveryPartner.updateOne({ userId: riderUserId }, { $set: { activeOrderIds: [] } });
+});
+
+test('a failed payout leaves earnings ELIGIBLE (never SETTLED, never lost)', async () => {
+  const rTok = await riderToken();
+  const aTok = await adminToken();
+  const orderId = await assignAndAccept(rTok, aTok);
+  const D = (s, b) => api().post(`/api/delivery/orders/${orderId}/${s}`).set('Authorization', `Bearer ${rTok}`).send(b || {});
+  await D('picked-up');
+  await D('arrived');
+  const otp = (await Order.findOne({ orderId })).deliveryOtp;
+  await D('complete', { otp });
+
+  const e = await DeliveryEarning.findOne({ orderId });
+  await DeliveryEarning.updateOne({ _id: e._id }, { $set: { status: 'eligible', eligibleAt: new Date() } });
+
+  process.env.PAYOUT_MOCK_FORCE_FAIL = 'true';
+  try {
+    const settle = await api().post(`/api/admin/delivery/partners/${riderUserId}/earnings/settle`)
+      .set('Authorization', `Bearer ${aTok}`).send({});
+    assert.equal(settle.status, 200);
+    assert.equal(settle.body.success, false);
+    assert.equal(settle.body.settlement.status, 'FAILED');
+    assert.ok(settle.body.settlement.failureReason);
+    assert.equal(settle.body.settled, 0);
+  } finally {
+    delete process.env.PAYOUT_MOCK_FORCE_FAIL;
+  }
+
+  // earning is untouched — still eligible, not settled, money not lost
+  const after = await DeliveryEarning.findById(e._id);
+  assert.equal(after.status, 'eligible');
+  assert.equal(after.settledAt, undefined);
+
+  // retry succeeds once the provider is healthy again
+  const retry = await api().post(`/api/admin/delivery/partners/${riderUserId}/earnings/settle`)
+    .set('Authorization', `Bearer ${aTok}`).send({});
+  assert.equal(retry.status, 200);
+  assert.equal(retry.body.settlement.status, 'SUCCESS');
+  assert.equal((await DeliveryEarning.findById(e._id)).status, 'settled');
+
+  await DeliveryPartner.updateOne({ userId: riderUserId }, { $set: { activeOrderIds: [] } });
+});
+
+test('cancelled/failed orders never create an earning row', async () => {
+  const rTok = await riderToken();
+  const aTok = await adminToken();
+
+  const orderId = await assignAndAccept(rTok, aTok);
+  const D = (s, b) => api().post(`/api/delivery/orders/${orderId}/${s}`).set('Authorization', `Bearer ${rTok}`).send(b || {});
+  await D('picked-up');
+  const failed = await D('fail', { reason: 'customer unreachable' });
+  assert.equal(failed.body.order.status, 'Failed');
+  assert.equal(await DeliveryEarning.findOne({ orderId }), null, 'a failed delivery earns nothing');
+
+  const { recordEarning } = await import('../src/controllers/deliveryController.js');
+  const cancelledOrder = await Order.create({
+    orderId: `${ORDER_PREFIX}-CXL${++_n}`,
+    customerId: 'cust_qa', customerName: 'QA Cust', customerPhone: '+91 9000000000',
+    items: [{ name: 'Milk', quantity: 1, price: 50 }], itemTotal: 50, totalAmount: 75,
+    deliveryAddress: 'QA Drop', status: 'Cancelled',
+    deliveryPartnerUserId: riderUserId,
+  });
+  await recordEarning(cancelledOrder, riderUserId);
+  assert.equal(await DeliveryEarning.findOne({ orderId: cancelledOrder.orderId }), null, 'a cancelled order earns nothing even if recordEarning is called directly');
+
+  await DeliveryPartner.updateOne({ userId: riderUserId }, { $set: { activeOrderIds: [] } });
+});
+
+test('reassignment: only the partner who actually completes the delivery gets the earning', async () => {
+  const rTok = await riderToken();
+  const aTok = await adminToken();
+  await api().put('/api/delivery/status').set('Authorization', `Bearer ${rTok}`).send({ isOnline: true });
+  await api().post('/api/delivery/location').set('Authorization', `Bearer ${rTok}`).send({ lat: 17.44, lng: 78.37 });
+
+  const order = await makeOrder();
+  // force-assign to rider, then reassign to rider2 (simulating a reassignment) before completion
+  await api().post(`/api/admin/orders/${order.orderId}/assign`)
+    .set('Authorization', `Bearer ${aTok}`).send({ partnerUserId: riderUserId, force: true });
+  await api().post(`/api/admin/orders/${order.orderId}/unassign`)
+    .set('Authorization', `Bearer ${aTok}`).send({ reason: 'reassigning' });
+  const forced2 = await api().post(`/api/admin/orders/${order.orderId}/assign`)
+    .set('Authorization', `Bearer ${aTok}`).send({ partnerUserId: rider2UserId, force: true });
+  assert.equal(forced2.status, 200);
+
+  const rider2Tok = await (async () => {
+    const res = await api().post('/api/auth/login').send({ email: RIDER2_EMAIL, password: 'delivery123' });
+    return res.body.token;
+  })();
+  const D2 = (s, b) => api().post(`/api/delivery/orders/${order.orderId}/${s}`).set('Authorization', `Bearer ${rider2Tok}`).send(b || {});
+  await D2('picked-up');
+  await D2('arrived');
+  const otp = (await Order.findOne({ orderId: order.orderId })).deliveryOtp;
+  await D2('complete', { otp });
+
+  const earnings = await DeliveryEarning.find({ orderId: order.orderId });
+  assert.equal(earnings.length, 1, 'exactly one earning for the reassigned order');
+  assert.equal(String(earnings[0].partnerUserId), rider2UserId, 'only the final delivering partner is paid');
+
+  await DeliveryPartner.updateOne({ userId: riderUserId }, { $set: { activeOrderIds: [] } });
+  await DeliveryPartner.updateOne({ userId: rider2UserId }, { $set: { activeOrderIds: [] } });
 });
 
 test('wrong OTP three times locks completion', async () => {
@@ -805,6 +923,46 @@ test('customer rates the delivery partner after Delivered → recomputes partner
 
   await Order.deleteOne({ orderId: delivered.orderId });
   await DeliveryPartner.updateOne({ userId: riderUserId }, { $set: { rating: 5, ratingCount: 0 } });
+});
+
+test('customer tip: recorded once, rolled into the earning, cannot be double-counted', async () => {
+  const cTok = await custToken();
+  const me = await api().get('/api/customers/me').set('Authorization', `Bearer ${cTok}`);
+  const custId = me.body.customer.customerId;
+
+  const delivered = await Order.create({
+    orderId: `${ORDER_PREFIX}-tip-${Date.now().toString().slice(-5)}`,
+    customerId: custId, customerName: 'QA Cust', customerPhone: `+91 ${CUST_PHONE}`,
+    items: [{ name: 'Milk', quantity: 1, price: 50 }], itemTotal: 50, totalAmount: 75,
+    deliveryAddress: 'QA Drop', pickup: { name: 'DS', lat: 17.44, lng: 78.37 },
+    deliveryLocation: { lat: 17.45, lng: 78.38 },
+    status: 'Delivered', deliveryPartnerUserId: riderUserId, deliveryPartnerName: 'QA Rider',
+    deliveredAt: new Date(),
+  });
+
+  const { recordEarning } = await import('../src/controllers/deliveryController.js');
+  await recordEarning(delivered, riderUserId);
+  const before = await DeliveryEarning.findOne({ orderId: delivered.orderId });
+  assert.equal(before.tips, 0);
+
+  const bad = await api().post(`/api/orders/${delivered.orderId}/tip`).set('Authorization', `Bearer ${cTok}`).send({ amount: 0 });
+  assert.equal(bad.status, 400);
+
+  const ok = await api().post(`/api/orders/${delivered.orderId}/tip`).set('Authorization', `Bearer ${cTok}`).send({ amount: 20 });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal(ok.body.tip.amount, 20);
+
+  const after = await DeliveryEarning.findOne({ orderId: delivered.orderId });
+  assert.equal(after.tips, 20);
+  assert.equal(after.total, before.baseFee + before.distanceFee + 20);
+
+  // a second tip attempt on the same order is rejected — never counted twice
+  const dupe = await api().post(`/api/orders/${delivered.orderId}/tip`).set('Authorization', `Bearer ${cTok}`).send({ amount: 15 });
+  assert.equal(dupe.status, 409);
+  assert.equal((await DeliveryEarning.findOne({ orderId: delivered.orderId })).tips, 20, 'tip amount unchanged');
+  assert.equal((await Tip.countDocuments({ orderId: delivered.orderId })), 1);
+
+  await Order.deleteOne({ orderId: delivered.orderId });
 });
 
 test('PUT /api/settings persists the delivery/dispatch tuning fields', async () => {

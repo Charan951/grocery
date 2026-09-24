@@ -9,6 +9,7 @@ import { DeliverySettlement } from '../models/DeliverySettlement.js';
 import { DeliveryZone } from '../models/DeliveryZone.js';
 import { DeviceToken } from '../models/DeviceToken.js';
 import { createOffer, acceptOffer, cancelForOrder, tryAssign } from '../services/assignmentService.js';
+import { createAndProcessSettlement } from '../services/settlementService.js';
 import { logAudit } from './apiController.js';
 import { sendDeliveryCredentials } from '../services/mailService.js';
 
@@ -315,15 +316,19 @@ export const adminDeliveryController = {
 
       const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 500);
       const q = { partnerUserId: userId };
-      if (req.query.status === 'pending' || req.query.status === 'settled') q.status = req.query.status;
+      if (['pending', 'eligible', 'settled'].includes(req.query.status)) q.status = req.query.status;
 
       const items = await DeliveryEarning.find(q).sort({ earnedAt: -1 }).limit(limit).lean();
       const all = await DeliveryEarning.find({ partnerUserId: userId }).select('total status').lean();
       const sum = (arr) => arr.reduce((s, e) => s + (e.total || 0), 0);
 
       const pendingTotal = sum(all.filter((e) => e.status === 'pending'));
+      const eligibleTotal = sum(all.filter((e) => e.status === 'eligible'));
       const settledTotal = sum(all.filter((e) => e.status === 'settled'));
-      const lifetimeTotal = pendingTotal + settledTotal;
+      const lifetimeTotal = pendingTotal + eligibleTotal + settledTotal;
+
+      const lastSettlement = await DeliverySettlement.findOne({ deliveryPartnerId: userId, status: 'SUCCESS' })
+        .sort({ processedAt: -1 }).lean();
 
       res.json({
         success: true,
@@ -331,13 +336,17 @@ export const adminDeliveryController = {
         summary: {
           lifetimeTotal,
           pendingTotal,
+          eligibleTotal,
           settledTotal,
           totalEarned: lifetimeTotal,
           pendingAmount: pendingTotal,
+          eligibleAmount: eligibleTotal,
           settledAmount: settledTotal,
           count: all.length,
           pendingCount: all.filter((e) => e.status === 'pending').length,
+          eligibleCount: all.filter((e) => e.status === 'eligible').length,
           settledCount: all.filter((e) => e.status === 'settled').length,
+          lastSettlementAt: lastSettlement?.processedAt || null,
         },
         earnings: items,
       });
@@ -346,7 +355,10 @@ export const adminDeliveryController = {
     }
   },
 
-  // POST /api/admin/delivery/partners/:userId/earnings/settle  { ids?: string[] }  (omit = all pending)
+  // POST /api/admin/delivery/partners/:userId/earnings/settle  { ids?: string[] }  (omit = all eligible)
+  // Creates a settlement and runs it through the (mock) payout provider.
+  // Earnings only become SETTLED if the payout actually succeeds; a failed
+  // payout leaves them ELIGIBLE so the money is never lost and can be retried.
   settlePartnerEarnings: async (req, res) => {
     try {
       const { userId } = req.params;
@@ -354,57 +366,31 @@ export const adminDeliveryController = {
       if (!user) return res.status(404).json({ success: false, message: 'Delivery partner not found' });
 
       const ids = Array.isArray(req.body?.ids) && req.body.ids.length > 0 ? req.body.ids : null;
-      const filter = { partnerUserId: userId, status: 'pending', ...(ids ? { _id: { $in: ids } } : {}) };
+      const filter = { partnerUserId: userId, status: 'eligible', ...(ids ? { _id: { $in: ids } } : {}) };
 
-      const pendingItems = await DeliveryEarning.find(filter).lean();
-      if (!pendingItems || pendingItems.length === 0) {
-        return res.status(400).json({ success: false, message: 'No pending earnings found to settle for this delivery partner' });
+      const eligibleItems = await DeliveryEarning.find(filter).lean();
+      if (!eligibleItems || eligibleItems.length === 0) {
+        return res.status(400).json({ success: false, message: 'No eligible earnings found to settle for this delivery partner' });
       }
 
-      const settlementAmount = pendingItems.reduce((s, e) => s + (e.total || 0), 0);
-      if (settlementAmount <= 0) {
-        return res.status(400).json({ success: false, message: 'Settlement amount must be greater than zero' });
-      }
-
-      const count = await DeliverySettlement.countDocuments();
-      const settlementId = `SET_${String(1001 + count).padStart(3, '0')}`;
-      const now = new Date();
-      const settledBy = req.user?._id;
-      const itemIds = pendingItems.map((e) => e._id);
-      const orderIds = pendingItems.map((e) => e.orderId);
-
-      const updateRes = await DeliveryEarning.updateMany(
-        { _id: { $in: itemIds }, status: 'pending' },
-        { $set: { status: 'settled', settlementId, settledAt: now, settledBy } }
-      );
-
-      const actualSettledCount = updateRes.modifiedCount ?? updateRes.nModified ?? 0;
-      if (actualSettledCount === 0) {
-        return res.status(400).json({ success: false, message: 'Earnings were already settled by another process' });
-      }
-
-      const settlement = await DeliverySettlement.create({
-        settlementId,
-        deliveryPartnerId: userId,
-        amount: settlementAmount,
-        earningIds: itemIds,
-        orderIds,
-        orderCount: pendingItems.length,
-        status: 'SETTLED',
-        settledAt: now,
-        settledBy,
+      const settlement = await createAndProcessSettlement({
+        partnerUserId: userId,
+        earningItems: eligibleItems,
+        settledBy: req.user?._id,
       });
 
       await logAudit(
         String(req.user._id),
         req.user.name,
-        'Delivery Earnings Settled',
-        `${user.name}: ₹${settlementAmount} (${actualSettledCount} earnings settled, ID: ${settlementId})`
+        'Delivery Settlement ' + (settlement.status === 'SUCCESS' ? 'Succeeded' : 'Failed'),
+        `${user.name}: ₹${settlement.amount} (${eligibleItems.length} earnings, ID: ${settlement.settlementId}, payout: ${settlement.status})`
       );
 
       res.json({
-        success: true,
-        message: `Successfully settled ₹${settlementAmount} for ${user.name}`,
+        success: settlement.status === 'SUCCESS',
+        message: settlement.status === 'SUCCESS'
+          ? `Successfully settled ₹${settlement.amount} for ${user.name}`
+          : `Payout failed for ${user.name}: ${settlement.failureReason || 'unknown error'}. Earnings remain eligible.`,
         settlement: {
           settlementId: settlement.settlementId,
           deliveryPartnerId: settlement.deliveryPartnerId,
@@ -413,10 +399,12 @@ export const adminDeliveryController = {
           orderCount: settlement.orderCount,
           orderIds: settlement.orderIds,
           status: settlement.status,
-          settledAt: settlement.settledAt,
-          settledBy: req.user.name || String(settledBy),
+          paymentReference: settlement.paymentReference,
+          failureReason: settlement.failureReason,
+          processedAt: settlement.processedAt,
+          settledBy: req.user.name || String(req.user?._id),
         },
-        settled: actualSettledCount,
+        settled: settlement.status === 'SUCCESS' ? eligibleItems.length : 0,
       });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
@@ -482,6 +470,9 @@ export const adminDeliveryController = {
           orderCount: s.orderCount || earnings.length,
           orderIds: s.orderIds || [],
           status: s.status,
+          paymentReference: s.paymentReference,
+          failureReason: s.failureReason,
+          processedAt: s.processedAt,
           settledAt: s.settledAt,
           settledBy: s.settledBy ? s.settledBy.name : 'Admin',
         },

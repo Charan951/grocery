@@ -201,7 +201,13 @@ export const PartnerDetail: React.FC = () => {
   };
 
   const settleAll = async () => {
-    if (!window.confirm('Mark all pending earnings as settled (paid out)?')) return;
+    const eligibleAmount = Number(earnings?.summary?.eligibleTotal ?? earnings?.summary?.eligibleAmount ?? 0);
+    const eligibleCount = Number(earnings?.summary?.eligibleCount ?? 0);
+    if (eligibleAmount <= 0 || eligibleCount === 0) {
+      alert('No eligible earnings to settle.');
+      return;
+    }
+    if (!window.confirm(`Settle eligible earnings?\n\nEligible Amount: ₹${eligibleAmount}\nNumber of Earnings: ${eligibleCount}`)) return;
     setSettling(true);
     try {
       const r = await fetch(`${API_URL}/admin/delivery/partners/${userId}/earnings/settle`, {
@@ -209,7 +215,7 @@ export const PartnerDetail: React.FC = () => {
         headers: { 'Content-Type': 'application/json', ...authHeader() },
         body: '{}',
       }).then((r) => r.json());
-      if (!r.success) alert(r.message || 'Settle failed');
+      alert(r.message || (r.success ? 'Settled' : 'Settle failed'));
       await loadEarnings();
     } catch {
       alert('Settle failed');
@@ -291,6 +297,7 @@ export const PartnerDetail: React.FC = () => {
           : 'Available';
 
   const pendingPayout = Number(earnings?.summary?.pendingTotal || 0);
+  const eligiblePayout = Number(earnings?.summary?.eligibleTotal || 0);
 
   return (
     <div className="flex flex-col gap-6 animate-fadeIn">
@@ -446,24 +453,35 @@ export const PartnerDetail: React.FC = () => {
       {/* Earnings */}
       {earnings && (
         <div className={`${PANEL} p-5 sm:p-6 flex flex-col gap-4`}>
-          <SectionHead icon={<Wallet size={15} />} title="Earnings Overview" />
+          <SectionHead icon={<Wallet size={15} />} title="Earnings Overview">
+            <button
+              onClick={settleAll}
+              disabled={settling || eligiblePayout <= 0}
+              className="bg-primary text-white font-bold py-1.5 px-4 rounded-full text-[11px] hover:bg-secondary disabled:opacity-40 cursor-pointer transition-colors"
+            >
+              {settling ? 'Settling…' : 'Settle Eligible Earnings'}
+            </button>
+          </SectionHead>
 
           <MetricGrid cols="grid-cols-2 sm:grid-cols-4">
             <Metric label="Total Earned" lead value={`₹${earnings.summary.lifetimeTotal ?? earnings.summary.totalEarned ?? 0}`} />
             <Metric
-              label="Pending Settlement"
+              label="Pending"
               lead
-              value={
-                pendingPayout > 0 ? (
-                  <span className="text-warning">₹{pendingPayout}</span>
-                ) : (
-                  '₹0'
-                )
-              }
+              value={pendingPayout > 0 ? <span className="text-warning">₹{pendingPayout}</span> : '₹0'}
             />
-            <Metric label="Settled" lead value={`₹${earnings.summary.settledTotal ?? earnings.summary.settledAmount ?? 0}`} />
-            <Metric label="Deliveries paid" lead value={earnings.summary.count ?? 0} />
+            <Metric
+              label="Eligible Amount"
+              lead
+              value={eligiblePayout > 0 ? <span className="text-primary">₹{eligiblePayout}</span> : '₹0'}
+            />
+            <Metric label="Total Settled" lead value={`₹${earnings.summary.settledTotal ?? earnings.summary.settledAmount ?? 0}`} />
           </MetricGrid>
+          {earnings.summary.lastSettlementAt && (
+            <p className="text-[11px] text-text-tertiary font-semibold">
+              Last settlement: {shortDT(earnings.summary.lastSettlementAt)}
+            </p>
+          )}
 
           {earnings.earnings.length > 0 ? (
             <div className="overflow-x-auto -mx-1">
@@ -481,6 +499,9 @@ export const PartnerDetail: React.FC = () => {
                     </th>
                     <th className="px-2 py-2 border-b border-divider font-bold uppercase text-[11px] tracking-wide text-right">
                       Bonus
+                    </th>
+                    <th className="px-2 py-2 border-b border-divider font-bold uppercase text-[11px] tracking-wide text-right">
+                      Tip
                     </th>
                     <th className="px-2 py-2 border-b border-divider font-bold uppercase text-[11px] tracking-wide text-right">
                       Total Earning
@@ -508,12 +529,15 @@ export const PartnerDetail: React.FC = () => {
                       <td className="px-2 py-2 tabular-nums text-text-secondary text-right whitespace-nowrap">
                         ₹{e.bonus || 0}
                       </td>
+                      <td className="px-2 py-2 tabular-nums text-text-secondary text-right whitespace-nowrap">
+                        ₹{e.tips || 0}
+                      </td>
                       <td className="px-2 py-2 tabular-nums font-extrabold text-text-primary text-right">
                         ₹{e.total}
                       </td>
                       <td className="px-2 py-2">
-                        <ShelfTag tone={e.status === 'settled' ? 'green' : 'amber'}>
-                          {e.status === 'settled' ? 'Settled' : 'Pending'}
+                        <ShelfTag tone={e.status === 'settled' ? 'green' : e.status === 'eligible' ? 'blue' : 'amber'}>
+                          {e.status === 'settled' ? 'Settled' : e.status === 'eligible' ? 'Eligible' : 'Pending'}
                         </ShelfTag>
                       </td>
                       <td className="px-2 py-2 text-text-secondary text-right whitespace-nowrap">

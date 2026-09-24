@@ -1,13 +1,16 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:freshcart/core/constants/app_colors.dart';
 import 'package:freshcart/core/theme/app_typography.dart';
+import 'package:freshcart/core/widgets/smart_image.dart';
 import 'package:freshcart/features/categories/data/models/category_model.dart';
 import 'package:freshcart/features/products/data/models/product_model.dart';
 
 /// Bestsellers shelf: up to 6 category cards (3 per row). Each card shows only
 /// the products that have actually sold (top sellers first, max 4) and the
 /// tiles fill the whole card. Ranking comes live from `/product-sales`.
+/// Tapping a card opens that category's bestsellers as a flat, ranked list
+/// (no subcategory rail) — same as the web `/products?ids=` page.
 class CategoryShelfSection extends StatelessWidget {
   final String title;
   final List<CategoryModel> categories;
@@ -15,7 +18,6 @@ class CategoryShelfSection extends StatelessWidget {
 
   /// productId → units sold. Products with no sales are never shown.
   final Map<String, int> productSales;
-  final void Function(String categoryId) onOpenCategory;
 
   const CategoryShelfSection({
     super.key,
@@ -23,7 +25,6 @@ class CategoryShelfSection extends StatelessWidget {
     required this.categories,
     required this.products,
     required this.productSales,
-    required this.onOpenCategory,
   });
 
   static const int maxCategories = 6;
@@ -37,10 +38,16 @@ class CategoryShelfSection extends StatelessWidget {
         ..sort((a, b) => productSales[b.id]!.compareTo(productSales[a.id]!));
       if (sold.isEmpty) continue;
       final score = sold.fold<int>(0, (s, p) => s + productSales[p.id]!);
-      entries.add(_ShelfEntry(c, sold.take(4).toList(), score));
+      entries.add(_ShelfEntry(c, sold, score));
     }
     entries.sort((a, b) => b.score.compareTo(a.score));
     return entries.take(maxCategories).toList();
+  }
+
+  void _open(BuildContext context, _ShelfEntry e) {
+    final ids = e.products.map((p) => Uri.encodeComponent(p.id)).join(',');
+    final title = Uri.encodeComponent('Bestsellers in ${e.category.name}');
+    context.push('/category/${e.category.id}?ids=$ids&title=$title');
   }
 
   @override
@@ -73,7 +80,7 @@ class CategoryShelfSection extends StatelessWidget {
                       child: _ShelfCard(
                         entry: e,
                         isDark: isDark,
-                        onTap: () => onOpenCategory(e.category.id),
+                        onTap: () => _open(context, e),
                       ),
                     ),
                 ],
@@ -88,6 +95,8 @@ class CategoryShelfSection extends StatelessWidget {
 
 class _ShelfEntry {
   final CategoryModel category;
+
+  /// Every sold product in the category, top seller first.
   final List<ProductModel> products;
   final int score;
   const _ShelfEntry(this.category, this.products, this.score);
@@ -102,18 +111,22 @@ class _ShelfCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shown = entry.products;
+    final shown = entry.products.take(4).toList();
+    final more = entry.products.length - shown.length;
     final tileBg = isDark ? const Color(0xFF2A2A2C) : Colors.white;
+    final cardBg = isDark ? const Color(0xFF1E1E20) : const Color(0xFFF1F3F8);
+    final borderColor = isDark ? AppColors.dividerDark : const Color(0xFFE5E7EB);
 
     Widget tile(ProductModel p) => Expanded(
           child: Container(
             decoration: BoxDecoration(color: tileBg, borderRadius: BorderRadius.circular(9)),
             clipBehavior: Clip.antiAlias,
-            padding: const EdgeInsets.all(3),
-            child: CachedNetworkImage(
-              imageUrl: p.imageUrl,
-              fit: BoxFit.contain,
-              errorWidget: (_, _, _) => const SizedBox.shrink(),
+            child: SizedBox.expand(
+              child: smartImage(
+                url: p.imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_) => const SizedBox.shrink(),
+              ),
             ),
           ),
         );
@@ -143,38 +156,66 @@ class _ShelfCard extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(5),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E1E20) : const Color(0xFFF1F3F8),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isDark ? AppColors.dividerDark : const Color(0xFFE5E7EB),
+          Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.bottomCenter,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: borderColor),
+                ),
+                child: AspectRatio(
+                  aspectRatio: 1,
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < rows.length; i++) ...[
+                        if (i > 0) const SizedBox(height: 4),
+                        rows[i],
+                      ],
+                    ],
+                  ),
+                ),
               ),
-            ),
-            child: AspectRatio(
-              aspectRatio: 1,
-              child: Column(
-                children: [
-                  for (var i = 0; i < rows.length; i++) ...[
-                    if (i > 0) const SizedBox(height: 4),
-                    rows[i],
-                  ],
-                ],
-              ),
-            ),
+              if (more > 0)
+                Positioned(
+                  bottom: -7,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: cardBg,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: borderColor),
+                    ),
+                    child: Text(
+                      '+$more more',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? AppColors.textSecondaryDark : const Color(0xFF6B7280),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            entry.category.name,
-            maxLines: 2,
-            textAlign: TextAlign.center,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 12,
-              height: 1.2,
-              fontWeight: FontWeight.w800,
-              color: isDark ? AppColors.textPrimaryDark : const Color(0xFF1F2937),
+          const SizedBox(height: 10),
+          // Two lines reserved so every card is the same height.
+          SizedBox(
+            height: MediaQuery.textScalerOf(context).scale(12) * 1.2 * 2,
+            child: Text(
+              entry.category.name,
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.2,
+                fontWeight: FontWeight.w800,
+                color: isDark ? AppColors.textPrimaryDark : const Color(0xFF1F2937),
+              ),
             ),
           ),
         ],

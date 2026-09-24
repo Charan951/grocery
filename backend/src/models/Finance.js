@@ -8,6 +8,9 @@ const couponSchema = new mongoose.Schema({
   minOrder: { type: Number, default: 0 },
   value: { type: Number, required: true }, // raw discount amount
   isPercent: { type: Boolean, default: false },
+  // Only a customer with no previous (non-cancelled) order may use it; the
+  // cart auto-applies the best such coupon for new customers.
+  firstOrderOnly: { type: Boolean, default: false },
   active: { type: Boolean, default: true }
 }, { timestamps: true });
 

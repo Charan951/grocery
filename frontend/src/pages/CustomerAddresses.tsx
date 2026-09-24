@@ -23,6 +23,8 @@ import {
 import { useCMS } from '../context/CMSContext';
 import { useSmartBack } from '../hooks/useSmartBack';
 import { apiUrl } from '../config/api';
+import { LocationPickerMap } from '../components/LocationPickerMap';
+import { getPreciseLocation, formatAccuracy } from '../utils/geolocation';
 
 interface SavedAddress {
   id: string;
@@ -65,6 +67,9 @@ export const CustomerAddresses: React.FC = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [position, setPosition] = useState<[number, number]>([17.4842, 78.3888]);
+  // GPS accuracy (metres) of the last Locate Me fix; cleared once the pin is moved by hand.
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
 
   // Form Fields: Name, Phone, House/Flat No, Landmark, Label, Area, Pincode
   const [receiverName, setReceiverName] = useState(customerUser?.name || '');
@@ -116,37 +121,56 @@ export const CustomerAddresses: React.FC = () => {
 
         const addr = data.address || {};
         const areaName = addr.suburb || addr.neighbourhood || addr.city_district || addr.city || addr.town || data.display_name.split(',')[0] || 'SELECTED LOCATION';
-        const postCode = addr.postcode || (data.display_name.match(/\b\d{6}\b/)?.[0]) || '500072';
+        const postCode = addr.postcode || (data.display_name.match(/\b\d{6}\b/)?.[0]) || '';
 
         setDetectedArea(areaName.trim().toUpperCase());
         setDetectedPincode(postCode);
       } else {
-        setFullAddressText(`New Balaji Nagar, KPHB Colony, Hyderabad, Telangana 500072, India`);
+        // No street name for this spot — keep the real coordinates, never a made-up address.
+        setFullAddressText(`Pinned location (${lat.toFixed(5)}, ${lng.toFixed(5)})`);
+        setDetectedArea('PINNED LOCATION');
+        setDetectedPincode('');
       }
     } catch (err) {
-      if (!fullAddressText) {
-        setFullAddressText(`New Balaji Nagar, KPHB Colony, Hyderabad, Telangana 500072, India`);
-      }
+      setFullAddressText(`Pinned location (${lat.toFixed(5)}, ${lng.toFixed(5)})`);
+      setDetectedArea('PINNED LOCATION');
+      setDetectedPincode('');
     } finally {
       clearTimeout(timeout);
       setIsGeocoding(false);
     }
   };
 
-  // Interactive Map Click Handler
-  const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+  // The shopper panned/clicked the map: the centre pin is the new location.
+  const handleMapPick = (lat: number, lng: number) => {
+    setGpsAccuracy(null);
+    setPosition([lat, lng]);
+    fetchAddressForCoords(lat, lng);
+  };
 
-    const latOffset = ((rect.height / 2 - y) / rect.height) * 0.015;
-    const lngOffset = ((x - rect.width / 2) / rect.width) * 0.015;
+  const flash = (msg: string, ms = 4000) => {
+    setNotificationMsg(msg);
+    setTimeout(() => setNotificationMsg(''), ms);
+  };
 
-    const newLat = Number((position[0] + latOffset).toFixed(6));
-    const newLng = Number((position[1] + lngOffset).toFixed(6));
-
-    setPosition([newLat, newLng]);
-    fetchAddressForCoords(newLat, newLng);
+  // Fresh high-accuracy fix (not a cached network guess), then reverse-geocode.
+  const locateUser = async ({ silent = false } = {}) => {
+    setIsLocating(true);
+    try {
+      const fix = await getPreciseLocation();
+      setGpsAccuracy(fix.accuracy);
+      setPosition([fix.lat, fix.lng]);
+      fetchAddressForCoords(fix.lat, fix.lng);
+      if (fix.accuracy > 500) {
+        flash(`Approximate location (${formatAccuracy(fix.accuracy)}) — this device has no precise GPS. Drag the map to your exact spot.`, 7000);
+      } else if (!silent) {
+        flash(`Location found (${formatAccuracy(fix.accuracy)}). Drag the map to fine-tune.`);
+      }
+    } catch (err) {
+      if (!silent) flash((err as Error).message, 7000);
+    } finally {
+      setIsLocating(false);
+    }
   };
 
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -195,6 +219,7 @@ export const CustomerAddresses: React.FC = () => {
     fullAddr?: string
   ) => {
     setPosition([lat, lng]);
+    setGpsAccuracy(null);
     const areaUpper = cityName.split(',')[0].toUpperCase();
     const finalAddr = fullAddr || `${cityName}, ${stateName}${pincode ? ' - ' + pincode : ''}, India`;
     setFullAddressText(finalAddr);
@@ -221,10 +246,11 @@ export const CustomerAddresses: React.FC = () => {
         const newLat = parseFloat(top.lat);
         const newLng = parseFloat(top.lon);
         setPosition([newLat, newLng]);
+        setGpsAccuracy(null);
         setFullAddressText(top.display_name);
 
         const areaMatch = top.display_name.split(',')[0] || 'SELECTED LOCATION';
-        const pincodeMatch = top.display_name.match(/\b\d{6}\b/)?.[0] || '500072';
+        const pincodeMatch = top.display_name.match(/\b\d{6}\b/)?.[0] || '';
         setDetectedArea(areaMatch.trim().toUpperCase());
         setDetectedPincode(pincodeMatch);
       }
@@ -246,25 +272,12 @@ export const CustomerAddresses: React.FC = () => {
     setDetectedArea('SELECT LOCATION ON MAP');
     setDetectedPincode('');
     setPosition([17.4842, 78.3888]);
+    setGpsAccuracy(null);
     setViewMode('form');
 
     // Auto-detect the visitor's live location the moment the form opens so the
     // map pins where they actually are instead of a default city centre.
-    if (navigator.geolocation) {
-      setIsGeocoding(true);
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          setPosition([lat, lng]);
-          fetchAddressForCoords(lat, lng);
-        },
-        () => {
-          setIsGeocoding(false);
-        },
-        { enableHighAccuracy: false, timeout: 7000, maximumAge: 120000 }
-      );
-    }
+    locateUser({ silent: true });
   };
 
   const handleOpenEdit = (addr: SavedAddress, e: React.MouseEvent) => {
@@ -279,29 +292,12 @@ export const CustomerAddresses: React.FC = () => {
     setDetectedArea(addr.area?.toUpperCase() || 'KPHB COLONY');
     setDetectedPincode(addr.pincode || '500072');
     setPosition([addr.lat || 17.4842, addr.lng || 78.3888]);
+    setGpsAccuracy(null);
     setViewMode('form');
   };
 
   const handleLocateMe = () => {
-    if (navigator.geolocation) {
-      setIsGeocoding(true);
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          setPosition([lat, lng]);
-          fetchAddressForCoords(lat, lng);
-          setNotificationMsg('GPS location updated!');
-          setTimeout(() => setNotificationMsg(''), 3000);
-        },
-        () => {
-          setIsGeocoding(false);
-          setNotificationMsg('Could not detect your location. Search or tap the map instead.');
-          setTimeout(() => setNotificationMsg(''), 3000);
-        },
-        { enableHighAccuracy: false, timeout: 7000, maximumAge: 120000 }
-      );
-    }
+    if (!isLocating) locateUser();
   };
 
   const handleSaveAndConfirm = async () => {
@@ -636,10 +632,11 @@ export const CustomerAddresses: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleLocateMe}
-                  className="bg-primary hover:bg-secondary text-white font-extrabold text-xs px-4 py-3 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-2xs"
+                  disabled={isLocating}
+                  className="bg-primary hover:bg-secondary disabled:opacity-70 text-white font-extrabold text-xs px-4 py-3 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-2xs"
                 >
-                  <Navigation size={15} />
-                  <span>Locate Me</span>
+                  <Navigation size={15} className={isLocating ? 'animate-pulse' : ''} />
+                  <span>{isLocating ? 'Locating…' : 'Locate Me'}</span>
                 </button>
               </form>
 
@@ -691,34 +688,22 @@ export const CustomerAddresses: React.FC = () => {
               )}
             </div>
 
-            {/* Interactive OpenStreetMap Container with Click/Tap Pinning */}
-            <div
-              onClick={handleMapClick}
-              className="w-full h-56 md:h-64 rounded-2xl overflow-hidden border border-divider relative shadow-2xs shrink-0 bg-background cursor-crosshair group"
-            >
-              <iframe
-                title="OpenStreetMap Location Picker"
-                width="100%"
-                height="100%"
-                frameBorder="0"
-                scrolling="no"
-                src={`https://www.openstreetmap.org/export/embed.html?bbox=${position[1] - 0.01}%2C${position[0] - 0.01}%2C${position[1] + 0.01}%2C${position[0] + 0.01}&layer=mapnik&marker=${position[0]}%2C${position[1]}`}
-                className="pointer-events-none"
+            {/* Interactive OpenStreetMap: drag the map to put your door under the pin */}
+            <div className="w-full h-56 md:h-64 rounded-2xl overflow-hidden border border-divider relative shadow-2xs shrink-0 bg-background">
+              <LocationPickerMap
+                position={position}
+                accuracy={gpsAccuracy}
+                onPick={handleMapPick}
+                className="w-full h-full"
               />
 
-              {/* Center Pin Marker Graphic Overlay */}
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full pointer-events-none flex flex-col items-center">
-                <div className="w-8 h-8 rounded-full bg-error text-white flex items-center justify-center shadow-lg border-2 border-white">
-                  <MapPin size={20} />
-                </div>
-                <div className="w-3 h-1.5 bg-black/40 rounded-full blur-[1px] mt-0.5" />
-              </div>
-
-              <div className="absolute top-3 right-3 z-10 bg-surface/95 backdrop-blur-xs px-3.5 py-1.5 rounded-full text-xs font-bold text-text-secondary border border-divider shadow-2xs flex items-center gap-1.5">
-                {isGeocoding ? (
+              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[500] bg-surface/95 backdrop-blur-xs px-3.5 py-1.5 rounded-full text-xs font-bold text-text-secondary border border-divider shadow-2xs flex items-center gap-1.5 pointer-events-none whitespace-nowrap">
+                {isLocating ? (
+                  <span className="text-primary font-bold animate-pulse">Finding your location…</span>
+                ) : isGeocoding ? (
                   <span className="text-primary font-bold animate-pulse">Updating address...</span>
                 ) : (
-                  <span className="flex items-center gap-1.5"><Info size={13} className="text-text-tertiary" /> Click anywhere on map to pin location</span>
+                  <span className="flex items-center gap-1.5"><Info size={13} className="text-text-tertiary" /> Drag the map to place the pin</span>
                 )}
               </div>
             </div>

@@ -6,7 +6,8 @@ import { Assignment } from '../models/Assignment.js';
 import { Notification, Settings } from '../models/Operations.js';
 import { DeliveryEarning } from '../models/DeliveryEarning.js';
 import { DeliverySettlement } from '../models/DeliverySettlement.js';
-import { autoSettlePendingEarnings } from '../services/settlementService.js';
+import { Tip } from '../models/Tip.js';
+import { autoMarkEligibleEarnings } from '../services/settlementService.js';
 import { uploadToCloudinary } from '../config/cloudinary.js';
 import { acceptOffer, rejectOffer } from '../services/assignmentService.js';
 import { registerDeviceToken, removeDeviceToken, sendToOwner } from '../services/pushService.js';
@@ -15,6 +16,24 @@ const RESET_TTL_MS = 15 * 60 * 1000;
 // No mailer wired yet — surface the reset code in the response so ops/support can
 // relay it, exactly like the OTP dev flow.
 const RESET_TEST_MODE = () => process.env.OTP_TEST_MODE === 'true' || !process.env.SMTP_HOST;
+
+// Calendar range boundaries in IST (UTC+5:30): today = midnight, week = Monday
+// midnight, month = the 1st at midnight, anything else (e.g. 'all') = no bound.
+const IST_OFFSET_MS = 5.5 * 3600000;
+const rangeStartIst = (range) => {
+  const nowIst = new Date(Date.now() + IST_OFFSET_MS);
+  const y = nowIst.getUTCFullYear();
+  const m = nowIst.getUTCMonth();
+  const d = nowIst.getUTCDate();
+  const istMidnight = new Date(Date.UTC(y, m, d) - IST_OFFSET_MS);
+  const daysSinceMonday = (nowIst.getUTCDay() + 6) % 7;
+  let since = null;
+  if (range === 'today') since = istMidnight;
+  else if (range === 'week') since = new Date(Date.UTC(y, m, d - daysSinceMonday) - IST_OFFSET_MS);
+  else if (range === 'month') since = new Date(Date.UTC(y, m, 1) - IST_OFFSET_MS);
+  const istDayKey = (date) => new Date(new Date(date).getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
+  return { since, istMidnight, istDayKey };
+};
 
 const clampLat = (v) => typeof v === 'number' && v >= -90 && v <= 90;
 const clampLng = (v) => typeof v === 'number' && v >= -180 && v <= 180;
@@ -83,6 +102,10 @@ const notifyCustomer = async (order, title, body) => {
 export const recordEarning = async (order, partnerUserId) => {
   try {
     if (!order || !partnerUserId) return;
+    // Only a successful delivery generates a final earning — never for
+    // assigned/accepted/packed/dispatched, cancelled or failed orders.
+    if (order.status !== 'Delivered') return;
+
     const s = (await Settings.findOne().lean()) || {};
     const baseFee = Number(s.deliveryBaseFee ?? 20);
     const perKm = Number(s.deliveryPerKmFee ?? 6);
@@ -94,10 +117,18 @@ export const recordEarning = async (order, partnerUserId) => {
       distanceKm = Math.round((metresBetween([p.lng, p.lat], [d.lng, d.lat]) / 1000) * 10) / 10;
     }
     const distanceFee = Math.round(distanceKm * perKm);
-    const tips = 0;
+
+    // Tip is looked up (never re-entered) so it can never be counted twice —
+    // it belongs to whichever partner actually completed the delivery.
+    const tip = await Tip.findOne({ orderId: order.orderId }).lean();
+    const tips = tip && String(tip.deliveryPartnerId) === String(partnerUserId) ? Number(tip.amount || 0) : 0;
+
     const total = baseFee + distanceFee + tips;
     const earnedAt = order.deliveredAt || order.updatedAt || new Date();
 
+    // Idempotency: orderId is unique on DeliveryEarning, and $setOnInsert only
+    // writes on the first upsert, so a re-triggered delivery event (or the
+    // auto-heal sweep below) can never create a second earning for the order.
     await DeliveryEarning.updateOne(
       { orderId: order.orderId },
       { $setOnInsert: { partnerUserId, baseFee, distanceKm, distanceFee, tips, total, status: 'pending', earnedAt } },
@@ -647,28 +678,18 @@ export const deliveryController = {
         await recordEarning(ord, uid);
       }
 
-      // IST (UTC+5:30) day boundary for "today".
-      const IST_OFFSET = 5.5 * 3600000;
-      const nowIst = new Date(Date.now() + IST_OFFSET);
-      const istMidnight = new Date(Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate()) - IST_OFFSET);
+      const { since, istMidnight, istDayKey } = rangeStartIst(range);
 
-      // Auto-settle any pending earnings from previous days so each day starts freshly
-      await autoSettlePendingEarnings({ onlyBeforeDate: istMidnight });
-
-      let since = null;
-      if (range === 'today') since = istMidnight;
-      else if (range === 'week') since = new Date(Date.now() - 7 * 86400000);
-      else if (range === 'month') since = new Date(Date.now() - 30 * 86400000);
+      // Earnings from previous days become eligible for admin settlement —
+      // this never marks them SETTLED; only a successful payout does that.
+      await autoMarkEligibleEarnings({ onlyBeforeDate: istMidnight });
 
       const q = { partnerUserId: uid };
       if (since) q.earnedAt = { $gte: since };
-      const items = await DeliveryEarning.find(q).sort({ earnedAt: -1 }).limit(200).lean();
+      // Every figure below is computed over the full selected range.
+      const items = await DeliveryEarning.find(q).sort({ earnedAt: -1 }).lean();
 
-      // Today specific items for 24h bonus calculation
-      const todayItems = await DeliveryEarning.find({ partnerUserId: uid, earnedAt: { $gte: istMidnight } })
-        .sort({ earnedAt: -1 })
-        .lean();
-
+      const todayItems = items.filter((e) => new Date(e.earnedAt) >= istMidnight);
       const todayCount = todayItems.length;
 
       // Bonus Tiers based on 24h order milestone
@@ -678,22 +699,21 @@ export const deliveryController = {
         { orders: 15, bonus: 100 },
         { orders: 20, bonus: 180 },
       ];
+      const bonusFor = (n) => BONUS_TIERS.reduce((b, t) => (n >= t.orders ? t.bonus : b), 0);
 
-      let todayBonus = 0;
-      if (todayCount >= 20) todayBonus = 180;
-      else if (todayCount >= 15) todayBonus = 100;
-      else if (todayCount >= 10) todayBonus = 50;
-      else if (todayCount >= 5) todayBonus = 20;
+      // The bonus is earned per IST day, so a week/month total is the sum of each day's bonus.
+      const perDay = {};
+      for (const e of items) {
+        const k = istDayKey(e.earnedAt);
+        perDay[k] = (perDay[k] || 0) + 1;
+      }
+      const bonusTotal = Object.values(perDay).reduce((s, n) => s + bonusFor(n), 0);
+      const todayBonus = bonusFor(todayCount);
 
       const sum = (arr, k) => arr.reduce((s, e) => s + (e[k] || 0), 0);
 
-      // Lifetime partner totals for summary
-      const allEarnings = await DeliveryEarning.find({ partnerUserId: uid }).select('total status').lean();
-      const lifetimePending = sum(allEarnings.filter((e) => e.status === 'pending'), 'total');
-      const lifetimeSettled = sum(allEarnings.filter((e) => e.status === 'settled'), 'total');
-      const totalEarned = lifetimePending + lifetimeSettled;
-
       const pending = items.filter((e) => e.status === 'pending');
+      const eligible = items.filter((e) => e.status === 'eligible');
       const settled = items.filter((e) => e.status === 'settled');
 
       const todayDirect = sum(todayItems, 'total');
@@ -714,19 +734,23 @@ export const deliveryController = {
       res.json({
         success: true,
         range,
+        since,
         summary: {
           count: items.length,
-          total: sum(items, 'total') + todayBonus,
+          total: sum(items, 'total') + bonusTotal,
           todayTotal,
           pending: sum(pending, 'total'),
+          eligible: sum(eligible, 'total'),
           settled: sum(settled, 'total'),
-          totalEarned,
-          pendingAmount: lifetimePending,
-          settledAmount: lifetimeSettled,
+          // Header-card figures, scoped to the selected range.
+          totalEarned: sum(items, 'total') + bonusTotal,
+          pendingAmount: sum(pending, 'total') + sum(eligible, 'total'),
+          eligibleAmount: sum(eligible, 'total'),
+          settledAmount: sum(settled, 'total'),
           base: sum(items, 'baseFee'),
           distance: sum(items, 'distanceFee'),
           tips: sum(items, 'tips'),
-          bonusTotal: todayBonus,
+          bonusTotal,
           loginDurationMins,
           todayCount,
         },
@@ -878,11 +902,14 @@ export const deliveryController = {
     }
   },
 
-  // GET /api/delivery/settlements
+  // GET /api/delivery/settlements?range=today|week|month|all  (omitted → all)
   getSettlements: async (req, res) => {
     try {
       const uid = req.user._id;
-      const settlements = await DeliverySettlement.find({ deliveryPartnerId: uid })
+      const { since } = rangeStartIst(String(req.query.range || 'all'));
+      const q = { deliveryPartnerId: uid };
+      if (since) q.settledAt = { $gte: since };
+      const settlements = await DeliverySettlement.find(q)
         .sort({ settledAt: -1 })
         .lean();
 
@@ -895,6 +922,8 @@ export const deliveryController = {
           orderCount: s.orderCount || (s.orderIds ? s.orderIds.length : 0),
           orderIds: s.orderIds || [],
           status: s.status,
+          paymentReference: s.paymentReference,
+          failureReason: s.failureReason,
           settledAt: s.settledAt,
         })),
       });

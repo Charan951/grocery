@@ -4,6 +4,7 @@ import { useSmartBack } from '../hooks/useSmartBack';
 import { useHideBottomNav } from '../context/BottomNavContext';
 import { io, Socket } from 'socket.io-client';
 import { OrderChat } from '../components/OrderChat';
+import { OrderReturns } from '../components/OrderReturns';
 import { BannerCarousel } from '../components/BannerCarousel';
 import { useCMS } from '../context/CMSContext';
 import L from 'leaflet';
@@ -21,6 +22,12 @@ import {
   List,
 } from 'lucide-react';
 import { apiUrl, SOCKET_URL } from '../config/api';
+
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
 
 interface DeliveryBlock {
   partnerName: string;
@@ -61,7 +68,11 @@ interface TrackedOrder {
   items?: OrderItem[];
   totalAmount?: number;
   itemTotal?: number;
+  deliveryPartnerUserId?: string;
+  tip?: { amount: number; status: string; at?: string } | null;
 }
+
+const TIP_PRESETS = [10, 20, 30, 50];
 
 function customerPhone(): string {
   try {
@@ -320,6 +331,25 @@ export const TrackOrder: React.FC = () => {
   const [rateErr, setRateErr] = useState('');
   const [rateDone, setRateDone] = useState(false);
   const [rateEditing, setRateEditing] = useState(false);
+
+  // Tip state — shown from the moment a partner is assigned, and again
+  // (combined with rating) after delivery, until a tip is actually recorded.
+  const [tipDismissed, setTipDismissed] = useState(false);
+  const [tipAmount, setTipAmount] = useState<number | null>(null);
+  const [tipCustom, setTipCustom] = useState('');
+  const [tipBusy, setTipBusy] = useState(false);
+  const [tipStage, setTipStage] = useState('');
+  const [tipErr, setTipErr] = useState('');
+
+  useEffect(() => {
+    if (!window.Razorpay && !document.getElementById('rzp-checkout-js')) {
+      const script = document.createElement('script');
+      script.id = 'rzp-checkout-js';
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
 
   const elRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -908,6 +938,117 @@ export const TrackOrder: React.FC = () => {
     }
   };
 
+  const canTip = !!order && !!order.deliveryPartnerUserId
+    && !['Cancelled', 'Returned', 'Refunded', 'Failed'].includes(normalizedStatus)
+    && !order.tip;
+
+  const payTip = async (amount: number) => {
+    if (!order || !amount || amount < 1) return;
+    setTipBusy(true);
+    setTipErr('');
+    try {
+      setTipStage('Starting payment…');
+      const co = await fetch(apiUrl('/payment/create-order'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount, receipt: `tip_${order.orderId}` }),
+      }).then((r) => r.json());
+      if (!co?.success) throw new Error(co?.message || 'Could not start the tip payment.');
+      const { key, orderId: rzpOrderId, amount: rzpAmount, currency, testMode } = co;
+
+      const submitTip = async (body: Record<string, any>) => {
+        const res = await fetch(apiUrl(`/orders/${encodeURIComponent(order.orderId)}/tip`), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(localStorage.getItem('customer_token')
+              ? { Authorization: `Bearer ${localStorage.getItem('customer_token')}` }
+              : {}),
+          },
+          body: JSON.stringify({ amount, phone: customerPhone(), ...body }),
+        }).then((r) => r.json());
+        if (!res?.success) throw new Error(res?.message || 'Could not record your tip');
+        fetchOrder();
+      };
+
+      // Local-dev path: backend in test mode with no usable key — skip the sheet.
+      if (testMode && !key) {
+        setTipStage('Confirming…');
+        await submitTip({
+          razorpay_order_id: rzpOrderId,
+          razorpay_payment_id: `tip_sim_${Date.now()}`,
+          razorpay_signature: 'simulated',
+        });
+        setTipStage('');
+        setTipBusy(false);
+        return;
+      }
+
+      let waited = 0;
+      while (!window.Razorpay && waited < 5000) {
+        await new Promise((res) => setTimeout(res, 150));
+        waited += 150;
+      }
+      if (!window.Razorpay) throw new Error('Payment could not load. Check your connection and retry.');
+
+      const customerUser = (() => {
+        try {
+          const cached = localStorage.getItem('customer_user');
+          return cached ? JSON.parse(cached) : null;
+        } catch {
+          return null;
+        }
+      })();
+
+      setTipStage('Opening secure payment…');
+      const rzp = new window.Razorpay({
+        key,
+        order_id: rzpOrderId,
+        amount: rzpAmount,
+        currency: currency || 'INR',
+        name: 'FreshCart',
+        description: `Tip for order ${order.orderId}`,
+        prefill: {
+          name: customerUser?.name || '',
+          contact: customerPhone(),
+          email: customerUser?.email || '',
+        },
+        theme: { color: '#2E7D32' },
+        handler: async (resp: any) => {
+          setTipStage('Confirming…');
+          try {
+            await submitTip({
+              razorpay_order_id: resp.razorpay_order_id,
+              razorpay_payment_id: resp.razorpay_payment_id,
+              razorpay_signature: resp.razorpay_signature,
+            });
+          } catch (e: any) {
+            setTipErr(e?.message || 'Could not record your tip');
+          } finally {
+            setTipStage('');
+            setTipBusy(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setTipStage('');
+            setTipBusy(false);
+          },
+        },
+      });
+      rzp.on('payment.failed', (resp: any) => {
+        setTipStage('');
+        setTipBusy(false);
+        setTipErr(resp?.error?.description || 'Tip payment failed. Please try again.');
+      });
+      rzp.open();
+    } catch (e: any) {
+      setTipStage('');
+      setTipBusy(false);
+      setTipErr(e?.message || 'Something went wrong. Please try again.');
+    }
+  };
+
   // Bar-only easing: stays fully transparent while the banner is still
   // mostly on screen, then ramps to solid over the back half of the
   // scroll — see the App Bar's style comment for why this differs from
@@ -1373,6 +1514,75 @@ export const TrackOrder: React.FC = () => {
               </div>
             </div>
 
+            {/* Tip prompt while the delivery is on its way — customer picks an amount (or types one),
+                then explicitly hits Pay; nothing charges just from picking a preset. Can also skip
+                and be asked again after delivery. */}
+            {canTip && !isDelivered && !tipDismissed && (
+              <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-xs flex flex-col gap-3">
+                <div className="text-sm font-extrabold text-gray-900">
+                  Add a tip for {order.delivery?.partnerName || order.deliveryPartnerName || 'your delivery partner'}?
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {TIP_PRESETS.map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      disabled={tipBusy}
+                      onClick={() => {
+                        setTipAmount(amt);
+                        setTipCustom('');
+                      }}
+                      className={`rounded-full border font-extrabold text-xs px-4 py-2 disabled:opacity-40 ${
+                        tipAmount === amt && !tipCustom
+                          ? 'border-emerald-600 bg-emerald-600 text-white'
+                          : 'border-emerald-200 bg-[#E8F8F0] text-emerald-800'
+                      }`}
+                    >
+                      ₹{amt}
+                    </button>
+                  ))}
+                  <input
+                    type="number"
+                    min={1}
+                    value={tipCustom}
+                    onChange={(e) => {
+                      setTipCustom(e.target.value);
+                      setTipAmount(null);
+                    }}
+                    placeholder="Other"
+                    className="w-20 rounded-full border border-gray-200 px-3 py-2 text-xs font-bold focus:outline-none focus:border-emerald-600"
+                  />
+                  <button
+                    type="button"
+                    disabled={tipBusy}
+                    onClick={() => setTipDismissed(true)}
+                    className="text-xs font-bold text-gray-500 hover:text-gray-700 px-2"
+                  >
+                    Skip
+                  </button>
+                </div>
+                {(() => {
+                  const selected = tipCustom ? Number(tipCustom) : tipAmount;
+                  return (
+                    <button
+                      type="button"
+                      disabled={tipBusy || !selected || selected < 1}
+                      onClick={() => selected && payTip(selected)}
+                      className="self-start rounded-full bg-emerald-600 text-white font-bold text-xs px-5 py-2 disabled:opacity-40"
+                    >
+                      {tipBusy ? tipStage || 'Paying…' : selected ? `Pay ₹${selected}` : 'Select an amount'}
+                    </button>
+                  );
+                })()}
+                {tipErr && <div className="text-xs font-semibold text-red-600">{tipErr}</div>}
+              </div>
+            )}
+            {!!order.tip && !isDelivered && (
+              <div className="bg-[#E8F8F0] rounded-2xl border border-emerald-200 p-3.5 text-xs font-bold text-emerald-800 flex items-center gap-2">
+                <span>🎉 You tipped ₹{order.tip.amount} — thanks for supporting your delivery partner!</span>
+              </div>
+            )}
+
             {/* Chat Modal */}
             {chatOpen && (
               <OrderChat
@@ -1383,6 +1593,9 @@ export const TrackOrder: React.FC = () => {
                 onClose={() => setChatOpen(false)}
               />
             )}
+
+            {/* Returns & exchanges (delivered orders only) */}
+            {isDelivered && <OrderReturns orderId={order.orderId} status={order.status} />}
 
             {/* Partner Rating (when eligible) */}
             {canRate && (
@@ -1449,6 +1662,64 @@ export const TrackOrder: React.FC = () => {
                     Change rating
                   </button>
                 )}
+
+                {/* Tip, offered again alongside the rating once delivered */}
+                {order.tip ? (
+                  <div className="pt-1 border-t border-gray-100 text-xs font-bold text-emerald-700">
+                    🎉 You tipped ₹{order.tip.amount}
+                  </div>
+                ) : canTip ? (
+                  <div className="pt-2 border-t border-gray-100 flex flex-col gap-2">
+                    <div className="text-xs font-extrabold text-gray-900">
+                      Enjoyed the delivery? Add a tip
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {TIP_PRESETS.map((amt) => (
+                        <button
+                          key={amt}
+                          type="button"
+                          disabled={tipBusy}
+                          onClick={() => {
+                            setTipAmount(amt);
+                            setTipCustom('');
+                          }}
+                          className={`rounded-full border font-extrabold text-xs px-4 py-2 disabled:opacity-40 ${
+                            tipAmount === amt && !tipCustom
+                              ? 'border-emerald-600 bg-emerald-600 text-white'
+                              : 'border-emerald-200 bg-[#E8F8F0] text-emerald-800'
+                          }`}
+                        >
+                          ₹{amt}
+                        </button>
+                      ))}
+                      <input
+                        type="number"
+                        min={1}
+                        value={tipCustom}
+                        onChange={(e) => {
+                          setTipCustom(e.target.value);
+                          setTipAmount(null);
+                        }}
+                        placeholder="Other"
+                        className="w-20 rounded-full border border-gray-200 px-3 py-2 text-xs font-bold focus:outline-none focus:border-emerald-600"
+                      />
+                    </div>
+                    {(() => {
+                      const selected = tipCustom ? Number(tipCustom) : tipAmount;
+                      return (
+                        <button
+                          type="button"
+                          disabled={tipBusy || !selected || selected < 1}
+                          onClick={() => selected && payTip(selected)}
+                          className="self-start rounded-full bg-emerald-600 text-white font-bold text-xs px-5 py-2 disabled:opacity-40"
+                        >
+                          {tipBusy ? tipStage || 'Paying…' : selected ? `Pay ₹${selected}` : 'Select an amount'}
+                        </button>
+                      );
+                    })()}
+                    {tipErr && <div className="text-xs font-semibold text-red-600">{tipErr}</div>}
+                  </div>
+                ) : null}
               </div>
             )}
 

@@ -10,122 +10,141 @@ interface ShelfCategory {
   displayName?: string;
 }
 
-type Kind = 'bestsellers';
+interface ShelfEntry {
+  cat: ShelfCategory;
+  /** Every sold product in the category, top seller first. */
+  items: Product[];
+  score: number;
+}
 
 const MAX_CATEGORIES = 6;
 
 const productImage = (p: Product) => p.imageUrl || p.image || p.images?.[0] || '';
 
-/** Ranks categories by units sold. */
-function buildEntries(
-  kind: Kind,
-  categories: ShelfCategory[],
-  products: Product[],
-  sales: Record<string, number>,
-) {
-  const out: { cat: ShelfCategory; items: Product[]; score: number }[] = [];
+/** Only products that have actually sold, grouped by category and ranked by units sold. */
+function buildEntries(categories: ShelfCategory[], products: Product[], sales: Record<string, number>) {
+  const out: ShelfEntry[] = [];
   for (const cat of categories) {
-    let items = products.filter((p) => p.categoryId === cat.id);
+    const items = products
+      .filter((p) => p.categoryId === cat.id && productImage(p) && (sales[p.id] || 0) > 0)
+      .sort((a, b) => sales[b.id] - sales[a.id]);
     if (items.length === 0) continue;
-    const score =
-      (sales[cat.id] || 0) * 1000 +
-      items.filter((p) => p.isBestSeller).length * 10 +
-      items.length * 0.01;
-    items = [...items].sort(
-      (a, b) => Number(!!b.isBestSeller) - Number(!!a.isBestSeller) || (b.reviewsCount || 0) - (a.reviewsCount || 0),
-    );
+    const score = items.reduce((s, p) => s + sales[p.id], 0);
     out.push({ cat, items, score });
   }
   return out.sort((a, b) => b.score - a.score).slice(0, MAX_CATEGORIES);
 }
 
-const Shelf: React.FC<{
-  title: string;
-  kind: Kind;
-  categories: ShelfCategory[];
-  products: Product[];
-  sales: Record<string, number>;
-}> = ({ title, kind, categories, products, sales }) => {
-  const navigate = useNavigate();
-  const entries = useMemo(
-    () => buildEntries(kind, categories, products, sales),
-    [kind, categories, products, sales],
-  );
-  if (entries.length === 0) return null;
+const Tile: React.FC<{ p: Product }> = ({ p }) => (
+  <div className="min-w-0 min-h-0 flex-1 rounded-[9px] bg-white overflow-hidden">
+    <img
+      src={productImage(p)}
+      alt=""
+      loading="lazy"
+      className="w-full h-full object-cover"
+      onError={(e) => ((e.target as HTMLElement).style.visibility = 'hidden')}
+    />
+  </div>
+);
 
+const TileRow: React.FC<{ ps: Product[] }> = ({ ps }) => (
+  <div className="flex flex-1 min-h-0 gap-1">
+    {ps.map((p) => (
+      <Tile key={p.id} p={p} />
+    ))}
+  </div>
+);
+
+/** Tiles always fill the card: 1 → full, 2 → side by side, 3 → one wide on top + two below, 4 → 2×2. */
+const TileGrid: React.FC<{ shown: Product[] }> = ({ shown }) => {
+  const rows =
+    shown.length === 1 ? [shown]
+    : shown.length === 2 ? [shown]
+    : shown.length === 3 ? [shown.slice(0, 1), shown.slice(1)]
+    : [shown.slice(0, 2), shown.slice(2, 4)];
   return (
-    <section className="mb-5 w-full px-1">
-      <h2 className="text-lg font-black text-gray-900 tracking-tight font-display mb-3">{title}</h2>
-      <div className="grid grid-cols-3 gap-x-2.5 gap-y-3.5">
-        {entries.map(({ cat, items }) => {
-          const shown = items.slice(0, 4);
-          const more = items.length - shown.length;
-          return (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => navigate(`/products?category=${cat.slug || cat.id}&subCategory=All`)}
-              className="flex flex-col items-center bg-transparent border-none p-0 outline-none cursor-pointer text-center"
-            >
-              <div className="relative w-full rounded-2xl bg-[#F1F3F8] border border-gray-200/80 p-[5px]">
-                <div className="grid grid-cols-2 gap-1">
-                  {[0, 1, 2, 3].map((i) => (
-                    <div key={i} className="aspect-square rounded-[9px] bg-white overflow-hidden p-[3px]">
-                      {shown[i] && (
-                        <img
-                          src={productImage(shown[i])}
-                          alt=""
-                          loading="lazy"
-                          className="w-full h-full object-contain"
-                          onError={(e) => ((e.target as HTMLElement).style.display = 'none')}
-                        />
-                      )}
-                    </div>
-                  ))}
-                </div>
-                {more > 0 && (
-                  <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-gray-200 bg-[#F1F3F8] px-2 py-px text-[9.5px] font-semibold text-gray-500">
-                    +{more} more
-                  </span>
-                )}
-              </div>
-              <span className="mt-2.5 text-xs font-extrabold text-gray-800 leading-tight line-clamp-2 w-full">
-                {cat.displayName || cat.name}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </section>
+    <div className="aspect-square flex flex-col gap-1">
+      {rows.map((r, i) => (
+        <TileRow key={i} ps={r} />
+      ))}
+    </div>
   );
 };
 
-/** Blinkit-style "Bestsellers" category shelf (max 6 categories). */
+/** Blinkit-style "Bestsellers" category shelf (max 6 categories), ranked live from orders. */
 export const CategoryShelves: React.FC<{ categories: ShelfCategory[]; products: Product[] }> = ({
   categories,
   products,
 }) => {
+  const navigate = useNavigate();
   const [sales, setSales] = useState<Record<string, number>>({});
 
+  // Refetch on mount and whenever the tab regains focus so the shelf tracks
+  // what is selling right now.
   useEffect(() => {
     let alive = true;
-    fetch(apiUrl('/category-sales'))
-      .then((r) => r.json())
-      .then((d) => {
-        if (!alive || !Array.isArray(d?.data)) return;
-        const m: Record<string, number> = {};
-        for (const r of d.data) m[String(r.categoryId)] = Number(r.sold) || 0;
-        setSales(m);
-      })
-      .catch(() => {});
+    const load = () =>
+      fetch(apiUrl('/product-sales'), { cache: 'no-store' })
+        .then((r) => r.json())
+        .then((d) => {
+          if (!alive || !Array.isArray(d?.data)) return;
+          const m: Record<string, number> = {};
+          for (const r of d.data) m[String(r.productId)] = Number(r.sold) || 0;
+          setSales(m);
+        })
+        .catch(() => {});
+    load();
+    const onVisible = () => document.visibilityState === 'visible' && load();
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       alive = false;
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, []);
 
+  const entries = useMemo(() => buildEntries(categories, products, sales), [categories, products, sales]);
+  if (entries.length === 0) return null;
+
+  const open = ({ cat, items }: ShelfEntry) => {
+    const params = new URLSearchParams({
+      ids: items.map((p) => p.id).join(','),
+      title: `Bestsellers in ${cat.displayName || cat.name}`,
+    });
+    navigate(`/products?${params.toString()}`);
+  };
+
   return (
     <div className="sm:hidden">
-      <Shelf title="Bestsellers" kind="bestsellers" categories={categories} products={products} sales={sales} />
+      <section className="mb-5 w-full px-1">
+        <h2 className="text-lg font-black text-gray-900 tracking-tight font-display mb-3">Bestsellers</h2>
+        <div className="grid grid-cols-3 gap-x-2.5 gap-y-3.5">
+          {entries.map((e) => {
+            const shown = e.items.slice(0, 4);
+            const more = e.items.length - shown.length;
+            return (
+              <button
+                key={e.cat.id}
+                type="button"
+                onClick={() => open(e)}
+                className="flex flex-col items-center bg-transparent border-none p-0 outline-none cursor-pointer text-center"
+              >
+                <div className="relative w-full rounded-2xl bg-[#F1F3F8] border border-gray-200/80 p-[5px]">
+                  <TileGrid shown={shown} />
+                  {more > 0 && (
+                    <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-gray-200 bg-[#F1F3F8] px-2 py-px text-[9.5px] font-semibold text-gray-500">
+                      +{more} more
+                    </span>
+                  )}
+                </div>
+                {/* Two lines reserved so every card is the same height. */}
+                <span className="mt-2.5 text-xs font-extrabold text-gray-800 leading-tight line-clamp-2 w-full min-h-[2.5em]">
+                  {e.cat.displayName || e.cat.name}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 };

@@ -9,7 +9,13 @@ const deliverySettlementSchema = new mongoose.Schema({
   orderIds: [{ type: String }],
   orderCount: { type: Number, default: 0 },
 
-  status: { type: String, enum: ['settled', 'SETTLED'], default: 'SETTLED', index: true },
+  // Payout lifecycle is independent of earning status: a settlement can fail
+  // and be retried without ever having marked the underlying earnings SETTLED.
+  status: { type: String, enum: ['PENDING', 'PROCESSING', 'SUCCESS', 'FAILED'], default: 'PENDING', index: true },
+  paymentReference: { type: String },
+  failureReason: { type: String },
+  processedAt: { type: Date },
+
   settledAt: { type: Date, default: Date.now },
   settledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 }, { timestamps: true });

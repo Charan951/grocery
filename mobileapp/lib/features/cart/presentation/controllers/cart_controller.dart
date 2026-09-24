@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freshcart/core/di/injection.dart';
 import 'package:freshcart/core/services/pricing.dart';
 import 'package:freshcart/core/services/storage_service.dart';
+import 'package:freshcart/features/authentication/presentation/controllers/auth_controller.dart';
 import 'package:freshcart/features/cart/data/models/cart_item_model.dart';
 import 'package:freshcart/features/cart/presentation/controllers/commerce_providers.dart';
 import 'package:freshcart/features/home/presentation/controllers/catalog_providers.dart';
@@ -92,6 +93,17 @@ class CartNotifier extends StateNotifier<CartState> {
     ref.listen<PricingConfig>(pricingConfigProvider, (_, config) {
       setPricingConfig(config);
     });
+    // Coupons belong to the signed-in shopper: switching accounts (or logging
+    // out) drops whatever the previous customer applied.
+    ref.listen<String?>(
+      authProvider.select((s) => s.isAuthenticated ? s.user?.phone : null),
+      (prev, next) {
+        if (prev == next) return;
+        _ref.read(autoCouponDismissedProvider.notifier).state = false;
+        if (next == null) _loadCart(); // logout already wiped the stored cart
+        state = state.copyWith(clearCoupon: true);
+      },
+    );
   }
 
   void _loadCart() {
