@@ -1,4 +1,3 @@
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -16,6 +15,7 @@ import 'package:freshcart/features/cart/presentation/controllers/cart_controller
 import 'package:freshcart/features/categories/data/models/category_model.dart';
 import 'package:freshcart/features/home/presentation/controllers/catalog_providers.dart';
 import 'package:freshcart/features/home/presentation/widgets/home_header.dart';
+import 'package:freshcart/features/home/presentation/widgets/super_category_icon.dart';
 import 'package:freshcart/features/home/presentation/widgets/product_rail.dart';
 import 'package:freshcart/features/home/presentation/widgets/category_shelf_section.dart';
 import 'package:freshcart/features/products/data/models/product_model.dart';
@@ -31,6 +31,9 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final ScrollController _scrollController = ScrollController();
+  // The scrolling location + search block; once it's scrolled fully away the
+  // super-category strip is pinned.
+  final GlobalKey _topBarKey = GlobalKey();
   bool _isScrolledPastFestival = false;
 
   @override
@@ -59,7 +62,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   void _onScroll() {
     if (_scrollController.hasClients) {
-      final isPast = _scrollController.offset > 140.0;
+      // Drop the festival tint the moment the strip pins (same as web).
+      final pinAt = _topBarKey.currentContext?.size?.height ?? 110.0;
+      final isPast = _scrollController.offset >= pinAt;
       if (isPast != _isScrolledPastFestival) {
         setState(() {
           _isScrolledPastFestival = isPast;
@@ -127,19 +132,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     final isFestivalHeaderActive = isFestivalActive && !_isScrolledPastFestival;
 
-    final locationHeader = LocationHeader(
-      addressLine: address,
-      onAddressTap: () => context.push('/location_select'),
-      onProfileTap: () => context.go('/account'),
-      onNotificationsTap: () => context.push('/notifications'),
-      backgroundColor: isFestivalActive ? Colors.transparent : null,
+    // The status-bar inset is owned by the pinned shield sliver below, so the
+    // location row drops its own SafeArea top padding.
+    final locationHeader = MediaQuery.removePadding(
+      context: context,
+      removeTop: true,
+      child: LocationHeader(
+        addressLine: address,
+        onAddressTap: () => context.push('/location_select'),
+        onProfileTap: () => context.go('/account'),
+        onNotificationsTap: () => context.push('/notifications'),
+        backgroundColor: isFestivalActive ? Colors.transparent : null,
+      ),
     );
 
-    final stickyHeader = SearchBarHeader(
+    final searchHeader = SearchBarHeader(
       cartCount: cartCount,
       onSearchTap: () => context.push('/search_detail'),
       onCartTap: () => context.push('/cart'),
-      backgroundColor: isFestivalHeaderActive ? Colors.transparent : null,
+      backgroundColor: isFestivalActive ? Colors.transparent : null,
     );
 
     final superCatNav = _SuperCategoryNav(
@@ -227,7 +238,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     final surfaceColor = isDark ? AppColors.surfaceDark : AppColors.surface;
 
-    LinearGradient? locationGradient;
+    final statusBarHeight = MediaQuery.paddingOf(context).top;
+
+    Color? festivalTopColor;
+    LinearGradient? topBarGradient;
     LinearGradient? headerNavGradient;
     LinearGradient? festivalSectionGradient;
 
@@ -236,14 +250,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       final gStart = bg.colors.first;
       final gEnd = bg.colors.last;
 
-      locationGradient = LinearGradient(
-        colors: [gStart, Color.lerp(gStart, gEnd, 0.15)!],
+      festivalTopColor = gStart;
+      topBarGradient = LinearGradient(
+        colors: [gStart, Color.lerp(gStart, gEnd, 0.27)!],
         begin: bg.begin,
         end: bg.end,
       );
       headerNavGradient = LinearGradient(
         colors: [
-          Color.lerp(gStart, gEnd, 0.15)!,
+          Color.lerp(gStart, gEnd, 0.27)!,
           Color.lerp(gStart, gEnd, 0.38)!,
         ],
         begin: bg.begin,
@@ -268,21 +283,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             parent: BouncingScrollPhysics(),
           ),
           slivers: [
-            // 1. Location Header (Scrolls out of view first when scrolling down)
+            // 0. Status-bar shield — pinned so content never scrolls under
+            //    the system status bar once the top bar has scrolled away.
+            if (statusBarHeight > 0)
+              SliverPersistentHeader(
+                pinned: true,
+                delegate: _HeaderNavSliverDelegate(
+                  height: statusBarHeight,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    color: isFestivalHeaderActive && festivalTopColor != null
+                        ? festivalTopColor
+                        : surfaceColor,
+                  ),
+                ),
+              ),
+
+            // 1. Location row then search bar — plain box, so scrolling down
+            //    hides the location first and the search bar right after
+            //    (and reveals them in reverse on the way back up).
             SliverToBoxAdapter(
               child: Container(
-                decoration: isFestivalActive && locationGradient != null
-                    ? BoxDecoration(gradient: locationGradient)
+                key: _topBarKey,
+                decoration: isFestivalActive && topBarGradient != null
+                    ? BoxDecoration(gradient: topBarGradient)
                     : BoxDecoration(color: surfaceColor),
-                child: locationHeader,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [locationHeader, searchHeader],
+                ),
               ),
             ),
 
-            // 2. Persistent Sticky Navigation: Search Bar + Super Category Navigation (Pinned at top)
+            // 2. Super Category Navigation — the only part pinned at the top.
             SliverPersistentHeader(
               pinned: true,
               delegate: _HeaderNavSliverDelegate(
-                height: 120.0,
+                height: 59.0,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   decoration:
@@ -292,7 +329,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      stickyHeader,
                       superCatNav,
                       if (!isFestivalHeaderActive)
                         Divider(
@@ -1039,22 +1075,6 @@ class _SuperCategoryNavState extends ConsumerState<_SuperCategoryNav> {
     super.dispose();
   }
 
-  // Same Lucide outline icons and keyword mapping as the web SuperCategoryNav.
-  IconData _iconFor(String? name, String? iconKey) {
-    final k = '${iconKey ?? ''} ${name ?? ''}'.toLowerCase();
-    bool has(List<String> words) => words.any(k.contains);
-    if (has(['grid', 'all'])) return LucideIcons.layoutGrid;
-    if (has(['coffee', 'cafe'])) return LucideIcons.coffee;
-    if (has(['decor', 'chair', 'home', 'furniture', 'sofa'])) return LucideIcons.armchair;
-    if (has(['toy', 'shape', 'game'])) return LucideIcons.shapes;
-    if (has(['leaf', 'fresh', 'eco'])) return LucideIcons.leaf;
-    if (has(['headphone', 'electronic'])) return LucideIcons.headphones;
-    if (has(['mobile', 'phone', 'smartphone'])) return LucideIcons.smartphone;
-    if (has(['sparkle', 'beauty'])) return LucideIcons.sparkles;
-    if (has(['shirt', 'fashion', 'hanger', 'cloth'])) return LucideIcons.shirt;
-    return LucideIcons.layoutGrid;
-  }
-
   void _scrollToIndex(int index, double itemWidth, double screenWidth) {
     if (!_scrollController.hasClients) return;
     final targetOffset = (index * itemWidth) - (screenWidth / 2) + (itemWidth / 2) + 16;
@@ -1146,10 +1166,9 @@ class _SuperCategoryNavState extends ConsumerState<_SuperCategoryNav> {
               final iconKey = sc['icon'] as String?;
               final isSelected =
                   selectedSlug == slug || (selectedSlug == '' && slug == 'all');
-              final icon = _iconFor(name, iconKey);
-
-              final activeColor =
-                  widget.isFestivalActive ? Colors.black : const Color(0xFF0C831F);
+              // Black strip (web parity): the active tab reads through its
+              // filled icon + bold label + underline, the rest stay outlined.
+              final ink = useDarkPalette ? Colors.white : Colors.black;
 
               return SizedBox(
                 width: itemWidth,
@@ -1163,12 +1182,10 @@ class _SuperCategoryNavState extends ConsumerState<_SuperCategoryNav> {
                     mainAxisSize: MainAxisSize.min,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        icon,
-                        size: 20,
-                        color: isSelected
-                            ? activeColor
-                            : (useDarkPalette ? Colors.white54 : const Color(0xFF757575)),
+                      SuperCategoryIcon(
+                        iconKey: superCatIconKey(name, iconKey),
+                        filled: isSelected,
+                        color: ink,
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -1180,9 +1197,7 @@ class _SuperCategoryNavState extends ConsumerState<_SuperCategoryNav> {
                           fontSize: 11,
                           fontWeight:
                               isSelected ? FontWeight.w800 : FontWeight.w500,
-                          color: isSelected
-                              ? (useDarkPalette ? Colors.white : activeColor)
-                              : (useDarkPalette ? Colors.white60 : const Color(0xFF666666)),
+                          color: ink,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -1191,7 +1206,7 @@ class _SuperCategoryNavState extends ConsumerState<_SuperCategoryNav> {
                         height: 2.5,
                         width: isSelected ? 28 : 0,
                         decoration: BoxDecoration(
-                          color: activeColor,
+                          color: ink,
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),

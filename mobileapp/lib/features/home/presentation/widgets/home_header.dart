@@ -23,8 +23,11 @@ class LocationHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surface = backgroundColor ?? (isDark ? AppColors.surfaceDark : AppColors.surface);
-    final textColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimary;
-    final subColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondary;
+    // Black on light surfaces (web parity). A custom background means the
+    // festival gradient, which is always light — never use dark-mode text there.
+    final useDarkPalette = isDark && backgroundColor == null;
+    final textColor = useDarkPalette ? AppColors.textPrimaryDark : Colors.black;
+    final subColor = useDarkPalette ? AppColors.textSecondaryDark : Colors.black;
 
     return Container(
       color: surface,

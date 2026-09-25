@@ -2,6 +2,7 @@ import React from 'react';
 import { useCMS, defaultSuperCategories, FestivalCampaign } from '../context/CMSContext';
 import { resolveFestivalTheme } from '../utils/festivalThemeResolver';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { SuperCategoryIcon, superCatIconKey } from './SuperCategoryIcon';
 import {
   LayoutGrid, Coffee, Armchair, Shapes, Leaf, Headphones, Smartphone,
   Sparkles, Shirt, Utensils
@@ -39,6 +40,10 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
   const activeFestivalCampaign = festivalCampaignOverride ?? contextFestivalCampaign;
 
   const isMobile = useIsMobile(768);
+  // Below 640px the Home app bar scrolls away with the page (see Header), so
+  // this strip pins flush to the top instead of under the header.
+  const pinsToTop = useIsMobile(640);
+  const stripRef = React.useRef<HTMLElement>(null);
 
   const isFestivalActive = React.useMemo(() => {
     if (!isMobile || !activeFestivalCampaign || activeFestivalCampaign.isActive === false || activeFestivalCampaign.status === 'draft') {
@@ -127,7 +132,8 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
       if (raf) return;
       raf = requestAnimationFrame(() => {
         raf = 0;
-        setIsPinned(window.scrollY > 24);
+        const nav = stripRef.current;
+        setIsPinned(pinsToTop && nav ? nav.getBoundingClientRect().top <= 0 : window.scrollY > 24);
       });
     };
     window.addEventListener('scroll', onScroll, { passive: true });
@@ -136,7 +142,7 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
       window.removeEventListener('scroll', onScroll);
       if (raf) cancelAnimationFrame(raf);
     };
-  }, []);
+  }, [pinsToTop]);
 
   const showFestivalTint = isFestivalActive && isMobile && !isPinned;
 
@@ -151,6 +157,7 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
 
   return (
     <nav
+      ref={stripRef}
       aria-label="Shop by department"
       className={`w-full sticky z-30 border-b shadow-2xs ${
         showFestivalTint
@@ -159,7 +166,7 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
       }`}
       style={{
         backgroundColor: navBgColor,
-        top: 'calc(var(--sticky-header-h) - 1px)',
+        top: pinsToTop ? 0 : 'calc(var(--sticky-header-h) - 1px)',
         marginTop: '-1px',
         transition: 'top 300ms cubic-bezier(0.4, 0, 0.2, 1), background-color 250ms ease, border-color 250ms ease',
       }}
@@ -195,8 +202,10 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
             const IconComponent = getSuperCatIcon(cat.name, cat.icon);
 
             if (isMobile) {
-              const activeColorClass = showFestivalTint ? 'text-black' : 'text-primary-strong';
-              const activeBgClass = showFestivalTint ? 'bg-black' : 'bg-primary-strong';
+              // Mobile strip is always black: the active tab reads through its
+              // filled icon + bold label + underline, the rest stay outlined.
+              const activeColorClass = 'text-black';
+              const activeBgClass = 'bg-black';
 
               return (
                 <button
@@ -218,12 +227,11 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
                       className="w-5 h-5 object-contain"
                     />
                   ) : (
-                    <IconComponent
+                    <SuperCategoryIcon
+                      iconKey={superCatIconKey(cat.name, cat.icon)}
+                      filled={isActive}
                       size={20}
-                      fill={isActive && (cat.name.toLowerCase().includes('cafe') || cat.icon === 'Coffee') ? 'currentColor' : 'none'}
-                      className={`transition-colors duration-200 ${
-                        isActive ? activeColorClass : 'text-text-secondary'
-                      }`}
+                      className="text-black"
                     />
                   )}
 
@@ -232,7 +240,7 @@ export const SuperCategoryNav: React.FC<SuperCategoryNavProps> = ({
                     className={`text-[11px] leading-tight mt-0.5 truncate max-w-[68px] text-center ${
                       isActive
                         ? `font-extrabold ${activeColorClass}`
-                        : 'font-medium text-text-secondary'
+                        : 'font-medium text-black'
                     }`}
                   >
                     {cat.name}

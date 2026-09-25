@@ -4,6 +4,7 @@ import { FestivalCampaign, useCMS } from '../context/CMSContext';
 import { resolveFestivalTheme, isDarkColor } from '../utils/festivalThemeResolver';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { ChevronRight } from 'lucide-react';
+import { FestivalEdge } from './FestivalEdge';
 
 interface FestivalCampaignWrapperProps {
   campaign: FestivalCampaign;
@@ -267,12 +268,8 @@ export const FestivalCampaignWrapper: React.FC<FestivalCampaignWrapperProps> = (
         })()}
       </div>
 
-      {/* Bottom Scallop Arch Transition (24 repeating quadratic arches matching Flutter _ScallopPainter) */}
-      <div className="w-full overflow-hidden leading-none">
-        <svg className="w-full h-3.5 text-white fill-current block" viewBox="0 0 1200 24" preserveAspectRatio="none">
-          <path d="M0,24 Q25,0 50,24 Q75,0 100,24 Q125,0 150,24 Q175,0 200,24 Q225,0 250,24 Q275,0 300,24 Q325,0 350,24 Q375,0 400,24 Q425,0 450,24 Q475,0 500,24 Q525,0 550,24 Q575,0 600,24 Q625,0 650,24 Q675,0 700,24 Q725,0 750,24 Q775,0 800,24 Q825,0 850,24 Q875,0 900,24 Q925,0 950,24 Q975,0 1000,24 Q1025,0 1050,24 Q1075,0 1100,24 Q1125,0 1150,24 Q1175,0 1200,24 L1200,24 L0,24 Z" />
-        </svg>
-      </div>
+      {/* Bottom edge — a different design per predefined theme (see FestivalEdge) */}
+      <FestivalEdge themeKey={theme.key} className="text-white" />
     </section>
   );
 };

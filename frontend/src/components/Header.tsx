@@ -79,6 +79,10 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [headerHidden, setHeaderHidden] = useState(false);
+  // Mobile Home: the app bar scrolls with the page (location row leaves first,
+  // then the search row) so the super-category strip pins at the very top —
+  // same sliver order as Flutter's HomeScreen. No direction-based hide/show.
+  const scrollsWithPage = isMobile && location.pathname === '/';
   const [isScrolledDown, setIsScrolledDown] = useState(false);
 
   // Rotating sample search placeholders every 2 seconds
@@ -139,7 +143,7 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
         if (nextScrolled !== scrolledDown) { scrolledDown = nextScrolled; setIsScrolledDown(nextScrolled); }
 
         let nextHidden = hidden;
-        if (!isMobile || y <= 20) {
+        if (!isMobile || scrollsWithPage || y <= 20) {
           nextHidden = false;
         } else {
           const diff = y - lastScrollY.current;
@@ -155,7 +159,7 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
       window.removeEventListener('scroll', handleScroll);
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [isMobile]);
+  }, [isMobile, scrollsWithPage]);
 
   // Reset transient header state on route change.
   useEffect(() => {
@@ -425,7 +429,7 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
     <>
       <div
         ref={appBarRef}
-        className={`fixed top-0 left-0 right-0 z-[1000] w-full max-w-[100vw] overflow-x-clip transition-all duration-300 transform translate-y-0 border-none outline-none shadow-none`}
+        className={`${scrollsWithPage ? 'absolute' : 'fixed'} top-0 left-0 right-0 z-[1000] w-full max-w-[100vw] overflow-x-clip transition-all duration-300 transform translate-y-0 border-none outline-none shadow-none`}
         style={festivalHeaderBgStyle}
       >
         {/* Desktop & Mobile Header Content */}
@@ -487,11 +491,11 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
               aria-label="Change delivery address"
               className="flex flex-col items-start text-left cursor-pointer select-none group min-w-0 bg-transparent border-none"
             >
-              <div className="flex items-center gap-1 font-black text-xs tracking-tight leading-tight text-text-primary">
+              <div className="flex items-center gap-1 font-black text-xs tracking-tight leading-tight text-black">
                 <Zap size={14} className="shrink-0 fill-primary text-primary" />
                 <span>Express delivery</span>
               </div>
-              <div className="flex items-center gap-0.5 text-[11px] font-bold text-text-secondary truncate transition-colors">
+              <div className="flex items-center gap-0.5 text-[11px] font-bold text-black truncate transition-colors">
                 <span className="truncate max-w-[190px]">
                   {(() => {
                     if (typeof userLocation === 'object' && userLocation !== null && (userLocation.houseNo || userLocation.area || userLocation.address || userLocation.fullAddress)) {
@@ -507,7 +511,7 @@ export const Header: React.FC<HeaderProps> = ({ onWishlistOpen, onCartOpen }) =>
                     return 'Add delivery address';
                   })()}
                 </span>
-                <ChevronDown size={12} className="shrink-0 text-text-tertiary" />
+                <ChevronDown size={12} className="shrink-0 text-black" />
               </div>
             </button>
 

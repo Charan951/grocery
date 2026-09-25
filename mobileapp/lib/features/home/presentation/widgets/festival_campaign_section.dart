@@ -8,13 +8,14 @@ import 'package:freshcart/features/products/data/models/product_model.dart';
 import '../../data/models/festival_campaign_model.dart';
 import '../controllers/catalog_providers.dart';
 import '../utils/festival_theme_resolver.dart';
+import 'festival_edge.dart';
 
 /// 1:1 port of the web storefront's `FestivalCampaignWrapper.tsx` (mobile
 /// breakpoint). Layout, spacing, type scale, colours and the two card styles
 /// (`style1` uniform grid / paged carousel, `style2` hero-rotator + 2×2 grid)
 /// mirror the React component. The gradient background is painted by the parent
 /// (`home_screen.dart`) so the section blends with the header above it — this
-/// widget only draws the content + the bottom scallop arch.
+/// widget only draws the content + the per-theme bottom edge ([FestivalEdge]).
 class FestivalCampaignSection extends ConsumerWidget {
   final FestivalCampaignModel campaign;
   final Function(String categoryId) onOpenCategory;
@@ -104,9 +105,10 @@ class FestivalCampaignSection extends ConsumerWidget {
           ),
         ),
 
-        // web: bottom scallop arch transition (24 quadratic arches)
-        _ScallopArchBorder(
-          fillColor: isDark ? const Color(0xFF18181B) : Colors.white,
+        // Bottom edge — a different design per predefined theme (web: FestivalEdge)
+        FestivalEdge(
+          themeKey: theme.key,
+          color: isDark ? const Color(0xFF18181B) : Colors.white,
         ),
       ],
     );
@@ -941,52 +943,4 @@ class _Style2HeroState extends State<_Style2Hero> {
       ),
     );
   }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Bottom scallop arch  (unchanged — already matches the web SVG path)
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _ScallopArchBorder extends StatelessWidget {
-  final Color fillColor;
-  const _ScallopArchBorder({required this.fillColor});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 14,
-      width: double.infinity,
-      child: CustomPaint(painter: _ScallopPainter(fillColor: fillColor)),
-    );
-  }
-}
-
-class _ScallopPainter extends CustomPainter {
-  final Color fillColor;
-  _ScallopPainter({required this.fillColor});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = fillColor
-      ..style = PaintingStyle.fill;
-
-    final path = Path()..moveTo(0, size.height);
-    const count = 24;
-    final archW = size.width / count;
-
-    for (int i = 0; i < count; i++) {
-      final startX = i * archW;
-      final midX = startX + archW / 2;
-      final endX = startX + archW;
-      path.lineTo(startX, size.height);
-      path.quadraticBezierTo(midX, 0, endX, size.height);
-    }
-    path.lineTo(size.width, size.height);
-    path.close();
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
