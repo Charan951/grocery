@@ -41,7 +41,10 @@ class ProfileScreen extends ConsumerWidget {
         ),
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        // The shell overlays the bottom nav (~70), floating cart (~58) and
+        // active-order pill (~58) on top of tab content — clear all three so
+        // Log out / Delete account at the end of the list stay tappable.
+        padding: EdgeInsets.fromLTRB(16, 16, 16, 220 + MediaQuery.paddingOf(context).bottom),
         children: [
           _Card(
             isDark: isDark,
