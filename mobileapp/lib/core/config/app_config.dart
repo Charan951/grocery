@@ -16,18 +16,16 @@ class AppConfig {
   // Can also be set at build time without editing this file:
   //   flutter run --dart-define USE_PRODUCTION_BACKEND=true
   static const bool useProductionBackend =
-      bool.fromEnvironment('USE_PRODUCTION_BACKEND', defaultValue: false);
+      bool.fromEnvironment('USE_PRODUCTION_BACKEND', defaultValue: true);
 
-  // Fill these in once you deploy the backend (see MEMORY.md §1 — deployment
-  // isn't configured yet, so these are placeholders until then). Only read
-  // when [useProductionBackend] is true.
+  // Live backend (deployed). Only read when [useProductionBackend] is true.
   static const String productionApiBaseUrl = String.fromEnvironment(
     'PRODUCTION_API_BASE_URL',
-    defaultValue: 'https://api.freshcart.example.com/api',
+    defaultValue: 'https://grocery.speshway.site/api',
   );
   static const String productionSocketUrl = String.fromEnvironment(
     'PRODUCTION_SOCKET_URL',
-    defaultValue: 'https://api.freshcart.example.com',
+    defaultValue: 'https://grocery.speshway.site',
   );
 
   // Explicit --dart-define overrides win over everything else, in either mode.

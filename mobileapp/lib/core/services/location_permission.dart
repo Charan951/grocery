@@ -70,7 +70,7 @@ class LocationPermissionService {
       if (p == LocationPermission.denied) {
         p = await Geolocator.requestPermission();
       }
-      return _classify(p);
+      return await _classify(p);
     } catch (_) {
       return LocationPermState.granted;
     }

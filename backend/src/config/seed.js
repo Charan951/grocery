@@ -54,6 +54,29 @@ export const seedDatabase = async () => {
       }
     }
 
+    // Play Store review login — ensured on every boot (idempotent), incl. production.
+    const reviewEmail = 'verification@gmail.com';
+    let reviewUser = await User.findOne({ email: reviewEmail });
+    if (!reviewUser) {
+      reviewUser = await User.create({
+        name: 'Verification User',
+        email: reviewEmail,
+        password: 'verify@123',
+        role: 'Customer',
+        status: 'Active'
+      });
+    }
+    if (reviewUser.role === 'Customer' && !(await Customer.findOne({ email: reviewEmail }))) {
+      await Customer.create({
+        customerId: 'cust_' + reviewUser._id.toString().slice(-6),
+        name: reviewUser.name,
+        email: reviewEmail,
+        phone: '9000000001',
+        referralCode: 'PLAYREVIEW',
+        addresses: []
+      });
+    }
+
     // Every Delivery-role user needs a DeliveryPartner profile (idempotent, self-heals).
     const deliveryUsers = await User.find({ role: 'Delivery' }).select('_id phone');
     for (const du of deliveryUsers) {
