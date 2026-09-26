@@ -91,6 +91,9 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
     setTimeout(() => {
       resetState();
       onClose();
+      // Every sign-in lands on Home (matches the mobile app), not back on the
+      // Account page the modal was opened from.
+      navigate('/');
     }, 900);
   };
 

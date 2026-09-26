@@ -67,15 +67,22 @@ export const seedDatabase = async () => {
         status: 'Active'
       });
     }
-    if (reviewUser.role === 'Customer' && !(await Customer.findOne({ email: reviewEmail }))) {
+    // The mobile app signs in via /customers/login-email, which checks
+    // Customer.passwordHash — so the customer profile must carry the password.
+    const reviewCustomer = await Customer.findOne({ email: reviewEmail }).select('+passwordHash');
+    if (!reviewCustomer) {
       await Customer.create({
-        customerId: 'cust_' + reviewUser._id.toString().slice(-6),
-        name: reviewUser.name,
+        customerId: 'cust_9000000000',
+        name: 'Reviewer',
         email: reviewEmail,
-        phone: '9000000000',
+        phone: '+91 9000000000',
+        passwordHash: await bcrypt.hash('verify@123', 10),
         referralCode: 'PLAYREVIEW',
         addresses: []
       });
+    } else if (!reviewCustomer.passwordHash) {
+      reviewCustomer.passwordHash = await bcrypt.hash('verify@123', 10);
+      await reviewCustomer.save();
     }
 
     // Every Delivery-role user needs a DeliveryPartner profile (idempotent, self-heals).
