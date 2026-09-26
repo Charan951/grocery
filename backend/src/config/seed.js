@@ -59,7 +59,8 @@ export const seedDatabase = async () => {
     let reviewUser = await User.findOne({ email: reviewEmail });
     if (!reviewUser) {
       reviewUser = await User.create({
-        name: 'Verification User',
+        name: 'Reviewer',
+        phone: '9000000000',
         email: reviewEmail,
         password: 'verify@123',
         role: 'Customer',
@@ -71,7 +72,7 @@ export const seedDatabase = async () => {
         customerId: 'cust_' + reviewUser._id.toString().slice(-6),
         name: reviewUser.name,
         email: reviewEmail,
-        phone: '9000000001',
+        phone: '9000000000',
         referralCode: 'PLAYREVIEW',
         addresses: []
       });
