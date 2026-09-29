@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, MapPin, Clock, ShieldCheck, Plus, Minus, CreditCard, Wallet,
@@ -240,32 +240,82 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   };
 
+  /** Asks the backend (which asks Razorpay) whether this attempt was actually
+   * paid. Covers the sheet erroring after the money went through — Razorpay
+   * then refuses every retry with "order is already paid". */
+  const reconcile = async (rzpOrderId: string, orderId: string): Promise<boolean> => {
+    try {
+      const r = await fetch(apiUrl('/payment/reconcile'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ razorpay_order_id: rzpOrderId, orderId }),
+      }).then((res) => res.json());
+      return r?.paid === true;
+    } catch {
+      return false;
+    }
+  };
+
+  // The last unfinished Razorpay attempt. Retrying reuses it instead of placing
+  // a duplicate order, and lets us pick up a payment that already went through.
+  const pendingRzp = useRef<{
+    orderId: string;
+    rzpOrderId: string;
+    key: string;
+    amount: number;
+    currency: string;
+    payable: number;
+  } | null>(null);
+
   const runRazorpay = async () => {
     setIsProcessing(true);
     setPayError(null);
-    const orderId = newOrderId();
 
     try {
-      setStage('Creating payment order…');
-      const co = await fetch(apiUrl('/payment/create-order'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: finalPayable, receipt: orderId }),
-      }).then((r) => r.json());
+      let attempt = pendingRzp.current;
+      if (attempt && attempt.payable !== finalPayable) attempt = null;
 
-      if (!co?.success) throw new Error(co?.message || 'Could not start the payment.');
-      const { key, orderId: rzpOrderId, amount, currency, testMode } = co;
+      if (attempt) {
+        setStage('Checking previous payment…');
+        if (await reconcile(attempt.rzpOrderId, attempt.orderId)) {
+          pendingRzp.current = null;
+          finish(attempt.orderId, 'Paid');
+          return;
+        }
+      }
 
-      setStage('Placing your order…');
-      await placeOrder({
-        orderId,
-        paymentMethod: 'Razorpay',
-        paymentStatus: 'Pending',
-        paymentRef: rzpOrderId,
-      });
+      if (!attempt) {
+        const newId = newOrderId();
+        setStage('Creating payment order…');
+        const co = await fetch(apiUrl('/payment/create-order'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount: finalPayable, receipt: newId }),
+        }).then((r) => r.json());
+
+        if (!co?.success) throw new Error(co?.message || 'Could not start the payment.');
+
+        setStage('Placing your order…');
+        await placeOrder({
+          orderId: newId,
+          paymentMethod: 'Razorpay',
+          paymentStatus: 'Pending',
+          paymentRef: co.orderId,
+        });
+        attempt = {
+          orderId: newId,
+          rzpOrderId: co.orderId,
+          key: co.key,
+          amount: co.amount,
+          currency: co.currency || 'INR',
+          payable: finalPayable,
+        };
+        pendingRzp.current = attempt;
+      }
+      const { orderId, rzpOrderId, key, amount, currency } = attempt;
 
       // Local-dev path: backend in test mode with no usable key — skip the sheet.
-      if (testMode && !key) {
+      if (!key) {
         setStage('Confirming…');
         await fetch(apiUrl('/payment/verify'), {
           method: 'POST',
@@ -277,6 +327,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             orderId,
           }),
         });
+        pendingRzp.current = null;
         finish(orderId, 'Paid');
         return;
       }
@@ -318,7 +369,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               }),
             }).then((r) => r.json());
 
-            if (v?.verified) {
+            if (v?.verified || (await reconcile(rzpOrderId, orderId))) {
+              pendingRzp.current = null;
               finish(orderId, 'Paid');
             } else {
               setIsProcessing(false);
@@ -334,10 +386,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           }
         },
         modal: {
-          ondismiss: () => {
+          ondismiss: async () => {
+            // The sheet may have errored after Razorpay took the money
+            // ("order is already paid") — check before calling it cancelled.
+            setStage('Checking payment status…');
+            if (await reconcile(rzpOrderId, orderId)) {
+              pendingRzp.current = null;
+              finish(orderId, 'Paid');
+              return;
+            }
             setIsProcessing(false);
             setStage('');
-            setPayError('Payment cancelled. Your order is saved — tap Pay to try again.');
+            setPayError('Payment not completed. Your order is saved — tap Pay to try again.');
           },
         },
       });

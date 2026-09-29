@@ -31,6 +31,7 @@ const HERE = { lat: 12.9716, lng: 77.5946 };
 
 let riderUserId;
 let customerId;
+let custToken;
 
 test.before(async () => {
   process.env.OTP_TEST_MODE = 'true';
@@ -54,6 +55,7 @@ test.before(async () => {
 
   await api().post('/api/customers/otp/send').send({ phone: CUST_PHONE });
   const v = await api().post('/api/customers/otp/verify').send({ phone: CUST_PHONE, code: '000000' });
+  custToken = v.body.token;
   customerId = v.body.customer?.customerId || (await Customer.findOne({ phone: new RegExp(`${CUST_PHONE}$`) })).customerId;
 });
 
@@ -109,7 +111,7 @@ test('eligibility is owner-only and closed before delivery / after the window', 
   const ok = await api().get(`/api/orders/${order.orderId}/returns`).query({ phone: CUST_PHONE });
   assert.equal(ok.status, 200, JSON.stringify(ok.body));
   assert.equal(ok.body.eligible, true);
-  assert.deepEqual(ok.body.refundMethods, ['original', 'wallet']);
+  assert.deepEqual(ok.body.refundMethods, ['original', 'wallet', 'bank']);
   assert.equal(ok.body.items.find((i) => i.key === 'p-milk').returnableQty, 2);
 
   const pending = await makeDelivered({ status: 'Out For Delivery', deliveredAt: undefined });
@@ -299,4 +301,76 @@ test('expired offers roll over and eventually stall for manual assignment', asyn
   if (!rr.offers.length) assert.equal(rr.dispatchStalled, true);
   await expireStaleReturnOffers();
   await DeliveryPartner.updateOne({ userId: riderUserId }, { $set: { isOnline: true } });
+});
+
+test('refund accounts: validate, mask, and pay a bank refund to the snapshotted account', async () => {
+  const auth = { Authorization: `Bearer ${custToken}` };
+  const bank = { type: 'bank', holderName: 'QA Returner', ifsc: 'hdfc0001234', accountNumber: '123456789012', confirmAccountNumber: '123456789012' };
+
+  const mismatch = await api().post('/api/customers/me/refund-accounts').set(auth).send({ ...bank, confirmAccountNumber: '123456789013' });
+  assert.equal(mismatch.status, 400);
+  const badIfsc = await api().post('/api/customers/me/refund-accounts').set(auth).send({ ...bank, ifsc: 'HD-1' });
+  assert.equal(badIfsc.status, 400);
+
+  // Payouts are simulated, so dummy details save by default; strict mode enforces real formats.
+  process.env.REFUND_ACCOUNT_STRICT = 'true';
+  const strictDummy = await api().post('/api/customers/me/refund-accounts').set(auth)
+    .send({ ...bank, ifsc: 'HDFC101234', accountNumber: '0000000000000000', confirmAccountNumber: '0000000000000000' });
+  assert.equal(strictDummy.status, 400);
+  delete process.env.REFUND_ACCOUNT_STRICT;
+  const dummy = await api().post('/api/customers/me/refund-accounts').set(auth)
+    .send({ ...bank, ifsc: 'HDFC101234', accountNumber: '0000000000000000', confirmAccountNumber: '0000000000000000' });
+  assert.equal(dummy.status, 201, JSON.stringify(dummy.body));
+  await api().delete(`/api/customers/me/refund-accounts/${dummy.body.account.id}`).set(auth).expect(200);
+
+  const add = await api().post('/api/customers/me/refund-accounts').set(auth).send(bank);
+  assert.equal(add.status, 201, JSON.stringify(add.body));
+  assert.equal(add.body.account.accountLast4, '9012');
+  assert.equal(add.body.account.ifsc, 'HDFC0001234');
+  assert.equal(add.body.account.isDefault, true);
+  assert.ok(!JSON.stringify(add.body).includes('123456789012'));
+  const dup = await api().post('/api/customers/me/refund-accounts').set(auth).send(bank);
+  assert.equal(dup.status, 409);
+  const upi = await api().post('/api/customers/me/refund-accounts').set(auth).send({ type: 'upi', upiId: 'qa.returner@okhdfc' });
+  assert.equal(upi.status, 201);
+  assert.equal(upi.body.accounts.length, 2);
+
+  // Never exposed on the profile endpoints.
+  const me = await api().get('/api/customers/me').set(auth);
+  assert.equal(me.status, 200);
+  assert.ok(!JSON.stringify(me.body).includes('123456789012'));
+
+  const order = await makeDelivered({ paymentMethod: 'Cash on Delivery', paymentStatus: 'Pending' });
+  const elig = await api().get(`/api/orders/${order.orderId}/returns`).query({ phone: CUST_PHONE });
+  assert.deepEqual(elig.body.refundMethods, ['wallet', 'bank']);
+  const create = await api().post(`/api/orders/${order.orderId}/returns`).send({
+    phone: CUST_PHONE, type: 'return', reasonCode: 'quality', items: [{ key: 'p-bread', quantity: 1 }],
+    refundMethod: 'bank', refundAccountId: add.body.account.id,
+  });
+  assert.equal(create.status, 201, JSON.stringify(create.body));
+  const r = create.body.returnRequest;
+  assert.equal(r.refund.method, 'bank');
+  assert.match(r.refund.account.label, /9012/);
+  assert.ok(!JSON.stringify(r).includes('123456789012'));
+
+  // Removing the saved account afterwards can't redirect or break the refund.
+  await api().delete(`/api/customers/me/refund-accounts/${add.body.account.id}`).set(auth).expect(200);
+
+  const token = await adminToken();
+  await new Promise((res) => setTimeout(res, 300));
+  await ensureRiderOnline();
+  await api().post(`/api/admin/returns/${r.returnId}/assign`).set('Authorization', `Bearer ${token}`).send({ partnerUserId: riderUserId });
+  const rt = await riderToken();
+  const col = await api().post(`/api/delivery/returns/${r.returnId}/collect`).set('Authorization', `Bearer ${rt}`)
+    .send({ otp: r.pickupOtp, itemsVerified: true, photos: [PHOTO] });
+  assert.equal(col.status, 200, JSON.stringify(col.body));
+
+  const walletBefore = (await Customer.findOne({ customerId })).walletBalance || 0;
+  const now = await api().post(`/api/admin/returns/${r.returnId}/refund`).set('Authorization', `Bearer ${token}`);
+  assert.equal(now.status, 200, JSON.stringify(now.body));
+  assert.equal(now.body.returnRequest.refund.status, 'processed');
+  assert.match(now.body.returnRequest.refund.reference, /^MOCK_PAYOUT_/);
+  assert.ok(!JSON.stringify(now.body).includes('123456789012'));
+  assert.equal((await Customer.findOne({ customerId })).walletBalance || 0, walletBefore, 'bank refunds must not touch the wallet');
+  await api().post(`/api/delivery/returns/${r.returnId}/complete`).set('Authorization', `Bearer ${rt}`).expect(200);
 });

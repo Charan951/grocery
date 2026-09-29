@@ -16,8 +16,17 @@ export interface ReturnableItem {
   price: number; quantity: number; returnableQty: number;
 }
 
+export type RefundMethod = 'wallet' | 'original' | 'bank';
+
+/** A saved bank account / UPI ID, as the API exposes it (number masked). */
+export interface RefundAccount {
+  id: string; type: 'bank' | 'upi'; holderName?: string; isDefault: boolean; label: string;
+  ifsc?: string; accountLast4?: string; upiId?: string;
+}
+
 export interface ReturnRefund {
-  amount: number; method: 'wallet' | 'original';
+  amount: number; method: RefundMethod;
+  account?: { id?: string; type?: 'bank' | 'upi'; holderName?: string; ifsc?: string; upiId?: string; label?: string };
   status: 'none' | 'scheduled' | 'processing' | 'processed' | 'failed';
   dueAt?: string; processedAt?: string;
 }
@@ -34,7 +43,7 @@ export interface ReturnRequest {
 
 export interface OrderReturns {
   eligible: boolean; reason: string | null; windowHours: number; windowEndsAt: string | null;
-  refundDelayHours: number; refundMethods: ('wallet' | 'original')[];
+  refundDelayHours: number; refundMethods: RefundMethod[];
   items: ReturnableItem[]; requests: ReturnRequest[];
 }
 
@@ -67,13 +76,33 @@ export const returnsApi = {
   mine: () => call<{ returns: ReturnRequest[] }>(withPhone('/returns/mine')).then((d) => d.returns),
   create: (orderId: string, body: {
     type: ReturnType; items: { key: string; quantity: number }[]; reasonCode: string;
-    comment?: string; photos?: string[]; refundMethod?: 'wallet' | 'original';
+    comment?: string; photos?: string[]; refundMethod?: RefundMethod; refundAccountId?: string;
   }) => call<{ returnRequest: ReturnRequest }>(`/orders/${encodeURIComponent(orderId)}/returns`, {
     method: 'POST', body: JSON.stringify({ ...body, phone: customerPhone() }),
   }).then((d) => d.returnRequest),
   cancel: (returnId: string) => call<{ returnRequest: ReturnRequest }>(`/returns/${encodeURIComponent(returnId)}/cancel`, {
     method: 'POST', body: JSON.stringify({ phone: customerPhone() }),
   }).then((d) => d.returnRequest),
+};
+
+/** Where a refund goes, in customer wording. */
+export const refundDestinationLabel = (r: Pick<ReturnRefund, 'method' | 'account'>): string =>
+  r.method === 'wallet' ? 'FreshCart wallet'
+    : r.method === 'bank' ? (r.account?.label || 'bank account')
+    : 'original payment method';
+
+export type NewRefundAccount =
+  | { type: 'bank'; holderName: string; ifsc: string; accountNumber: string; confirmAccountNumber: string; makeDefault?: boolean }
+  | { type: 'upi'; upiId: string; holderName?: string; makeDefault?: boolean };
+
+// Saved refund destinations — token-only (/customers/me), never phone-keyed.
+export const refundAccountsApi = {
+  list: () => call<{ accounts: RefundAccount[] }>('/customers/me/refund-accounts').then((d) => d.accounts),
+  add: (body: NewRefundAccount) => call<{ account: RefundAccount; accounts: RefundAccount[] }>('/customers/me/refund-accounts', {
+    method: 'POST', body: JSON.stringify(body),
+  }),
+  setDefault: (id: string) => call<{ accounts: RefundAccount[] }>(`/customers/me/refund-accounts/${encodeURIComponent(id)}/default`, { method: 'POST' }).then((d) => d.accounts),
+  remove: (id: string) => call<{ accounts: RefundAccount[] }>(`/customers/me/refund-accounts/${encodeURIComponent(id)}`, { method: 'DELETE' }).then((d) => d.accounts),
 };
 
 /** Shrink a camera photo to a ≤1280px JPEG data URI before upload. */

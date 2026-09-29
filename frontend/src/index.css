@@ -108,6 +108,15 @@
 }
 
 @theme {
+  /* Our --spacing-xs…xl tokens would otherwise hijack max-w-xs…xl (Tailwind
+     resolves max-w-* against --spacing-* too), collapsing max-w-xl to 2rem.
+     --max-width-* is checked first, so pin the standard container sizes. */
+  --max-width-xs: 20rem;
+  --max-width-sm: 24rem;
+  --max-width-md: 28rem;
+  --max-width-lg: 32rem;
+  --max-width-xl: 36rem;
+
   --color-primary: var(--primary);
   --color-primary-strong: var(--primary-strong);
   --color-secondary: var(--secondary);

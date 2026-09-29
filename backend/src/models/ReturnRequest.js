@@ -89,7 +89,19 @@ const returnRequestSchema = new mongoose.Schema({
   // dueAt passes — or immediately by an admin "refund now".
   refund: {
     amount: { type: Number, default: 0 },
-    method: { type: String, enum: ['wallet', 'original'], default: 'wallet' },
+    method: { type: String, enum: ['wallet', 'original', 'bank'], default: 'wallet' },
+    // bank: snapshot of the customer's chosen refund account at request time, so
+    // editing/removing the saved account later can't redirect a scheduled refund.
+    // The full account number is select:false — only payRefund reads it.
+    account: {
+      id: { type: String },
+      type: { type: String, enum: ['bank', 'upi'] },
+      holderName: { type: String },
+      accountNumber: { type: String, select: false },
+      ifsc: { type: String },
+      upiId: { type: String },
+      label: { type: String },
+    },
     status: { type: String, enum: ['none', 'scheduled', 'processing', 'processed', 'failed'], default: 'none' },
     dueAt: { type: Date },
     processedAt: { type: Date },

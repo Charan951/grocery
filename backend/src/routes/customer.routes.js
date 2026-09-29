@@ -37,6 +37,10 @@ router.post('/customers/me/wallet/debit', protectCustomer, customerController.wa
 router.post('/customers/me/wallet/topup', protectCustomer, customerController.walletTopup);
 router.post('/customers/me/wallet/topup/verify', protectCustomer, customerController.walletTopupVerify);
 router.get('/customers/me/wallet/transactions', protectCustomer, customerController.walletTransactions);
+router.get('/customers/me/refund-accounts', protectCustomer, customerController.listRefundAccounts);
+router.post('/customers/me/refund-accounts', protectCustomer, customerController.addRefundAccount);
+router.post('/customers/me/refund-accounts/:accountId/default', protectCustomer, customerController.setDefaultRefundAccount);
+router.delete('/customers/me/refund-accounts/:accountId', protectCustomer, customerController.deleteRefundAccount);
 router.post('/customers/me/devices', protectCustomer, customerController.registerDevice);
 router.delete('/customers/me/devices/:token', protectCustomer, customerController.removeDevice);
 router.delete('/customers/me', attachCustomerOptional, customerController.deleteMe); // self-service account deletion (token OR ?phone=)

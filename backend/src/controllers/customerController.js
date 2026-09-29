@@ -7,7 +7,7 @@ import { DeliveryPartner } from '../models/DeliveryPartner.js';
 import { Category, Product, Brand, SpecialGroup, Banner, PromoCard } from '../models/Catalog.js';
 import { Inventory } from '../models/Inventory.js';
 import { Order } from '../models/Order.js';
-import { Customer } from '../models/Customer.js';
+import { Customer, maskRefundAccount } from '../models/Customer.js';
 import { Coupon, Offer, Payment, WalletTransaction } from '../models/Finance.js';
 import { Review, Notification, CMSPage, Blog, Settings, AuditLog, SupportTicket } from '../models/Operations.js';
 import { uploadToCloudinary } from '../config/cloudinary.js';
@@ -398,6 +398,99 @@ export const customerController = {
         walletBalance: req.customer.walletBalance || 0,
         transactions: list,
       });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // ---- Refund accounts (bank / UPI) — protectCustomer ----
+  // GET /api/customers/me/refund-accounts
+  listRefundAccounts: async (req, res) => {
+    try {
+      const c = await Customer.findOne({ customerId: req.customer.customerId }).select('+refundAccounts');
+      res.json({ success: true, accounts: (c?.refundAccounts || []).map(maskRefundAccount) });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // POST /api/customers/me/refund-accounts
+  //   bank: { type: 'bank', holderName, ifsc, accountNumber, confirmAccountNumber }
+  //   upi:  { type: 'upi', upiId, holderName? }
+  addRefundAccount: async (req, res) => {
+    try {
+      const b = req.body || {};
+      const holderName = String(b.holderName || '').trim().replace(/\s+/g, ' ');
+      // Bank payouts are simulated (payoutService), so dummy details are fine
+      // for now. Set REFUND_ACCOUNT_STRICT=true once a real payout provider is
+      // wired in to enforce the real IFSC / account-number formats.
+      const strict = process.env.REFUND_ACCOUNT_STRICT === 'true';
+      let entry;
+      if (b.type === 'bank') {
+        const ifsc = String(b.ifsc || '').trim().toUpperCase();
+        const acct = String(b.accountNumber || '').replace(/\s/g, '');
+        const ifscOk = strict ? /^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc) : /^[A-Z0-9]{4,11}$/.test(ifsc);
+        const acctOk = strict ? /^\d{9,18}$/.test(acct) : /^\d{4,18}$/.test(acct);
+        if (!ifscOk) return res.status(400).json({ success: false, message: 'Enter a valid 11-character IFSC code (e.g. HDFC0001234)' });
+        if (!acctOk) return res.status(400).json({ success: false, message: strict ? 'Account number must be 9–18 digits' : 'Account number must be 4–18 digits' });
+        if (acct !== String(b.confirmAccountNumber || '').replace(/\s/g, '')) return res.status(400).json({ success: false, message: 'Account numbers do not match' });
+        if (holderName.length < 2 || holderName.length > 80) return res.status(400).json({ success: false, message: "Enter the account holder's name" });
+        entry = { type: 'bank', holderName, ifsc, accountNumber: acct };
+      } else if (b.type === 'upi') {
+        const upiId = String(b.upiId || '').trim().toLowerCase();
+        if (!/^[a-z0-9._-]{2,256}@[a-z]{2,64}$/.test(upiId)) return res.status(400).json({ success: false, message: 'Enter a valid UPI ID (e.g. name@okbank)' });
+        entry = { type: 'upi', holderName: holderName.slice(0, 80), upiId };
+      } else {
+        return res.status(400).json({ success: false, message: 'Choose bank account or UPI' });
+      }
+
+      const c = await Customer.findOne({ customerId: req.customer.customerId }).select('+refundAccounts');
+      if (!c) return res.status(404).json({ success: false, message: 'Customer not found' });
+      const list = c.refundAccounts || [];
+      const dup = list.some((a) => a.type === entry.type && (entry.type === 'bank'
+        ? a.accountNumber === entry.accountNumber && a.ifsc === entry.ifsc
+        : a.upiId === entry.upiId));
+      if (dup) return res.status(409).json({ success: false, message: 'This account is already saved' });
+      if (list.length >= 5) return res.status(400).json({ success: false, message: 'You can save up to 5 refund accounts' });
+
+      entry.isDefault = list.length === 0 || !!b.makeDefault;
+      if (entry.isDefault) list.forEach((a) => { a.isDefault = false; });
+      list.push(entry);
+      c.refundAccounts = list;
+      await c.save();
+      res.status(201).json({ success: true, account: maskRefundAccount(c.refundAccounts[c.refundAccounts.length - 1]), accounts: c.refundAccounts.map(maskRefundAccount) });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // POST /api/customers/me/refund-accounts/:accountId/default
+  setDefaultRefundAccount: async (req, res) => {
+    try {
+      const c = await Customer.findOne({ customerId: req.customer.customerId }).select('+refundAccounts');
+      if (!c?.refundAccounts?.some((a) => a.id === req.params.accountId)) return res.status(404).json({ success: false, message: 'Account not found' });
+      c.refundAccounts.forEach((a) => { a.isDefault = a.id === req.params.accountId; });
+      await c.save();
+      res.json({ success: true, accounts: c.refundAccounts.map(maskRefundAccount) });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
+  // DELETE /api/customers/me/refund-accounts/:accountId
+  // Refunds already scheduled keep their own snapshot, so removal is always safe.
+  deleteRefundAccount: async (req, res) => {
+    try {
+      const c = await Customer.findOne({ customerId: req.customer.customerId }).select('+refundAccounts');
+      const list = c?.refundAccounts || [];
+      const idx = list.findIndex((a) => a.id === req.params.accountId);
+      if (idx < 0) return res.status(404).json({ success: false, message: 'Account not found' });
+      const wasDefault = list[idx].isDefault;
+      list.splice(idx, 1);
+      if (wasDefault && list.length) list[0].isDefault = true;
+      c.refundAccounts = list;
+      await c.save();
+      res.json({ success: true, accounts: c.refundAccounts.map(maskRefundAccount) });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
     }

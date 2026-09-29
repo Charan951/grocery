@@ -80,9 +80,21 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
 
     expect(find.byType(ProfileScreen), findsOneWidget);
-    expect(find.text('Order history'), findsOneWidget);
-    expect(find.text('Wishlist'), findsOneWidget);
-    expect(find.text('Notifications'), findsOneWidget);
-    expect(find.text('Dark mode'), findsOneWidget);
+    for (final label in const [
+      'Your orders',
+      'Need help?',
+      'Address book',
+      'Your wishlist',
+      'FreshCart Wallet',
+      'Bank & UPI details',
+      'Payment & refunds',
+      'FreshCart Pay Later',
+      'Help & support',
+      'Rate FreshCart',
+      'Terms & legal',
+      'Log out',
+    ]) {
+      expect(find.text(label), findsOneWidget, reason: label);
+    }
   });
 }

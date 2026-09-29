@@ -69,16 +69,67 @@ class ReturnableItem {
       );
 }
 
+/// A saved bank account / UPI ID for refunds (account number masked by the API).
+class RefundAccount {
+  final String id;
+  final String type; // bank | upi
+  final String holderName;
+  final bool isDefault;
+  final String label;
+  final String ifsc;
+  final String accountLast4;
+  final String upiId;
+
+  const RefundAccount({
+    required this.id,
+    required this.type,
+    required this.label,
+    this.holderName = '',
+    this.isDefault = false,
+    this.ifsc = '',
+    this.accountLast4 = '',
+    this.upiId = '',
+  });
+
+  bool get isBank => type == 'bank';
+
+  factory RefundAccount.fromJson(Map<String, dynamic> j) => RefundAccount(
+        id: _s(j['id']),
+        type: _s(j['type'], 'bank'),
+        holderName: _s(j['holderName']),
+        isDefault: j['isDefault'] == true,
+        label: _s(j['label']),
+        ifsc: _s(j['ifsc']),
+        accountLast4: _s(j['accountLast4']),
+        upiId: _s(j['upiId']),
+      );
+}
+
 class ReturnRefund {
   final num amount;
-  final String method; // wallet | original
+  final String method; // wallet | original | bank
   final String status; // none | scheduled | processing | processed | failed
   final DateTime? dueAt;
   final DateTime? processedAt;
+  final String accountLabel; // bank only, e.g. "A/c ••••1234 · HDFC0001234"
 
-  const ReturnRefund({required this.amount, required this.method, required this.status, this.dueAt, this.processedAt});
+  const ReturnRefund({
+    required this.amount,
+    required this.method,
+    required this.status,
+    this.dueAt,
+    this.processedAt,
+    this.accountLabel = '',
+  });
 
   bool get toWallet => method == 'wallet';
+
+  /// Where the money goes, in customer wording — matches the web.
+  String get destination => switch (method) {
+        'wallet' => 'FreshCart wallet',
+        'bank' => accountLabel.isNotEmpty ? accountLabel : 'bank account',
+        _ => 'original payment method',
+      };
 
   factory ReturnRefund.fromJson(Map<String, dynamic> j) => ReturnRefund(
         amount: _n(j['amount']),
@@ -86,6 +137,7 @@ class ReturnRefund {
         status: _s(j['status'], 'none'),
         dueAt: _d(j['dueAt']),
         processedAt: _d(j['processedAt']),
+        accountLabel: _s((j['account'] as Map?)?['label']),
       );
 }
 

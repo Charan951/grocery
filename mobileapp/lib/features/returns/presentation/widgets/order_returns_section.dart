@@ -290,14 +290,21 @@ class _ReturnCardState extends ConsumerState<_ReturnCard> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(refund.toWallet ? Icons.account_balance_wallet_outlined : Icons.credit_card_rounded, size: 17, color: secondary),
+                  Icon(
+                      refund.toWallet
+                          ? Icons.account_balance_wallet_outlined
+                          : refund.method == 'bank'
+                              ? Icons.account_balance_outlined
+                              : Icons.credit_card_rounded,
+                      size: 17,
+                      color: secondary),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${inr(refund.amount)} refund to ${refund.toWallet ? 'FreshCart wallet' : 'original payment method'}',
+                          '${inr(refund.amount)} refund to ${refund.destination}',
                           style: AppTypography.labelMedium(primary).copyWith(fontWeight: FontWeight.w800),
                         ),
                         const SizedBox(height: 2),

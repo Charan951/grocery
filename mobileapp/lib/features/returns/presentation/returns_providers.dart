@@ -8,6 +8,12 @@ final orderReturnsProvider = FutureProvider.autoDispose.family<OrderReturns, Str
   return OrderReturns.fromJson(json);
 });
 
+/// The signed-in customer's saved bank accounts / UPI IDs for refunds.
+final refundAccountsProvider = FutureProvider.autoDispose<List<RefundAccount>>((ref) async {
+  final list = await ref.watch(apiServiceProvider).fetchRefundAccounts();
+  return list.map(RefundAccount.fromJson).toList();
+});
+
 /// The shared issue list (same one the web shows).
 final returnConfigProvider = FutureProvider.autoDispose<ReturnConfig>((ref) async {
   final json = await ref.watch(apiServiceProvider).fetchReturnConfig();

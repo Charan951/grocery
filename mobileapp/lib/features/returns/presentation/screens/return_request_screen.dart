@@ -37,6 +37,7 @@ class _ReturnRequestScreenState extends ConsumerState<ReturnRequestScreen> {
   final _comment = TextEditingController();
   final List<Uint8List> _photos = [];
   String? _refundMethod;
+  String? _refundAccountId; // bank refunds: which saved account (null → default)
   bool _busy = false;
 
   @override
@@ -94,6 +95,7 @@ class _ReturnRequestScreenState extends ConsumerState<ReturnRequestScreen> {
             comment: _comment.text,
             photos: [for (final p in _photos) 'data:image/jpeg;base64,${base64Encode(p)}'],
             refundMethod: _type == 'return' ? (_refundMethod ?? data.refundMethods.first) : null,
+            refundAccountId: _type == 'return' && (_refundMethod ?? data.refundMethods.first) == 'bank' ? _refundAccountId : null,
           );
       ref.invalidate(orderReturnsProvider(widget.orderId));
       ref.invalidate(orderDetailProvider(widget.orderId));
@@ -165,7 +167,7 @@ class _ReturnRequestScreenState extends ConsumerState<ReturnRequestScreen> {
                         : PrimaryButton(
                             text: 'Request ${_type == 'return' ? 'return' : 'exchange'} pickup',
                             isLoading: _busy,
-                            onPressed: (_reasonCode.isEmpty || commentMissing || _busy) ? null : () => _submit(data, picked),
+                            onPressed: (_reasonCode.isEmpty || commentMissing || _needsAccount(data) || _busy) ? null : () => _submit(data, picked),
                           ),
                   ),
                 ),
@@ -372,10 +374,22 @@ class _ReturnRequestScreenState extends ConsumerState<ReturnRequestScreen> {
             onTap: () => setState(() => _refundMethod = m),
             child: Row(
               children: [
-                Icon(m == 'wallet' ? Icons.account_balance_wallet_outlined : Icons.credit_card_rounded, size: 20, color: secondary),
+                Icon(
+                    m == 'wallet'
+                        ? Icons.account_balance_wallet_outlined
+                        : m == 'bank'
+                            ? Icons.account_balance_outlined
+                            : Icons.credit_card_rounded,
+                    size: 20,
+                    color: secondary),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(m == 'wallet' ? 'FreshCart wallet' : 'Original payment method',
+                  child: Text(
+                      m == 'wallet'
+                          ? 'FreshCart wallet'
+                          : m == 'bank'
+                              ? 'Bank account / UPI'
+                              : 'Original payment method',
                       style: AppTypography.labelLarge(primary).copyWith(fontWeight: FontWeight.w700)),
                 ),
                 if ((_refundMethod ?? data.refundMethods.first) == m)
@@ -383,6 +397,7 @@ class _ReturnRequestScreenState extends ConsumerState<ReturnRequestScreen> {
               ],
             ),
           ),
+        if ((_refundMethod ?? data.refundMethods.first) == 'bank') _bankPicker(primary, secondary),
       ],
       const SizedBox(height: 12),
       Container(
@@ -403,6 +418,76 @@ class _ReturnRequestScreenState extends ConsumerState<ReturnRequestScreen> {
         ),
       ),
     ];
+  }
+
+  /// Bank refund picked but no saved account to send it to yet.
+  bool _needsAccount(OrderReturns data) {
+    if (_type != 'return' || (_refundMethod ?? data.refundMethods.first) != 'bank') return false;
+    final list = ref.watch(refundAccountsProvider).valueOrNull ?? const <RefundAccount>[];
+    return _refundAccountId == null && list.isEmpty;
+  }
+
+  /// Saved bank / UPI accounts under the "Bank account / UPI" choice.
+  Widget _bankPicker(Color primary, Color secondary) {
+    final accounts = ref.watch(refundAccountsProvider);
+    Future<void> add(String type) async {
+      final saved = await context.push<RefundAccount>('/refund-accounts/add?type=$type');
+      if (saved != null && mounted) setState(() => _refundAccountId = saved.id);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 8, bottom: 8),
+      child: accounts.when(
+        loading: () => const Padding(padding: EdgeInsets.all(12), child: LinearProgressIndicator()),
+        error: (e, _) => Text(e is ApiException ? e.message : 'Could not load your accounts',
+            style: AppTypography.bodySmall(AppColors.errorText)),
+        data: (list) {
+          final selected = _refundAccountId ?? (list.where((a) => a.isDefault).firstOrNull ?? list.firstOrNull)?.id;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final a in list)
+                InkWell(
+                  onTap: () => setState(() => _refundAccountId = a.id),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      children: [
+                        Icon(selected == a.id ? Icons.radio_button_checked : Icons.radio_button_off,
+                            size: 20, color: selected == a.id ? AppColors.primary : secondary),
+                        const SizedBox(width: 12),
+                        Expanded(child: Text(a.label, style: AppTypography.labelMedium(primary), overflow: TextOverflow.ellipsis)),
+                      ],
+                    ),
+                  ),
+                ),
+              if (list.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Text('Add the account you want the refund sent to.', style: AppTypography.bodySmall(secondary)),
+                ),
+              Wrap(
+                spacing: 8,
+                children: [
+                  TextButton.icon(
+                    onPressed: () => add('bank'),
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('Add bank account'),
+                    style: TextButton.styleFrom(foregroundColor: AppColors.primaryText),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => add('upi'),
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('Add UPI ID'),
+                    style: TextButton.styleFrom(foregroundColor: AppColors.primaryText),
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   TextStyle _label(Color c) => TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, letterSpacing: 0.5, color: c);

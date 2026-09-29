@@ -128,6 +128,58 @@ export const paymentController = {
     }
   },
 
+  // POST /api/payment/reconcile  { razorpay_order_id, orderId?, paymentMethod? }
+  // Asks Razorpay directly whether an order was paid. Used when checkout ends
+  // without a success callback (sheet error, "order is already paid", dismissed
+  // after a flaky attempt) so a payment that did go through isn't lost. Trust
+  // comes from the Razorpay API, not the client, so no signature is needed.
+  reconcile: async (req, res) => {
+    try {
+      const { razorpay_order_id, orderId, paymentMethod } = req.body || {};
+      const rzpOrderId = String(razorpay_order_id || '');
+      if (!rzpOrderId.startsWith('order_') || rzpOrderId.startsWith('order_test_')) {
+        return res.json({ success: true, paid: false });
+      }
+
+      const rzpOrder = await razorpayInstance.orders.fetch(rzpOrderId);
+      const { items = [] } = await razorpayInstance.orders.fetchPayments(rzpOrderId);
+      let payment = items.find((p) => p.status === 'captured');
+      if (!payment) {
+        // Authorized-but-uncaptured payments get auto-refunded; capture them now.
+        const authorized = items.find((p) => p.status === 'authorized');
+        if (authorized) {
+          try {
+            payment = await razorpayInstance.payments.capture(authorized.id, authorized.amount, authorized.currency || 'INR');
+          } catch (_) {
+            payment = authorized;
+          }
+        }
+      }
+      const paid = rzpOrder.status === 'paid' || payment?.status === 'captured';
+      if (!paid) return res.json({ success: true, paid: false, status: rzpOrder.status });
+
+      if (orderId) {
+        const order = await Order.findOne({ orderId: String(orderId) });
+        // Only settle our order if this Razorpay order actually belongs to it.
+        const matches = order && (
+          order.paymentRef === rzpOrderId ||
+          Math.round(Number(order.totalAmount || 0) * 100) === Number(rzpOrder.amount)
+        );
+        if (matches && order.paymentStatus !== 'Paid') {
+          order.paymentStatus = 'Paid';
+          order.paymentRef = rzpOrderId;
+          if (payment?.id) order.paymentId = payment.id;
+          if (paymentMethod) order.paymentMethod = String(paymentMethod).slice(0, 60);
+          await order.save();
+        }
+      }
+
+      res.json({ success: true, paid: true, paymentId: payment?.id || null, razorpayOrderId: rzpOrderId });
+    } catch (err) {
+      res.status(502).json({ success: false, paid: false, message: 'Could not check the payment status.' });
+    }
+  },
+
   // POST /api/payment/webhook — Razorpay server-to-server events.
   // Body is a raw Buffer (see app.js). Verifies X-Razorpay-Signature and marks
   // the matching order Paid on payment.captured / order.paid.

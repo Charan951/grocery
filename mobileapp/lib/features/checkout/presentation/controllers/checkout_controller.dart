@@ -121,26 +121,37 @@ class CheckoutController extends StateNotifier<CheckoutState> {
           ));
 
           if (result is PaymentFailure) {
-            _fail(result.cancelled ? 'Payment cancelled.' : result.message);
-            return;
-          }
-          final ok = result as PaymentSuccess;
-
-          state = state.copyWith(stage: 'Verifying payment…');
-          final verify = await _api.verifyPayment(
-            razorpayOrderId: ok.razorpayOrderId,
-            paymentId: ok.paymentId,
-            signature: ok.signature,
-          );
-          if (verify['verified'] != true) {
-            _fail('We could not verify your payment. You have not been charged for an order.');
-            return;
+            // The sheet can error after Razorpay took the money (it then
+            // refuses retries with "order is already paid"). Ask the backend
+            // before failing so the customer isn't charged without an order.
+            state = state.copyWith(stage: 'Checking payment status…');
+            final reconciledId = await _reconciledPaymentId(rzpOrderId);
+            if (reconciledId == null) {
+              _fail(result.cancelled ? 'Payment cancelled.' : result.message);
+              return;
+            }
+            paymentId = reconciledId;
+          } else {
+            final ok = result as PaymentSuccess;
+            state = state.copyWith(stage: 'Verifying payment…');
+            final verify = await _api.verifyPayment(
+              razorpayOrderId: ok.razorpayOrderId,
+              paymentId: ok.paymentId,
+              signature: ok.signature,
+            );
+            if (verify['verified'] != true) {
+              final reconciledId = await _reconciledPaymentId(rzpOrderId);
+              if (reconciledId == null) {
+                _fail('We could not verify your payment. You have not been charged for an order.');
+                return;
+              }
+            }
+            paymentId = ok.paymentId;
           }
 
           paymentLabel = 'Razorpay';
           paid = true;
-          paymentId = ok.paymentId;
-          paymentRef = ok.razorpayOrderId;
+          paymentRef = rzpOrderId;
           break;
       }
 
@@ -169,6 +180,17 @@ class CheckoutController extends StateNotifier<CheckoutState> {
       _fail(e.message);
     } catch (e) {
       _fail('Something went wrong. Please try again.');
+    }
+  }
+
+  /// The Razorpay payment id if [rzpOrderId] was actually paid, else null.
+  Future<String?> _reconciledPaymentId(String rzpOrderId) async {
+    try {
+      final r = await _api.reconcilePayment(razorpayOrderId: rzpOrderId);
+      if (r['paid'] != true) return null;
+      return (r['paymentId'] ?? '').toString();
+    } catch (_) {
+      return null;
     }
   }
 

@@ -9,21 +9,28 @@ import {
   Wallet,
   ChevronRight,
   LogOut,
-  Edit3,
+  Pencil,
   ArrowLeft,
   CheckCircle2,
-  Leaf,
+  Heart,
+  Landmark,
+  ReceiptText,
+  CalendarClock,
+  Star,
+  User,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSmartBack } from '../hooks/useSmartBack';
 import { CustomerAuthModal } from '../components/CustomerAuthModal';
 import { apiUrl } from '../config/api';
 
+const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.freshcart.app.freshcart';
+
 type MenuItem = {
   icon: React.ElementType;
   title: string;
-  subtitle: string;
   onClick: () => void;
+  trailing?: string;
 };
 
 export const CustomerProfile: React.FC = () => {
@@ -43,10 +50,9 @@ export const CustomerProfile: React.FC = () => {
   const [phone] = useState(customerUser?.phone || '');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [successMsg, setSuccessMsg] = useState('');
+  const [notice, setNotice] = useState('');
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [walletHint, setWalletHint] = useState(false);
 
   useEffect(() => {
     if (customerUser) {
@@ -65,6 +71,11 @@ export const CustomerProfile: React.FC = () => {
     const t = setTimeout(() => setConfirmDelete(false), 3500);
     return () => clearTimeout(t);
   }, [confirmDelete]);
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(''), 3500);
+    return () => clearTimeout(t);
+  }, [notice]);
 
   const handleLogout = () => {
     localStorage.removeItem('customer_user');
@@ -78,7 +89,6 @@ export const CustomerProfile: React.FC = () => {
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    setSuccessMsg('');
 
     const fallbackName = name || (phone ? `Customer (${phone.slice(-4)})` : 'FreshCart shopper');
     const updatedCustomer = { ...customerUser, name: fallbackName, email: email || '' };
@@ -103,10 +113,9 @@ export const CustomerProfile: React.FC = () => {
     setCustomerUser(updatedCustomer);
     window.dispatchEvent(new Event('customer_auth_changed'));
     window.dispatchEvent(new Event('storage'));
-    setSuccessMsg('Profile updated.');
+    setNotice('Profile updated.');
     setIsEditingProfile(false);
     setIsSubmitting(false);
-    setTimeout(() => setSuccessMsg(''), 3500);
   };
 
   const handleDeleteAccount = async () => {
@@ -126,20 +135,54 @@ export const CustomerProfile: React.FC = () => {
   const isSignedIn = Boolean(customerUser);
   const displayName = customerUser?.name || 'FreshCart shopper';
   const displayPhone = customerUser?.phone || '';
-  const avatarInitial = (customerUser?.name || 'F').charAt(0).toUpperCase();
+  const avatarInitial = (customerUser?.name || '').trim().charAt(0).toUpperCase();
   const walletBalance = Number(customerUser?.walletBalance || 0);
 
-  const menuItems: MenuItem[] = isSignedIn
-    ? [
-        { icon: ShoppingBag, title: 'My Orders', subtitle: 'Track, reorder & download invoices', onClick: () => navigate('/orders') },
-        { icon: MapPin, title: 'Saved Addresses', subtitle: 'Manage your delivery locations', onClick: () => navigate('/locations') },
-        { icon: Headphones, title: 'Help & Support', subtitle: '24×7 assistance & live chat', onClick: () => navigate('/support') },
-        { icon: FileText, title: 'Terms & Legal', subtitle: 'Privacy policy & terms of service', onClick: () => navigate('/legal') },
-      ]
-    : [
-        { icon: Headphones, title: 'Help & Support', subtitle: '24×7 assistance & live chat', onClick: () => navigate('/support') },
-        { icon: FileText, title: 'Terms & Legal', subtitle: 'Privacy policy & terms of service', onClick: () => navigate('/legal') },
-      ];
+  // Signed-out shoppers get the auth modal instead of an account-only page.
+  const requireAuth = (fn: () => void) => () => (isSignedIn ? fn() : setIsAuthModalOpen(true));
+  const comingSoon = (feature: string) => () => setNotice(`${feature} is coming soon.`);
+
+  const quickTiles: MenuItem[] = [
+    { icon: ShoppingBag, title: 'Your orders', onClick: requireAuth(() => navigate('/orders')) },
+    {
+      icon: Wallet,
+      title: isSignedIn ? `₹${walletBalance.toFixed(0)}` : 'Wallet',
+      onClick: requireAuth(() => setNotice('Adding money to your wallet is available in the FreshCart app.')),
+    },
+    { icon: Headphones, title: 'Need help?', onClick: () => navigate('/support') },
+  ];
+
+  const sections: { title: string; items: MenuItem[] }[] = [
+    {
+      title: 'Your information',
+      items: [
+        { icon: MapPin, title: 'Address book', onClick: requireAuth(() => navigate('/locations')) },
+        { icon: Heart, title: 'Your wishlist', onClick: () => window.dispatchEvent(new Event('open_wishlist')) },
+      ],
+    },
+    {
+      title: 'Payments and refunds',
+      items: [
+        {
+          icon: Wallet,
+          title: 'FreshCart Wallet',
+          trailing: isSignedIn ? `₹${walletBalance.toFixed(2)}` : undefined,
+          onClick: requireAuth(() => setNotice('Adding money to your wallet is available in the FreshCart app.')),
+        },
+        { icon: Landmark, title: 'Bank & UPI details', onClick: requireAuth(() => navigate('/account/profile/bank-details')) },
+        { icon: ReceiptText, title: 'Payment & refunds', onClick: () => navigate('/support') },
+        { icon: CalendarClock, title: 'FreshCart Pay Later', onClick: requireAuth(comingSoon('FreshCart Pay Later')) },
+      ],
+    },
+    {
+      title: 'Other information',
+      items: [
+        { icon: Headphones, title: 'Help & support', onClick: () => navigate('/support') },
+        { icon: Star, title: 'Rate FreshCart', onClick: () => window.open(PLAY_STORE_URL, '_blank', 'noopener') },
+        { icon: FileText, title: 'Terms & legal', onClick: () => navigate('/legal') },
+      ],
+    },
+  ];
 
   const rise = {
     initial: { opacity: 0, y: 10 },
@@ -148,212 +191,185 @@ export const CustomerProfile: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-surface text-text-primary font-sans selection:bg-primary/20 pb-28 sm:pb-16">
+    <div className="relative min-h-screen bg-[#F3F6F2] text-text-primary font-sans selection:bg-primary/20 pb-44 sm:pb-16">
       <SEO
         title="Account | FreshCart"
         description="Manage your FreshCart account, orders, saved addresses, wallet balance and support."
       />
 
-      <div className="max-w-2xl mx-auto px-4">
-        {/* Auto-back to wherever the shopper came from + page heading. No app bar. */}
-        <div className="pb-3" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
+      {/* Green wash that fades into the page, Blinkit-style */}
+      <div
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-80 pointer-events-none"
+        style={{ background: 'linear-gradient(180deg, #BFE8C3 0%, #DDF3DF 45%, #F3F6F2 100%)' }}
+      />
+
+      <div className="relative max-w-2xl mx-auto px-4">
+        <div className="pb-2" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
           <button
             onClick={goBack}
             aria-label="Go back"
-            className="w-10 h-10 rounded-full bg-background border border-divider flex items-center justify-center text-text-primary transition-colors hover:bg-divider/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 cursor-pointer"
+            className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-text-primary transition-colors hover:bg-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 cursor-pointer"
           >
             <ArrowLeft size={18} />
           </button>
-          <h1 className="mt-3 text-2xl font-extrabold font-display tracking-tight">Account</h1>
         </div>
 
-        <AnimatePresence>
-          {successMsg && (
-            <motion.div
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              className="mb-3 flex items-center gap-2 rounded-xl border border-primary/25 bg-primary/8 px-3.5 py-2.5 text-xs font-bold text-[#0C831F]"
-            >
-              <CheckCircle2 size={15} className="shrink-0" />
-              <span>{successMsg}</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {isSignedIn ? (
-          <motion.div {...rise}>
-            {/* Identity */}
-            <section className="border-t border-divider py-5">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3.5 min-w-0">
-                  <div className="w-14 h-14 rounded-full bg-primary/10 text-[#0C831F] border border-primary/20 font-extrabold text-xl flex items-center justify-center shrink-0">
-                    {avatarInitial}
-                  </div>
-                  <div className="min-w-0">
-                    <h2 className="text-lg font-extrabold font-display leading-tight tracking-tight truncate">
-                      {displayName}
-                    </h2>
-                    {displayPhone && (
-                      <p className="text-xs font-semibold text-text-secondary mt-0.5">{displayPhone}</p>
-                    )}
-                    {customerUser?.email && (
-                      <p className="text-[11px] font-medium text-text-tertiary mt-0.5 truncate">{customerUser.email}</p>
-                    )}
-                  </div>
-                </div>
+        <motion.div {...rise}>
+          {/* Identity */}
+          <section className="flex flex-col items-center text-center pb-5">
+            <div className="w-24 h-24 rounded-full bg-white shadow-sm flex items-center justify-center text-[#2E7D32]">
+              {isSignedIn && avatarInitial ? (
+                <span className="text-4xl font-extrabold font-display">{avatarInitial}</span>
+              ) : (
+                <User size={44} strokeWidth={2.25} />
+              )}
+            </div>
+            {isSignedIn ? (
+              <>
+                <h1 className="mt-3 text-2xl font-extrabold font-display tracking-tight max-w-full truncate">
+                  {displayName}
+                </h1>
+                <p className="mt-0.5 text-sm font-semibold text-text-secondary">
+                  {[displayPhone, customerUser?.email].filter(Boolean).join(' • ')}
+                </p>
                 <button
                   onClick={() => setIsEditingProfile((v) => !v)}
-                  className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-background border border-divider px-3.5 py-2 text-xs font-bold text-text-primary transition-colors hover:border-primary/40 hover:text-[#0C831F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 cursor-pointer"
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-extrabold text-[#2E7D32] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 rounded cursor-pointer"
                 >
-                  <Edit3 size={13} />
-                  {isEditingProfile ? 'Close' : 'Edit'}
+                  <Pencil size={12} />
+                  {isEditingProfile ? 'Close' : 'Edit profile'}
                 </button>
-              </div>
+              </>
+            ) : (
+              <>
+                <h1 className="mt-3 text-2xl font-extrabold font-display tracking-tight">Your account</h1>
+                <p className="mt-1 text-sm font-medium text-text-secondary">
+                  Log in to track orders, save addresses and check out faster.
+                </p>
+                <button
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="mt-4 rounded-full bg-primary px-8 py-3 text-sm font-extrabold text-white transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 cursor-pointer"
+                >
+                  Log in or sign up
+                </button>
+              </>
+            )}
+          </section>
 
-              <AnimatePresence>
-                {isEditingProfile && (
-                  <motion.form
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    onSubmit={handleSaveProfile}
-                    className="mt-4 space-y-3 overflow-hidden"
-                  >
-                    <div>
-                      <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-text-secondary">
-                        Full name
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="Your name"
-                        className="w-full rounded-xl border border-divider bg-background px-3.5 py-2 text-sm font-semibold text-text-primary outline-none transition-all focus:border-primary"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-text-secondary">
-                        Email address
-                      </label>
-                      <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="name@example.com"
-                        className="w-full rounded-xl border border-divider bg-background px-3.5 py-2 text-sm font-semibold text-text-primary outline-none transition-all focus:border-primary"
-                      />
-                    </div>
-                    <div className="flex items-center justify-between gap-3 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => (confirmDelete ? handleDeleteAccount() : setConfirmDelete(true))}
-                        className="text-xs font-bold text-error transition-colors hover:underline cursor-pointer"
-                      >
-                        {confirmDelete ? 'Tap again to delete account' : 'Delete account'}
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={isSubmitting}
-                        className="rounded-full bg-primary px-6 py-2.5 text-xs font-extrabold text-white transition-colors hover:bg-secondary disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 cursor-pointer"
-                      >
-                        {isSubmitting ? 'Saving…' : 'Save'}
-                      </button>
-                    </div>
-                  </motion.form>
-                )}
-              </AnimatePresence>
-            </section>
-
-            {/* Wallet */}
-            <section className="border-t border-divider py-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3.5">
-                  <span className="w-10 h-10 rounded-xl bg-primary/10 text-[#0C831F] flex items-center justify-center shrink-0">
-                    <Wallet size={19} />
-                  </span>
+          <AnimatePresence>
+            {isSignedIn && isEditingProfile && (
+              <motion.form
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                onSubmit={handleSaveProfile}
+                className="mb-4 overflow-hidden rounded-2xl bg-white"
+              >
+                <div className="space-y-3 p-4">
                   <div>
-                    <h3 className="text-[11px] font-black uppercase tracking-wider text-text-secondary">
-                      FreshCart Wallet
-                    </h3>
-                    <p className="text-lg font-extrabold leading-none mt-1 tabular-nums">
-                      ₹{walletBalance.toFixed(2)}
-                    </p>
+                    <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-text-secondary">
+                      Full name
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Your name"
+                      className="w-full rounded-xl border border-divider bg-background px-3.5 py-2 text-sm font-semibold text-text-primary outline-none transition-all focus:border-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-text-secondary">
+                      Email address
+                    </label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="name@example.com"
+                      className="w-full rounded-xl border border-divider bg-background px-3.5 py-2 text-sm font-semibold text-text-primary outline-none transition-all focus:border-primary"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-3 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => (confirmDelete ? handleDeleteAccount() : setConfirmDelete(true))}
+                      className="text-xs font-bold text-error transition-colors hover:underline cursor-pointer"
+                    >
+                      {confirmDelete ? 'Tap again to delete account' : 'Delete account'}
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="rounded-full bg-primary px-6 py-2.5 text-xs font-extrabold text-white transition-colors hover:bg-secondary disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 cursor-pointer"
+                    >
+                      {isSubmitting ? 'Saving…' : 'Save'}
+                    </button>
                   </div>
                 </div>
-                <button
-                  onClick={() => setWalletHint(true)}
-                  className="rounded-full border border-primary/30 bg-primary/8 px-4 py-2 text-xs font-extrabold text-[#0C831F] transition-colors hover:bg-primary hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 cursor-pointer"
-                >
-                  Add money
-                </button>
-              </div>
-              <AnimatePresence>
-                {walletHint && (
-                  <motion.p
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="mt-3 overflow-hidden pl-[3.375rem] text-[11px] font-medium text-text-secondary"
-                  >
-                    Adding money to your wallet is available in the FreshCart mobile app.
-                  </motion.p>
-                )}
-              </AnimatePresence>
-            </section>
+              </motion.form>
+            )}
+          </AnimatePresence>
 
-            {/* Menu — plain rows, one hairline per sub-page */}
-            <nav className="border-t border-divider">
-              {menuItems.map((item) => (
+          {/* Quick tiles */}
+          <div className="grid grid-cols-3 gap-3">
+            {quickTiles.map((tile) => (
+              <button
+                key={tile.title}
+                onClick={tile.onClick}
+                className="flex flex-col items-center justify-center gap-2 rounded-2xl bg-white px-2 py-4 transition-transform active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 cursor-pointer"
+              >
+                <span className="w-11 h-11 rounded-full bg-primary/10 text-[#2E7D32] flex items-center justify-center">
+                  <tile.icon size={22} strokeWidth={2} />
+                </span>
+                <span className="text-[13px] font-bold text-text-primary leading-tight truncate max-w-full tabular-nums">
+                  {tile.title}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {sections.map((section) => (
+            <section key={section.title} className="mt-4 rounded-2xl bg-white overflow-hidden">
+              <h2 className="px-4 pt-4 pb-2 text-base font-extrabold font-display tracking-tight">{section.title}</h2>
+              {section.items.map((item) => (
                 <MenuRow key={item.title} item={item} />
               ))}
-            </nav>
+            </section>
+          ))}
 
-            {/* Sign out */}
-            <div className="border-t border-divider pt-4">
+          {isSignedIn && (
+            <section className="mt-4 rounded-2xl bg-white overflow-hidden">
               <button
                 onClick={() => (confirmSignOut ? handleLogout() : setConfirmSignOut(true))}
-                className="w-full flex items-center justify-center gap-2 rounded-xl border border-error/25 py-3 text-sm font-extrabold text-error transition-colors hover:bg-error/8 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/25 cursor-pointer"
+                className="w-full flex items-center gap-3.5 px-4 py-4 text-left text-sm font-bold text-error transition-colors hover:bg-error/5 focus-visible:outline-none focus-visible:bg-error/5 cursor-pointer"
               >
-                <LogOut size={17} />
-                {confirmSignOut ? 'Tap again to sign out' : 'Sign out'}
-              </button>
-            </div>
-
-            <p className="pt-4 text-center text-[11px] font-medium text-text-tertiary">FreshCart · v1.0</p>
-          </motion.div>
-        ) : (
-          <motion.div {...rise}>
-            {/* Login / sign up */}
-            <section className="border-t border-divider py-6">
-              <span className="inline-flex w-11 h-11 items-center justify-center rounded-full bg-primary/10 text-[#0C831F]">
-                <Leaf size={22} fill="currentColor" />
-              </span>
-              <h2 className="mt-3 text-xl font-extrabold font-display leading-tight tracking-tight">
-                Log in or sign up
-              </h2>
-              <p className="mt-1.5 text-sm font-medium text-text-secondary">
-                Save your addresses, track every order, and check out in seconds.
-              </p>
-              <button
-                onClick={() => setIsAuthModalOpen(true)}
-                className="mt-4 w-full rounded-full bg-primary py-3.5 text-sm font-extrabold text-white transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 cursor-pointer"
-              >
-                Log in or sign up
+                <LogOut size={19} />
+                {confirmSignOut ? 'Tap again to log out' : 'Log out'}
               </button>
             </section>
+          )}
 
-            <nav className="border-t border-divider">
-              {menuItems.map((item) => (
-                <MenuRow key={item.title} item={item} />
-              ))}
-            </nav>
+          <p className="pt-5 text-center text-[11px] font-medium text-text-tertiary">FreshCart · v1.0</p>
+        </motion.div>
+      </div>
 
-            <p className="pt-4 text-center text-[11px] font-medium text-text-tertiary">FreshCart · v1.0</p>
+      <AnimatePresence>
+        {notice && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 12 }}
+            role="status"
+            className="fixed left-1/2 -translate-x-1/2 bottom-40 z-50 flex items-center gap-2 rounded-full bg-[#1C1C1E] px-4 py-2.5 text-xs font-bold text-white shadow-lg max-w-[calc(100%-2rem)]"
+          >
+            <CheckCircle2 size={15} className="shrink-0 text-primary" />
+            <span>{notice}</span>
           </motion.div>
         )}
-      </div>
+      </AnimatePresence>
 
       <CustomerAuthModal
         isOpen={isAuthModalOpen}
@@ -370,15 +386,11 @@ export const CustomerProfile: React.FC = () => {
 const MenuRow: React.FC<{ item: MenuItem }> = ({ item }) => (
   <button
     onClick={item.onClick}
-    className="group w-full flex items-center gap-3.5 py-4 text-left bg-transparent border-0 border-b border-divider last:border-b-0 transition-colors active:bg-background hover:bg-background focus-visible:outline-none focus-visible:bg-background cursor-pointer"
+    className="group w-full flex items-center gap-3.5 px-4 py-3.5 text-left bg-transparent border-0 border-t border-divider transition-colors hover:bg-background active:bg-background focus-visible:outline-none focus-visible:bg-background cursor-pointer"
   >
-    <span className="w-9 h-9 rounded-xl bg-primary/10 text-[#0C831F] flex items-center justify-center shrink-0">
-      <item.icon size={18} strokeWidth={2.25} />
-    </span>
-    <span className="flex-1 min-w-0">
-      <span className="block text-sm font-bold text-text-primary leading-tight">{item.title}</span>
-      <span className="block text-[11px] font-medium text-text-secondary mt-0.5 truncate">{item.subtitle}</span>
-    </span>
-    <ChevronRight size={17} className="text-text-tertiary shrink-0 transition-transform group-hover:translate-x-0.5" />
+    <item.icon size={20} strokeWidth={1.9} className="text-text-primary shrink-0" />
+    <span className="flex-1 min-w-0 text-[15px] font-semibold text-text-primary truncate">{item.title}</span>
+    {item.trailing && <span className="text-sm font-bold text-[#2E7D32] tabular-nums">{item.trailing}</span>}
+    <ChevronRight size={18} className="text-text-tertiary shrink-0 transition-transform group-hover:translate-x-0.5" />
   </button>
 );

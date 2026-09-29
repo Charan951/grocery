@@ -480,6 +480,23 @@ class ApiService {
     }
   }
 
+  /// `POST /api/payment/reconcile` → `{ paid: bool, paymentId }`. Asks Razorpay
+  /// whether [razorpayOrderId] was actually paid, for when the sheet reports an
+  /// error after the money went through ("order is already paid").
+  Future<Map<String, dynamic>> reconcilePayment({
+    required String razorpayOrderId,
+    String? orderId,
+  }) async {
+    try {
+      final body = <String, dynamic>{'razorpay_order_id': razorpayOrderId};
+      if (orderId != null) body['orderId'] = orderId;
+      final res = await _dio.post('/payment/reconcile', data: body);
+      return Map<String, dynamic>.from(res.data as Map);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
   /// `POST /api/customers/me/wallet/debit` → `{ walletBalance }`. Throws on
   /// insufficient balance (400).
   Future<double> walletDebit({required double amount, String? orderId}) async {
@@ -665,6 +682,7 @@ class ApiService {
     String? comment,
     List<String> photos = const [],
     String? refundMethod,
+    String? refundAccountId,
   }) async {
     try {
       final res = await _dio.post(
@@ -676,6 +694,7 @@ class ApiService {
           if (comment != null && comment.trim().isNotEmpty) 'comment': comment.trim(),
           'photos': photos,
           'refundMethod': ?refundMethod,
+          'refundAccountId': ?refundAccountId,
         },
         // Photos make this body large — give the upload room.
         options: Options(sendTimeout: const Duration(seconds: 60), receiveTimeout: const Duration(seconds: 60)),
@@ -690,6 +709,49 @@ class ApiService {
   Future<void> cancelReturn(String returnId) async {
     try {
       await _dio.post('/returns/${Uri.encodeComponent(returnId)}/cancel');
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  // ---- Refund accounts (bank / UPI) — numbers come back masked ----
+
+  /// `GET /api/customers/me/refund-accounts` → saved refund destinations.
+  Future<List<Map<String, dynamic>>> fetchRefundAccounts() async {
+    try {
+      final res = await _dio.get('/customers/me/refund-accounts');
+      return ((res.data as Map)['accounts'] as List? ?? const [])
+          .whereType<Map>()
+          .map((m) => Map<String, dynamic>.from(m))
+          .toList();
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  /// `POST /api/customers/me/refund-accounts` → the new (masked) account.
+  /// Bank: `{ type: 'bank', ifsc, accountNumber, confirmAccountNumber, holderName }`.
+  /// UPI: `{ type: 'upi', upiId }`.
+  Future<Map<String, dynamic>> addRefundAccount(Map<String, dynamic> body) async {
+    try {
+      final res = await _dio.post('/customers/me/refund-accounts', data: body);
+      return Map<String, dynamic>.from((res.data as Map)['account'] as Map);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  Future<void> setDefaultRefundAccount(String id) async {
+    try {
+      await _dio.post('/customers/me/refund-accounts/${Uri.encodeComponent(id)}/default');
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  Future<void> deleteRefundAccount(String id) async {
+    try {
+      await _dio.delete('/customers/me/refund-accounts/${Uri.encodeComponent(id)}');
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
     }

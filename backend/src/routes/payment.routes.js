@@ -20,6 +20,7 @@ const router = express.Router();
 // ==========================================
 router.post('/payment/create-order', attachCustomerOptional, paymentController.createRazorpayOrder);
 router.post('/payment/verify', attachCustomerOptional, paymentController.verifyPayment);
+router.post('/payment/reconcile', attachCustomerOptional, paymentController.reconcile);
 router.post('/payment/webhook', paymentController.webhook); // raw-body parsed in app.js
 
 

@@ -412,7 +412,21 @@ export const CustomerOrders: React.FC = () => {
             setSwitchPaymentError(e?.message || 'Could not verify your payment.');
           }
         },
-        modal: { ondismiss: () => setSwitchingPayment(false) },
+        modal: {
+          // The sheet may have errored after Razorpay took the money
+          // ("order is already paid") — ask the backend before giving up.
+          ondismiss: async () => {
+            try {
+              const r = await fetch(apiUrl('/payment/reconcile'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ razorpay_order_id: rzpOrderId, orderId: id, paymentMethod: 'Razorpay UPI/Card' }),
+              }).then((res) => res.json());
+              if (r?.paid) return onVerified();
+            } catch { /* fall through */ }
+            setSwitchingPayment(false);
+          },
+        },
       });
       rzp.open();
     } catch (e: any) {

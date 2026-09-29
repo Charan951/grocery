@@ -7,7 +7,7 @@ import crypto from 'crypto';
 import mongoose from 'mongoose';
 import { ReturnRequest } from '../models/ReturnRequest.js';
 import { Order } from '../models/Order.js';
-import { Customer } from '../models/Customer.js';
+import { Customer, maskRefundAccount } from '../models/Customer.js';
 import { User } from '../models/User.js';
 import { DeliveryPartner } from '../models/DeliveryPartner.js';
 import { DeliveryEarning } from '../models/DeliveryEarning.js';
@@ -17,6 +17,7 @@ import { findCandidates, geoDistanceMeters } from './assignmentService.js';
 import { sendToOwner } from './pushService.js';
 import { uploadToCloudinary } from '../config/cloudinary.js';
 import { isPaymentsTestMode, razorpayInstance } from '../controllers/_shared.js';
+import { payoutService } from './payoutService.js';
 
 let _io = null;
 export const setReturnIo = (io) => { _io = io; };
@@ -75,12 +76,27 @@ const notifyCustomer = async (rr, title, body) => {
 export const broadcastReturn = (rr) => {
   const payload = {
     returnId: rr.returnId, orderId: rr.orderId, type: rr.type, status: rr.status,
-    refund: rr.refund, partnerName: rr.partnerName ? String(rr.partnerName).split(' ')[0] : null,
+    refund: publicRefund(rr.refund), partnerName: rr.partnerName ? String(rr.partnerName).split(' ')[0] : null,
     timeline: rr.timeline, at: new Date().toISOString(),
   };
   emit(rr.orderId, 'return_status_update', payload);
   emit(rr.returnId, 'return_status_update', payload);
   emit('admin_fleet', 'return_update', payload);
+};
+
+/** Human label for where a refund goes, e.g. "FreshCart wallet" or "A/c ••••1234 · HDFC0001234". */
+export const refundDestination = (refund) => {
+  if (refund?.method === 'wallet') return 'FreshCart wallet';
+  if (refund?.method === 'bank') return refund.account?.label || 'bank account';
+  return 'original payment method';
+};
+
+/** Refund with the snapshotted account number removed — safe for any client. */
+const publicRefund = (refund) => {
+  if (!refund) return refund;
+  const r = typeof refund.toObject === 'function' ? refund.toObject() : { ...refund };
+  if (r.account) { const { accountNumber, ...rest } = r.account; r.account = rest; }
+  return r;
 };
 
 const pushTimeline = (rr, status, note) => rr.timeline.push({ status, note, at: new Date() });
@@ -165,7 +181,9 @@ export const eligibilityFor = async (order) => {
     windowHours: cfg.windowHours,
     windowEndsAt,
     refundDelayHours: cfg.refundDelayHours,
-    refundMethods: isCodOrder(order) || order.paymentStatus !== 'Paid' ? ['wallet'] : ['original', 'wallet'],
+    // 'bank' pays out to a saved bank account / UPI ID — the only non-wallet
+    // option for COD orders, which have no gateway payment to reverse.
+    refundMethods: isCodOrder(order) || order.paymentStatus !== 'Paid' ? ['wallet', 'bank'] : ['original', 'wallet', 'bank'],
     items,
     requests: requests.map((r) => customerView(r)),
   };
@@ -176,7 +194,7 @@ const newOtp = () => String(crypto.randomInt(1000, 10000));
 
 /**
  * Create a return/exchange for `order` owned by `customer`.
- * body: { type, items: [{ key|productId|id, quantity }], reasonCode, comment, photos[], refundMethod }
+ * body: { type, items: [{ key|productId|id, quantity }], reasonCode, comment, photos[], refundMethod, refundAccountId }
  * Returns { rr } or { error: [status, message] }.
  */
 export const createReturn = async ({ order, customer, body }) => {
@@ -220,6 +238,18 @@ export const createReturn = async ({ order, customer, body }) => {
     refundMethod = elig.refundMethods.includes(body.refundMethod) ? body.refundMethod : elig.refundMethods[0];
   }
 
+  let refundAccount;
+  if (type === 'return' && refundMethod === 'bank') {
+    const owner = await Customer.findOne({ customerId: customer.customerId }).select('+refundAccounts').lean();
+    const saved = owner?.refundAccounts || [];
+    const acct = body.refundAccountId ? saved.find((a) => a.id === body.refundAccountId) : (saved.find((a) => a.isDefault) || saved[0]);
+    if (!acct) return { error: [400, 'Add a bank account or UPI ID to get your refund there'] };
+    refundAccount = {
+      id: acct.id, type: acct.type, holderName: acct.holderName, accountNumber: acct.accountNumber,
+      ifsc: acct.ifsc, upiId: acct.upiId, label: maskRefundAccount(acct).label,
+    };
+  }
+
   const s = await getSettings();
   const store = order.pickup?.lat != null ? order.pickup : s.storeOrigin || null;
   const rr = await ReturnRequest.create({
@@ -238,7 +268,7 @@ export const createReturn = async ({ order, customer, body }) => {
     pickupLocation: order.deliveryLocation?.lat != null ? order.deliveryLocation : (store ? { lat: store.lat, lng: store.lng } : undefined),
     store: store ? { name: store.name, lat: store.lat, lng: store.lng } : undefined,
     pickupOtp: newOtp(),
-    refund: { amount: refundAmount, method: refundMethod, status: 'none' },
+    refund: { amount: refundAmount, method: refundMethod, status: 'none', ...(refundAccount ? { account: refundAccount } : {}) },
     timeline: [{
       status: 'Requested',
       note: `${type === 'return' ? 'Return' : 'Exchange'} requested: ${reason.label}${comment ? ` — ${comment}` : ''}`,
@@ -577,7 +607,7 @@ export const partnerCollect = async (rr, { otp, photos, itemsVerified, note }) =
     rr.refund.status = 'scheduled';
     rr.refund.dueAt = new Date(now.getTime() + refundDelayHours * 3600000);
     pushTimeline(rr, 'Picked Up', `Item(s) collected. Refund of ₹${rr.refund.amount} scheduled within ${refundDelayHours} hours.`);
-    customerMsg = `We collected ${rr.returnId}. ₹${rr.refund.amount} will be refunded to your ${rr.refund.method === 'wallet' ? 'FreshCart wallet' : 'original payment method'} within ${refundDelayHours} hours.`;
+    customerMsg = `We collected ${rr.returnId}. ₹${rr.refund.amount} will be refunded to your ${refundDestination(rr.refund)} within ${refundDelayHours} hours.`;
   } else if (rr.type === 'exchange') {
     pushTimeline(rr, 'Picked Up', 'Item(s) collected and replacement handed over.');
     customerMsg = `Exchange ${rr.returnId} done — your replacement has been handed over.`;
@@ -658,6 +688,16 @@ const payRefund = async (rr) => {
     // TEST/MOCK: no live gateway configured — simulate the provider refund.
     return { reference: `MOCK_REFUND_${rr.returnId}_${Date.now()}` };
   }
+  if (rr.refund.method === 'bank') {
+    const full = await ReturnRequest.findOne({ returnId: rr.returnId }).select('+refund.account.accountNumber').lean();
+    const acct = full?.refund?.account;
+    if (!acct?.type) throw new Error('No refund account on this return');
+    // TEST/MOCK: payoutService simulates the bank/UPI transfer until a real
+    // payout provider (RazorpayX/Cashfree) is wired in.
+    const out = await payoutService.process({ settlementId: rr.returnId, amount, account: acct });
+    if (!out.success) throw new Error(out.failureReason || 'Bank transfer failed');
+    return { reference: out.reference };
+  }
   const cust = await Customer.findOne({ customerId: rr.customerId });
   if (!cust) throw new Error('Customer account not found for wallet refund');
   cust.walletBalance = (cust.walletBalance || 0) + amount;
@@ -684,10 +724,10 @@ export const processRefund = async (returnId, { force = false } = {}) => {
     rr.refund.processedAt = new Date();
     rr.refund.reference = reference;
     rr.refund.failureReason = undefined;
-    pushTimeline(rr, rr.status, `Refund of ₹${rr.refund.amount} transferred to ${rr.refund.method === 'wallet' ? 'FreshCart wallet' : 'original payment method'}`);
+    pushTimeline(rr, rr.status, `Refund of ₹${rr.refund.amount} transferred to ${refundDestination(rr.refund)}`);
     await rr.save();
     broadcastReturn(rr);
-    notifyCustomer(rr, 'Refund processed', `₹${rr.refund.amount} for ${rr.returnId} has been refunded to your ${rr.refund.method === 'wallet' ? 'FreshCart wallet' : 'original payment method'}.`);
+    notifyCustomer(rr, 'Refund processed', `₹${rr.refund.amount} for ${rr.returnId} has been refunded to your ${refundDestination(rr.refund)}.`);
     return { ok: true, rr };
   } catch (err) {
     rr.refund.status = 'failed';
@@ -730,7 +770,7 @@ export const customerView = (doc) => {
     proofPhotos: r.proofPhotos || [],
     rejectionReason: r.rejectionReason,
     failureReason: r.failureReason,
-    refund: r.type === 'return' ? r.refund : undefined,
+    refund: r.type === 'return' ? publicRefund(r.refund) : undefined,
     timeline: r.timeline || [],
     createdAt: r.createdAt,
     pickedUpAt: r.pickedUpAt,

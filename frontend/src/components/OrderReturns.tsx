@@ -3,11 +3,13 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { io } from 'socket.io-client';
 import {
   RotateCcw, Repeat2, Camera, X, Minus, Plus, ChevronRight, ChevronLeft, Wallet, CreditCard,
-  Lock, CheckCircle2, Clock, AlertCircle, Truck, Loader2,
+  Lock, CheckCircle2, Clock, AlertCircle, Truck, Loader2, Landmark,
 } from 'lucide-react';
+import { RefundAccountForm } from './RefundAccountForm';
 import { SOCKET_URL } from '../config/api';
 import {
-  returnsApi, compressImage, returnStatusCopy,
+  returnsApi, compressImage, returnStatusCopy, refundAccountsApi, refundDestinationLabel,
+  type RefundAccount, type RefundMethod,
   type OrderReturns as OrderReturnsData, type ReturnConfig, type ReturnRequest, type ReturnType,
 } from '../utils/returnsApi';
 
@@ -162,10 +164,10 @@ const ReturnCard: React.FC<{ r: ReturnRequest; onCancel: (id: string) => void; c
 
       {!isExchange && r.refund && r.refund.amount > 0 && (
         <div className="rounded-xl bg-gray-50 border border-gray-100 p-3 flex items-start gap-2.5">
-          {r.refund.method === 'wallet' ? <Wallet size={15} className="text-gray-500 mt-0.5 shrink-0" /> : <CreditCard size={15} className="text-gray-500 mt-0.5 shrink-0" />}
+          {r.refund.method === 'wallet' ? <Wallet size={15} className="text-gray-500 mt-0.5 shrink-0" /> : r.refund.method === 'bank' ? <Landmark size={15} className="text-gray-500 mt-0.5 shrink-0" /> : <CreditCard size={15} className="text-gray-500 mt-0.5 shrink-0" />}
           <div className="text-xs min-w-0">
             <p className="font-extrabold text-gray-900">
-              {inr(r.refund.amount)} refund to {r.refund.method === 'wallet' ? 'FreshCart wallet' : 'original payment method'}
+              {inr(r.refund.amount)} refund to {refundDestinationLabel(r.refund)}
             </p>
             <p className="text-gray-500 font-medium mt-0.5">
               {r.refund.status === 'processed' ? `Transferred on ${fmt(r.refund.processedAt)}`
@@ -238,12 +240,24 @@ const ReturnSheet: React.FC<{
   const [reasonCode, setReasonCode] = useState('');
   const [comment, setComment] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
-  const [refundMethod, setRefundMethod] = useState<'wallet' | 'original'>(data.refundMethods[0]);
+  const [refundMethod, setRefundMethod] = useState<RefundMethod>(data.refundMethods[0]);
+  const [accounts, setAccounts] = useState<RefundAccount[] | null>(null);
+  const [accountId, setAccountId] = useState('');
+  const [addingAccount, setAddingAccount] = useState<'bank' | 'upi' | null>(null);
+  const hasToken = Boolean(localStorage.getItem('customer_token'));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { returnsApi.config().then(setConfig).catch(() => setError('Could not load return options')); }, []);
+  // Saved bank / UPI accounts, fetched the first time 'bank' is picked.
+  useEffect(() => {
+    if (refundMethod !== 'bank' || accounts || !hasToken) return;
+    refundAccountsApi.list().then((list) => {
+      setAccounts(list);
+      setAccountId((list.find((a) => a.isDefault) || list[0])?.id || '');
+    }).catch(() => setAccounts([]));
+  }, [refundMethod, accounts, hasToken]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -257,6 +271,7 @@ const ReturnSheet: React.FC<{
   const reason = reasons.find((r) => r.code === reasonCode);
   const maxPhotos = config?.maxPhotos || 4;
   const commentMissing = !!reason?.requiresComment && comment.trim().length < 5;
+  const needsAccount = type === 'return' && refundMethod === 'bank' && !accountId;
 
   const setItemQty = (key: string, n: number, max: number) =>
     setQty((q) => ({ ...q, [key]: Math.max(0, Math.min(max, n)) }));
@@ -283,6 +298,7 @@ const ReturnSheet: React.FC<{
         comment: comment.trim() || undefined,
         photos,
         refundMethod: type === 'return' ? refundMethod : undefined,
+        refundAccountId: type === 'return' && refundMethod === 'bank' ? accountId : undefined,
       });
       onCreated();
     } catch (e: any) {
@@ -470,11 +486,40 @@ const ReturnSheet: React.FC<{
                     {data.refundMethods.map((m) => (
                       <label key={m} className={`flex items-center gap-3 rounded-xl border px-3.5 py-3 cursor-pointer ${refundMethod === m ? 'border-[#00A86B] bg-emerald-50/60' : 'border-gray-200'}`}>
                         <input type="radio" name="refund-method" checked={refundMethod === m} onChange={() => setRefundMethod(m)} className="accent-[#00A86B] w-4 h-4" />
-                        {m === 'wallet' ? <Wallet size={16} className="text-gray-500" /> : <CreditCard size={16} className="text-gray-500" />}
-                        <span className="text-sm font-bold text-gray-800">{m === 'wallet' ? 'FreshCart wallet' : 'Original payment method'}</span>
+                        {m === 'wallet' ? <Wallet size={16} className="text-gray-500" /> : m === 'bank' ? <Landmark size={16} className="text-gray-500" /> : <CreditCard size={16} className="text-gray-500" />}
+                        <span className="text-sm font-bold text-gray-800">{m === 'wallet' ? 'FreshCart wallet' : m === 'bank' ? 'Bank account / UPI' : 'Original payment method'}</span>
                       </label>
                     ))}
                   </div>
+                  {refundMethod === 'bank' && (
+                    <div className="mt-2 rounded-xl border border-gray-200 p-3">
+                      {!hasToken ? (
+                        <p className="text-xs font-bold text-gray-600">Sign in again to get refunds in your bank account.</p>
+                      ) : addingAccount ? (
+                        <RefundAccountForm
+                          kind={addingAccount}
+                          onCancel={() => setAddingAccount(null)}
+                          onSaved={(acct, all) => { setAccounts(all); setAccountId(acct.id); setAddingAccount(null); }}
+                        />
+                      ) : accounts === null ? (
+                        <p className="flex items-center gap-2 text-xs font-bold text-gray-500"><Loader2 size={14} className="animate-spin" /> Loading saved accounts…</p>
+                      ) : (
+                        <div className="flex flex-col gap-2">
+                          {accounts.map((a) => (
+                            <label key={a.id} className="flex items-center gap-3 cursor-pointer">
+                              <input type="radio" name="refund-account" checked={accountId === a.id} onChange={() => setAccountId(a.id)} className="accent-[#00A86B] w-4 h-4" />
+                              <span className="text-sm font-semibold text-gray-800 truncate">{a.label}</span>
+                            </label>
+                          ))}
+                          {!accounts.length && <p className="text-xs font-bold text-gray-600">Add the account you want the refund sent to.</p>}
+                          <div className="flex gap-4 pt-1">
+                            <button type="button" onClick={() => setAddingAccount('bank')} className="text-xs font-black text-[#00A86B] hover:underline cursor-pointer">+ Add bank account</button>
+                            <button type="button" onClick={() => setAddingAccount('upi')} className="text-xs font-black text-[#00A86B] hover:underline cursor-pointer">+ Add UPI ID</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </fieldset>
               )}
 
@@ -506,7 +551,7 @@ const ReturnSheet: React.FC<{
           ) : (
             <button
               type="button"
-              disabled={!reasonCode || commentMissing || busy}
+              disabled={!reasonCode || commentMissing || needsAccount || busy}
               onClick={submit}
               className="w-full bg-[#00A86B] hover:bg-[#00915c] disabled:bg-gray-300 text-white py-3.5 rounded-xl font-black text-sm flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
             >

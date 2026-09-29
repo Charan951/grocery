@@ -22,6 +22,7 @@ import { Legal } from './pages/Legal';
 import { CustomerOrders } from './pages/CustomerOrders';
 const TrackOrder = lazy(() => import('./pages/TrackOrder'));
 import { CustomerProfile } from './pages/CustomerProfile';
+import { RefundAccounts } from './pages/RefundAccounts';
 import { CustomerSupport } from './pages/CustomerSupport';
 import { CustomerAddresses } from './pages/CustomerAddresses';
 import { Search } from './pages/Search';
@@ -77,6 +78,13 @@ const AppContent: React.FC = () => {
   // (a subcategory, or "All" within a category) rather than the category
   // landing page — the app bar / category nav hide for that view.
   const [productsListView, setProductsListView] = useState(false);
+
+  // Pages without a header (e.g. Account) open the wishlist drawer via this event.
+  useEffect(() => {
+    const open = () => setWishlistOpen(true);
+    window.addEventListener('open_wishlist', open);
+    return () => window.removeEventListener('open_wishlist', open);
+  }, []);
 
   // Admin Session State
   const [adminUser, setAdminUser] = useState<any>(() => {
@@ -227,6 +235,7 @@ const AppContent: React.FC = () => {
           <Route path="/track/:orderId" element={<Suspense fallback={<div className="min-h-screen flex items-center justify-center text-gray-400 text-sm font-semibold">Loading tracker…</div>}><TrackOrder /></Suspense>} />
           <Route path="/profile" element={<CustomerProfile />} />
           <Route path="/account/profile" element={<CustomerProfile />} />
+          <Route path="/account/profile/bank-details" element={<RefundAccounts />} />
           <Route path="/s/terms-of-service" element={<Legal defaultTab="terms" />} />
           <Route path="/s/privacy-policy" element={<Legal defaultTab="privacy" />} />
           <Route path="/terms-of-service" element={<Legal defaultTab="terms" />} />

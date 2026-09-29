@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { io } from 'socket.io-client';
 import {
-  ArrowLeft, RotateCcw, Repeat2, UserPlus, RefreshCw, XCircle, CheckCircle2, Wallet, CreditCard,
+  ArrowLeft, RotateCcw, Repeat2, UserPlus, RefreshCw, XCircle, CheckCircle2, Wallet, CreditCard, Landmark,
   AlertCircle, Search, Image as ImageIcon, X,
 } from 'lucide-react';
 import { PageHeader } from '../../components/admin/PageHeader';
@@ -11,7 +11,7 @@ import { API_URL, SOCKET_URL } from '../../config/api';
 
 type Tone = 'green' | 'amber' | 'red' | 'blue' | 'neutral';
 
-interface Refund { amount: number; method: 'wallet' | 'original'; status: string; dueAt?: string; processedAt?: string; reference?: string; failureReason?: string }
+interface Refund { amount: number; method: 'wallet' | 'original' | 'bank'; account?: { label?: string; holderName?: string }; status: string; dueAt?: string; processedAt?: string; reference?: string; failureReason?: string }
 interface ReturnRow {
   returnId: string; orderId: string; type: 'return' | 'exchange'; status: string;
   customerName?: string; customerPhone?: string;
@@ -428,8 +428,10 @@ const ReturnDetail: React.FC<{ returnId: string; onBack: () => void }> = ({ retu
                 <ShelfTag tone={refundTone(rr.refund.status)}>{rr.refund.status === 'none' ? 'after pickup' : rr.refund.status}</ShelfTag>
               </div>
               <p className="flex items-center gap-1.5 text-admin-text-muted">
-                {rr.refund.method === 'wallet' ? <Wallet size={13} /> : <CreditCard size={13} />}
-                {rr.refund.method === 'wallet' ? 'FreshCart wallet' : 'Original payment method'}
+                {rr.refund.method === 'wallet' ? <Wallet size={13} /> : rr.refund.method === 'bank' ? <Landmark size={13} /> : <CreditCard size={13} />}
+                {rr.refund.method === 'wallet' ? 'FreshCart wallet'
+                  : rr.refund.method === 'bank' ? `${rr.refund.account?.label || 'Bank account'}${rr.refund.account?.holderName ? ` · ${rr.refund.account.holderName}` : ''}`
+                  : 'Original payment method'}
               </p>
               {rr.refund.dueAt && rr.refund.status !== 'processed' && <p className="text-admin-text-muted">Auto-transfer at {fmt(rr.refund.dueAt)}</p>}
               {rr.refund.processedAt && <p className="text-admin-text-muted">Transferred {fmt(rr.refund.processedAt)}</p>}

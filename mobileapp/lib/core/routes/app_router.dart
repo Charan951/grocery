@@ -19,6 +19,7 @@ import 'package:freshcart/features/checkout/presentation/screens/checkout_screen
 import 'package:freshcart/features/tracking/presentation/screens/tracking_screen.dart';
 import 'package:freshcart/features/profile/presentation/screens/profile_screen.dart';
 import 'package:freshcart/features/profile/presentation/screens/wallet_screen.dart';
+import 'package:freshcart/features/profile/presentation/screens/refund_accounts_screen.dart';
 import 'package:freshcart/features/profile/presentation/screens/membership_screen.dart';
 import 'package:freshcart/features/profile/presentation/screens/support_screen.dart';
 import 'package:freshcart/features/profile/presentation/screens/addresses_screen.dart';
@@ -240,6 +241,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: '/wallet',
         builder: (c, s) => const WalletScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/refund-accounts',
+        builder: (c, s) => const RefundAccountsScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: '/refund-accounts/add',
+        builder: (c, s) => AddRefundAccountScreen(type: s.uri.queryParameters['type'] ?? 'bank'),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
